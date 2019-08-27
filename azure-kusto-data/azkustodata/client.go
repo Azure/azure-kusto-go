@@ -39,11 +39,11 @@ func NewKustoClient(authContext KustoAuthContext) *KustoClient {
 	}
 }
 
-func (kc *KustoClient) Execute(database string, query string) (*KustoResult, error) {
+func (kc *KustoClient) Execute(database string, query string) (string, error) {
 	token, err := kc.tokenGetter.GetToken()
 
 	if err != nil {
-		return nil, err
+		return "", err
 	}
 
 	payload := map[string]string{
@@ -54,12 +54,13 @@ func (kc *KustoClient) Execute(database string, query string) (*KustoResult, err
 	requestId, err := uuid.NewUUID()
 
 	if err != nil {
-		return nil, err
+		return "", err
 	}
 
 	client := &http.Client{}
 
 	jsonBody, err := json.Marshal(payload)
+	if query.start
 	req, err := http.NewRequest("POST", kc.queryEndpoint, bytes.NewBuffer(jsonBody))
 
 	for k, v := range kc.defaultHeaders {
@@ -73,7 +74,7 @@ func (kc *KustoClient) Execute(database string, query string) (*KustoResult, err
 	resp, err := client.Do(req)
 
 	if err != nil {
-		return nil, err
+		return "", err
 	}
 
 	defer resp.Body.Close()
@@ -81,12 +82,8 @@ func (kc *KustoClient) Execute(database string, query string) (*KustoResult, err
 	result, err := ioutil.ReadAll(resp.Body)
 
 	if err != nil {
-		return nil, err
+		return "", err
 	}
 
-	fmt.Print(string(result))
-
-	return &KustoResult{
-
-	}, nil
+	return string(result), nil
 }
