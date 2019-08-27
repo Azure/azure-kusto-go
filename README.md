@@ -1,4 +1,31 @@
 
+# Usage
+
+```go
+cluster := "https://mycluster.region.kusto.windows.net"
+appId := ""
+appKey := ""
+tenantId := ""
+kustoContext, err := azkustodata.AuthenticateWithAadApp(cluster, appId, appKey, tenantId)
+
+if (err != nil) {
+    panic(err)
+}
+
+client := azkustodata.NewKustoClient(*kustoContext)
+
+db := "SampleDB"
+query := "SampleTable | take 10"
+
+response, err := client.Execute(db, query)
+
+if (err != nil) {
+    panic(err)
+}
+
+print(response)
+```
+
 # Contributing
 
 This project welcomes contributions and suggestions.  Most contributions require you to agree to a
