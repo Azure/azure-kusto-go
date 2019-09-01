@@ -1,15 +1,18 @@
 package azkustoingest
 
-import "azure-kusto-go/azure-kusto-data/azkustodata"
+import (
+	"azure-kusto-go/azure-kusto-data/azkustodata"
+	"fmt"
+)
 
 type IngestionResources struct {
 	securedReadyForAggregationQueues []string
-	containers []string
+	containers                       []string
 }
 
 type ResourceManager struct {
-	client azkustodata.KustoClient
-	resource IngestionResources
+	client    azkustodata.KustoClient
+	resources IngestionResources
 }
 
 func NewResourceManager(client azkustodata.KustoClient) (*ResourceManager, error) {
@@ -34,13 +37,44 @@ func getResourceFromServer(client azkustodata.KustoClient) {
 func (rm *ResourceManager) FetchIngestionResources() (*IngestionResources, error) {
 	resourcesResponse, err := rm.client.Execute("NetDefaultDB", ".get ingestion resources")
 
+	storage := make([]string, 0)
+	securedReadyForAggregationQueues := make([]string, 0)
+
+	primary, err := resourcesResponse.GetPrimaryResults()
+
+	var resourceTypeCol int
+	var resourceUriCol int
+	for i, v := range primary[0].GetColumns() {
+		if v.ColumnName == "ResourceType" {
+			resourceTypeCol = i
+		}
+		if v.ColumnName == "ResourceUri" {
+			resourceUriCol = i
+		}
+
+	}
+
+	for _, row := range primary[0].GetRows() {
+		switch row[resourceTypeCol] {
+		case "SecuredReadyForAggregationQueue":
+			{
+				securedReadyForAggregationQueues = append(securedReadyForAggregationQueues, fmt.Sprint(row[resourceUriCol]))
+			}
+		case "TempStorage":
+			{
+				storage = append(storage, fmt.Sprint(row[resourceUriCol]))
+			}
+		}
+	}
+
 	if err != nil {
 		return nil, err
 	}
 
-
-
-	return nil, nil;
+	//return &{
+	//	securedReadyForAggregationQueues: securedReadyForAggregationQueues,
+	//	containers: storage
+	//}, nil;
 }
 
 func (rm *ResourceManager) GetIngestionQueues() ([]string, error) {
@@ -52,13 +86,10 @@ func (rm *ResourceManager) GetStorageAccount() (string, error) {
 }
 
 
-def _get_ingest_client_resources_from_service(self):
-table = self._kusto_client.execute("NetDefaultDB", ".get ingestion resources").primary_results[0]
-
-secured_ready_for_aggregation_queues = self._get_resource_by_name(table, "SecuredReadyForAggregationQueue")
+secured_ready_for_aggregation_queues = self._get_resource_by_name(table, )
 failed_ingestions_queues = self._get_resource_by_name(table, "FailedIngestionsQueue")
 successful_ingestions_queues = self._get_resource_by_name(table, "SuccessfulIngestionsQueue")
-containers = self._get_resource_by_name(table, "TempStorage")
+containers = self._get_resource_by_name(table, "")
 status_tables = self._get_resource_by_name(table, "IngestionsStatusTable")
 
 return _IngestClientResources(

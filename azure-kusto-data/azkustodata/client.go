@@ -7,6 +7,7 @@ import (
 	"github.com/google/uuid"
 	"io/ioutil"
 	"net/http"
+	"strings"
 )
 
 type KustoClient struct {
@@ -17,11 +18,8 @@ type KustoClient struct {
 	defaultHeaders     map[string]string
 }
 
-type KustoResult struct {
-}
-
 type Executor interface {
-	Execute(database string, query string) KustoResult
+	Execute(database string, query string) KustoResults
 }
 
 func NewKustoClient(authContext KustoAuthContext) *KustoClient {
@@ -39,11 +37,11 @@ func NewKustoClient(authContext KustoAuthContext) *KustoClient {
 	}
 }
 
-func (kc *KustoClient) Execute(database string, query string) (string, error) {
+func (kc *KustoClient) Execute(database string, query string) (KustoResults, error) {
 	token, err := kc.tokenGetter.GetToken()
 
 	if err != nil {
-		return "", err
+		return nil, err
 	}
 
 	payload := map[string]string{
@@ -54,14 +52,20 @@ func (kc *KustoClient) Execute(database string, query string) (string, error) {
 	requestId, err := uuid.NewUUID()
 
 	if err != nil {
-		return "", err
+		return nil, err
 	}
 
 	client := &http.Client{}
 
 	jsonBody, err := json.Marshal(payload)
-	if query.start
-	req, err := http.NewRequest("POST", kc.queryEndpoint, bytes.NewBuffer(jsonBody))
+	q := strings.TrimSpace(query)
+	endpoint := kc.queryEndpoint
+
+	if q[:1] == "." {
+		endpoint = kc.managementEndpoint
+	}
+
+	req, err := http.NewRequest("POST", endpoint, bytes.NewBuffer(jsonBody))
 
 	for k, v := range kc.defaultHeaders {
 		req.Header.Set(k, v)
@@ -74,7 +78,7 @@ func (kc *KustoClient) Execute(database string, query string) (string, error) {
 	resp, err := client.Do(req)
 
 	if err != nil {
-		return "", err
+		return nil, err
 	}
 
 	defer resp.Body.Close()
@@ -82,8 +86,23 @@ func (kc *KustoClient) Execute(database string, query string) (string, error) {
 	result, err := ioutil.ReadAll(resp.Body)
 
 	if err != nil {
-		return "", err
+		return nil, err
 	}
 
-	return string(result), nil
+	print(string(result))
+
+	switch {
+	case strings.Contains(endpoint, "v1"):
+		v1result := KustoResponseDataSetV1{}
+		err = json.Unmarshal(result, &v1result.Tables)
+
+		return v1result, err
+	case strings.Contains(endpoint, "v2"):
+		v2result := KustoResponseDataSetV2{}
+		err = json.Unmarshal(result, &v2result.Tables)
+
+		return v2result, err
+	}
+
+	return nil, nil
 }

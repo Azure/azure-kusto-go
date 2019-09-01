@@ -31,16 +31,6 @@ type IngestionBlobInfo struct {
 	auth  string
 }
 
-func (ibi *IngestionBlobInfo) MarshalJSON() ([]byte, error) {
-	return json.Marshal(&struct {
-		LastSeen int64 `json:"lastSeen"`
-		*MyUser
-	}{
-		LastSeen: ibi.Unix(),
-		MyUser:   ibi,
-	})
-}
-
 func NewIngestionBlobInfo(blob string, props map[string]string, auth string) (*IngestionBlobInfo) {
 	return &IngestionBlobInfo{
 		blob:  blob,
