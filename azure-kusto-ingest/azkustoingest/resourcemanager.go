@@ -3,16 +3,40 @@ package azkustoingest
 import (
 	"azure-kusto-go/azure-kusto-data/azkustodata"
 	"fmt"
+	"regexp"
 )
 
 type IngestionResources struct {
-	securedReadyForAggregationQueues []string
-	containers                       []string
+	securedReadyForAggregationQueues []ResourceUri
+	containers                       []ResourceUri
+}
+
+type ResourceUri struct {
+	storageAccountName string
+	objectType         string
+	objectName         string
+	sas                string
+}
+
+func (ru ResourceUri) String() (string) {
+	return fmt.Sprintf(`https://%s.%s.core.windows.net/%s?%s`, ru.storageAccountName, ru.objectType, ru.objectName, ru.sas)
+}
+
+var storageUriRegex = regexp.MustCompile(`https://(\\w+).(queue|blob|table).core.windows.net/([\\w,-]+)\\?(.*)`)
+
+func ParseUri(uri string) (ResourceUri) {
+	res := storageUriRegex.FindAllStringSubmatch(uri, -1)
+	return ResourceUri{
+		storageAccountName: res[0][0],
+		objectType:         res[0][1],
+		objectName:         res[0][2],
+		sas:                res[0][3],
+	}
 }
 
 type ResourceManager struct {
 	client    azkustodata.KustoClient
-	resources IngestionResources
+	resources *IngestionResources
 }
 
 func NewResourceManager(client azkustodata.KustoClient) (*ResourceManager, error) {
@@ -21,119 +45,104 @@ func NewResourceManager(client azkustodata.KustoClient) (*ResourceManager, error
 	}, nil;
 }
 
+type AuthContextProvider interface {
+	GetAuthContext() (string, error)
+}
+
 type IngestionResourcesFetcher interface {
 	FetchIngestionResources() (*IngestionResources, error)
 }
 
 type IngestionResourceProvider interface {
-	GetIngestionQueues() ([]string, error)
-	GetStorageAccount() (string, error)
+	GetIngestionQueues() ([]ResourceUri, error)
+	GetStorageAccounts() ([]ResourceUri, error)
 }
 
-func getResourceFromServer(client azkustodata.KustoClient) {
-
-}
-
-func (rm *ResourceManager) FetchIngestionResources() (*IngestionResources, error) {
+func (rm *ResourceManager) FetchIngestionResources() (error) {
 	resourcesResponse, err := rm.client.Execute("NetDefaultDB", ".get ingestion resources")
 
-	storage := make([]string, 0)
-	securedReadyForAggregationQueues := make([]string, 0)
+	if err != nil {
+		return err
+	}
 
-	primary, err := resourcesResponse.GetPrimaryResults()
+	containers := make([]ResourceUri, 0)
+	securedReadyForAggregationQueues := make([]ResourceUri, 0)
+
+	primary := resourcesResponse.GetPrimaryResults()
+
+	if err != nil {
+		return err
+	}
 
 	var resourceTypeCol int
 	var resourceUriCol int
 	for i, v := range primary[0].GetColumns() {
-		if v.ColumnName == "ResourceType" {
+		if v.ColumnName == "ResourceTypeName" {
 			resourceTypeCol = i
 		}
-		if v.ColumnName == "ResourceUri" {
+		if v.ColumnName == "StorageRoot" {
 			resourceUriCol = i
 		}
 
 	}
 
 	for _, row := range primary[0].GetRows() {
-		switch row[resourceTypeCol] {
+		resourceType := row[resourceTypeCol]
+		resourceUri := ParseUri(fmt.Sprint(row[resourceUriCol]))
+
+		switch resourceType {
 		case "SecuredReadyForAggregationQueue":
 			{
-				securedReadyForAggregationQueues = append(securedReadyForAggregationQueues, fmt.Sprint(row[resourceUriCol]))
+				securedReadyForAggregationQueues = append(securedReadyForAggregationQueues, resourceUri)
 			}
 		case "TempStorage":
 			{
-				storage = append(storage, fmt.Sprint(row[resourceUriCol]))
+				containers = append(containers, resourceUri)
 			}
 		}
 	}
 
-	if err != nil {
-		return nil, err
+	rm.resources = &IngestionResources{
+		securedReadyForAggregationQueues: securedReadyForAggregationQueues,
+		containers:                       containers,
 	}
 
-	//return &{
-	//	securedReadyForAggregationQueues: securedReadyForAggregationQueues,
-	//	containers: storage
-	//}, nil;
+	return nil;
 }
 
-func (rm *ResourceManager) GetIngestionQueues() ([]string, error) {
-	return nil, nil;
+func (rm *ResourceManager) GetAuthContext() (string, error) {
+	result, err := rm.client.Execute("NetDefaultDB", ".get kusto identity token")
+
+	if err != nil {
+		return "", err
+	}
+
+	primary := result.GetPrimaryResults()
+	columns := primary[0].GetColumns()
+
+	var authContextColIndex int = -1
+	for i, col := range columns {
+		if col.ColumnName == "AuthorizationContext" {
+			authContextColIndex = i
+			break
+		}
+	}
+
+	return primary[0].GetRows()[0][authContextColIndex].(string), nil
 }
 
-func (rm *ResourceManager) GetStorageAccount() (string, error) {
-	return nil, nil;
+func (rm *ResourceManager) GetIngestionQueues() ([]ResourceUri, error) {
+	if rm.resources == nil {
+		_ = rm.FetchIngestionResources()
+	}
+
+	return rm.resources.securedReadyForAggregationQueues, nil;
 }
 
+func (rm *ResourceManager) GetStorageAccount() ([]ResourceUri, error) {
+	if rm.resources == nil {
+		_ = rm.FetchIngestionResources()
+	}
 
-secured_ready_for_aggregation_queues = self._get_resource_by_name(table, )
-failed_ingestions_queues = self._get_resource_by_name(table, "FailedIngestionsQueue")
-successful_ingestions_queues = self._get_resource_by_name(table, "SuccessfulIngestionsQueue")
-containers = self._get_resource_by_name(table, "")
-status_tables = self._get_resource_by_name(table, "IngestionsStatusTable")
-
-return _IngestClientResources(
-secured_ready_for_aggregation_queues,
-failed_ingestions_queues,
-successful_ingestions_queues,
-containers,
-status_tables,
-)
-
-def _refresh_authorization_context(self):
-if (
-not self._authorization_context
-or self._authorization_context.isspace()
-or (self._authorization_context_last_update + self._refresh_period) <= datetime.utcnow()
-):
-self._authorization_context = self._get_authorization_context_from_service()
-self._authorization_context_last_update = datetime.utcnow()
-
-def _get_authorization_context_from_service(self):
-return self._kusto_client.execute("NetDefaultDB", ".get kusto identity token").primary_results[0][0][
-"AuthorizationContext"
-]
-
-def get_ingestion_queues(self):
-self._refresh_ingest_client_resources()
-return self._ingest_client_resources.secured_ready_for_aggregation_queues
-
-def get_failed_ingestions_queues(self):
-self._refresh_ingest_client_resources()
-return self._ingest_client_resources.failed_ingestions_queues
-
-def get_successful_ingestions_queues(self):
-self._refresh_ingest_client_resources()
-return self._ingest_client_resources.successful_ingestions_queues
-
-def get_containers(self):
-self._refresh_ingest_client_resources()
-return self._ingest_client_resources.containers
-
-def get_ingestions_status_tables(self):
-self._refresh_ingest_client_resources()
-return self._ingest_client_resources.status_tables
-
-def get_authorization_context(self):
-self._refresh_authorization_context()
-return self._authorization_context
+	return rm.resources.securedReadyForAggregationQueues, nil;
+}

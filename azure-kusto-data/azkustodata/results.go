@@ -11,8 +11,8 @@ type KustoTable interface {
 }
 
 type KustoResults interface {
-	GetTables() ([]KustoTable, error)
-	GetPrimaryResults() ([]KustoTable, error)
+	GetTables() ([]KustoTable)
+	GetPrimaryResults() ([]KustoTable)
 }
 
 type KustoResponseTableV1 struct {
