@@ -70,10 +70,6 @@ func (rm *ResourceManager) FetchIngestionResources() (error) {
 
 	primary := resourcesResponse.GetPrimaryResults()
 
-	if err != nil {
-		return err
-	}
-
 	var resourceTypeCol int
 	var resourceUriCol int
 	for i, v := range primary[0].GetColumns() {
@@ -139,7 +135,7 @@ func (rm *ResourceManager) GetIngestionQueues() ([]ResourceUri, error) {
 	return rm.resources.securedReadyForAggregationQueues, nil;
 }
 
-func (rm *ResourceManager) GetStorageAccount() ([]ResourceUri, error) {
+func (rm *ResourceManager) GetStorageAccounts() ([]ResourceUri, error) {
 	if rm.resources == nil {
 		_ = rm.FetchIngestionResources()
 	}

@@ -8,7 +8,6 @@ import (
 	"github.com/Azure/azure-storage-blob-go/azblob"
 	"github.com/Azure/azure-storage-queue-go/azqueue"
 	"io/ioutil"
-	"log"
 	"math/rand"
 	"net/url"
 	"os"
@@ -16,7 +15,7 @@ import (
 
 type IngestClient struct {
 	client          azkustodata.KustoClient
-	resourceManager IngestionResourceProvider
+	resourceManager ResourceManager
 }
 
 func NewIngestClient(client azkustodata.KustoClient) (*IngestClient) {
@@ -39,7 +38,7 @@ func (ic IngestClient) IngestFromLocalStorage(path string, props map[string]stri
 	storage := storages[rand.Intn(len(storages))]
 
 	// Create a BlockBlobURL object to a blob in the container (we assume the container already exists).
-	//blob_name = "{db}__{table}__{guid}__{file}".format(
+	// blobName = fmt.Sprint("%s__%s__%s__%s", props["database"], props[]).format(
 	//	db=ingestion_properties.database,
 	//	table=ingestion_properties.table,
 	//	guid=descriptor.source_id or uuid.uuid4(),
@@ -47,9 +46,7 @@ func (ic IngestClient) IngestFromLocalStorage(path string, props map[string]stri
 	//)
 
 	u, _ := url.Parse(storage.String())
-	if err != nil {
-		log.Fatal(err)
-	}
+
 	//blockBlobURL := azblob.NewBlockBlobURL(*u, azblob.NewPipeline(credential, azblob.PipelineOptions{}))
 
 	ctx := context.Background() // This example uses a never-expiring context
@@ -105,14 +102,21 @@ func (ic IngestClient) ingestFromCloudStorage(path string, props map[string]stri
 
 	source := make(map[string]string)
 	source["path"] = path
-	ingestionBlobInfo := NewIngestionBlobInfo(source, props, "auth")
+	auth, err := ic.resourceManager.GetAuthContext()
+
+	if err != nil {
+		return err
+	}
+
+	ingestionBlobInfo := NewIngestionBlobInfo(source, props, auth)
 	ingestionBlobInfoAsJSON, err := json.Marshal(ingestionBlobInfo)
 
 	if err != nil {
 		return err;
 	}
+
 	var message []byte;
-	base64.StdEncoding.Encode(message, []byte(ingestionBlobInfoAsJSON))
+	base64.StdEncoding.Encode(message, ingestionBlobInfoAsJSON)
 	queueService.Enqueue(context.Background(), string(message), 0, 0)
 
 	return nil;
