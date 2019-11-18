@@ -4,8 +4,8 @@ import (
 	"encoding/json"
 	"fmt"
 
-	"azure-kusto-go/azure-kusto-data/azkustodata/errors"
-	"azure-kusto-go/azure-kusto-data/azkustodata/types"
+	"github.com/Azure/azure-kusto-go/azure-kusto-data/azkustodata/errors"
+	"github.com/Azure/azure-kusto-go/azure-kusto-data/azkustodata/types"
 )
 
 const (

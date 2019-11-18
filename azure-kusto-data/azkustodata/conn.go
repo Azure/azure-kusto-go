@@ -17,7 +17,7 @@ import (
 	"strings"
 	"time"
 
-	"azure-kusto-go/azure-kusto-data/azkustodata/errors"
+	"github.com/Azure/azure-kusto-go/azure-kusto-data/azkustodata/errors"
 
 	"github.com/Azure/go-autorest/autorest"
 	"github.com/google/uuid"

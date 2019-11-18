@@ -9,8 +9,8 @@ import (
 	"io"
 	"sync"
 
-	"azure-kusto-go/azure-kusto-data/azkustodata/errors"
-	"azure-kusto-go/azure-kusto-data/azkustodata/types"
+	"github.com/Azure/azure-kusto-go/azure-kusto-data/azkustodata/errors"
+	"github.com/Azure/azure-kusto-go/azure-kusto-data/azkustodata/types"
 )
 
 // pool provides a package level pool of map[string]interface{} to lower our allocations for decoding.
