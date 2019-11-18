@@ -21,7 +21,7 @@ type stateMachine interface {
 	rowIter() *RowIterator
 }
 
-// runSM runs a stateMachine to its conclustion.
+// runSM runs a stateMachine to its conclusion.
 func runSM(sm stateMachine) {
 	defer close(sm.rowIter().inRows)
 
@@ -77,6 +77,7 @@ func (d *nonProgressiveSM) process() (sf stateFn, err error) {
 		case dataTable:
 			switch table.TableKind {
 			case tkPrimaryResult:
+				// syncs the flow, waiting for columns to be decoded
 				d.columnSetOnce.Do(func() {
 					d.iter.inColumns <- table.Columns
 				})

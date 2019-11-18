@@ -1,6 +1,6 @@
 // Package types holds Kusto data type representations. All types provide a Value that
 // stores the native value and Valid which indicates if the value was set or was null.
-// Note: This package is missing the Decimal an Timespan types.
+// TODO: This package is missing the Decimal an Timespan types.
 package types
 
 import (
@@ -118,6 +118,17 @@ func (d *Dynamic) Unmarshal(i interface{}) error {
 	if i == nil {
 		return nil
 	}
+
+	// TODO: temporary fix.
+	//  Because unmarshalling happens
+	if v, ok := i.(map[string]interface{}); ok {
+		b, _ := json.Marshal(v)
+		d.Value = string(b)
+		d.Valid = true
+
+		return nil
+	}
+
 	v, ok := i.(string)
 	if !ok {
 		return fmt.Errorf("Column with type 'dynamic' was not stored as a string, was %T", i)

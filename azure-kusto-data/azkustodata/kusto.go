@@ -156,8 +156,8 @@ func (c *Client) Query(ctx context.Context, db, query string, options ...QueryOp
 
 	var header dataSetHeader
 
-	ff := <-frameCh
-	switch v := ff.(type) {
+	firstFrame := <-frameCh
+	switch v := firstFrame.(type) {
 	case dataSetHeader:
 		header = v
 	case errorFrame:

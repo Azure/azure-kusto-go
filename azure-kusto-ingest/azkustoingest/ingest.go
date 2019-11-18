@@ -14,11 +14,11 @@ import (
 )
 
 type IngestClient struct {
-	client          azkustodata.KustoClient
+	client          azkustodata.Client
 	resourceManager ResourceManager
 }
 
-func NewIngestClient(client azkustodata.KustoClient) (*IngestClient) {
+func New(client azkustodata.Client) (*IngestClient) {
 	return &IngestClient{
 		client: client,
 	}

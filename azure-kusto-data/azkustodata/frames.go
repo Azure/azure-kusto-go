@@ -115,127 +115,16 @@ const (
 	tnQueryCompletionInformation = "QueryCompletionInformation" // tkQueryCompletionInformation
 )
 
-// dataTable is used report information as a Table with Columns as row headers and Rows as the contained
-// data. It implements Frame.
-type dataTable struct {
-	baseFrame
-	// TableID is a numeric representation of the this dataTable in relation to other dataTables returned
-	// in numeric order starting at 09.
-	TableID int `json:"TableId"`
-	// TableKind is a Kusto dataTable sub-type.
-	TableKind string
-	// TableName is a name for the dataTable.
-	TableName string
-	// Columns is a list of column names and their Kusto storage types.
-	Columns Columns
-	// Rows contains the the table data that was fetched.
-	Rows []types.KustoValues
 
-	op errors.Op
-}
-
-// Unmarshal unmarshals a JSON decoded map value that represents a dataTable.
-func (d *dataTable) Unmarshal(m map[string]interface{}) (err error) {
-	for _, key := range []string{kTableID, kTableKind, kTableName, kFrameType, kColumns, kRows} {
-		if _, exists := m[key]; !exists {
-			return errors.E(d.op, errors.KInternal, fmt.Errorf("dataTable.%s was not present", key))
-		}
-	}
-
-	if ft, ok := m[kFrameType].(string); !ok {
-		return errors.E(d.op, errors.KInternal, fmt.Errorf("dataTable.Unmarshal received data with no FrameType key"))
-	} else if ft != ftDataTable {
-		return errors.E(d.op, errors.KInternal, fmt.Errorf("dataTable.Unmarshal received data with FrameType == %s", ft))
-	} else {
-		d.baseFrame.FrameType = ft
-	}
-
-	jn, ok := m[kTableID].(json.Number)
-	if !ok {
-		return errors.E(d.op, errors.KInternal, fmt.Errorf("dataTable.TableId was not a json.Number"))
-	}
-	tblID, err := jn.Int64()
-	if err != nil {
-		return errors.E(d.op, errors.KInternal, fmt.Errorf("dataTable entry TableID was not an int64, was %s", m[kFrameType].(json.Number).String()))
-	}
-	d.TableID = int(tblID)
-
-	if v, ok := m[kTableKind].(string); ok {
-		d.TableKind = v
-	} else {
-		return errors.E(d.op, errors.KInternal, fmt.Errorf("dataTable.%s had non string entry, had type %T", kTableKind, m[kTableKind]))
-	}
-
-	if v, ok := m[kTableName].(string); ok {
-		d.TableName = v
-	} else {
-		return errors.E(d.op, errors.KInternal, fmt.Errorf("dataTable.%s had non string entry, had type %T", kTableName, m[kTableName]))
-	}
-
-	if _, ok := m[kColumns].([]interface{}); !ok {
-		return errors.E(d.op, errors.KInternal, fmt.Errorf("dataTable.Columns had type %T, expected []interface{}", m[kColumns]))
-	}
-
-	for _, inter := range m[kColumns].([]interface{}) {
-		m := inter.(map[string]interface{})
-		for _, name := range []string{kColumnName, kColumnType} {
-			if _, exists := m[name]; !exists {
-				return errors.E(d.op, errors.KInternal, fmt.Errorf("dataTable.Columns had entry without .%s", name))
-			}
-		}
-		cn, ok := m[kColumnName].(string)
-		if !ok {
-			return errors.E(d.op, errors.KInternal, fmt.Errorf("dataTable.Columns had entry with .ColumnName set to a %T type", m[kColumnName]))
-		}
-		ct, ok := m[kColumnType].(string)
-		if !ok {
-			return errors.E(d.op, errors.KInternal, fmt.Errorf("dataTable.Columns had entry with .ColumnType set to a %T type", m[kColumnType]))
-		}
-		col := Column{
-			ColumnName: cn,
-			ColumnType: ct,
-		}
-		d.Columns = append(d.Columns, col)
-	}
-
-	if _, ok := m[kRows].([]interface{}); !ok {
-		return errors.E(d.op, errors.KInternal, fmt.Errorf("dataTable.Rows had type %T, expected []interface{}", m[kRows]))
-	}
-
-	for x, inter := range m[kRows].([]interface{}) {
-		if _, ok := inter.([]interface{}); !ok {
-			if err := errors.OneToErr(inter.(map[string]interface{}), d.op); err != nil {
-				return err
-			}
-			return errors.E(d.op, errors.KInternal, fmt.Errorf("dataTable.Rows had entry(%d) of type %T, expected []interface{}", x, inter))
-		}
-		var newRow types.KustoValues
-		for i, inner := range inter.([]interface{}) {
-			f := conversion[d.Columns[i].ColumnType]
-			if f == nil {
-				return errors.E(d.op, errors.KInternal, fmt.Errorf("in row %d, column %s: had unsupported type %s ", x, d.Columns[i].ColumnName, d.Columns[i].ColumnType))
-			}
-			inter, err := f(inner)
-			if err != nil {
-				return errors.E(d.op, errors.KInternal, fmt.Errorf("in row %d, column %s, conversion error: %s", x, d.Columns[i].ColumnName, err))
-			}
-			newRow = append(newRow, inter)
-		}
-		d.Rows = append(d.Rows, newRow)
-	}
-	return nil
-}
-
-func (dataTable) isFrame() {}
 
 // dataSetCompletion indicates the stream id done. It implements Frame.
 type dataSetCompletion struct {
 	baseFrame
 	// HasErrors indicates that their was an error in the stream.
 	HasErrors bool
-	// Cancelled indicates that the request was cancelled.
+	// Cancelled indicates that the request was cancelledt.
 	Cancelled bool
-	// OneAPIErrors is a list of errors encountered.
+	// OneAPIErrors is a list of errors encounteredt.
 	OneAPIErrors []string `json:"OneApiErrors"`
 
 	op errors.Op
@@ -244,7 +133,7 @@ type dataSetCompletion struct {
 func (dataSetCompletion) isFrame() {}
 
 // Unmarshal unmarshals a JSON decoded map value that represents a dataSetCompletion.
-func (d *dataSetCompletion) Unmarshal(m map[string]interface{}) (err error) {
+func (dsc *dataSetCompletion) Unmarshal(m map[string]interface{}) (err error) {
 	const (
 		oneAPIKey = "OneApiErrors"
 		frameType = "FrameType"
@@ -254,40 +143,40 @@ func (d *dataSetCompletion) Unmarshal(m map[string]interface{}) (err error) {
 
 	for _, name := range []string{frameType, hasErrors, cancelled} {
 		if _, ok := m[name]; !ok {
-			return errors.E(d.op, errors.KInternal, fmt.Errorf("dataSetCompletion.%s did not exist", name))
+			return errors.E(dsc.op, errors.KInternal, fmt.Errorf("dataSetCompletion.%s did not exist", name))
 		}
 	}
 	var ok bool
 
-	d.baseFrame.FrameType, ok = m[frameType].(string)
+	dsc.baseFrame.FrameType, ok = m[frameType].(string)
 	if !ok {
-		return errors.E(d.op, errors.KInternal, fmt.Errorf("dataSetCompletion.%s was a %T, expected string", frameType, m[frameType]))
+		return errors.E(dsc.op, errors.KInternal, fmt.Errorf("dataSetCompletion.%s was a %T, expected string", frameType, m[frameType]))
 	}
-	if d.FrameType != ftDataSetCompletion {
-		return errors.E(d.op, errors.KInternal, fmt.Errorf("dataSetCompletion.FrameType was set to %s", d.FrameType))
-	}
-
-	d.HasErrors, ok = m[hasErrors].(bool)
-	if !ok {
-		return errors.E(d.op, errors.KInternal, fmt.Errorf("dataSetCompletion.%s was a %T, expected string", hasErrors, m[hasErrors]))
+	if dsc.FrameType != ftDataSetCompletion {
+		return errors.E(dsc.op, errors.KInternal, fmt.Errorf("dataSetCompletion.FrameType was set to %s", dsc.FrameType))
 	}
 
-	d.Cancelled, ok = m[cancelled].(bool)
+	dsc.HasErrors, ok = m[hasErrors].(bool)
 	if !ok {
-		return errors.E(d.op, errors.KTimeout, fmt.Errorf("dataSetCompletion.%s was a %T, expected string", cancelled, m[cancelled]))
+		return errors.E(dsc.op, errors.KInternal, fmt.Errorf("dataSetCompletion.%s was a %T, expected string", hasErrors, m[hasErrors]))
+	}
+
+	dsc.Cancelled, ok = m[cancelled].(bool)
+	if !ok {
+		return errors.E(dsc.op, errors.KTimeout, fmt.Errorf("dataSetCompletion.%s was a %T, expected string", cancelled, m[cancelled]))
 	}
 
 	if _, ok := m[oneAPIKey]; ok {
 		errList, ok := m[oneAPIKey].([]interface{})
 		if !ok {
-			return errors.E(d.op, errors.KInternal, fmt.Errorf("dataSetCompletion.OneApiErrors was expected to be []interface{}, was %T", m[oneAPIKey]))
+			return errors.E(dsc.op, errors.KInternal, fmt.Errorf("dataSetCompletion.OneApiErrors was expected to be []interface{}, was %T", m[oneAPIKey]))
 		}
 		for _, entry := range errList {
 			str, ok := entry.(string)
 			if !ok {
-				return errors.E(d.op, errors.KInternal, fmt.Errorf("dataSetCompletion.OneApiErrors had non-string type entry(%v)", entry))
+				return errors.E(dsc.op, errors.KInternal, fmt.Errorf("dataSetCompletion.OneApiErrors had non-string type entry(%v)", entry))
 			}
-			d.OneAPIErrors = append(d.OneAPIErrors, str)
+			dsc.OneAPIErrors = append(dsc.OneAPIErrors, str)
 		}
 	}
 	return nil
@@ -386,13 +275,13 @@ const (
 // tableFragment details the streaming data passed by server that would normally be the Row data in
 type tableFragment struct {
 	baseFrame
-	// TableID is a numeric representation of the this table in relation to other table parts returned.
+	// TableID is a numeric representation of the this table in relation to other table parts returnedt.
 	TableID int `json:"TableId"`
-	// FieldCount is the number of  fields being returned. This should align with the len(tableHeader.Columns).
+	// FieldCount is the number of  fields being returnedt. This should align with the len(tableHeader.Columns).
 	FieldCount int
 	// TableFragment type is the type of TFDataAppend or TFDataReplace.
 	TableFragmentType string
-	// Rows contains the the table data that was fetched.
+	// Rows contains the the table data that was fetchedt.
 	Rows []types.KustoValues
 
 	columns Columns // Needed for decoding values.
@@ -484,7 +373,7 @@ func (t *tableFragment) rowConversion(in []interface{}) (types.KustoValues, erro
 // is to notify the client about the query progress.
 type tableProgress struct {
 	baseFrame
-	// TableID is a numeric representation of the this table in relation to other table parts returned.
+	// TableID is a numeric representation of the this table in relation to other table parts returnedt.
 	TableID int `json:"TableId"`
 	// TableProgress is the progress in percent (0--100).
 	TableProgress float64
@@ -537,7 +426,7 @@ func (t *tableProgress) Unmarshal(m map[string]interface{}) (err error) {
 // tableCompletion frames marks the end of the table transmission. No more frames related to that table will be sent.
 type tableCompletion struct {
 	baseFrame
-	// TableID is a numeric representation of the this table in relation to other table parts returned.
+	// TableID is a numeric representation of the this table in relation to other table parts returnedt.
 	TableID int `json:"TableId"`
 	// RowCount is the final number of rows in the table.
 	RowCount int
