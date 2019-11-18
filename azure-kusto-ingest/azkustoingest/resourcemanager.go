@@ -18,13 +18,13 @@ type ResourceUri struct {
 	sas                string
 }
 
-func (ru ResourceUri) String() (string) {
+func (ru ResourceUri) String() string {
 	return fmt.Sprintf(`https://%s.%s.core.windows.net/%s?%s`, ru.storageAccountName, ru.objectType, ru.objectName, ru.sas)
 }
 
 var storageUriRegex = regexp.MustCompile(`https://(\\w+).(queue|blob|table).core.windows.net/([\\w,-]+)\\?(.*)`)
 
-func ParseUri(uri string) (ResourceUri) {
+func ParseUri(uri string) ResourceUri {
 	res := storageUriRegex.FindAllStringSubmatch(uri, -1)
 	return ResourceUri{
 		storageAccountName: res[0][0],
@@ -42,7 +42,7 @@ type ResourceManager struct {
 func NewResourceManager(client azkustodata.KustoClient) (*ResourceManager, error) {
 	return &ResourceManager{
 		client: client,
-	}, nil;
+	}, nil
 }
 
 type AuthContextProvider interface {
@@ -58,7 +58,7 @@ type IngestionResourceProvider interface {
 	GetStorageAccounts() ([]ResourceUri, error)
 }
 
-func (rm *ResourceManager) FetchIngestionResources() (error) {
+func (rm *ResourceManager) FetchIngestionResources() error {
 	resourcesResponse, err := rm.client.Execute("NetDefaultDB", ".get ingestion resources")
 
 	if err != nil {
@@ -103,7 +103,7 @@ func (rm *ResourceManager) FetchIngestionResources() (error) {
 		containers:                       containers,
 	}
 
-	return nil;
+	return nil
 }
 
 func (rm *ResourceManager) GetAuthContext() (string, error) {
@@ -132,7 +132,7 @@ func (rm *ResourceManager) GetIngestionQueues() ([]ResourceUri, error) {
 		_ = rm.FetchIngestionResources()
 	}
 
-	return rm.resources.securedReadyForAggregationQueues, nil;
+	return rm.resources.securedReadyForAggregationQueues, nil
 }
 
 func (rm *ResourceManager) GetStorageAccounts() ([]ResourceUri, error) {
@@ -140,5 +140,5 @@ func (rm *ResourceManager) GetStorageAccounts() ([]ResourceUri, error) {
 		_ = rm.FetchIngestionResources()
 	}
 
-	return rm.resources.securedReadyForAggregationQueues, nil;
+	return rm.resources.securedReadyForAggregationQueues, nil
 }

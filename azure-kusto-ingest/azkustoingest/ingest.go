@@ -18,17 +18,17 @@ type IngestClient struct {
 	resourceManager ResourceManager
 }
 
-func New(client azkustodata.Client) (*IngestClient) {
+func New(client azkustodata.Client) *IngestClient {
 	return &IngestClient{
 		client: client,
 	}
 }
 
 type StorageIngestor interface {
-	IngestFromStorage(path string, options StorageSourceOptions) (error)
+	IngestFromStorage(path string, options StorageSourceOptions) error
 }
 
-func (ic IngestClient) IngestFromLocalStorage(path string, props map[string]string, options map[string]string) (error) {
+func (ic IngestClient) IngestFromLocalStorage(path string, props map[string]string, options map[string]string) error {
 	storages, err := ic.resourceManager.GetStorageAccounts()
 
 	if err != nil {
@@ -83,7 +83,7 @@ func (ic IngestClient) IngestFromLocalStorage(path string, props map[string]stri
 	return nil
 }
 
-func (ic IngestClient) ingestFromCloudStorage(path string, props map[string]string, options map[string]string) (error) {
+func (ic IngestClient) ingestFromCloudStorage(path string, props map[string]string, options map[string]string) error {
 	queues, err := ic.resourceManager.GetIngestionQueues()
 
 	if err != nil {
@@ -112,17 +112,17 @@ func (ic IngestClient) ingestFromCloudStorage(path string, props map[string]stri
 	ingestionBlobInfoAsJSON, err := json.Marshal(ingestionBlobInfo)
 
 	if err != nil {
-		return err;
+		return err
 	}
 
-	var message []byte;
+	var message []byte
 	base64.StdEncoding.Encode(message, ingestionBlobInfoAsJSON)
 	queueService.Enqueue(context.Background(), string(message), 0, 0)
 
-	return nil;
+	return nil
 }
 
-func (ic IngestClient) IngestFromStorage(path string, props map[string]string, options map[string]string) (error) {
+func (ic IngestClient) IngestFromStorage(path string, props map[string]string, options map[string]string) error {
 	_, err := os.Stat(path)
 	if os.IsNotExist(err) {
 		return ic.ingestFromCloudStorage(path, props, options)
