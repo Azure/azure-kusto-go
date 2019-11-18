@@ -115,8 +115,6 @@ const (
 	tnQueryCompletionInformation = "QueryCompletionInformation" // tkQueryCompletionInformation
 )
 
-
-
 // dataSetCompletion indicates the stream id done. It implements Frame.
 type dataSetCompletion struct {
 	baseFrame

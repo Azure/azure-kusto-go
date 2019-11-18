@@ -84,7 +84,7 @@ type queryMsg struct {
 func (c *conn) query(ctx context.Context, db, query string, options ...QueryOption) (chan frame, error) {
 	opt := &queryOptions{
 		requestProperties: &requestProperties{
-			Options: map[string]interface{}{},
+			Options:    map[string]interface{}{},
 			Parameters: map[string]interface{}{},
 		},
 	}
