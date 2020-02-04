@@ -160,7 +160,7 @@ func TestNormalDecode(t *testing.T) {
 	}
 
 	dec := newDecoder(strings.NewReader(jsonStr), errors.OpQuery)
-	ch := dec.decode(ctx)
+	ch := dec.decodeV2(ctx)
 
 	fr := <-ch
 	frame1Got, ok := fr.(dataSetHeader)

@@ -10,10 +10,10 @@ import (
 	"context"
 	"encoding/json"
 	"fmt"
+	"io"
 	"io/ioutil"
 	"net/http"
 	"net/url"
-	"regexp"
 	"strings"
 	"time"
 
@@ -22,8 +22,6 @@ import (
 	"github.com/Azure/go-autorest/autorest"
 	"github.com/google/uuid"
 )
-
-var validURL = regexp.MustCompile(`https://([a-zA-Z0-9_-]{1,}\.){1,2}kusto.windows.net`)
 
 // conn provides connectivity to a Kusto instance.
 type conn struct {
@@ -37,10 +35,6 @@ type conn struct {
 
 // newConn returns a new conn object.
 func newConn(endpoint string, auth Authorization, timeout time.Duration) (*conn, error) {
-	if !validURL.MatchString(endpoint) {
-		return nil, errors.E(errors.OpServConn, errors.KClientArgs, fmt.Errorf("endpoint is not valid(%s), should be https://<cluster name>.kusto.windows.net", endpoint))
-	}
-
 	headers := http.Header{}
 	headers.Add("Accept", "application/json")
 	headers.Add("Accept-Encoding", "gzip,deflate")
@@ -53,9 +47,9 @@ func newConn(endpoint string, auth Authorization, timeout time.Duration) (*conn,
 
 	c := &conn{
 		auth:        auth.Authorizer,
-		endMgmt:     &url.URL{Scheme: "https", Host: u.Hostname(), Path: "/v1/rest/mgmt"},
-		endQuery:    &url.URL{Scheme: "https", Host: u.Hostname(), Path: "/v2/rest/query"},
-		streamQuery: &url.URL{Scheme: "https", Host: u.Hostname(), Path: "/v1/rest/ingest/"},
+		endMgmt:     &url.URL{Scheme: u.Scheme, Host: u.Host, Path: "/v1/rest/mgmt"},
+		endQuery:    &url.URL{Scheme: u.Scheme, Host: u.Host, Path: "/v2/rest/query"},
+		streamQuery: &url.URL{Scheme: u.Scheme, Host: u.Host, Path: "/v1/rest/ingest/"},
 		reqHeaders:  headers,
 		headersPool: make(chan http.Header, 100),
 		client: &http.Client{
@@ -84,7 +78,7 @@ type queryMsg struct {
 func (c *conn) query(ctx context.Context, db, query string, options ...QueryOption) (chan frame, error) {
 	opt := &queryOptions{
 		requestProperties: &requestProperties{
-			Options: map[string]interface{}{},
+			Options:    map[string]interface{}{},
 			Parameters: map[string]interface{}{},
 		},
 	}
@@ -118,45 +112,35 @@ const (
 	execMgmt    = 2
 )
 
-func (c *conn) execute(ctx context.Context, execType int, db, query string, payload string, properties requestProperties) (chan frame, error) {
+func newKustoRequest(ctx context.Context, c conn, op errors.Op, db string, query string, properties requestProperties) (*http.Request, error) {
 	headers := <-c.headersPool
+	// TODO (daniel): ask John why this is done async
 	go func() {
 		c.headersPool <- copyHeaders(c.reqHeaders)
 	}()
 
-	var op errors.Op
-	if execType == execQuery {
-		op = errors.OpQuery
-	} else if execType == execMgmt {
-		op = errors.OpMgmt
-	}
-
 	var endpoint *url.URL
 	var q []byte
 
-	switch execType {
-	case execQuery, execMgmt:
-		headers.Add("Content-Type", "application/json; charset=utf-8")
-		headers.Add("x-ms-client-request-id", "KPC.execute;"+uuid.New().String())
+	headers.Add("Content-Type", "application/json; charset=utf-8")
+	headers.Add("x-ms-client-request-id", "KGC.execute;"+uuid.New().String())
 
-		var err error
-		q, err = json.Marshal(
-			queryMsg{
-				DB:         db,
-				CSL:        query,
-				Properties: properties,
-			},
-		)
-		if err != nil {
-			return nil, errors.E(op, errors.KClientInternal, fmt.Errorf("could not JSON marshal the Query message: %s", err))
-		}
-		if execType == execQuery {
-			endpoint = c.endQuery
-		} else {
-			endpoint = c.endMgmt
-		}
-	default:
-		return nil, errors.E(op, errors.KClientInternal, fmt.Errorf("internal error: did not understand the type of execType: %d", execType))
+	var err error
+	q, err = json.Marshal(
+		queryMsg{
+			DB:         db,
+			CSL:        query,
+			Properties: properties,
+		},
+	)
+	if err != nil {
+		return nil, errors.E(op, errors.KClientInternal, fmt.Errorf("could not JSON marshal the Query message: %s", err))
+	}
+
+	if op == errors.OpQuery {
+		endpoint = c.endQuery
+	} else {
+		endpoint = c.endMgmt
 	}
 
 	req := &http.Request{
@@ -166,24 +150,22 @@ func (c *conn) execute(ctx context.Context, execType int, db, query string, payl
 		Body:   ioutil.NopCloser(bytes.NewBuffer(q)),
 	}
 
-	var err error
-	prep := c.auth.WithAuthorization()
-	req, err = prep(autorest.CreatePreparer()).Prepare(req)
+	if c.auth != nil {
+		prep := c.auth.WithAuthorization()
+		req, err = prep(autorest.CreatePreparer()).Prepare(req)
+	}
+
 	if err != nil {
 		return nil, errors.E(op, errors.KClientInternal, err)
 	}
 
-	resp, err := c.client.Do(req.WithContext(ctx))
-	if err != nil {
-		// TODO(jdoak): We need a http error unwrap function that pulls out an *errors.Error.
-		return nil, errors.E(op, errors.KHTTPError, err)
-	}
+	req.WithContext(ctx)
 
-	if resp.StatusCode != 200 {
-		// TODO(jdoak): We need to make this more verbose to be compliant with API guidelines.
-		return nil, errors.E(op, errors.KHTTPError, fmt.Errorf("received non 200 (OK) response from server, got: %s", resp.Status))
-	}
+	return req, nil
+}
 
+func bodyFromResponse(resp http.Response, op errors.Op) (io.Reader, error) {
+	var err error
 	body := resp.Body
 	switch enc := strings.ToLower(resp.Header.Get("Content-Encoding")); enc {
 	case "":
@@ -199,9 +181,44 @@ func (c *conn) execute(ctx context.Context, execType int, db, query string, payl
 		return nil, errors.ES(op, errors.KClientInternal, "Content-Encoding was unrecognized: %s", enc)
 	}
 
+	return body, nil
+}
+
+func (c *conn) execute(ctx context.Context, execType int, db, query string, payload string, properties requestProperties) (chan frame, error) {
+	var op errors.Op
+	if execType == execQuery {
+		op = errors.OpQuery
+	} else if execType == execMgmt {
+		op = errors.OpMgmt
+	}
+
+	kReq, err := newKustoRequest(ctx, *c, op, db, query, properties)
+
+	resp, err := c.client.Do(kReq)
+
+	if err != nil {
+		// TODO(jdoak): We need a http error unwrap function that pulls out an *errors.Error.
+		return nil, errors.E(op, errors.KHTTPError, err)
+	}
+
+	if resp.StatusCode != 200 {
+		// TODO(jdoak): We need to make this more verbose to be compliant with API guidelines.
+		return nil, errors.E(op, errors.KHTTPError, fmt.Errorf("received non 200 (OK) response from server, got: %s", resp.Status))
+	}
+
+	body, err := bodyFromResponse(*resp, op)
 	dec := newDecoder(body, op)
-	ch := dec.decode(ctx)
-	return ch, nil
+
+	switch op {
+	case execQuery:
+		ch := dec.decodeV2(ctx)
+		return ch, nil
+	case execMgmt:
+		ch := dec.decodeV1(ctx)
+		return ch, nil
+	default:
+		panic(errors.E(op, errors.KOther, fmt.Errorf("Unexpected op type")))
+	}
 }
 
 func copyHeaders(header http.Header) http.Header {

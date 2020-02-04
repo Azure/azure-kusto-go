@@ -68,13 +68,13 @@ func newDecoder(b io.Reader, op errors.Op) *decoder {
 // If the frame is an errorFrame then the byte stream had a problem. If you cancel the passed
 // context an error frame may not be returned and the stream should be considered broken.
 // Always look for a dataSetCompletion frame at the end.
-func (d *decoder) decode(ctx context.Context) chan frame {
+func (d *decoder) decodeV2(ctx context.Context) chan frame {
 	ch := make(chan frame, 100)
 
 	go func() {
 		defer close(ch)
 
-		// We should recieve a '[' indicating the start of the JSON list of Frames.
+		// We should receive a '[' indicating the start of the JSON list of Frames.
 		t, err := d.dec.Token()
 		if err == io.EOF {
 			return
@@ -98,6 +98,63 @@ func (d *decoder) decode(ctx context.Context) chan frame {
 
 		// Start decoding the rest of the frames.
 		d.decodeFrames(ctx, ch)
+	}()
+
+	return ch
+}
+
+type columnV1 struct {
+	DataType   string
+	ColumnType string
+	ColumnName string
+}
+
+type dataTableV1 struct {
+	TableName string
+	Columns   []columnV1
+	Rows      []interface{}
+}
+
+type dataSetV1 struct {
+	Tables []dataTableV1
+}
+
+func (d *decoder) decodeV1(ctx context.Context) chan frame {
+	ch := make(chan frame, 100)
+
+	go func() {
+		defer close(ch)
+		var dataset dataSetV1
+		if e := d.dec.Decode(&dataset); e != nil {
+			panic(e)
+		}
+
+		for index, table := range dataset.Tables {
+			dt := dataTable{
+				baseFrame: baseFrame{
+					FrameType: ftDataTable,
+				},
+				TableID:   index,
+				TableKind: tkPrimaryResult,
+				TableName: table.TableName,
+				op:        0,
+			}
+
+			columns := make([]Column, len(table.Columns))
+			for i, c := range table.Columns {
+				columns[i] = Column{
+					ColumnName: c.ColumnName,
+					ColumnType: c.ColumnType,
+				}
+			}
+			dt.Columns = columns
+
+			if e := dt.unmarshalRows(table.Rows); e != nil {
+				panic(e)
+			}
+
+			ch <- dt
+		}
 	}()
 
 	return ch

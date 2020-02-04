@@ -27,6 +27,16 @@ type queryer interface {
 	query(ctx context.Context, db, query string, options ...QueryOption) (chan frame, error)
 }
 
+type manager interface {
+	// Query queries a Kusto database and returns Frames that the server sends.
+	mgmt(ctx context.Context, db, query string, options ...QueryOption) (chan frame, error)
+}
+
+type executor interface {
+	queryer
+	manager
+}
+
 // Authorization provides the ADAL authorizer needed to access the resource. You can set Authorizer or
 // Config, but not both.
 type Authorization struct {
@@ -103,7 +113,7 @@ func (a *Authorization) validate(endpoint string) error {
 
 // Client is a client to a Kusto instance.
 type Client struct {
-	conn    queryer
+	conn    executor
 	timeout time.Duration
 	mu      sync.Mutex
 }
@@ -127,9 +137,12 @@ func New(endpoint string, auth Authorization, options ...Option) (*Client, error
 		o(client)
 	}
 
-	if err := auth.validate(endpoint); err != nil {
-		return nil, err
+	if auth.Config != nil {
+		if err := auth.validate(endpoint); err != nil {
+			return nil, err
+		}
 	}
+
 	conn, err := newConn(endpoint, auth, client.timeout)
 	if err != nil {
 		return nil, err
@@ -191,6 +204,41 @@ func (c *Client) Query(ctx context.Context, db, query string, options ...QueryOp
 }
 
 // Mgmt is used to do management queries to Kusto.
-func (c *Client) Mgmt(ctx context.Context, db, query string, options ...QueryOption) (chan frame, error) {
-	panic("not implemented")
+func (c *Client) Mgmt(ctx context.Context, db, query string, options ...QueryOption) ([]*Row, error) {
+	c.mu.Lock()
+	defer c.mu.Unlock()
+
+	ctx, _ = context.WithCancel(context.Background()) // Note: cancel is called when *RowIterator has Stop() called.
+	frameCh, err := c.conn.mgmt(ctx, db, query, options...)
+	if err != nil {
+		return nil, fmt.Errorf("error with Query: %s", err)
+	}
+
+	firstFrame := <-frameCh
+	switch v := firstFrame.(type) {
+	case dataTable:
+		dt := firstFrame.(dataTable)
+		rows := make([]*Row, len(dt.Rows))
+		colNames := make([]string, len(dt.Columns))
+
+		for i, c := range dt.Columns {
+			colNames[i] = c.ColumnName
+		}
+
+		for i, r := range dt.Rows {
+			rows[i] = &Row{
+				columns:     dt.Columns,
+				columnNames: colNames,
+				row:         r,
+				op:          errors.OpMgmt,
+			}
+		}
+
+		return rows, nil
+	case errorFrame:
+		return nil, v
+
+	default:
+		panic("huh?")
+	}
 }

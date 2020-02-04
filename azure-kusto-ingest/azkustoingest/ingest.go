@@ -5,22 +5,27 @@ import (
 	"context"
 	"encoding/base64"
 	"encoding/json"
+	"fmt"
 	"github.com/Azure/azure-storage-blob-go/azblob"
 	"github.com/Azure/azure-storage-queue-go/azqueue"
-	"io/ioutil"
 	"math/rand"
 	"net/url"
 	"os"
 )
 
 type IngestClient struct {
-	client          azkustodata.Client
-	resourceManager ResourceManager
+	client          *azkustodata.Client
+	resourceManager resourceManager
 }
 
-func New(client azkustodata.Client) (*IngestClient) {
+func New(dmEndpoint string, authorization azkustodata.Authorization) *IngestClient {
+	dmClient, _ := azkustodata.New(dmEndpoint, authorization);
 	return &IngestClient{
-		client: client,
+		client: dmClient,
+		resourceManager: resourceManager{
+			client:    dmClient,
+			resources: nil,
+		},
 	}
 }
 
@@ -28,63 +33,68 @@ type StorageIngestor interface {
 	IngestFromStorage(path string, options StorageSourceOptions) (error)
 }
 
-func (ic IngestClient) IngestFromLocalStorage(path string, props map[string]string, options map[string]string) (error) {
-	storages, err := ic.resourceManager.GetStorageAccounts()
-
-	if err != nil {
-		return err
-	}
-
-	storage := storages[rand.Intn(len(storages))]
-
-	// Create a BlockBlobURL object to a blob in the container (we assume the container already exists).
-	// blobName = fmt.Sprint("%s__%s__%s__%s", props["database"], props[]).format(
-	//	db=ingestion_properties.database,
-	//	table=ingestion_properties.table,
-	//	guid=descriptor.source_id or uuid.uuid4(),
-	//	file=descriptor.stream_name,
-	//)
-
-	u, _ := url.Parse(storage.String())
-
-	//blockBlobURL := azblob.NewBlockBlobURL(*u, azblob.NewPipeline(credential, azblob.PipelineOptions{}))
-
-	ctx := context.Background() // This example uses a never-expiring context
-
-	// Create some data to test the upload stream
-	blobSize := 8 * 1024 * 1024
-	data := make([]byte, blobSize)
-	rand.Read(data)
-
-	reader, err := ioutil.ReadFile(path)
-
-	if err != nil {
-		return err
-	}
-
-	// Perform UploadStreamToBlockBlob
-	bufferSize := 2 * 1024 * 1024 // Configure the size of the rotating buffers that are used when uploading
-	maxBuffers := 3               // Configure the number of rotating buffers that are used when uploading
-
-	// TODO: this is a placeholder for compilation
-	print(blobSize, bufferSize, maxBuffers, reader, ctx, u, azblob.Version())
-	//_, err = azblob.UploadStreamToBlockBlob(
-	//	ctx,
-	//	reader,
-	//	//bytes.NewReader(data),
-	//	blockBlobURL,
-	//	azblob.UploadStreamToBlockBlobOptions{
-	//		BufferSize: bufferSize,
-	//		MaxBuffers: maxBuffers,
-	//	}
-	//)
-
-	// Verify that upload was successful
-	return nil
+type StreamIngestor interface {
+	IngestFromStream(stream chan []byte, options StreamSourceOptions)
 }
 
-func (ic IngestClient) ingestFromCloudStorage(path string, props map[string]string, options map[string]string) (error) {
-	queues, err := ic.resourceManager.GetIngestionQueues()
+func (ic IngestClient) IngestFromStream(stream chan []byte, options StreamSourceOptions) {
+
+}
+
+func uploadFileToBlobStorage(ctx context.Context, fileName string, containerURL azblob.ContainerURL) azblob.BlockBlobURL {
+	// Here's how to upload a blob.
+	blobURL := containerURL.NewBlockBlobURL(fileName)
+	file, err := os.Open(fileName)
+
+	if err != nil {
+		panic(err)
+	}
+
+	// The high-level API UploadFileToBlockBlob function uploads blocks in parallel for optimal performance, and can handle large files as well.
+	// This function calls StageBlock/CommitBlockList for files larger 256 MBs, and calls Upload for any file smaller
+	fmt.Printf("Uploading the file with blob name: %s\n", fileName)
+	_, err = azblob.UploadFileToBlockBlob(ctx, file, blobURL, azblob.UploadToBlockBlobOptions{
+		BlockSize:   4 * 1024 * 1024,
+		Parallelism: 16})
+
+	if err != nil {
+		panic(err)
+	}
+
+	return blobURL
+}
+
+
+func (ic IngestClient) ingestFromLocalStorage(
+	path string,
+	props IngestionProperties,
+	options map[string]string) (error) {
+	storages, err := ic.resourceManager.getStorageAccounts(context.Background())
+
+	if err != nil {
+		return err
+	}
+
+	// Upload local file to temporary dm storage
+	storage := storages[rand.Intn(len(storages))]
+	creds, err := azblob.NewSharedKeyCredential("accountname", "accountkey")
+
+	if err != nil {
+		return err
+	}
+
+	pipeline := azblob.NewPipeline(creds, azblob.PipelineOptions{})
+	storageUrl, _ := url.Parse(storage.String())
+	containerUrl := azblob.NewContainerURL(*storageUrl, pipeline)
+	ctx := context.Background()
+	blobUrl := uploadFileToBlobStorage(ctx, path, containerUrl)
+
+	// upload as if this is just a regular cloud storage
+	return ic.ingestFromCloudStorage(fmt.Sprint(blobUrl), props, options)
+}
+
+func (ic IngestClient) ingestFromCloudStorage(path string, props IngestionProperties, options map[string]string) (error) {
+	queues, err := ic.resourceManager.getIngestionQueues(context.Background())
 
 	if err != nil {
 		return err
@@ -92,42 +102,44 @@ func (ic IngestClient) ingestFromCloudStorage(path string, props map[string]stri
 
 	queue := queues[rand.Intn(len(queues))]
 
-	//queueService := storage.GetQueueService(queue)
-	u, _ := url.Parse(queue.String())
-
-	// TODO: this should get proper creds using sas signature
 	creds := azqueue.NewAnonymousCredential()
-	pipeline := azqueue.NewPipeline(creds, azqueue.PipelineOptions{})
-	queueService := azqueue.NewMessagesURL(*u, pipeline)
+	p := azqueue.NewPipeline(creds, azqueue.PipelineOptions{})
 
-	source := make(map[string]string)
-	source["path"] = path
-	auth, err := ic.resourceManager.GetAuthContext()
+	u, _ := url.Parse(fmt.Sprintf("https://%s.queue.core.windows.net?%s", queue.storageAccountName, queue.sas))
+
+	serviceUrl := azqueue.NewServiceURL(*u, p)
+	queueUrl := serviceUrl.NewQueueURL(queue.objectName)
+	messageUrl := queueUrl.NewMessagesURL()
+
+	// TODO: better description of source
+	source := map[string]string{"path": path}
+
+	auth, err := ic.resourceManager.getAuthContext(context.Background())
 
 	if err != nil {
 		return err
 	}
 
-	ingestionBlobInfo := NewIngestionBlobInfo(source, props, auth)
+	ingestionBlobInfo := newIngestionBlobInfo(source, props, auth.AuthorizationContext.Value)
 	ingestionBlobInfoAsJSON, err := json.Marshal(ingestionBlobInfo)
 
 	if err != nil {
 		return err;
 	}
 
-	var message []byte;
-	base64.StdEncoding.Encode(message, ingestionBlobInfoAsJSON)
-	queueService.Enqueue(context.Background(), string(message), 0, 0)
+	_, e := messageUrl.Enqueue(context.Background(), base64.StdEncoding.EncodeToString(ingestionBlobInfoAsJSON), 0, 0)
+
+	if e != nil {
+		return e
+	}
 
 	return nil;
 }
 
-func (ic IngestClient) IngestFromStorage(path string, props map[string]string, options map[string]string) (error) {
-	_, err := os.Stat(path)
-	if os.IsNotExist(err) {
+func (ic IngestClient) IngestFromStorage(path string, props IngestionProperties, options map[string]string) error {
+	if _, err := url.ParseRequestURI(path); err == nil {
 		return ic.ingestFromCloudStorage(path, props, options)
 	} else {
-		return ic.IngestFromLocalStorage(path, props, options)
+		return ic.ingestFromLocalStorage(path, props, options)
 	}
-
 }

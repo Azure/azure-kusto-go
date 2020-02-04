@@ -2,143 +2,125 @@ package azkustoingest
 
 import (
 	"azure-kusto-go/azure-kusto-data/azkustodata"
+	"azure-kusto-go/azure-kusto-data/azkustodata/types"
+	"context"
 	"fmt"
 	"regexp"
 )
 
-type IngestionResources struct {
-	securedReadyForAggregationQueues []ResourceUri
-	containers                       []ResourceUri
+type ingestionResources struct {
+	queues     []resourceUri
+	containers []resourceUri
 }
 
-type ResourceUri struct {
+type resourceUri struct {
 	storageAccountName string
 	objectType         string
 	objectName         string
 	sas                string
 }
 
-func (ru ResourceUri) String() (string) {
-	return fmt.Sprintf(`https://%s.%s.core.windows.net/%s?%s`, ru.storageAccountName, ru.objectType, ru.objectName, ru.sas)
+func (ru resourceUri) String() string {
+	return fmt.Sprintf(`https://%s.%s.core.windows.net/%s?%s`,
+		ru.storageAccountName, ru.objectType, ru.objectName, ru.sas)
 }
 
-var storageUriRegex = regexp.MustCompile(`https://(\\w+).(queue|blob|table).core.windows.net/([\\w,-]+)\\?(.*)`)
+var storageUriRegex = regexp.MustCompile(`https://(\w+).(queue|blob|table).core.windows.net/([\w,-]+)\?(.*)`)
 
-func ParseUri(uri string) (ResourceUri) {
+func ParseUri(uri string) resourceUri {
 	res := storageUriRegex.FindAllStringSubmatch(uri, -1)
-	return ResourceUri{
-		storageAccountName: res[0][0],
-		objectType:         res[0][1],
-		objectName:         res[0][2],
-		sas:                res[0][3],
+	return resourceUri{
+		storageAccountName: res[0][1],
+		objectType:         res[0][2],
+		objectName:         res[0][3],
+		sas:                res[0][4],
 	}
 }
 
-type ResourceManager struct {
-	client    azkustodata.KustoClient
-	resources *IngestionResources
-}
-
-func NewResourceManager(client azkustodata.KustoClient) (*ResourceManager, error) {
-	return &ResourceManager{
-		client: client,
-	}, nil;
+type resourceManager struct {
+	client    *azkustodata.Client
+	resources *ingestionResources
 }
 
 type AuthContextProvider interface {
-	GetAuthContext() (string, error)
+	getAuthContext() (string, error)
 }
 
-type IngestionResourcesFetcher interface {
-	FetchIngestionResources() (*IngestionResources, error)
+type ingestionResourcesFetcher interface {
+	fetchIngestionResources() (*ingestionResources, error)
 }
 
 type IngestionResourceProvider interface {
-	GetIngestionQueues() ([]ResourceUri, error)
-	GetStorageAccounts() ([]ResourceUri, error)
+	getIngestionQueues() ([]resourceUri, error)
+	getStorageAccounts() ([]resourceUri, error)
 }
 
-func (rm *ResourceManager) FetchIngestionResources() (error) {
-	resourcesResponse, err := rm.client.Execute("NetDefaultDB", ".get ingestion resources")
+type ingestionResource struct {
+	ResourceTypeName types.String
+	StorageRoot      types.String
+}
+
+func (rm *resourceManager) fetchIngestionResources(ctx context.Context) error {
+	rows, err := rm.client.Mgmt(ctx, "NetDefaultDB", ".get ingestion resources")
 
 	if err != nil {
-		return err
+		panic(err)
 	}
 
-	containers := make([]ResourceUri, 0)
-	securedReadyForAggregationQueues := make([]ResourceUri, 0)
+	var containers []resourceUri
+	var queues []resourceUri
 
-	primary := resourcesResponse.GetPrimaryResults()
+	for _, row := range rows {
 
-	var resourceTypeCol int
-	var resourceUriCol int
-	for i, v := range primary[0].GetColumns() {
-		if v.ColumnName == "ResourceTypeName" {
-			resourceTypeCol = i
-		}
-		if v.ColumnName == "StorageRoot" {
-			resourceUriCol = i
+		rec := ingestionResource{}
+		if err := row.ToStruct(&rec); err != nil {
+			panic(err)
 		}
 
-	}
-
-	for _, row := range primary[0].GetRows() {
-		resourceType := row[resourceTypeCol]
-		resourceUri := ParseUri(fmt.Sprint(row[resourceUriCol]))
-
-		switch resourceType {
-		case "SecuredReadyForAggregationQueue":
-			{
-				securedReadyForAggregationQueues = append(securedReadyForAggregationQueues, resourceUri)
-			}
+		switch rec.ResourceTypeName.Value {
 		case "TempStorage":
-			{
-				containers = append(containers, resourceUri)
-			}
+			containers = append(containers, ParseUri(rec.StorageRoot.Value))
+		case "SecuredReadyForAggregationQueue":
+			queues = append(queues, ParseUri(rec.StorageRoot.Value))
 		}
 	}
 
-	rm.resources = &IngestionResources{
-		securedReadyForAggregationQueues: securedReadyForAggregationQueues,
-		containers:                       containers,
+	rm.resources = &ingestionResources{
+		queues:     queues,
+		containers: containers,
 	}
 
 	return nil;
 }
 
-func (rm *ResourceManager) GetAuthContext() (string, error) {
-	result, err := rm.client.Execute("NetDefaultDB", ".get kusto identity token")
-
-	if err != nil {
-		return "", err
-	}
-
-	primary := result.GetPrimaryResults()
-	columns := primary[0].GetColumns()
-
-	var authContextColIndex int = -1
-	for i, col := range columns {
-		if col.ColumnName == "AuthorizationContext" {
-			authContextColIndex = i
-			break
-		}
-	}
-
-	return primary[0].GetRows()[0][authContextColIndex].(string), nil
+type kustoIdentityToken struct {
+	AuthorizationContext types.String
 }
 
-func (rm *ResourceManager) GetIngestionQueues() ([]ResourceUri, error) {
-	if rm.resources == nil {
-		_ = rm.FetchIngestionResources()
+func (rm *resourceManager) getAuthContext(ctx context.Context) (kustoIdentityToken, error) {
+	rows, _ := rm.client.Mgmt(ctx, "NetDefaultDB", ".get kusto identity token")
+
+	token := kustoIdentityToken{}
+
+	if err := rows[0].ToStruct(&token); err != nil {
+		panic(err)
 	}
 
-	return rm.resources.securedReadyForAggregationQueues, nil;
+	return token, nil
 }
 
-func (rm *ResourceManager) GetStorageAccounts() ([]ResourceUri, error) {
+func (rm *resourceManager) getIngestionQueues(ctx context.Context) ([]resourceUri, error) {
 	if rm.resources == nil {
-		_ = rm.FetchIngestionResources()
+		_ = rm.fetchIngestionResources(ctx)
 	}
 
-	return rm.resources.securedReadyForAggregationQueues, nil;
+	return rm.resources.queues, nil
+}
+
+func (rm *resourceManager) getStorageAccounts(ctx context.Context) ([]resourceUri, error) {
+	if rm.resources == nil {
+		_ = rm.fetchIngestionResources(ctx)
+	}
+
+	return rm.resources.containers, nil
 }
