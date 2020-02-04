@@ -15,15 +15,38 @@ if (err != nil) {
 client := azkustodata.NewKustoClient(*kustoContext)
 
 db := "SampleDB"
-query := "SampleTable | take 10"
+query := "SampleTable | count"
 
-response, err := client.Execute(db, query)
-
-if (err != nil) {
+iter, err := kustoClient.Query(ctx, db, query)
+if err != nil {
     panic(err)
 }
 
-print(response)
+defer iter.Stop()
+
+
+
+// Loop through the iterated results, read them into our UserID structs and append them
+// to our list of recs.
+var recs []CountResult
+for {
+    row, err := iter.Next()
+    if err != nil {
+        // This indicates we are done.
+        if err == io.EOF {
+            break
+        }
+        // We ran into an error during the stream.
+        panic(err)
+    }
+    rec := CountResult{}
+    if err := row.ToStruct(&rec); err != nil {
+        panic(err)
+    }
+    recs = append(recs, rec)
+}
+
+print(recs)
 ```
 
 # Contributing

@@ -12,7 +12,7 @@ import (
 	"sync"
 	"time"
 
-	"azure-kusto-go/azure-kusto-data/azkustodata/errors"
+	"github.com/Azure/azure-kusto-go/azkustodata/errors"
 
 	"github.com/Azure/go-autorest/autorest"
 	"github.com/Azure/go-autorest/autorest/azure/auth"

@@ -1,7 +1,7 @@
 package azkustoingest
 
 import (
-	"azure-kusto-go/azure-kusto-data/azkustodata"
+	"github.com/Azure/azure-kusto-go/azkustodata"
 )
 
 type StreamingIngestClient struct {

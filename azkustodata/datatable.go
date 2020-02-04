@@ -1,10 +1,10 @@
 package azkustodata
 
 import (
-	"azure-kusto-go/azure-kusto-data/azkustodata/errors"
-	"azure-kusto-go/azure-kusto-data/azkustodata/types"
 	"encoding/json"
 	"fmt"
+	"github.com/Azure/azure-kusto-go/azkustodata/errors"
+	"github.com/Azure/azure-kusto-go/azkustodata/types"
 )
 
 // dataTable is used report information as a Table with Columns as row headers and Rows as the contained

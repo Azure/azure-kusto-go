@@ -1,11 +1,11 @@
 package azkustoingest
 
 import (
-	"azure-kusto-go/azure-kusto-data/azkustodata"
 	"context"
 	"encoding/base64"
 	"encoding/json"
 	"fmt"
+	"github.com/Azure/azure-kusto-go/azkustodata"
 	"github.com/Azure/azure-storage-blob-go/azblob"
 	"github.com/Azure/azure-storage-queue-go/azqueue"
 	"math/rand"

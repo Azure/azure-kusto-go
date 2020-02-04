@@ -1,8 +1,8 @@
 package azkustoingest
 
 import (
-	"azure-kusto-go/azure-kusto-data/azkustodata"
-	"azure-kusto-go/azure-kusto-data/azkustodata/types"
+	"github.com/Azure/azure-kusto-go/azkustodata"
+	"github.com/Azure/azure-kusto-go/azkustodata/types"
 	"context"
 	"fmt"
 	"regexp"
