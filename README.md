@@ -14,6 +14,8 @@
 
 ### Usage
 
+#### Query
+
 ```go
 package main
 
@@ -21,7 +23,7 @@ import (
     "context"
     "fmt"
 
-    "github.com/Azure/azure-kusto-go/azure-kusto-data/azkustodata"
+    "github.com/Azure/azure-kusto-go/azkustodata"
     "github.com/Azure/go-autorest/autorest/azure/auth"
 )
 
@@ -36,23 +38,80 @@ func main() {
         Config: authorizerConfig,
     }
 
-    kustoClient, err := azkustodata.New(cluster, authorization)
-    if err != nil {
-        panic(err)
-    }
-
-    ctx := context.Background()
-
-    db := "SampleDB"
-    query := "SampleTable | take 10"
-
-    response, err := kustoClient.Query(ctx, db, query)
-    if err != nil {
-        panic(err)
-    }
-
-    fmt.Println(response)
+    iter, err := kustoClient.Query(ctx, db, query)
+    	if err != nil {
+    		panic(err)
+    	}
+    
+    	defer iter.Stop()
+    
+    
+    
+    	// Loop through the iterated results, read them into our UserID structs and append them
+    	// to our list of recs.
+    	var recs []CountResult
+    	for {
+    		row, err := iter.Next()
+    		if err != nil {
+    			// This indicates we are done.
+    			if err == io.EOF {
+    				break
+    			}
+    			// We ran into an error during the stream.
+    			panic(err)
+    		}
+    		rec := CountResult{}
+    		if err := row.ToStruct(&rec); err != nil {
+    			panic(err)
+    		}
+    		recs = append(recs, rec)
+    	}
+    
+    	fmt.Println(recs)
 }
+```
+
+#### Ingestion
+
+```go
+package main
+
+import (
+	"context"
+	"fmt"
+	"github.com/Azure/azure-kusto-go/azkustodata"
+	"github.com/Azure/azure-kusto-go/azkustoingest"
+	"github.com/Azure/go-autorest/autorest/azure/auth"
+	"io"
+)
+
+func main()  {
+    cluster := "https://sampleCluster.kusto.windows.net"
+    dm := "https://ingest-sampleCluster.kusto.windows.net"
+    appId := ""
+    appKey := ""
+    tenantId := ""
+
+    authorizerConfig := auth.NewClientCredentialsConfig(appId, appKey, tenantId)
+    authorization := azkustodata.Authorization{
+        Config: authorizerConfig,
+    }
+    
+    ingestor := azkustoingest.New(dm, authorization)
+    	url := "https://mystorageaccount.blob.core.windows.net/container/folder/data.json?sp=r&st=2020-02-01T18:51:17Z&se=2020-12-13T02:51:17Z&spr=https&sv=2019-02-02&sr=b&sig=***"
+    	err := ingestor.IngestFromStorage(url, azkustoingest.IngestionProperties{
+    		DatabaseName:        "Database",
+    		TableName:           "Table",
+    		FlushImmediately:    true,
+    		IngestionMappingRef: "TableData_from_json",
+    	}, nil)
+    
+    	if err != nil {
+    		panic(err)
+    	} 
+
+}
+
 ```
 
 ### Contributing

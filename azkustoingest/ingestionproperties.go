@@ -46,7 +46,7 @@ func newIngestionBlobInfo(source map[string]string, props IngestionProperties, a
 	sourceId, found := source["Id"]
 
 	if !found {
-		sourceId = fmt.Sprint(uuid.Must(uuid.NewV4()))
+		sourceId = fmt.Sprint(uuid.NewV4())
 	}
 
 	ibi := &ingestionBlobInfo{
