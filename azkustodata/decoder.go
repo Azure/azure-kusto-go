@@ -2,6 +2,15 @@ package azkustodata
 
 // decoder.go provides a JSON stream decoder into Go native Kusto Frames.
 
+// Performance note: This JSON decoding is not anywhere close to the fastest decoder
+// that we can make. We are using convenience methods like map[string]interface{} that
+// require some allocation and garbage collection we could throw out.
+// However, at the time of this writing (10/16/2019) the Kusto service sends slower
+// than the decoder decodes. Tested our outgoing buffers and we have an average of 500ns between
+// complete frame receipt from the upstream (dec.More()) and the next frame.
+// At least with Progressive frames, there does not seem to be much reason to try and switch this
+// out for something faster but also harder to support/read.
+
 import (
 	"context"
 	"encoding/json"
@@ -69,7 +78,7 @@ func newDecoder(b io.Reader, op errors.Op) *decoder {
 // context an error frame may not be returned and the stream should be considered broken.
 // Always look for a dataSetCompletion frame at the end.
 func (d *decoder) decodeV2(ctx context.Context) chan frame {
-	ch := make(chan frame, 100)
+	ch := make(chan frame, 1) // Channel is sized to 1. We read from the channel faster than we put on the channel.
 
 	go func() {
 		defer close(ch)
@@ -273,7 +282,7 @@ func (d *decoder) decodeToMap(ctx context.Context, ch chan frame) error {
 	return nil
 }
 
-// These constants represent the value type stored in a Colunmn.
+// These constants represent the value type stored in a Column.
 const (
 	// CTBool indicates that a Column stores a Kusto boolean value.
 	CTBool = "bool"
@@ -292,7 +301,7 @@ const (
 	// CTString indicates that a Column stores a Kusto string value.
 	CTString = "string"
 	// CTTimespan indicates that a Column stores a Kusto timespan value.
-	CTTimespan = "timespan" // We have NOT written a conversion
+	CTTimespan = "timespan"
 	// CTDecimal indicates that a Column stores a Kusto decimal value.
 	CTDecimal = "decimal" // We have NOT written a conversion
 )
@@ -351,6 +360,13 @@ var conversion = map[string]func(i interface{}) (types.KustoValue, error){
 	},
 	CTString: func(i interface{}) (types.KustoValue, error) {
 		v := types.String{}
+		if err := v.Unmarshal(i); err != nil {
+			return nil, err
+		}
+		return v, nil
+	},
+	CTTimespan: func(i interface{}) (types.KustoValue, error) {
+		v := types.Timespan{}
 		if err := v.Unmarshal(i); err != nil {
 			return nil, err
 		}

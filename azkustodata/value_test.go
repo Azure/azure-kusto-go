@@ -402,6 +402,75 @@ func TestFieldsConvert(t *testing.T) {
 				PtrkString *types.String
 			}{"", nil, types.String{Value: "", Valid: false}, &types.String{Value: "", Valid: false}},
 		},
+		{
+			desc: "valid Timespan",
+			columns: Columns{
+				{ColumnType: CTTimespan, ColumnName: "timespan"},
+				{ColumnType: CTTimespan, ColumnName: "ptrTimespan"},
+				{ColumnType: CTTimespan, ColumnName: "kTimespan"},
+				{ColumnType: CTTimespan, ColumnName: "PtrkTimespan"},
+			},
+			k: types.Timespan{Value: 2 * time.Minute, Valid: true},
+			ptrStruct: &struct {
+				Timespan     time.Duration  `kusto:"timespan"`
+				PtrTimespan  *time.Duration `kusto:"ptrTimespan"`
+				KTimespan    types.Timespan `kusto:"kTimespan"`
+				PtrkTimespan *types.Timespan
+			}{},
+			err: false,
+			want: &struct {
+				Timespan     time.Duration  `kusto:"timespan"`
+				PtrTimespan  *time.Duration `kusto:"ptrTimespan"`
+				KTimespan    types.Timespan `kusto:"kTimespan"`
+				PtrkTimespan *types.Timespan
+			}{2 * time.Minute, durationPtr(2 * time.Minute), types.Timespan{Value: 2 * time.Minute, Valid: true}, &types.Timespan{Value: 2 * time.Minute, Valid: true}},
+		},
+		{
+			desc: "non-valid Timespan",
+			columns: Columns{
+				{ColumnType: CTTimespan, ColumnName: "timespan"},
+				{ColumnType: CTTimespan, ColumnName: "ptrTimespan"},
+				{ColumnType: CTTimespan, ColumnName: "kTimespan"},
+				{ColumnType: CTTimespan, ColumnName: "PtrkTimespan"},
+			},
+			k: types.Timespan{Value: 0, Valid: false},
+			ptrStruct: &struct {
+				Timespan     time.Duration  `kusto:"timespan"`
+				PtrTimespan  *time.Duration `kusto:"ptrTimespan"`
+				KTimespan    types.Timespan `kusto:"kTimespan"`
+				PtrkTimespan *types.Timespan
+			}{},
+			err: false,
+			want: &struct {
+				Timespan     time.Duration  `kusto:"timespan"`
+				PtrTimespan  *time.Duration `kusto:"ptrTimespan"`
+				KTimespan    types.Timespan `kusto:"kTimespan"`
+				PtrkTimespan *types.Timespan
+			}{0, nil, types.Timespan{Value: 0, Valid: false}, &types.Timespan{Value: 0, Valid: false}},
+		},
+		{
+			desc: "valid Decimal",
+			columns: Columns{
+				{ColumnType: CTDecimal, ColumnName: "decimal"},
+				{ColumnType: CTDecimal, ColumnName: "ptrDecimal"},
+				{ColumnType: CTDecimal, ColumnName: "kDecimal"},
+				{ColumnType: CTDecimal, ColumnName: "PtrkDecimal"},
+			},
+			k: types.Decimal{Value: "0.1", Valid: true},
+			ptrStruct: &struct {
+				Decimal     string        `kusto:"decimal"`
+				PtrDecimal  *string       `kusto:"ptrDecimal"`
+				KDecimal    types.Decimal `kusto:"kDecimal"`
+				PtrkDecimal *types.Decimal
+			}{},
+			err: false,
+			want: &struct {
+				Decimal     string        `kusto:"decimal"`
+				PtrDecimal  *string       `kusto:"ptrDecimal"`
+				KDecimal    types.Decimal `kusto:"kDecimal"`
+				PtrkDecimal *types.Decimal
+			}{"0.1", stringPtr("0.1"), types.Decimal{Value: "0.1", Valid: true}, &types.Decimal{Value: "0.1", Valid: true}},
+		},
 	}
 
 	for _, test := range tests {
@@ -446,4 +515,8 @@ func float64Ptr(f float64) *float64 {
 
 func stringPtr(s string) *string {
 	return &s
+}
+
+func durationPtr(d time.Duration) *time.Duration {
+	return &d
 }

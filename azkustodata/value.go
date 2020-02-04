@@ -55,7 +55,7 @@ func (f fields) match(col Column) string {
 	return f.colNameToFieldName[col.ColumnName]
 }
 
-// convert convers a KustoValue that is for Column col into "v" reflect.Value with reflect.Type "t".
+// convert converts a KustoValue that is for Column col into "v" reflect.Value with reflect.Type "t".
 func (f fields) convert(col Column, k types.KustoValue, t reflect.Type, v reflect.Value) error {
 	fieldName, ok := f.colNameToFieldName[col.ColumnName]
 	if !ok {
@@ -84,7 +84,7 @@ func (f fields) convert(col Column, k types.KustoValue, t reflect.Type, v reflec
 	case CTString:
 		return stringConvert(fieldName, col, k, t, v)
 	case CTTimespan:
-		return fmt.Errorf("Timespan type is not supported")
+		return timespanConvert(fieldName, col, k, t, v)
 	case CTDecimal:
 		return fmt.Errorf("Decimal type is not supported")
 	}
@@ -148,6 +148,34 @@ func dateTimeConvert(fieldName string, col Column, k types.KustoValue, t reflect
 		return nil
 	}
 	return fmt.Errorf("column %s could not store in struct.%s: column was type Kusto.DateTime, struct had type %s ", col.ColumnName, fieldName, sf.Type.Name())
+}
+
+func timespanConvert(fieldName string, col Column, k types.KustoValue, t reflect.Type, v reflect.Value) error {
+	val, ok := k.(types.Timespan)
+	if !ok {
+		return fmt.Errorf("Column %s is type %s was trying to store a KustoValue type of %T", col.ColumnName, col.ColumnType, k)
+	}
+	sf, _ := t.Elem().FieldByName(fieldName)
+	switch {
+	case sf.Type.AssignableTo(reflect.TypeOf(time.Duration(0))):
+		if val.Valid {
+			v.Elem().FieldByName(fieldName).Set(reflect.ValueOf(val.Value))
+		}
+		return nil
+	case sf.Type.ConvertibleTo(reflect.TypeOf(new(time.Duration))):
+		if val.Valid {
+			t := &val.Value
+			v.Elem().FieldByName(fieldName).Set(reflect.ValueOf(t))
+		}
+		return nil
+	case sf.Type.ConvertibleTo(reflect.TypeOf(types.Timespan{})):
+		v.Elem().FieldByName(fieldName).Set(reflect.ValueOf(val))
+		return nil
+	case sf.Type.ConvertibleTo(reflect.TypeOf(&types.Timespan{})):
+		v.Elem().FieldByName(fieldName).Set(reflect.ValueOf(&val))
+		return nil
+	}
+	return fmt.Errorf("column %s could not store in struct.%s: column was type Kusto.Timespan, struct had type %s ", col.ColumnName, fieldName, sf.Type.Name())
 }
 
 func dynamicConvert(fieldName string, col Column, k types.KustoValue, t reflect.Type, v reflect.Value) error {

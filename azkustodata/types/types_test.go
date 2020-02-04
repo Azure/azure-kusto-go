@@ -2,6 +2,7 @@ package types
 
 import (
 	"encoding/json"
+	"fmt"
 	"math"
 	"testing"
 	"time"
@@ -417,6 +418,113 @@ func TestString(t *testing.T) {
 
 		if diff := pretty.Compare(test.want, got); diff != "" {
 			t.Errorf("TestString(%s): -want/+got:\n%s", test.desc, diff)
+		}
+	}
+}
+
+func TestTimespan(t *testing.T) {
+	tests := []struct {
+		desc string
+		i    interface{}
+		err  bool
+		want Timespan
+	}{
+		{
+			desc: "value is non-nil and non-string",
+			i:    23,
+			err:  true,
+		},
+		{
+			desc: "value is nil",
+			i:    nil,
+			want: Timespan{},
+		},
+		{
+			desc: "value is string, but doesn't represent a time",
+			i:    "hello world",
+			err:  true,
+		},
+		{
+			desc: "value is string, but doesn't split right",
+			i:    "00:00",
+			err:  true,
+		},
+		{i: "00:00:00", want: Timespan{Valid: true}},
+		{i: "00:00:03", want: Timespan{Value: 3 * time.Second, Valid: true}},
+		{i: "00:04:03", want: Timespan{Value: 4*time.Minute + 3*time.Second, Valid: true}},
+		{i: "02:04:03", want: Timespan{Value: 2*time.Hour + 4*time.Minute + 3*time.Second, Valid: true}},
+		{i: "00:00:00.099", want: Timespan{Value: 99 * time.Millisecond, Valid: true}},
+		{i: "02:04:03.0123", want: Timespan{Value: 2*time.Hour + 4*time.Minute + 3*time.Second + 12300*time.Microsecond, Valid: true}},
+		{i: "01.00:00:00", want: Timespan{Value: 24 * time.Hour, Valid: true}},
+		{i: "02.04:05:07", want: Timespan{Value: 2*24*time.Hour + 4*time.Hour + 5*time.Minute + 7*time.Second, Valid: true}},
+		{i: "-01.00:00:00", want: Timespan{Value: -24 * time.Hour, Valid: true}},
+		{i: "-02.04:05:07", want: Timespan{Value: time.Duration(-1) * (2*24*time.Hour + 4*time.Hour + 5*time.Minute + 7*time.Second), Valid: true}},
+		{i: "00.00:00.00:00.000", want: Timespan{Valid: true}},
+		{i: "02.04:05:07.789", want: Timespan{Value: 2*24*time.Hour + 4*time.Hour + 5*time.Minute + 7*time.Second + 789*time.Millisecond, Valid: true}},
+		{i: "03.00:00:00.111", want: Timespan{Value: 3*24*time.Hour + 111*time.Millisecond, Valid: true}},
+		{i: "03.00:00:00.111", want: Timespan{Value: 3*24*time.Hour + 111*time.Millisecond, Valid: true}},
+		{i: "364.23:59:59.9999999", want: Timespan{Value: 364*day + 23*time.Hour + 59*time.Minute + 59*time.Second + 9999999*100*time.Nanosecond, Valid: true}},
+	}
+	for _, test := range tests {
+		if test.desc == "" {
+			test.desc = fmt.Sprintf("Conversion of %s", test.i)
+		}
+		got := Timespan{}
+		err := got.Unmarshal(test.i)
+		switch {
+		case err == nil && test.err:
+			t.Errorf("TestTimespan(%s): err == nil, want err != nil", test.desc)
+			continue
+		case err != nil && !test.err:
+			t.Errorf("TestTimespan(%s): err == %s, want err == nil", test.desc, err)
+			continue
+		case err != nil:
+			continue
+		}
+		if test.want != got {
+			t.Errorf("TestTimespan(%s): got %v, want %v", test.desc, got, test.want)
+		}
+	}
+}
+func TestDecimal(t *testing.T) {
+	tests := []struct {
+		desc string
+		i    interface{}
+		err  bool
+		want Decimal
+	}{
+		{
+			desc: "cannot be an string representing an integer",
+			i:    "1",
+			err:  true,
+		},
+		{
+			desc: "cannot be a non string",
+			i:    3.0,
+			err:  true,
+		},
+		{i: ".1", want: Decimal{Value: ".1", Valid: true}},
+		{i: "0.1", want: Decimal{Value: "0.1", Valid: true}},
+		{i: "3.07", want: Decimal{Value: "3.07", Valid: true}},
+	}
+	for _, test := range tests {
+		if test.desc == "" {
+			test.desc = fmt.Sprintf("Conversion of %s", test.i)
+		}
+		got := Decimal{}
+		err := got.Unmarshal(test.i)
+		switch {
+		case err == nil && test.err:
+			t.Errorf("TestDecimal(%s): err == nil, want err != nil", test.desc)
+			continue
+		case err != nil && !test.err:
+			t.Errorf("TestDecimal(%s): err == %s, want err == nil", test.desc, err)
+			continue
+		case err != nil:
+			continue
+		}
+		if test.want != got {
+			t.Errorf("TestDecimal(%s)internal string: got %v, want %v", test.desc, got, test.want)
 		}
 	}
 }
