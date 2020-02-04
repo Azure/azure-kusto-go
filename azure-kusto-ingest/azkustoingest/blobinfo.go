@@ -10,7 +10,7 @@ type IngestionBlobInfo struct {
 	properties map[string]interface{}
 }
 
-func NewIngestionBlobInfo(source map[string]string, props map[string]string, auth string) (*IngestionBlobInfo) {
+func NewIngestionBlobInfo(source map[string]string, props map[string]string, auth string) *IngestionBlobInfo {
 	var properties = make(map[string]interface{})
 
 	properties["BlobPath"] = source["path"]
