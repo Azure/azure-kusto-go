@@ -6,8 +6,8 @@ import (
 	"testing"
 	"time"
 
-	"github.com/Azure/azure-kusto-go/azure-kusto-data/azkustodata/errors"
-	"github.com/Azure/azure-kusto-go/azure-kusto-data/azkustodata/types"
+	"github.com/Azure/azure-kusto-go/azkustodata/errors"
+	"github.com/Azure/azure-kusto-go/azkustodata/types"
 
 	"github.com/google/uuid"
 	"github.com/kylelemons/godebug/pretty"
@@ -160,7 +160,7 @@ func TestNormalDecode(t *testing.T) {
 	}
 
 	dec := newDecoder(strings.NewReader(jsonStr), errors.OpQuery)
-	ch := dec.decode(ctx)
+	ch := dec.decodeV2(ctx)
 
 	fr := <-ch
 	frame1Got, ok := fr.(dataSetHeader)

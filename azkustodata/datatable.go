@@ -3,8 +3,8 @@ package azkustodata
 import (
 	"encoding/json"
 	"fmt"
-	"github.com/Azure/azure-kusto-go/azure-kusto-data/azkustodata/errors"
-	"github.com/Azure/azure-kusto-go/azure-kusto-data/azkustodata/types"
+	"github.com/Azure/azure-kusto-go/azkustodata/errors"
+	"github.com/Azure/azure-kusto-go/azkustodata/types"
 )
 
 // dataTable is used report information as a Table with Columns as row headers and Rows as the contained
@@ -25,6 +25,7 @@ type dataTable struct {
 
 	op errors.Op
 }
+
 
 func (dt *dataTable) unmarshalAttributes(m map[string]interface{}) (err error) {
 	// Check for general errors

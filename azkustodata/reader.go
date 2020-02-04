@@ -9,8 +9,8 @@ import (
 	"reflect"
 	"sync"
 
-	"github.com/Azure/azure-kusto-go/azure-kusto-data/azkustodata/errors"
-	"github.com/Azure/azure-kusto-go/azure-kusto-data/azkustodata/types"
+	"github.com/Azure/azure-kusto-go/azkustodata/errors"
+	"github.com/Azure/azure-kusto-go/azkustodata/types"
 )
 
 // Column describes a column descriptor.

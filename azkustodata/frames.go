@@ -4,8 +4,8 @@ import (
 	"encoding/json"
 	"fmt"
 
-	"github.com/Azure/azure-kusto-go/azure-kusto-data/azkustodata/errors"
-	"github.com/Azure/azure-kusto-go/azure-kusto-data/azkustodata/types"
+	"github.com/Azure/azure-kusto-go/azkustodata/errors"
+	"github.com/Azure/azure-kusto-go/azkustodata/types"
 )
 
 const (
@@ -114,6 +114,8 @@ const (
 	// tnQueryCompletionInformation is a dataTable.TableName associated with a TableKind of tkQueryCompletionInformation.
 	tnQueryCompletionInformation = "QueryCompletionInformation" // tkQueryCompletionInformation
 )
+
+
 
 // dataSetCompletion indicates the stream id done. It implements Frame.
 type dataSetCompletion struct {

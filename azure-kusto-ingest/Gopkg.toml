@@ -1,7 +1,0 @@
-[[constraint]]
-  version = "0.2.0"
-  name = "github.com/Azure/azure-storage-queue-go"
-
-[[constraint]]
-  version = "0.3.0"
-  name = "github.com/Azure/azure-storage-blob-go"

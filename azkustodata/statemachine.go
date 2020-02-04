@@ -8,7 +8,7 @@ import (
 	"fmt"
 	"sync"
 
-	"github.com/Azure/azure-kusto-go/azure-kusto-data/azkustodata/errors"
+	"github.com/Azure/azure-kusto-go/azkustodata/errors"
 )
 
 // stateFn represents a function that executes at a given state.
