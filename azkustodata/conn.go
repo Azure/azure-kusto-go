@@ -15,6 +15,7 @@ import (
 	"net/http"
 	"net/url"
 	"strings"
+	"sync"
 	"time"
 
 	"github.com/Azure/azure-kusto-go/azkustodata/errors"
@@ -22,6 +23,12 @@ import (
 	"github.com/Azure/go-autorest/autorest"
 	"github.com/google/uuid"
 )
+
+var bufferPool = sync.Pool{
+	New: func() interface{} {
+		return &bytes.Buffer{}
+	},
+}
 
 // conn provides connectivity to a Kusto instance.
 type conn struct {
@@ -120,13 +127,15 @@ func newKustoRequest(ctx context.Context, c conn, op errors.Op, db string, query
 	}()
 
 	var endpoint *url.URL
-	var q []byte
+	buff := bufferPool.Get().(*bytes.Buffer)
+	buff.Reset()
+	defer bufferPool.Put(buff)
 
 	headers.Add("Content-Type", "application/json; charset=utf-8")
 	headers.Add("x-ms-client-request-id", "KGC.execute;"+uuid.New().String())
 
 	var err error
-	q, err = json.Marshal(
+	err = json.NewEncoder(buff).Encode(
 		queryMsg{
 			DB:         db,
 			CSL:        query,
@@ -147,7 +156,7 @@ func newKustoRequest(ctx context.Context, c conn, op errors.Op, db string, query
 		Method: http.MethodPost,
 		URL:    endpoint,
 		Header: headers,
-		Body:   ioutil.NopCloser(bytes.NewBuffer(q)),
+		Body:   ioutil.NopCloser(buff),
 	}
 
 	if c.auth != nil {

@@ -248,7 +248,6 @@ func (p *progressiveSM) completion() (stateFn, error) {
 	}
 	if p.currentHeader.TableKind == tkPrimaryResult {
 		// Do nothing here.
-		//p.iter.inCompletion <-p.currentFrame.(TableCompletion)
 	} else {
 		p.iter.inNonPrimary <- *p.nonPrimary
 	}
