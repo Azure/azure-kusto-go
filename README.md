@@ -1,55 +1,61 @@
+# Microsoft Azure Kusto (Azure Data Explorer) SDK for Go
 
-# Usage
+### Install
+
+* `go get github.com/Azure/azure-kusto-go`
+
+### Minimum Requirements
+
+* go version go1.13.3
+
+### Authentication Methods:
+
+* AAD application - Provide app ID and app key
+
+### Usage
 
 ```go
-cluster := "https://mycluster.region.kusto.windows.net"
-appId := ""
-appKey := ""
-tenantId := ""
-kustoContext, err := azkustodata.AuthenticateWithAadApp(cluster, appId, appKey, tenantId)
+package main
 
-if (err != nil) {
-    panic(err)
-}
+import (
+    "context"
+    "fmt"
 
-client := azkustodata.NewKustoClient(*kustoContext)
+    "github.com/Azure/azure-kusto-go/azure-kusto-data/azkustodata"
+    "github.com/Azure/go-autorest/autorest/azure/auth"
+)
 
-db := "SampleDB"
-query := "SampleTable | count"
+func main() {
+    cluster := "https://sampleCluster.kusto.windows.net"
+    appId := ""
+    appKey := ""
+    tenantId := ""
 
-iter, err := kustoClient.Query(ctx, db, query)
-if err != nil {
-    panic(err)
-}
+    authorizerConfig := auth.NewClientCredentialsConfig(appId, appKey, tenantId)
+    authorization := azkustodata.Authorization{
+        Config: authorizerConfig,
+    }
 
-defer iter.Stop()
-
-
-
-// Loop through the iterated results, read them into our UserID structs and append them
-// to our list of recs.
-var recs []CountResult
-for {
-    row, err := iter.Next()
+    kustoClient, err := azkustodata.New(cluster, authorization)
     if err != nil {
-        // This indicates we are done.
-        if err == io.EOF {
-            break
-        }
-        // We ran into an error during the stream.
         panic(err)
     }
-    rec := CountResult{}
-    if err := row.ToStruct(&rec); err != nil {
-        panic(err)
-    }
-    recs = append(recs, rec)
-}
 
-print(recs)
+    ctx := context.Background()
+
+    db := "SampleDB"
+    query := "SampleTable | take 10"
+
+    response, err := kustoClient.Query(ctx, db, query)
+    if err != nil {
+        panic(err)
+    }
+
+    fmt.Println(response)
+}
 ```
 
-# Contributing
+### Contributing
 
 This project welcomes contributions and suggestions.  Most contributions require you to agree to a
 Contributor License Agreement (CLA) declaring that you have the right to, and actually do, grant us
@@ -62,3 +68,10 @@ provided by the bot. You will only need to do this once across all repos using o
 This project has adopted the [Microsoft Open Source Code of Conduct](https://opensource.microsoft.com/codeofconduct/).
 For more information see the [Code of Conduct FAQ](https://opensource.microsoft.com/codeofconduct/faq/) or
 contact [opencode@microsoft.com](mailto:opencode@microsoft.com) with any additional questions or comments.
+
+### Looking for SDKs for other languages/platforms?
+
+- [Node](https://github.com/azure/azure-kusto-node)
+- [Java](https://github.com/azure/azure-kusto-java)
+- [.NET](https://docs.microsoft.com/en-us/azure/kusto/api/netfx/about-the-sdk)
+- [Python](https://github.com/Azure/azure-kusto-python)
