@@ -23,7 +23,7 @@ import (
     "context"
     "fmt"
 
-    "github.com/Azure/azure-kusto-go/azkustodata"
+    "github.com/Azure/azure-kusto-go/data"
     "github.com/Azure/go-autorest/autorest/azure/auth"
 )
 
@@ -34,7 +34,7 @@ func main() {
     tenantId := ""
 
     authorizerConfig := auth.NewClientCredentialsConfig(appId, appKey, tenantId)
-    authorization := azkustodata.Authorization{
+    authorization := data.Authorization{
         Config: authorizerConfig,
     }
 
@@ -79,8 +79,8 @@ package main
 import (
 	"context"
 	"fmt"
-	"github.com/Azure/azure-kusto-go/azkustodata"
-	"github.com/Azure/azure-kusto-go/azkustoingest"
+	"github.com/Azure/azure-kusto-go/data"
+	"github.com/Azure/azure-kusto-go/ingest"
 	"github.com/Azure/go-autorest/autorest/azure/auth"
 	"io"
 )
@@ -93,13 +93,13 @@ func main()  {
     tenantId := ""
 
     authorizerConfig := auth.NewClientCredentialsConfig(appId, appKey, tenantId)
-    authorization := azkustodata.Authorization{
+    authorization := data.Authorization{
         Config: authorizerConfig,
     }
     
-    ingestor := azkustoingest.New(dm, authorization)
+    ingestor := ingest.New(dm, authorization)
     	url := "https://mystorageaccount.blob.core.windows.net/container/folder/data.json?sp=r&st=2020-02-01T18:51:17Z&se=2020-12-13T02:51:17Z&spr=https&sv=2019-02-02&sr=b&sig=***"
-    	err := ingestor.IngestFromStorage(url, azkustoingest.IngestionProperties{
+    	err := ingestor.IngestFromStorage(url, ingest.IngestionProperties{
     		DatabaseName:        "Database",
     		TableName:           "Table",
     		FlushImmediately:    true,

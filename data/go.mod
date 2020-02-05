@@ -1,4 +1,4 @@
-module github.com/Azure/azure-kusto-go/azkustodata
+module github.com/Azure/azure-kusto-go/data
 
 go 1.13
 

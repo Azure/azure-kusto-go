@@ -1,4 +1,4 @@
-package azkustodata
+package data
 
 // queryopts.go holds the varying QueryOption constructors as the list is so long that
 // it clogs up the main kusto.go file.

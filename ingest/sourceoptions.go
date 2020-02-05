@@ -1,4 +1,4 @@
-package azkustoingest
+package ingest
 
 type SourceOptions struct {
 

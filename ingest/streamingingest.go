@@ -1,16 +1,16 @@
-package azkustoingest
+package ingest
 
 import (
-	"github.com/Azure/azure-kusto-go/azkustodata"
+	"azure-kusto-go/data"
 )
 
 type StreamingIngestClient struct {
-	client          *azkustodata.Client
+	client          *data.Client
 	resourceManager resourceManager
 }
 
-func NewStreamingIngestClient(dmEndpoint string, authorization azkustodata.Authorization) *IngestClient {
-	dmClient, _ := azkustodata.New(dmEndpoint, authorization);
+func NewStreamingIngestClient(dmEndpoint string, authorization data.Authorization) *IngestClient {
+	dmClient, _ := data.New(dmEndpoint, authorization);
 	return &IngestClient{
 		client: dmClient,
 		resourceManager: resourceManager{

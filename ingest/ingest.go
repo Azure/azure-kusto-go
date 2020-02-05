@@ -1,11 +1,11 @@
-package azkustoingest
+package ingest
 
 import (
+	"azure-kusto-go/data"
 	"context"
 	"encoding/base64"
 	"encoding/json"
 	"fmt"
-	"github.com/Azure/azure-kusto-go/azkustodata"
 	"github.com/Azure/azure-storage-blob-go/azblob"
 	"github.com/Azure/azure-storage-queue-go/azqueue"
 	"math/rand"
@@ -14,12 +14,12 @@ import (
 )
 
 type IngestClient struct {
-	client          *azkustodata.Client
+	client          *data.Client
 	resourceManager resourceManager
 }
 
-func New(dmEndpoint string, authorization azkustodata.Authorization) *IngestClient {
-	dmClient, _ := azkustodata.New(dmEndpoint, authorization);
+func New(dmEndpoint string, authorization data.Authorization) *IngestClient {
+	dmClient, _ := data.New(dmEndpoint, authorization);
 	return &IngestClient{
 		client: dmClient,
 		resourceManager: resourceManager{

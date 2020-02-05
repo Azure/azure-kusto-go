@@ -1,4 +1,4 @@
-package azkustodata
+package data
 
 import (
 	"context"

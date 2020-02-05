@@ -1,4 +1,4 @@
-package azkustodata
+package data
 
 // decoder.go provides a JSON stream decoder into Go native Kusto Frames.
 
@@ -18,8 +18,8 @@ import (
 	"io"
 	"sync"
 
-	"github.com/Azure/azure-kusto-go/azkustodata/errors"
-	"github.com/Azure/azure-kusto-go/azkustodata/types"
+	"azure-kusto-go/data/errors"
+	"azure-kusto-go/data/types"
 )
 
 // pool provides a package level pool of map[string]interface{} to lower our allocations for decoding.

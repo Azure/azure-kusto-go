@@ -1,10 +1,10 @@
-package azkustodata
+package data
 
 import (
 	"encoding/json"
 	"testing"
 
-	"github.com/Azure/azure-kusto-go/azkustodata/types"
+	"azure-kusto-go/data/types"
 
 	"github.com/kylelemons/godebug/pretty"
 )

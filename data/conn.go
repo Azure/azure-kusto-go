@@ -1,4 +1,4 @@
-package azkustodata
+package data
 
 // conn.go holds the connection to the Kusto server and provides methods to do queries
 // and receive Kusto frames back.
@@ -18,7 +18,7 @@ import (
 	"sync"
 	"time"
 
-	"github.com/Azure/azure-kusto-go/azkustodata/errors"
+	"azure-kusto-go/data/errors"
 
 	"github.com/Azure/go-autorest/autorest"
 	"github.com/google/uuid"

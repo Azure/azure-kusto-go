@@ -1,8 +1,8 @@
-package azkustoingest
+package ingest
 
 import (
-	"github.com/Azure/azure-kusto-go/azkustodata"
-	"github.com/Azure/azure-kusto-go/azkustodata/types"
+	"azure-kusto-go/data"
+	"azure-kusto-go/data/types"
 	"context"
 	"fmt"
 	"regexp"
@@ -38,7 +38,7 @@ func ParseUri(uri string) resourceUri {
 }
 
 type resourceManager struct {
-	client    *azkustodata.Client
+	client    *data.Client
 	resources *ingestionResources
 }
 

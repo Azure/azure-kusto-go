@@ -1,4 +1,4 @@
-package azkustodata
+package data
 
 // Reader provides a Reader object for Querying Kusto and turning it into Go objects and types.
 
@@ -9,8 +9,8 @@ import (
 	"reflect"
 	"sync"
 
-	"github.com/Azure/azure-kusto-go/azkustodata/errors"
-	"github.com/Azure/azure-kusto-go/azkustodata/types"
+	"azure-kusto-go/data/errors"
+	"azure-kusto-go/data/types"
 )
 
 // Column describes a column descriptor.

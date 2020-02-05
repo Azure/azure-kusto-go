@@ -2,7 +2,7 @@
 Package kusto provides a Kusto client for accessing Kusto storage.
 Author: jdoak@microsoft.com
 */
-package azkustodata
+package data
 
 import (
 	"context"
@@ -12,7 +12,7 @@ import (
 	"sync"
 	"time"
 
-	"github.com/Azure/azure-kusto-go/azkustodata/errors"
+	"azure-kusto-go/data/errors"
 
 	"github.com/Azure/go-autorest/autorest"
 	"github.com/Azure/go-autorest/autorest/azure/auth"

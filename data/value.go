@@ -1,4 +1,4 @@
-package azkustodata
+package data
 
 // value.go provides methods for converting a row to a *struct and for converting KustoValue into Go types.
 
@@ -9,7 +9,7 @@ import (
 	"strings"
 	"time"
 
-	"github.com/Azure/azure-kusto-go/azkustodata/types"
+	"azure-kusto-go/data/types"
 
 	"github.com/google/uuid"
 )

@@ -1,4 +1,4 @@
-package azkustodata
+package data
 
 // statemachine.go provides statemachines for interpreting frame streams for varying Kusto options.
 // Based on the standard Go statemachine design by Rob Pike.
@@ -8,7 +8,7 @@ import (
 	"fmt"
 	"sync"
 
-	"github.com/Azure/azure-kusto-go/azkustodata/errors"
+	"azure-kusto-go/data/errors"
 )
 
 // stateFn represents a function that executes at a given state.

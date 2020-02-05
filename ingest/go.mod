@@ -1,9 +1,9 @@
-module github.com/Azure/azure-kusto-go/azkustoingest
+module github.com/Azure/azure-kusto-go/ingest
 
 go 1.13
 
 require (
-	github.com/Azure/azure-kusto-go/azkustodata v0.0.0-00010101000000-000000000000 // indirect
+	github.com/Azure/azure-kusto-go/data v0.0.0-00010101000000-000000000000 // indirect
 	github.com/Azure/azure-storage-blob-go v0.8.0 // indirect
 	github.com/Azure/azure-storage-queue-go v0.0.0-20191125232315-636801874cdd // indirect
 	github.com/satori/go.uuid v1.2.0 // indirect
