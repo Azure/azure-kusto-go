@@ -7,6 +7,7 @@ import (
 	"time"
 )
 
+// TODO (daniel) : some of these should be string enums
 type IngestionProperties struct {
 	DatabaseName        string
 	TableName           string
@@ -16,6 +17,7 @@ type IngestionProperties struct {
 	ReportMethod        int
 }
 
+// TODO (daniel) : some of these should be string enums (or consts)
 type AdditionalProperties struct {
 	AuthContext          string `json:"authorizationContext,omitempty"`
 	IngestionMapping     string `json:"ingestionMapping,omitempty"`
@@ -43,7 +45,7 @@ type ingestionBlobInfo struct {
 }
 
 func newIngestionBlobInfo(source map[string]string, props IngestionProperties, auth string) *ingestionBlobInfo {
-	sourceId, found := source["Id"]
+	sourceId, found := source["id"]
 
 	if !found {
 		sourceId = fmt.Sprint(uuid.NewV4())

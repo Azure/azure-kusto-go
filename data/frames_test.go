@@ -4,7 +4,7 @@ import (
 	"encoding/json"
 	"testing"
 
-	"azure-kusto-go/data/types"
+	"github.com/Azure/azure-kusto-go/data/types"
 
 	"github.com/kylelemons/godebug/pretty"
 )

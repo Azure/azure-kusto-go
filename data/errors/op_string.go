@@ -12,11 +12,12 @@ func _() {
 	_ = x[OpQuery-1]
 	_ = x[OpMgmt-2]
 	_ = x[OpServConn-3]
+	_ = x[OpStreamingIngest-4]
 }
 
-const _Op_name = "OpUnknownOpQueryOpMgmtOpServConn"
+const _Op_name = "OpUnknownOpQueryOpMgmtOpServConnOpStreamingIngest"
 
-var _Op_index = [...]uint8{0, 9, 16, 22, 32}
+var _Op_index = [...]uint8{0, 9, 16, 22, 32, 42}
 
 func (i Op) String() string {
 	if i >= Op(len(_Op_index)-1) {

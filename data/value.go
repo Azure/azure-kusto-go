@@ -9,7 +9,7 @@ import (
 	"strings"
 	"time"
 
-	"azure-kusto-go/data/types"
+	"github.com/Azure/azure-kusto-go/data/types"
 
 	"github.com/google/uuid"
 )

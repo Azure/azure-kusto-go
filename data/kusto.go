@@ -12,7 +12,7 @@ import (
 	"sync"
 	"time"
 
-	"azure-kusto-go/data/errors"
+	"github.com/Azure/azure-kusto-go/data/errors"
 
 	"github.com/Azure/go-autorest/autorest"
 	"github.com/Azure/go-autorest/autorest/azure/auth"
@@ -32,9 +32,14 @@ type manager interface {
 	mgmt(ctx context.Context, db, query string, options ...QueryOption) (chan frame, error)
 }
 
+type streamer interface {
+	stream(ctx context.Context, db, table string, data []byte, format string, mappingRef *string, options ...QueryOption) (error)
+}
+
 type executor interface {
 	queryer
 	manager
+	streamer
 }
 
 // Authorization provides the ADAL authorizer needed to access the resource. You can set Authorizer or
@@ -241,4 +246,18 @@ func (c *Client) Mgmt(ctx context.Context, db, query string, options ...QueryOpt
 	default:
 		panic("huh?")
 	}
+}
+
+// Stream is used to do Streaming ingestion
+// TODO: format should be a closed set (or a string enum)
+func (c *Client) Stream(ctx context.Context, db, table string, data []byte, format string, mappingRef *string, options ...QueryOption) (error) {
+	c.mu.Lock()
+	defer c.mu.Unlock()
+
+	ctx, _ = context.WithCancel(context.Background()) // Note: cancel is called when *RowIterator has Stop() called.
+	err := c.conn.stream(ctx, db, table,data, format, mappingRef, options...)
+	if err != nil {
+		return fmt.Errorf("error with Query: %s", err)
+	}
+	return nil
 }

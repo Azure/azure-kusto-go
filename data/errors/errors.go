@@ -30,10 +30,11 @@ type Op uint16
 
 //go:generate stringer -type Op
 const (
-	OpUnknown  Op = 0 // OpUnknown indicates that the operation that caused the problem is unknown.
-	OpQuery    Op = 1 // OpQuery indicates that a Query() call is being made.
-	OpMgmt     Op = 2 // OpMgmt indicates that a Mgmt() call is being made.
-	OpServConn Op = 3 // OpServConn indicates that the client is attempting to connect to the service.
+	OpUnknown         Op = 0 // OpUnknown indicates that the operation that caused the problem is unknown.
+	OpQuery           Op = 1 // OpQuery indicates that a Query() call is being made.
+	OpMgmt            Op = 2 // OpMgmt indicates that a Mgmt() call is being made.
+	OpServConn        Op = 3 // OpServConn indicates that the client is attempting to connect to the service.
+	OpStreamingIngest Op = 4 // OpQuery indicates that a StreamingIngest() call is being made.
 )
 
 // Kind field classifies the error as one of a set of standard conditions.

@@ -6,8 +6,8 @@ import (
 	"testing"
 	"time"
 
-	"azure-kusto-go/data/errors"
-	"azure-kusto-go/data/types"
+	"github.com/Azure/azure-kusto-go/data/errors"
+	"github.com/Azure/azure-kusto-go/data/types"
 
 	"github.com/google/uuid"
 	"github.com/kylelemons/godebug/pretty"

@@ -18,7 +18,7 @@ import (
 	"sync"
 	"time"
 
-	"azure-kusto-go/data/errors"
+	"github.com/Azure/azure-kusto-go/data/errors"
 
 	"github.com/Azure/go-autorest/autorest"
 	"github.com/google/uuid"
@@ -56,7 +56,7 @@ func newConn(endpoint string, auth Authorization, timeout time.Duration) (*conn,
 		auth:        auth.Authorizer,
 		endMgmt:     &url.URL{Scheme: u.Scheme, Host: u.Host, Path: "/v1/rest/mgmt"},
 		endQuery:    &url.URL{Scheme: u.Scheme, Host: u.Host, Path: "/v2/rest/query"},
-		streamQuery: &url.URL{Scheme: u.Scheme, Host: u.Host, Path: "/v1/rest/ingest/"},
+		streamQuery: &url.URL{Scheme: u.Scheme, Host: u.Host, Path: "/v1/rest/ingest"},
 		reqHeaders:  headers,
 		headersPool: make(chan http.Header, 100),
 		client: &http.Client{
@@ -94,7 +94,7 @@ func (c *conn) query(ctx context.Context, db, query string, options ...QueryOpti
 		o(opt)
 	}
 
-	return c.execute(ctx, execQuery, db, query, "", *opt.requestProperties)
+	return c.execute(ctx, execQuery, db, query, nil, *opt.requestProperties)
 }
 
 // mgmt is used to do management queries to Kusto.
@@ -110,13 +110,87 @@ func (c *conn) mgmt(ctx context.Context, db, query string, options ...QueryOptio
 		o(opt)
 	}
 
-	return c.execute(ctx, execMgmt, db, query, "", *opt.requestProperties)
+	return c.execute(ctx, execMgmt, db, query, nil, *opt.requestProperties)
+}
+
+// stream is used to do streaming ingestion to Kusto.
+// TODO (daniel): methods should be consolidated better
+func (c *conn) stream(ctx context.Context, db, table string, data []byte, format string, mappingRef *string, options ...QueryOption) error {
+	opt := &queryOptions{
+		requestProperties: &requestProperties{
+			Options:    map[string]interface{}{},
+			Parameters: map[string]interface{}{},
+		},
+	}
+
+	for _, o := range options {
+		o(opt)
+	}
+
+	var op errors.Op
+
+	headers := <-c.headersPool
+	// TODO (daniel): ask John why this is done async
+	go func() {
+		c.headersPool <- copyHeaders(c.reqHeaders)
+	}()
+
+	var endpoint *url.URL
+
+	headers.Add("Content-Type", "gzip")
+	headers.Add("x-ms-client-request-id", "KGC.execute;"+uuid.New().String())
+
+	updatedUri := fmt.Sprintf(`%s/%s/%s?streamFormat=%s`, c.streamQuery, db, table, format)
+	if mappingRef != nil {
+		updatedUri += "&mappingName=" + *mappingRef
+	}
+
+	endpoint, err := url.Parse(updatedUri)
+
+	if err != nil {
+		panic(err)
+	}
+
+	req := &http.Request{
+		Method: http.MethodPost,
+		URL:    endpoint,
+		Header: headers,
+		// TODO (daniel): does this make sense?
+		Body: ioutil.NopCloser(bytes.NewReader(data)),
+	}
+
+	if c.auth != nil {
+		prep := c.auth.WithAuthorization()
+		req, err = prep(autorest.CreatePreparer()).Prepare(req)
+	}
+
+	if err != nil {
+		return errors.E(op, errors.KClientInternal, err)
+	}
+
+	req.WithContext(ctx)
+
+	resp, err := c.client.Do(req)
+
+	if err != nil {
+		// TODO(jdoak): We need a http error unwrap function that pulls out an *errors.Error.
+		return errors.E(op, errors.KHTTPError, err)
+	}
+
+	if resp.StatusCode != 200 {
+		// TODO(jdoak): We need to make this more verbose to be compliant with API guidelines.
+		return errors.E(op, errors.KHTTPError, fmt.Errorf("received non 200 (OK) response from server, got: %s", resp.Status))
+	}
+
+	// TODO: should probably read the error from the response
+	return nil
 }
 
 const (
 	execUnknown = 0
 	execQuery   = 1
 	execMgmt    = 2
+	execStream  = 3
 )
 
 func newKustoRequest(ctx context.Context, c conn, op errors.Op, db string, query string, properties requestProperties) (*http.Request, error) {
@@ -146,17 +220,23 @@ func newKustoRequest(ctx context.Context, c conn, op errors.Op, db string, query
 		return nil, errors.E(op, errors.KClientInternal, fmt.Errorf("could not JSON marshal the Query message: %s", err))
 	}
 
-	if op == errors.OpQuery {
-		endpoint = c.endQuery
-	} else {
+	switch op {
+	case execMgmt:
 		endpoint = c.endMgmt
+	case execQuery:
+		endpoint = c.endQuery
+	case execStream:
+		endpoint = c.streamQuery
+	default:
+		panic("unknown operation requested.")
 	}
 
 	req := &http.Request{
 		Method: http.MethodPost,
 		URL:    endpoint,
 		Header: headers,
-		Body:   ioutil.NopCloser(buff),
+		// TODO (daniel): change this to payload
+		Body: ioutil.NopCloser(buff),
 	}
 
 	if c.auth != nil {
@@ -193,8 +273,15 @@ func bodyFromResponse(resp http.Response, op errors.Op) (io.Reader, error) {
 	return body, nil
 }
 
-func (c *conn) execute(ctx context.Context, execType int, db, query string, payload string, properties requestProperties) (chan frame, error) {
+type execResp struct {
+	reqHeader  http.Header
+	respHeader http.Header
+	frameCh    chan frame
+}
+
+func (c *conn) execute(ctx context.Context, execType int, db, query string, payload chan []byte, properties requestProperties) (chan frame, error) {
 	var op errors.Op
+
 	if execType == execQuery {
 		op = errors.OpQuery
 	} else if execType == execMgmt {

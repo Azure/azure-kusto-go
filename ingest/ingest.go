@@ -1,7 +1,7 @@
 package ingest
 
 import (
-	"azure-kusto-go/data"
+	"github.com/Azure/azure-kusto-go/data"
 	"context"
 	"encoding/base64"
 	"encoding/json"
@@ -12,6 +12,17 @@ import (
 	"net/url"
 	"os"
 )
+
+type StorageSourceOptions struct {
+	Id *string
+	Size *int
+}
+
+type StreamSourceOptions struct {
+	Id *string
+	// TODO (daniel): should be enum
+	Format string
+}
 
 type IngestClient struct {
 	client          *data.Client
@@ -30,15 +41,11 @@ func New(dmEndpoint string, authorization data.Authorization) *IngestClient {
 }
 
 type StorageIngestor interface {
-	IngestFromStorage(path string, options StorageSourceOptions) (error)
+	IngestFromStorage(path string,  props IngestionProperties, options StorageSourceOptions) (error)
 }
 
 type StreamIngestor interface {
-	IngestFromStream(stream chan []byte, options StreamSourceOptions)
-}
-
-func (ic IngestClient) IngestFromStream(stream chan []byte, options StreamSourceOptions) {
-
+	IngestFromStream(stream chan []byte, props IngestionProperties, options StreamSourceOptions)
 }
 
 func uploadFileToBlobStorage(ctx context.Context, fileName string, containerURL azblob.ContainerURL) azblob.BlockBlobURL {
@@ -68,7 +75,7 @@ func uploadFileToBlobStorage(ctx context.Context, fileName string, containerURL 
 func (ic IngestClient) ingestFromLocalStorage(
 	path string,
 	props IngestionProperties,
-	options map[string]string) (error) {
+	options *StorageSourceOptions) (error) {
 	storages, err := ic.resourceManager.getStorageAccounts(context.Background())
 
 	if err != nil {
@@ -93,7 +100,7 @@ func (ic IngestClient) ingestFromLocalStorage(
 	return ic.ingestFromCloudStorage(fmt.Sprint(blobUrl), props, options)
 }
 
-func (ic IngestClient) ingestFromCloudStorage(path string, props IngestionProperties, options map[string]string) (error) {
+func (ic IngestClient) ingestFromCloudStorage(path string, props IngestionProperties, options *StorageSourceOptions) (error) {
 	queues, err := ic.resourceManager.getIngestionQueues(context.Background())
 
 	if err != nil {
@@ -113,6 +120,15 @@ func (ic IngestClient) ingestFromCloudStorage(path string, props IngestionProper
 
 	// TODO: better description of source
 	source := map[string]string{"path": path}
+
+	if options != nil {
+		if options.Id != nil {
+			source["id"] = *options.Id
+		}
+		if options.Id != nil {
+			source["size"] = *options.Id
+		}
+	}
 
 	auth, err := ic.resourceManager.getAuthContext(context.Background())
 
@@ -136,7 +152,8 @@ func (ic IngestClient) ingestFromCloudStorage(path string, props IngestionProper
 	return nil;
 }
 
-func (ic IngestClient) IngestFromStorage(path string, props IngestionProperties, options map[string]string) error {
+func (ic IngestClient) IngestFromStorage(path string, props IngestionProperties, options *StorageSourceOptions) error {
+
 	if _, err := url.ParseRequestURI(path); err == nil {
 		return ic.ingestFromCloudStorage(path, props, options)
 	} else {

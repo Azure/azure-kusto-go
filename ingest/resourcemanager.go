@@ -1,8 +1,8 @@
 package ingest
 
 import (
-	"azure-kusto-go/data"
-	"azure-kusto-go/data/types"
+	"github.com/Azure/azure-kusto-go/data"
+	"github.com/Azure/azure-kusto-go/data/types"
 	"context"
 	"fmt"
 	"regexp"

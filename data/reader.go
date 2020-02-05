@@ -9,8 +9,8 @@ import (
 	"reflect"
 	"sync"
 
-	"azure-kusto-go/data/errors"
-	"azure-kusto-go/data/types"
+	"github.com/Azure/azure-kusto-go/data/errors"
+	"github.com/Azure/azure-kusto-go/data/types"
 )
 
 // Column describes a column descriptor.
@@ -283,10 +283,10 @@ func (r *RowIterator) Progressive() bool {
 	return r.progressive
 }
 
-// NonPrimary will return a non-primary dataTable if it exists from the last query. The non-primary table kinds
+// getNonPrimary will return a non-primary dataTable if it exists from the last query. The non-primary table kinds
 // are defined as constants starting with TK<name>.
 // Returns io.ErrUnexpectedEOF if not found. May not have all tables until RowIterator has reached io.EOF.
-func (r *RowIterator) NonPrimary(ctx context.Context, tableKind string, tableName string) (dataTable, error) {
+func (r *RowIterator) getNonPrimary(ctx context.Context, tableKind string, tableName string) (dataTable, error) {
 	r.mu.Lock()
 	defer r.mu.Unlock()
 	for _, table := range r.nonPrimary {
