@@ -20,7 +20,7 @@ type StreamingIngestClient struct {
 	out             chan streamPacket
 }
 
-func (ic StreamingIngestClient) streamToKusto() {
+func (ic StreamingIngestClient) streamToKusto(done chan bool) {
 	for sp := range ic.out {
 		format := "csv"
 		if sp.options != nil {
@@ -40,6 +40,8 @@ func (ic StreamingIngestClient) streamToKusto() {
 			panic(err)
 		}
 	}
+
+	done <- true
 }
 
 func NewStreaming(dmEndpoint string, authorization data.Authorization) *StreamingIngestClient {
@@ -63,38 +65,51 @@ const MAX_STREAMING_PACKET_SIZE = 4 * MB
 
 // The reason this method is on the ingest client vs the query client is that there are some preliminary steps that are needed.
 // If one is to ingest directly via the client.Stream option, one is to handle the proper serialization by himself.
-func (sic *StreamingIngestClient) IngestFromStream(in chan interface{}, properties IngestionProperties, options *StreamSourceOptions) error {
-	sic.out = make(chan streamPacket, 1)
+func (sic *StreamingIngestClient) IngestFromStream(in chan interface{}, properties IngestionProperties, options *StreamSourceOptions, done chan bool) {
+	sic.out = make(chan streamPacket)
 
-	go sic.streamToKusto()
+	// spin up consumer
+	go sic.streamToKusto(done)
+
 	// TODO: use buff pool from John's code
 	var buf bytes.Buffer
 	gz := gzip.NewWriter(&buf)
 	encoder := json.NewEncoder(gz)
+
 	defer func() {
-		// TODO (daniel): is this correct?
 		buf.Reset()
 		gz.Close()
-		close(sic.out)
+		close(done)
 	}()
 
 	for obj := range in {
-		e := encoder.Encode(obj)
-		if e != nil {
-			panic(e)
-		}
-
-		if buf.Len() > MAX_STREAMING_PACKET_SIZE {
-			sic.out <- streamPacket{
-				buf.Bytes(),
-				properties,
-				options,
+		if obj != nil {
+			e := encoder.Encode(obj)
+			if e != nil {
+				panic(e)
 			}
-			// TODO (daniel): I'm sure there is a better way to do this
-			buf.Reset()
-		}
 
+			if buf.Len() > MAX_STREAMING_PACKET_SIZE {
+				sic.out <- streamPacket{
+					buf.Bytes(),
+					properties,
+					options,
+				}
+
+				// TODO (daniel): I'm sure there is a better way to do this
+				buf.Reset()
+			}
+		}
 	}
 
-	return nil
+	// One last flush
+	sic.out <- streamPacket{
+		buf.Bytes(),
+		properties,
+		options,
+	}
+
+	close(sic.out)
+
+	<- done
 }

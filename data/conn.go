@@ -179,10 +179,12 @@ func (c *conn) stream(ctx context.Context, db, table string, data []byte, format
 
 	if resp.StatusCode != 200 {
 		// TODO(jdoak): We need to make this more verbose to be compliant with API guidelines.
-		return errors.E(op, errors.KHTTPError, fmt.Errorf("received non 200 (OK) response from server, got: %s", resp.Status))
+		content, _ := ioutil.ReadAll(resp.Body)
+		return errors.E(op, errors.KHTTPError, fmt.Errorf("received non 200 (OK) response from server, got: %s .\n %s", resp.Status, string(content)))
 	}
 
-	// TODO: should probably read the error from the response
+	// TODO (daniel): should probably read the error from the response, clean this up
+
 	return nil
 }
 
