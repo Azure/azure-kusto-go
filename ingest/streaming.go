@@ -20,7 +20,7 @@ type StreamingIngestClient struct {
 	out             chan streamPacket
 }
 
-func (ic StreamingIngestClient) streamToKusto(done chan bool) {
+func (ic StreamingIngestClient) streamToKusto(context context.Context,done chan bool) {
 	for sp := range ic.out {
 		format := "csv"
 		if sp.options != nil {
@@ -28,7 +28,7 @@ func (ic StreamingIngestClient) streamToKusto(done chan bool) {
 		}
 
 		err := ic.client.Stream(
-			context.Background(),
+			context,
 			sp.props.DatabaseName,
 			sp.props.TableName,
 			sp.data,
@@ -69,22 +69,21 @@ func (sic *StreamingIngestClient) IngestFromStream(in chan interface{}, properti
 	sic.out = make(chan streamPacket)
 
 	// spin up consumer
-	go sic.streamToKusto(done)
+	// TODO (daniel): should I pass external context here?
+	go sic.streamToKusto(context.Background() ,done)
 
 	// TODO: use buff pool from John's code
 	var buf bytes.Buffer
 	gz := gzip.NewWriter(&buf)
 	encoder := json.NewEncoder(gz)
 
-	defer func() {
-		buf.Reset()
-		gz.Close()
-		close(done)
-	}()
+	defer close(done)
 
 	for obj := range in {
 		if obj != nil {
 			e := encoder.Encode(obj)
+			// TODO (daniel): I probably shouldn't flush here
+			gz.Flush()
 			if e != nil {
 				panic(e)
 			}
@@ -97,11 +96,13 @@ func (sic *StreamingIngestClient) IngestFromStream(in chan interface{}, properti
 				}
 
 				// TODO (daniel): I'm sure there is a better way to do this
-				buf.Reset()
+				gz.Reset(&buf)
 			}
 		}
 	}
 
+	gz.Flush()
+	gz.Close()
 	// One last flush
 	sic.out <- streamPacket{
 		buf.Bytes(),

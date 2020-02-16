@@ -138,7 +138,7 @@ func (c *conn) stream(ctx context.Context, db, table string, data []byte, format
 	var endpoint *url.URL
 
 	headers.Add("Content-Type", "gzip")
-	headers.Add("x-ms-client-request-id", "KGC.execute;"+uuid.New().String())
+	headers.Add("x-ms-client-request-id", "KGC.execute_streaming;"+uuid.New().String())
 
 	updatedUri := fmt.Sprintf(`%s/%s/%s?streamFormat=%s`, c.streamQuery, db, table, format)
 	if mappingRef != nil {
@@ -177,10 +177,11 @@ func (c *conn) stream(ctx context.Context, db, table string, data []byte, format
 		return errors.E(op, errors.KHTTPError, err)
 	}
 
-	if resp.StatusCode != 200 {
+	// The entire 2xx is valid
+	if resp.StatusCode >= 300 {
 		// TODO(jdoak): We need to make this more verbose to be compliant with API guidelines.
 		content, _ := ioutil.ReadAll(resp.Body)
-		return errors.E(op, errors.KHTTPError, fmt.Errorf("received non 200 (OK) response from server, got: %s .\n %s", resp.Status, string(content)))
+		return errors.E(op, errors.KHTTPError, fmt.Errorf("received non 2xx (OK) response from server, got: %s .\n %s", resp.Status, string(content)))
 	}
 
 	// TODO (daniel): should probably read the error from the response, clean this up
