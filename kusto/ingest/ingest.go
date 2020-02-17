@@ -13,11 +13,16 @@ import (
 	"os"
 )
 
+// Kusto ingest client provides methods to allow ingestion into kusto (ADX).
+// To learn more about the different types of ingestions and when to use each, visit:
+// https://docs.microsoft.com/en-us/azure/data-explorer/ingest-data-overview#ingestion-methods
 type IngestClient struct {
 	client          *kusto.Client
 	resourceManager resourceManager
 }
 
+// Create a new Kusto ingest client
+// Expects a uri that point to the data management endpoint (`https://ingest-mycluster.kusto.windows.net`)
 func New(dmEndpoint string, authorization kusto.Authorization) *IngestClient {
 	dmClient, _ := kusto.New(dmEndpoint, authorization);
 	return &IngestClient{
@@ -52,7 +57,6 @@ func uploadFileToBlobStorage(ctx context.Context, fileName string, containerURL 
 
 	// The high-level API UploadFileToBlockBlob function uploads blocks in parallel for optimal performance, and can handle large files as well.
 	// This function calls StageBlock/CommitBlockList for files larger 256 MBs, and calls Upload for any file smaller
-	fmt.Printf("Uploading the file with blob name: %s\n", fileName)
 	_, err = azblob.UploadFileToBlockBlob(ctx, file, blobURL, azblob.UploadToBlockBlobOptions{
 		BlockSize:   4 * 1024 * 1024,
 		Parallelism: 16})
@@ -64,8 +68,12 @@ func uploadFileToBlobStorage(ctx context.Context, fileName string, containerURL 
 	return blobURL
 }
 
-
-func (ic IngestClient) ingestFromLocalStorage(
+// Issues a queued ingestion based on the given path (local FS) and properties.
+// To learn more about ingestion properties, go to:
+// https://docs.microsoft.com/en-us/azure/kusto/management/data-ingestion/#ingestion-properties
+// To learn more about ingestion methods go to:
+// https://docs.microsoft.com/en-us/azure/data-explorer/ingest-data-overview#ingestion-methods
+func (ic IngestClient) IngestFromLocalStorage(
 	path string,
 	props IngestionProperties,
 	options map[string]string) (error) {
@@ -77,7 +85,7 @@ func (ic IngestClient) ingestFromLocalStorage(
 
 	// Upload local file to temporary dm storage
 	storage := storages[rand.Intn(len(storages))]
-	creds, err := azblob.NewSharedKeyCredential("accountname", "accountkey")
+	creds := azblob.NewAnonymousCredential()
 
 	if err != nil {
 		return err
@@ -90,10 +98,15 @@ func (ic IngestClient) ingestFromLocalStorage(
 	blobUrl := uploadFileToBlobStorage(ctx, path, containerUrl)
 
 	// upload as if this is just a regular cloud storage
-	return ic.ingestFromCloudStorage(fmt.Sprint(blobUrl), props, options)
+	return ic.IngestFromCloudStorage(fmt.Sprint(blobUrl), props, options)
 }
 
-func (ic IngestClient) ingestFromCloudStorage(path string, props IngestionProperties, options map[string]string) (error) {
+// Issues a queued ingestion based on the given path (URL) and properties.
+// To learn more about ingestion properties, go to:
+// https://docs.microsoft.com/en-us/azure/kusto/management/data-ingestion/#ingestion-properties
+// To learn more about ingestion methods go to:
+// https://docs.microsoft.com/en-us/azure/data-explorer/ingest-data-overview#ingestion-methods
+func (ic IngestClient) IngestFromCloudStorage(path string, props IngestionProperties, options map[string]string) (error) {
 	queues, err := ic.resourceManager.getIngestionQueues(context.Background())
 
 	if err != nil {
@@ -136,10 +149,15 @@ func (ic IngestClient) ingestFromCloudStorage(path string, props IngestionProper
 	return nil;
 }
 
+// Issues a queued ingestion based on the given path (URL / local FS) and properties.
+// To learn more about ingestion properties, go to:
+// https://docs.microsoft.com/en-us/azure/kusto/management/data-ingestion/#ingestion-properties
+// To learn more about ingestion methods go to:
+// https://docs.microsoft.com/en-us/azure/data-explorer/ingest-data-overview#ingestion-methods
 func (ic IngestClient) IngestFromStorage(path string, props IngestionProperties, options map[string]string) error {
 	if _, err := url.ParseRequestURI(path); err == nil {
-		return ic.ingestFromCloudStorage(path, props, options)
+		return ic.IngestFromCloudStorage(path, props, options)
 	} else {
-		return ic.ingestFromLocalStorage(path, props, options)
+		return ic.IngestFromLocalStorage(path, props, options)
 	}
 }

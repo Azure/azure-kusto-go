@@ -71,7 +71,6 @@ func (rm *resourceManager) fetchIngestionResources(ctx context.Context) error {
 	var queues []resourceUri
 
 	for _, row := range rows {
-
 		rec := ingestionResource{}
 		if err := row.ToStruct(&rec); err != nil {
 			panic(err)

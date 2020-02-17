@@ -7,8 +7,12 @@ import (
 	"time"
 )
 
+// To learn more about ingestion properties, go to:
+// https://docs.microsoft.com/en-us/azure/kusto/management/data-ingestion/#ingestion-properties
 type IngestionProperties struct {
+	// Target Database
 	DatabaseName        string
+	// Target Table
 	TableName           string
 	FlushImmediately    bool
 	IngestionMappingRef string
