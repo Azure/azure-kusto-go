@@ -39,35 +39,35 @@ func main() {
     }
 
     iter, err := kustoClient.Query(ctx, db, kusto.NewStmt("MyTable | count "))
-if err != nil {
-	panic(err)
-}
-
-defer iter.Stop()
-
-
-
-// Loop through the iterated results, read them into our UserID structs and append them
-// to our list of recs.
-var recs []CountResult
-for {
-	row, err := iter.Next()
 	if err != nil {
-		// This indicates we are done.
-		if err == io.EOF {
-			break
-		}
-		// We ran into an error during the stream.
 		panic(err)
 	}
-	rec := CountResult{}
-	if err := row.ToStruct(&rec); err != nil {
-		panic(err)
-	}
-	recs = append(recs, rec)
-}
 
-fmt.Println(recs)
+	defer iter.Stop()
+
+
+
+	// Loop through the iterated results, read them into our UserID structs and append them
+	// to our list of recs.
+	var recs []CountResult
+	for {
+		row, err := iter.Next()
+		if err != nil {
+			// This indicates we are done.
+			if err == io.EOF {
+				break
+			}
+			// We ran into an error during the stream.
+			panic(err)
+		}
+		rec := CountResult{}
+		if err := row.ToStruct(&rec); err != nil {
+			panic(err)
+		}
+		recs = append(recs, rec)
+	}
+
+	fmt.Println(recs)
 }
 ```
 
