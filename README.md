@@ -23,7 +23,7 @@ import (
     "context"
     "fmt"
 
-    "github.com/Azure/azure-kusto-go/data"
+    "github.com/Azure/azure-kusto-go/kusto"
     "github.com/Azure/go-autorest/autorest/azure/auth"
 )
 
@@ -33,41 +33,41 @@ func main() {
     appKey := ""
     tenantId := ""
 
-    authorizerConfig := auth.NewClientCredentialsConfig(appId, appKey, tenantId)
-    authorization := data.Authorization{
+    authorizerConfig := kusto.NewClientCredentialsConfig(appId, appKey, tenantId)
+    authorization := kusto.Authorization{
         Config: authorizerConfig,
     }
 
-    iter, err := kustoClient.Query(ctx, db, query)
-    	if err != nil {
-    		panic(err)
-    	}
-    
-    	defer iter.Stop()
-    
-    
-    
-    	// Loop through the iterated results, read them into our UserID structs and append them
-    	// to our list of recs.
-    	var recs []CountResult
-    	for {
-    		row, err := iter.Next()
-    		if err != nil {
-    			// This indicates we are done.
-    			if err == io.EOF {
-    				break
-    			}
-    			// We ran into an error during the stream.
-    			panic(err)
-    		}
-    		rec := CountResult{}
-    		if err := row.ToStruct(&rec); err != nil {
-    			panic(err)
-    		}
-    		recs = append(recs, rec)
-    	}
-    
-    	fmt.Println(recs)
+    iter, err := kustoClient.Query(ctx, db, kusto.NewStmt("MyTable | count "))
+	if err != nil {
+		panic(err)
+	}
+
+	defer iter.Stop()
+
+
+
+	// Loop through the iterated results, read them into our UserID structs and append them
+	// to our list of recs.
+	var recs []CountResult
+	for {
+		row, err := iter.Next()
+		if err != nil {
+			// This indicates we are done.
+			if err == io.EOF {
+				break
+			}
+			// We ran into an error during the stream.
+			panic(err)
+		}
+		rec := CountResult{}
+		if err := row.ToStruct(&rec); err != nil {
+			panic(err)
+		}
+		recs = append(recs, rec)
+	}
+
+	fmt.Println(recs)
 }
 ```
 
@@ -79,8 +79,8 @@ package main
 import (
 	"context"
 	"fmt"
-	"github.com/Azure/azure-kusto-go/data"
-	"github.com/Azure/azure-kusto-go/ingest"
+	"github.com/Azure/azure-kusto-go/kusto"
+	"github.com/Azure/azure-kusto-go/kusto/ingest"
 	"github.com/Azure/go-autorest/autorest/azure/auth"
 	"io"
 )
@@ -93,22 +93,22 @@ func main()  {
     tenantId := ""
 
     authorizerConfig := auth.NewClientCredentialsConfig(appId, appKey, tenantId)
-    authorization := data.Authorization{
+    authorization := kusto.Authorization{
         Config: authorizerConfig,
     }
     
     ingestor := ingest.New(dm, authorization)
-    	url := "https://mystorageaccount.blob.core.windows.net/container/folder/data.json?sp=r&st=2020-02-01T18:51:17Z&se=2020-12-13T02:51:17Z&spr=https&sv=2019-02-02&sr=b&sig=***"
-    	err := ingestor.IngestFromStorage(url, ingest.IngestionProperties{
-    		DatabaseName:        "Database",
-    		TableName:           "Table",
-    		FlushImmediately:    true,
-    		IngestionMappingRef: "TableData_from_json",
-    	}, nil)
-    
-    	if err != nil {
-    		panic(err)
-    	} 
+	url := "https://mystorageaccount.blob.core.windows.net/container/folder/data.json?sp=r&st=2020-02-01T18:51:17Z&se=2020-12-13T02:51:17Z&spr=https&sv=2019-02-02&sr=b&sig=***"
+	err := ingestor.IngestFromStorage(url, ingest.IngestionProperties{
+		DatabaseName:        "Database",
+		TableName:           "Table",
+		FlushImmediately:    true,
+		IngestionMappingRef: "TableData_from_json",
+	}, nil)
+
+	if err != nil {
+		panic(err)
+	} 
 
 }
 
