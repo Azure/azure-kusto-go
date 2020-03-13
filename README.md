@@ -23,11 +23,11 @@ GoDoc for the packages.
 ### Authorizing
 
 ```go
-	// auth package is: "github.com/Azure/go-autorest/autorest/azure/auth"
+// auth package is: "github.com/Azure/go-autorest/autorest/azure/auth"
 
-	authorizer := kusto.Authorization{
-		Config: auth.NewClientCredentialsConfig(clientID, clientSecret, tenantID),
-	}
+authorizer := kusto.Authorization{
+	Config: auth.NewClientCredentialsConfig(clientID, clientSecret, tenantID),
+}
 ```
 This creates a Kusto Authorizer using your client identity, secret and tenant identity.
 You may also uses other forms of authorization, please see the Authorization type in the GoDoc for more.
@@ -36,9 +36,9 @@ You may also uses other forms of authorization, please see the Authorization typ
 
 ```go
 client, err := kusto.New(endpoint, authorizer)
-	if err != nil {
-		panic("add error handling")
-	}
+if err != nil {
+	panic("add error handling")
+}
 ```
 endpoint represents the Kusto endpoint. This will resemble: "https://<instance>.<region>.kusto.windows.net".
 
@@ -49,25 +49,25 @@ endpoint represents the Kusto endpoint. This will resemble: "https://<instance>.
 The Kusto package package queries data into a ***table.Row** which can be printed or have the column data extracted.
 
 ```go
-	// table package is: github.com/Azure/azure-kusto-go/kusto/data/table
+// table package is: github.com/Azure/azure-kusto-go/kusto/data/table
 
-	// Query our database table "systemNodes" for the CollectionTimes and the NodeIds.
-	iter, err := client.Query(ctx, "database", kusto.NewStmt("systemNodes | project CollectionTime, NodeId"))
-	if err != nil {
-		panic("add error handling")
-	}
-	defer iter.Stop()
+// Query our database table "systemNodes" for the CollectionTimes and the NodeIds.
+iter, err := client.Query(ctx, "database", kusto.NewStmt("systemNodes | project CollectionTime, NodeId"))
+if err != nil {
+	panic("add error handling")
+}
+defer iter.Stop()
 
-	// .Do() will call the function for every row in the table.
-	err = iter.Do(
-		func(row *table.Row) error {
-			fmt.Println(row) // As a convenience, printing a *table.Row will output csv
-			return nil
-		},
-	)
-	if err != nil {
-		panic("add error handling")
-	}
+// .Do() will call the function for every row in the table.
+err = iter.Do(
+	func(row *table.Row) error {
+		fmt.Println(row) // As a convenience, printing a *table.Row will output csv
+		return nil
+	},
+)
+if err != nil {
+	panic("add error handling")
+}
 ```
 
 #### Query Into Structs
@@ -77,33 +77,33 @@ that is returned supports this via the **.ToStruct()** method.
 
 ```go
 // NodeRec represents our Kusto data that will be returned.
-	type NodeRec struct {
-		// ID is the table's NodeId. We use the field tag here to to instruct our client to convert NodeId to ID.
-		ID int64 `kusto:"NodeId"`
-		// CollectionTime is Go representation of the Kusto datetime type.
-		CollectionTime time.Time
-	}
+type NodeRec struct {
+	// ID is the table's NodeId. We use the field tag here to to instruct our client to convert NodeId to ID.
+	ID int64 `kusto:"NodeId"`
+	// CollectionTime is Go representation of the Kusto datetime type.
+	CollectionTime time.Time
+}
 
-	iter, err := client.Query(ctx, "database", kusto.NewStmt("systemNodes | project CollectionTime, NodeId"))
-	if err != nil {
-		panic("add error handling")
-	}
-	defer iter.Stop()
+iter, err := client.Query(ctx, "database", kusto.NewStmt("systemNodes | project CollectionTime, NodeId"))
+if err != nil {
+	panic("add error handling")
+}
+defer iter.Stop()
 
-	recs := []NodeRec{}
-	err = iter.Do(
-		func(row *table.Row) error {
-			rec := NodeRec{}
-			if err := row.ToStruct(&rec); err != nil {
-				return err
-			}
-			recs = append(recs, rec)
-			return nil
-		},
-	)
-	if err != nil {
-		panic("add error handling")
-	}
+recs := []NodeRec{}
+err = iter.Do(
+	func(row *table.Row) error {
+		rec := NodeRec{}
+		if err := row.ToStruct(&rec); err != nil {
+			return err
+		}
+		recs = append(recs, rec)
+		return nil
+	},
+)
+if err != nil {
+	panic("add error handling")
+}
 ```
 
 ### Ingestion
@@ -118,9 +118,9 @@ That documentation can be found [here](https://docs.microsoft.com/en-us/azure/ku
 Ingesting a local file requires simply passing the path to the file to be ingested:
 
 ```go
-	if err := in.FromFile(ctx, "/path/to/a/local/file"); err != nil {
-		panic("add error handling")
-	}
+if err := in.FromFile(ctx, "/path/to/a/local/file"); err != nil {
+	panic("add error handling")
+}
 ```
 
 FromFile() will accept Unix path names on Unix platforms and Windows path names on Windows platforms.
@@ -131,9 +131,9 @@ The file will not be deleted after upload (there is an option that will allow th
 This pacakge will also accept ingestion from an Azure Blobstore file:
 
 ```go
-	if err := in.FromFile(ctx, "https://myaccount.blob.core.windows.net/$root/myblob"); err != nil {
-		panic("add error handling")
-	}
+if err := in.FromFile(ctx, "https://myaccount.blob.core.windows.net/$root/myblob"); err != nil {
+	panic("add error handling")
+}
 ```
 
 This will ingest a file from Azure Blobstore. We only support https:// paths and your domain name may differ than what is here.
@@ -143,9 +143,9 @@ This will ingest a file from Azure Blobstore. We only support https:// paths and
 Instestion from a stream commits blocks of fully formed data encodes (JSON, AVRO, ...) into Kusto:
 
 ```go
-	if err := in.Stream(ctx, jsonEncodedData, ingest.JSON, "mappingName"); err != nil {
-		panic("add error handling")
-	}
+if err := in.Stream(ctx, jsonEncodedData, ingest.JSON, "mappingName"); err != nil {
+	panic("add error handling")
+}
 ```
 
 ### Contributing
