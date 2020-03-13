@@ -6,7 +6,9 @@ import (
 	"testing"
 	"time"
 
-	"github.com/Azure/azure-kusto-go/kusto/types"
+	"github.com/Azure/azure-kusto-go/kusto/data/table"
+	"github.com/Azure/azure-kusto-go/kusto/data/types"
+	"github.com/Azure/azure-kusto-go/kusto/data/value"
 
 	"github.com/google/uuid"
 	"github.com/kylelemons/godebug/pretty"
@@ -21,53 +23,53 @@ func TestStructToKustoValues(t *testing.T) {
 
 	tests := []struct {
 		desc string
-		cols Columns
+		cols table.Columns
 		val  *testStruct
-		want types.KustoValues
+		want value.Values
 		err  bool
 	}{
 		{
 			desc: "All fields should export",
-			cols: Columns{
-				{Name: "Int", Type: CTInt},
-				{Name: "String", Type: CTString},
-				{Name: "Long", Type: CTLong},
+			cols: table.Columns{
+				{Name: "Int", Type: types.Int},
+				{Name: "String", Type: types.String},
+				{Name: "Long", Type: types.Long},
 			},
 			val: &testStruct{
 				MyInt:  2,
 				String: "hello",
 				Long:   1,
 			},
-			want: types.KustoValues{
-				types.Int{Value: 2, Valid: true},
-				types.String{Value: "hello", Valid: true},
-				types.Long{Value: 1, Valid: true},
+			want: value.Values{
+				value.Int{Value: 2, Valid: true},
+				value.String{Value: "hello", Valid: true},
+				value.Long{Value: 1, Valid: true},
 			},
 		},
 		{
 			desc: "MyInt doesn't get exported",
-			cols: Columns{
-				{Name: "int", Type: CTInt}, // We have "int" instead of "Int"
-				{Name: "String", Type: CTString},
-				{Name: "Long", Type: CTLong},
+			cols: table.Columns{
+				{Name: "int", Type: types.Int}, // We have "int" instead of "Int"
+				{Name: "String", Type: types.String},
+				{Name: "Long", Type: types.Long},
 			},
 			val: &testStruct{
 				MyInt:  2,
 				String: "hello",
 				Long:   1,
 			},
-			want: types.KustoValues{
-				types.Int{Value: 0, Valid: false},
-				types.String{Value: "hello", Valid: true},
-				types.Long{Value: 1, Valid: true},
+			want: value.Values{
+				value.Int{Value: 0, Valid: false},
+				value.String{Value: "hello", Valid: true},
+				value.Long{Value: 1, Valid: true},
 			},
 		},
 		{
 			desc: "Tagged field(MyInt) is wrong type and won't convert doesn't get exported",
-			cols: Columns{
-				{Name: "Int", Type: CTReal}, // We have CTReal instead of CTInt
-				{Name: "String", Type: CTString},
-				{Name: "Long", Type: CTLong},
+			cols: table.Columns{
+				{Name: "Int", Type: types.Real}, // We have types.Real instead of types.Int
+				{Name: "String", Type: types.String},
+				{Name: "Long", Type: types.Long},
 			},
 			val: &testStruct{
 				MyInt:  2,
@@ -78,10 +80,10 @@ func TestStructToKustoValues(t *testing.T) {
 		},
 		{
 			desc: "Non-tagged field(String) is wrong type and won't convert doesn't get exported",
-			cols: Columns{
-				{Name: "Int", Type: CTInt},
-				{Name: "String", Type: CTReal}, // We have CTReal instead of CTString
-				{Name: "Long", Type: CTLong},
+			cols: table.Columns{
+				{Name: "Int", Type: types.Int},
+				{Name: "String", Type: types.Real}, // We have types.Real instead of types.String
+				{Name: "Long", Type: types.Long},
 			},
 			val: &testStruct{
 				MyInt:  2,
@@ -112,29 +114,29 @@ func TestStructToKustoValues(t *testing.T) {
 }
 
 func TestDefaultRow(t *testing.T) {
-	columns := Columns{
-		Column{Type: CTBool},
-		Column{Type: CTDateTime},
-		Column{Type: CTDynamic},
-		Column{Type: CTGUID},
-		Column{Type: CTInt},
-		Column{Type: CTLong},
-		Column{Type: CTReal},
-		Column{Type: CTString},
-		Column{Type: CTTimespan},
-		Column{Type: CTDecimal},
+	columns := table.Columns{
+		table.Column{Type: types.Bool},
+		table.Column{Type: types.DateTime},
+		table.Column{Type: types.Dynamic},
+		table.Column{Type: types.GUID},
+		table.Column{Type: types.Int},
+		table.Column{Type: types.Long},
+		table.Column{Type: types.Real},
+		table.Column{Type: types.String},
+		table.Column{Type: types.Timespan},
+		table.Column{Type: types.Decimal},
 	}
-	want := types.KustoValues{
-		types.Bool{},
-		types.DateTime{},
-		types.Dynamic{},
-		types.GUID{},
-		types.Int{},
-		types.Long{},
-		types.Real{},
-		types.String{},
-		types.Timespan{},
-		types.Decimal{},
+	want := value.Values{
+		value.Bool{},
+		value.DateTime{},
+		value.Dynamic{},
+		value.GUID{},
+		value.Int{},
+		value.Long{},
+		value.Real{},
+		value.String{},
+		value.Timespan{},
+		value.Decimal{},
 	}
 
 	got, err := defaultRow(columns)
@@ -149,33 +151,33 @@ func TestDefaultRow(t *testing.T) {
 
 func TestColToValueCheck(t *testing.T) {
 	matchers := []struct {
-		column Column
-		kt     types.KustoValue
+		column table.Column
+		kt     value.Kusto
 	}{
-		{Column{Type: CTBool}, types.Bool{}},
-		{Column{Type: CTDateTime}, types.DateTime{}},
-		{Column{Type: CTDynamic}, types.Dynamic{}},
-		{Column{Type: CTGUID}, types.GUID{}},
-		{Column{Type: CTInt}, types.Int{}},
-		{Column{Type: CTLong}, types.Long{}},
-		{Column{Type: CTReal}, types.Real{}},
-		{Column{Type: CTString}, types.String{}},
-		{Column{Type: CTTimespan}, types.Timespan{}},
-		{Column{Type: CTDecimal}, types.Decimal{}},
+		{table.Column{Type: types.Bool}, value.Bool{}},
+		{table.Column{Type: types.DateTime}, value.DateTime{}},
+		{table.Column{Type: types.Dynamic}, value.Dynamic{}},
+		{table.Column{Type: types.GUID}, value.GUID{}},
+		{table.Column{Type: types.Int}, value.Int{}},
+		{table.Column{Type: types.Long}, value.Long{}},
+		{table.Column{Type: types.Real}, value.Real{}},
+		{table.Column{Type: types.String}, value.String{}},
+		{table.Column{Type: types.Timespan}, value.Timespan{}},
+		{table.Column{Type: types.Decimal}, value.Decimal{}},
 	}
 
 	for _, match := range matchers {
-		if err := colToValueCheck(Columns{match.column}, types.KustoValues{match.kt}); err != nil {
+		if err := colToValueCheck(table.Columns{match.column}, value.Values{match.kt}); err != nil {
 			t.Errorf("TestColToValueCheck(%s): did not handle the correct type match, got err == %s", match.column, err)
 		}
 
-		var v types.KustoValue
-		if reflect.TypeOf(match.kt) != reflect.TypeOf(types.Bool{}) {
-			v = types.Bool{}
+		var v value.Kusto
+		if reflect.TypeOf(match.kt) != reflect.TypeOf(value.Bool{}) {
+			v = value.Bool{}
 		} else {
-			v = types.Int{}
+			v = value.Int{}
 		}
-		if err := colToValueCheck(Columns{match.column}, types.KustoValues{v}); err == nil {
+		if err := colToValueCheck(table.Columns{match.column}, value.Values{v}); err == nil {
 			t.Errorf("TestColToValueCheck(%s): did not handle the incorrect type match, got err == %s", match.column, err)
 		}
 	}
@@ -185,19 +187,19 @@ func TestConvertBool(t *testing.T) {
 	var (
 		val = true
 		ptr = new(bool)
-		ty  = types.Bool{Value: true, Valid: true}
+		ty  = value.Bool{Value: true, Valid: true}
 	)
 	*ptr = true
 
 	tests := []struct {
 		value interface{}
-		want  types.Bool
+		want  value.Bool
 		err   bool
 	}{
 		{value: 1, err: true},
-		{value: val, want: types.Bool{Value: true, Valid: true}},
-		{value: ptr, want: types.Bool{Value: true, Valid: true}},
-		{value: ty, want: types.Bool{Value: true, Valid: true}},
+		{value: val, want: value.Bool{Value: true, Valid: true}},
+		{value: ptr, want: value.Bool{Value: true, Valid: true}},
+		{value: ty, want: value.Bool{Value: true, Valid: true}},
 	}
 	for _, test := range tests {
 		got, err := convertBool(reflect.ValueOf(test.value))
@@ -221,19 +223,19 @@ func TestConvertDateTime(t *testing.T) {
 	var (
 		val = now
 		ptr = new(time.Time)
-		ty  = types.DateTime{Value: now, Valid: true}
+		ty  = value.DateTime{Value: now, Valid: true}
 	)
 	*ptr = now
 
 	tests := []struct {
 		value interface{}
-		want  types.DateTime
+		want  value.DateTime
 		err   bool
 	}{
 		{value: 1, err: true},
-		{value: val, want: types.DateTime{Value: now, Valid: true}},
-		{value: ptr, want: types.DateTime{Value: now, Valid: true}},
-		{value: ty, want: types.DateTime{Value: now, Valid: true}},
+		{value: val, want: value.DateTime{Value: now, Valid: true}},
+		{value: ptr, want: value.DateTime{Value: now, Valid: true}},
+		{value: ty, want: value.DateTime{Value: now, Valid: true}},
 	}
 	for _, test := range tests {
 		got, err := convertDateTime(reflect.ValueOf(test.value))
@@ -256,19 +258,19 @@ func TestConvertTimespan(t *testing.T) {
 	var (
 		val = 1 * time.Second
 		ptr = new(time.Duration)
-		ty  = types.Timespan{Value: 1 * time.Second, Valid: true}
+		ty  = value.Timespan{Value: 1 * time.Second, Valid: true}
 	)
 	*ptr = val
 
 	tests := []struct {
 		value interface{}
-		want  types.Timespan
+		want  value.Timespan
 		err   bool
 	}{
 		{value: "hello", err: true},
-		{value: val, want: types.Timespan{Value: 1 * time.Second, Valid: true}},
-		{value: ptr, want: types.Timespan{Value: 1 * time.Second, Valid: true}},
-		{value: ty, want: types.Timespan{Value: 1 * time.Second, Valid: true}},
+		{value: val, want: value.Timespan{Value: 1 * time.Second, Valid: true}},
+		{value: ptr, want: value.Timespan{Value: 1 * time.Second, Valid: true}},
+		{value: ty, want: value.Timespan{Value: 1 * time.Second, Valid: true}},
 	}
 	for _, test := range tests {
 		got, err := convertTimespan(reflect.ValueOf(test.value))
@@ -302,18 +304,18 @@ func TestConvertDynamic(t *testing.T) {
 	var (
 		val = v
 		ptr = &v
-		ty  = types.Dynamic{Value: string(j), Valid: true}
+		ty  = value.Dynamic{Value: mustMapInter(j), Valid: true}
 	)
 
 	tests := []struct {
 		value interface{}
-		want  types.Dynamic
+		want  value.Dynamic
 		err   bool
 	}{
 		{value: 1, err: true},
-		{value: val, want: types.Dynamic{Value: string(j), Valid: true}},
-		{value: ptr, want: types.Dynamic{Value: string(j), Valid: true}},
-		{value: ty, want: types.Dynamic{Value: string(j), Valid: true}},
+		{value: val, want: value.Dynamic{Value: mustMapInter(j), Valid: true}},
+		{value: ptr, want: value.Dynamic{Value: mustMapInter(j), Valid: true}},
+		{value: ty, want: value.Dynamic{Value: mustMapInter(j), Valid: true}},
 	}
 	for _, test := range tests {
 		got, err := convertDynamic(reflect.ValueOf(test.value))
@@ -337,19 +339,19 @@ func TestConvertGUID(t *testing.T) {
 	var (
 		val = u
 		ptr = new(uuid.UUID)
-		ty  = types.GUID{Value: u, Valid: true}
+		ty  = value.GUID{Value: u, Valid: true}
 	)
 	*ptr = u
 
 	tests := []struct {
 		value interface{}
-		want  types.GUID
+		want  value.GUID
 		err   bool
 	}{
 		{value: 1, err: true},
-		{value: val, want: types.GUID{Value: u, Valid: true}},
-		{value: ptr, want: types.GUID{Value: u, Valid: true}},
-		{value: ty, want: types.GUID{Value: u, Valid: true}},
+		{value: val, want: value.GUID{Value: u, Valid: true}},
+		{value: ptr, want: value.GUID{Value: u, Valid: true}},
+		{value: ty, want: value.GUID{Value: u, Valid: true}},
 	}
 	for _, test := range tests {
 		got, err := convertGUID(reflect.ValueOf(test.value))
@@ -372,19 +374,19 @@ func TestConvertInt(t *testing.T) {
 	var (
 		val = int32(1)
 		ptr = new(int32)
-		ty  = types.Int{Value: 1, Valid: true}
+		ty  = value.Int{Value: 1, Valid: true}
 	)
 	*ptr = val
 
 	tests := []struct {
 		value interface{}
-		want  types.Int
+		want  value.Int
 		err   bool
 	}{
 		{value: "hello", err: true},
-		{value: val, want: types.Int{Value: 1, Valid: true}},
-		{value: ptr, want: types.Int{Value: 1, Valid: true}},
-		{value: ty, want: types.Int{Value: 1, Valid: true}},
+		{value: val, want: value.Int{Value: 1, Valid: true}},
+		{value: ptr, want: value.Int{Value: 1, Valid: true}},
+		{value: ty, want: value.Int{Value: 1, Valid: true}},
 	}
 	for _, test := range tests {
 		got, err := convertInt(reflect.ValueOf(test.value))
@@ -407,19 +409,19 @@ func TestConvertLong(t *testing.T) {
 	var (
 		val = int64(1)
 		ptr = new(int64)
-		ty  = types.Long{Value: 1, Valid: true}
+		ty  = value.Long{Value: 1, Valid: true}
 	)
 	*ptr = val
 
 	tests := []struct {
 		value interface{}
-		want  types.Long
+		want  value.Long
 		err   bool
 	}{
 		{value: "hello", err: true},
-		{value: val, want: types.Long{Value: 1, Valid: true}},
-		{value: ptr, want: types.Long{Value: 1, Valid: true}},
-		{value: ty, want: types.Long{Value: 1, Valid: true}},
+		{value: val, want: value.Long{Value: 1, Valid: true}},
+		{value: ptr, want: value.Long{Value: 1, Valid: true}},
+		{value: ty, want: value.Long{Value: 1, Valid: true}},
 	}
 	for _, test := range tests {
 		got, err := convertLong(reflect.ValueOf(test.value))
@@ -442,19 +444,19 @@ func TestConvertReal(t *testing.T) {
 	var (
 		val = float64(1.0)
 		ptr = new(float64)
-		ty  = types.Real{Value: 1.0, Valid: true}
+		ty  = value.Real{Value: 1.0, Valid: true}
 	)
 	*ptr = val
 
 	tests := []struct {
 		value interface{}
-		want  types.Real
+		want  value.Real
 		err   bool
 	}{
 		{value: "hello", err: true},
-		{value: val, want: types.Real{Value: 1.0, Valid: true}},
-		{value: ptr, want: types.Real{Value: 1.0, Valid: true}},
-		{value: ty, want: types.Real{Value: 1.0, Valid: true}},
+		{value: val, want: value.Real{Value: 1.0, Valid: true}},
+		{value: ptr, want: value.Real{Value: 1.0, Valid: true}},
+		{value: ty, want: value.Real{Value: 1.0, Valid: true}},
 	}
 	for _, test := range tests {
 		got, err := convertReal(reflect.ValueOf(test.value))
@@ -477,19 +479,19 @@ func TestConvertString(t *testing.T) {
 	var (
 		val = string("hello")
 		ptr = new(string)
-		ty  = types.String{Value: "hello", Valid: true}
+		ty  = value.String{Value: "hello", Valid: true}
 	)
 	*ptr = val
 
 	tests := []struct {
 		value interface{}
-		want  types.String
+		want  value.String
 		err   bool
 	}{
 		{value: 1, err: true},
-		{value: val, want: types.String{Value: "hello", Valid: true}},
-		{value: ptr, want: types.String{Value: "hello", Valid: true}},
-		{value: ty, want: types.String{Value: "hello", Valid: true}},
+		{value: val, want: value.String{Value: "hello", Valid: true}},
+		{value: ptr, want: value.String{Value: "hello", Valid: true}},
+		{value: ty, want: value.String{Value: "hello", Valid: true}},
 	}
 	for _, test := range tests {
 		got, err := convertString(reflect.ValueOf(test.value))
@@ -512,19 +514,19 @@ func TestConvertDecimal(t *testing.T) {
 	var (
 		val = string("1.3333333333")
 		ptr = new(string)
-		ty  = types.Decimal{Value: "1.3333333333", Valid: true}
+		ty  = value.Decimal{Value: "1.3333333333", Valid: true}
 	)
 	*ptr = val
 
 	tests := []struct {
 		value interface{}
-		want  types.Decimal
+		want  value.Decimal
 		err   bool
 	}{
 		{value: 1, err: true},
-		{value: val, want: types.Decimal{Value: "1.3333333333", Valid: true}},
-		{value: ptr, want: types.Decimal{Value: "1.3333333333", Valid: true}},
-		{value: ty, want: types.Decimal{Value: "1.3333333333", Valid: true}},
+		{value: val, want: value.Decimal{Value: "1.3333333333", Valid: true}},
+		{value: ptr, want: value.Decimal{Value: "1.3333333333", Valid: true}},
+		{value: ty, want: value.Decimal{Value: "1.3333333333", Valid: true}},
 	}
 	for _, test := range tests {
 		got, err := convertDecimal(reflect.ValueOf(test.value))
@@ -541,4 +543,30 @@ func TestConvertDecimal(t *testing.T) {
 			t.Errorf("TestConvertDecimal (%v): -want/+got:\n%s", test.value, diff)
 		}
 	}
+}
+
+func mustMapInter(i interface{}) map[string]interface{} {
+	if v, ok := i.(map[string]interface{}); ok {
+		return v
+	}
+
+	var b []byte
+	var err error
+	switch v := i.(type) {
+	case string:
+		b = []byte(v)
+	case []byte:
+		b = v
+	default:
+		b, err = json.Marshal(i)
+		if err != nil {
+			panic(err)
+		}
+	}
+
+	m := map[string]interface{}{}
+	if err := json.Unmarshal(b, &m); err != nil {
+		panic(err)
+	}
+	return m
 }

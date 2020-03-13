@@ -4,6 +4,7 @@ import (
 	"fmt"
 
 	"github.com/Azure/azure-kusto-go/kusto"
+	"github.com/Azure/azure-kusto-go/kusto/data/types"
 )
 
 const (
@@ -25,7 +26,7 @@ var (
 	singleStmt = rootStmt.Add(singleNode).MustDefinitions(
 		kusto.NewDefinitions().Must(
 			kusto.ParamTypes{
-				"Node": kusto.ParamType{Type: kusto.CTString},
+				"Node": kusto.ParamType{Type: types.String},
 			},
 		),
 	)

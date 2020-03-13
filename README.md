@@ -1,117 +1,151 @@
-# Microsoft Azure Kusto (Azure Data Explorer) SDK for Go
+# Microsoft Azure Data Explorer (Kusto) [![GoDoc](https://godoc.org/github.com/Azure/azure-kusto-go?status.svg)](https://godoc.org/github.com/Azure/azure-kusto-go)
 
-### Install
+- [About Azure Data Explorer](https://azure.microsoft.com/en-us/services/data-explorer/)
+- [Go Client documentation](https://godoc.org/github.com/Azure/azure-kusto-go) (Not available until public release, must use a local godoc server)
 
-* `go get github.com/Azure/azure-kusto-go`
 
-### Minimum Requirements
+## Install
 
-* go version go1.13.3
+* `go get github.com/Azure/azure-kusto-go/kusto`
 
-### Authentication Methods:
+While in private preview, this will require authenication.  Please see this [Go FAQ](https://golang.org/doc/faq#git_https)
 
-* AAD application - Provide app ID and app key
 
-### Usage
+## Minimum Requirements
 
-#### Query
+* go version go1.13
+
+## Examples
+
+Below are some simple examples to get users up and running quickly. For full examples, please refer to the
+GoDoc for the packages.
+
+### Authorizing
 
 ```go
-package main
+	// auth package is: "github.com/Azure/go-autorest/autorest/azure/auth"
 
-import (
-    "context"
-    "fmt"
-
-    "github.com/Azure/azure-kusto-go/kusto"
-    "github.com/Azure/go-autorest/autorest/azure/auth"
-)
-
-func main() {
-    cluster := "https://sampleCluster.kusto.windows.net"
-    appId := ""
-    appKey := ""
-    tenantId := ""
-
-    authorizerConfig := kusto.NewClientCredentialsConfig(appId, appKey, tenantId)
-    authorization := kusto.Authorization{
-        Config: authorizerConfig,
-    }
-
-    iter, err := kustoClient.Query(ctx, db, kusto.NewStmt("MyTable | count "))
-	if err != nil {
-		panic(err)
+	authorizer := kusto.Authorization{
+		Config: auth.NewClientCredentialsConfig(clientID, clientSecret, tenantID),
 	}
+```
+This creates a Kusto Authorizer using your client identity, secret and tenant identity.
+You may also uses other forms of authorization, please see the Authorization type in the GoDoc for more.
 
+### Creating a Client
+
+```go
+client, err := kusto.New(endpoint, authorizer)
+	if err != nil {
+		panic("add error handling")
+	}
+```
+endpoint represents the Kusto endpoint. This will resemble: "https://<instance>.<region>.kusto.windows.net".
+
+### Querying
+
+#### Query For Rows
+
+The Kusto package package queries data into a ***table.Row** which can be printed or have the column data extracted.
+
+```go
+	// table package is: github.com/Azure/azure-kusto-go/kusto/data/table
+
+	// Query our database table "systemNodes" for the CollectionTimes and the NodeIds.
+	iter, err := client.Query(ctx, "database", kusto.NewStmt("systemNodes | project CollectionTime, NodeId"))
+	if err != nil {
+		panic("add error handling")
+	}
 	defer iter.Stop()
 
-
-
-	// Loop through the iterated results, read them into our UserID structs and append them
-	// to our list of recs.
-	var recs []CountResult
-	for {
-		row, err := iter.Next()
-		if err != nil {
-			// This indicates we are done.
-			if err == io.EOF {
-				break
-			}
-			// We ran into an error during the stream.
-			panic(err)
-		}
-		rec := CountResult{}
-		if err := row.ToStruct(&rec); err != nil {
-			panic(err)
-		}
-		recs = append(recs, rec)
+	// .Do() will call the function for every row in the table.
+	err = iter.Do(
+		func(row *table.Row) error {
+			fmt.Println(row) // As a convenience, printing a *table.Row will output csv
+			return nil
+		},
+	)
+	if err != nil {
+		panic("add error handling")
 	}
-
-	fmt.Println(recs)
-}
 ```
 
-#### Ingestion
+#### Query Into Structs
+
+Users will often want to turn the returned data into Go structs that are easier to work with.  The ***table.Row** object
+that is returned supports this via the **.ToStruct()** method.
 
 ```go
-package main
+// NodeRec represents our Kusto data that will be returned.
+	type NodeRec struct {
+		// ID is the table's NodeId. We use the field tag here to to instruct our client to convert NodeId to ID.
+		ID int64 `kusto:"NodeId"`
+		// CollectionTime is Go representation of the Kusto datetime type.
+		CollectionTime time.Time
+	}
 
-import (
-	"context"
-	"fmt"
-	"github.com/Azure/azure-kusto-go/kusto"
-	"github.com/Azure/azure-kusto-go/kusto/ingest"
-	"github.com/Azure/go-autorest/autorest/azure/auth"
-	"io"
-)
-
-func main()  {
-    cluster := "https://sampleCluster.kusto.windows.net"
-    dm := "https://ingest-sampleCluster.kusto.windows.net"
-    appId := ""
-    appKey := ""
-    tenantId := ""
-
-    authorizerConfig := auth.NewClientCredentialsConfig(appId, appKey, tenantId)
-    authorization := kusto.Authorization{
-        Config: authorizerConfig,
-    }
-    
-    ingestor := ingest.New(dm, authorization)
-	url := "https://mystorageaccount.blob.core.windows.net/container/folder/data.json?sp=r&st=2020-02-01T18:51:17Z&se=2020-12-13T02:51:17Z&spr=https&sv=2019-02-02&sr=b&sig=***"
-	err := ingestor.IngestFromStorage(url, ingest.IngestionProperties{
-		DatabaseName:        "Database",
-		TableName:           "Table",
-		FlushImmediately:    true,
-		IngestionMappingRef: "TableData_from_json",
-	}, nil)
-
+	iter, err := client.Query(ctx, "database", kusto.NewStmt("systemNodes | project CollectionTime, NodeId"))
 	if err != nil {
-		panic(err)
-	} 
+		panic("add error handling")
+	}
+	defer iter.Stop()
 
-}
+	recs := []NodeRec{}
+	err = iter.Do(
+		func(row *table.Row) error {
+			rec := NodeRec{}
+			if err := row.ToStruct(&rec); err != nil {
+				return err
+			}
+			recs = append(recs, rec)
+			return nil
+		},
+	)
+	if err != nil {
+		panic("add error handling")
+	}
+```
 
+### Ingestion
+
+The **ingest/** package provides acces to Kusto's ingestion service for importing data into Kusto. This requires
+some prerequisite knowledge of acceptable data formats, mapping references, ...
+
+That documentation can be found [here](https://docs.microsoft.com/en-us/azure/kusto/management/data-ingestion/)
+
+#### From a File
+
+Ingesting a local file requires simply passing the path to the file to be ingested:
+
+```go
+	if err := in.FromFile(ctx, "/path/to/a/local/file"); err != nil {
+		panic("add error handling")
+	}
+```
+
+FromFile() will accept Unix path names on Unix platforms and Windows path names on Windows platforms.
+The file will not be deleted after upload (there is an option that will allow that though).
+
+#### From a Blobstore File
+
+This pacakge will also accept ingestion from an Azure Blobstore file:
+
+```go
+	if err := in.FromFile(ctx, "https://myaccount.blob.core.windows.net/$root/myblob"); err != nil {
+		panic("add error handling")
+	}
+```
+
+This will ingest a file from Azure Blobstore. We only support https:// paths and your domain name may differ than what is here.
+
+#### From a Stream
+
+Instestion from a stream commits blocks of fully formed data encodes (JSON, AVRO, ...) into Kusto:
+
+```go
+	if err := in.Stream(ctx, jsonEncodedData, ingest.JSON, "mappingName"); err != nil {
+		panic("add error handling")
+	}
 ```
 
 ### Contributing

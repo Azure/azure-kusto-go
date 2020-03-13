@@ -15,6 +15,11 @@ import (
 	"sync"
 	"time"
 
+	"github.com/Azure/azure-kusto-go/kusto/data/types"
+	"github.com/Azure/azure-kusto-go/kusto/data/value"
+	ilog "github.com/Azure/azure-kusto-go/kusto/internal/log"
+	"github.com/Azure/azure-kusto-go/kusto/unsafe"
+
 	"github.com/google/uuid"
 )
 
@@ -43,8 +48,8 @@ func (p ParamTypes) clone() ParamTypes {
 
 // ParamType provides type and default value information about the query parameter
 type ParamType struct {
-	// Type is the type this QueryParam will represent.
-	Type string
+	// Type is the type of Column type this QueryParam will represent.
+	Type types.Column
 	// Default is a default value to use if the query doesn't provide this value.
 	// The value that can be set is defined by the Type:
 	// CTBool must be a bool
@@ -65,7 +70,7 @@ type ParamType struct {
 var decRE = regexp.MustCompile(`^\d*\.\d+$`)
 
 func (p ParamType) validate() error {
-	if !validCT[p.Type] {
+	if !p.Type.Valid() {
 		return fmt.Errorf("the .Type was not a valid value, must be one of the values in this package starting with CT<type name>, was %s", p.Type)
 	}
 	if p.Default == nil {
@@ -73,49 +78,49 @@ func (p ParamType) validate() error {
 	}
 
 	switch p.Type {
-	case CTBool:
+	case types.Bool:
 		if _, ok := p.Default.(bool); !ok {
 			return fmt.Errorf("the .Type was %s, but the value was a %T", p.Type, p.Default)
 		}
 		return nil
-	case CTDateTime:
+	case types.DateTime:
 		if _, ok := p.Default.(time.Time); !ok {
 			return fmt.Errorf("the .Type was %s, but the value was a %T", p.Type, p.Default)
 		}
 		return nil
-	case CTDynamic:
+	case types.Dynamic:
 		return fmt.Errorf("the .Type was %s, but Dynamic types cannot have default values", p.Type)
-	case CTGUID:
+	case types.GUID:
 		if _, ok := p.Default.(uuid.UUID); !ok {
 			return fmt.Errorf("the .Type was %s, but the value was a %T", p.Type, p.Default)
 		}
 		return nil
-	case CTInt:
+	case types.Int:
 		if _, ok := p.Default.(int32); !ok {
 			return fmt.Errorf("the .Type was %s, but the value was a %T", p.Type, p.Default)
 		}
 		return nil
-	case CTLong:
+	case types.Long:
 		if _, ok := p.Default.(int64); !ok {
 			return fmt.Errorf("the .Type was %s, but the value was a %T", p.Type, p.Default)
 		}
 		return nil
-	case CTReal:
+	case types.Real:
 		if _, ok := p.Default.(float64); !ok {
 			return fmt.Errorf("the .Type was %s, but the value was a %T", p.Type, p.Default)
 		}
 		return nil
-	case CTString:
+	case types.String:
 		if _, ok := p.Default.(string); !ok {
 			return fmt.Errorf("the .Type was %s, but the value was a %T", p.Type, p.Default)
 		}
 		return nil
-	case CTTimespan:
+	case types.Timespan:
 		if _, ok := p.Default.(time.Duration); !ok {
 			return fmt.Errorf("the .Type was %s, but the value was a %T", p.Type, p.Default)
 		}
 		return nil
-	case CTDecimal:
+	case types.Decimal:
 		switch v := p.Default.(type) {
 		case string:
 			if !decRE.MatchString(v) {
@@ -135,58 +140,57 @@ func (p ParamType) validate() error {
 
 func (p ParamType) string() string {
 	switch p.Type {
-	case CTBool:
+	case types.Bool:
 		if p.Default == nil {
 			return p.name + ":bool"
 		}
 		v := p.Default.(bool)
 		return fmt.Sprintf("%s:bool = %v", p.name, v)
-	case CTDateTime:
+	case types.DateTime:
 		if p.Default == nil {
 			return p.name + ":datetime"
 		}
 		v := p.Default.(time.Time)
 		return fmt.Sprintf("%s:datetime = %s", p.name, v.Format(time.RFC3339Nano))
-	case CTDynamic:
+	case types.Dynamic:
 		return p.name + ":dynamic"
-	case CTGUID:
+	case types.GUID:
 		if p.Default == nil {
 			return p.name + ":guid"
 		}
 		v := p.Default.(uuid.UUID)
 		return fmt.Sprintf("%s:guid = %s", p.name, v.String())
-	case CTInt:
+	case types.Int:
 		if p.Default == nil {
 			return p.name + ":int"
 		}
 		v := p.Default.(int32)
 		return fmt.Sprintf("%s:int = %d", p.name, v)
-	case CTLong:
+	case types.Long:
 		if p.Default == nil {
 			return p.name + ":long"
 		}
 		v := p.Default.(int64)
 		return fmt.Sprintf("%s:long = %d", p.name, v)
-	case CTReal:
+	case types.Real:
 		if p.Default == nil {
 			return p.name + ":real"
 		}
 		v := p.Default.(float64)
 		return fmt.Sprintf("%s:real = %f", p.name, v)
-	case CTString:
+	case types.String:
 		if p.Default == nil {
 			return p.name + ":string"
 		}
 		v := p.Default.(string)
 		return fmt.Sprintf(`%s:string = "%s"`, p.name, v)
-	case CTTimespan:
+	case types.Timespan:
 		if p.Default == nil {
 			return p.name + ":timespan"
 		}
 		v := p.Default.(time.Duration)
-		panic("now gotta do something here")
-		return fmt.Sprintf("%s:timespan = %s", p.name, v)
-	case CTDecimal:
+		return fmt.Sprintf("%s:timespan = %s", p.name, value.Timespan{Value: v, Valid: true}.Marshal())
+	case types.Decimal:
 		if p.Default == nil {
 			return p.name + ":decimal"
 		}
@@ -301,10 +305,9 @@ func (p Definitions) clone() Definitions {
 	return p
 }
 
-// QueryValues represents a set of values that are used in Parameters.
-// TODO(jdoak): This name needs to change.  kusto.QueryValues gives the wrong name and it confuses with
-// with types.KustoValues.  Parameters can't be it, because we already have that.  There is a relase
-// checklist note for this and all other TODOs.
+// QueryValues represents a set of values that are substituted in Parameters. Every QueryValue key
+// must have a corresponding Parameter name. All values must be compatible with the Kusto Column type
+// it will go into (int64 for a long, int32 for int, time.Time for datetime, ...)
 type QueryValues map[string]interface{}
 
 func (v QueryValues) clone() QueryValues {
@@ -346,7 +349,7 @@ func (q Parameters) With(values QueryValues) (Parameters, error) {
 	return q, nil
 }
 
-// Must is the same as Values() except any error is a panic.
+// Must is the same as With() except any error is a panic.
 func (q Parameters) Must(values QueryValues) Parameters {
 	var err error
 	q, err = q.With(values)
@@ -396,7 +399,7 @@ func (q Parameters) validate(p Definitions) (Parameters, error) {
 			return q, fmt.Errorf("Parameters contains key %q that is not defined in the Stmt's Parameters", k)
 		}
 		switch paramType.Type {
-		case CTBool:
+		case types.Bool:
 			b, ok := v.(bool)
 			if !ok {
 				return q, fmt.Errorf("Parameters[%s](bool) = %T, which is not a bool", k, v)
@@ -406,56 +409,55 @@ func (q Parameters) validate(p Definitions) (Parameters, error) {
 				break
 			}
 			out[k] = "bool(false)"
-		case CTDateTime:
+		case types.DateTime:
 			t, ok := v.(time.Time)
 			if !ok {
 				return q, fmt.Errorf("Parameters[%s](datetime) = %T, which is not a time.Time", k, v)
 			}
 			out[k] = fmt.Sprintf("datetime(%s)", t.Format(time.RFC3339Nano))
-		case CTDynamic:
+		case types.Dynamic:
 			b, err := json.Marshal(v)
 			if err != nil {
 				return q, fmt.Errorf("Parameters[%s](dynamic), %T could not be marshalled into JSON, err: %s", k, v, err)
 			}
 			out[k] = fmt.Sprintf("dynamic(%s)", string(b))
-		case CTGUID:
+		case types.GUID:
 			u, ok := v.(uuid.UUID)
 			if !ok {
 				return q, fmt.Errorf("Parameters[%s](guid) = %T, which is not a uuid.UUID", k, v)
 			}
 			out[k] = fmt.Sprintf("guid(%s)", u.String())
-		case CTInt:
+		case types.Int:
 			i, ok := v.(int32)
 			if !ok {
 				return q, fmt.Errorf("Parameters[%s](int) = %T, which is not an int32", k, v)
 			}
 			out[k] = fmt.Sprintf("int(%d)", i)
-		case CTLong:
+		case types.Long:
 			i, ok := v.(int64)
 			if !ok {
 				return q, fmt.Errorf("Parameters[%s](long) = %T, which is not an int64", k, v)
 			}
 			out[k] = fmt.Sprintf("long(%d)", i)
-		case CTReal:
+		case types.Real:
 			i, ok := v.(float64)
 			if !ok {
 				return q, fmt.Errorf("Parameters[%s](real) = %T, which is not a float64", k, v)
 			}
 			out[k] = fmt.Sprintf("real(%f)", i)
-		case CTString:
+		case types.String:
 			s, ok := v.(string)
 			if !ok {
 				return q, fmt.Errorf("Parameters[%s](string) = %T, which is not a string", k, v)
 			}
 			out[k] = fmt.Sprintf("%s", s)
-		case CTTimespan:
+		case types.Timespan:
 			d, ok := v.(time.Duration)
 			if !ok {
 				return q, fmt.Errorf("Parameters[%s](timespan) = %T, which is not a time.Duration", k, v)
 			}
-			panic("still need to reverse engineer timespan")
-			out[k] = fmt.Sprintf("timespan(%s)", d)
-		case CTDecimal:
+			out[k] = fmt.Sprintf("timespan(%s)", value.Timespan{Value: d, Valid: true}.Marshal())
+		case types.Decimal:
 			var sval string
 			switch v := v.(type) {
 			case string:
@@ -480,11 +482,29 @@ type Stmt struct {
 	queryStr string
 	defs     Definitions
 	params   Parameters
+	unsafe   unsafe.Stmt
+}
+
+// StmtOption is an optional argument to NewStmt().
+type StmtOption func(s *Stmt)
+
+// UnsafeStmt provides enables unsafe actions on a Stmt and all Stmts derived from that Stmt.
+// This turns off safety features that could allow a service client to compromise your data store.
+// USE AT YOUR OWN RISK!
+func UnsafeStmt(options unsafe.Stmt) StmtOption {
+	return func(s *Stmt) {
+		ilog.UnsafeWarning()
+		s.unsafe.Add = true
+	}
 }
 
 // NewStmt creates a Stmt from a string constant.
-func NewStmt(query stringConstant) Stmt {
-	return Stmt{queryStr: query.String()}
+func NewStmt(query stringConstant, options ...StmtOption) Stmt {
+	s := Stmt{queryStr: query.String()}
+	for _, option := range options {
+		option(&s)
+	}
+	return s
 }
 
 // Add will add more text to the Stmt. This is similar to the + operator on two strings, except
@@ -492,6 +512,18 @@ func NewStmt(query stringConstant) Stmt {
 // Stmt.
 func (s Stmt) Add(query stringConstant) Stmt {
 	s.queryStr = s.queryStr + query.String()
+	return s
+}
+
+// UnsafeAdd provides a method to add strings that are not injection protected to the Stmt.
+// To utilize this method, you must create the Stmt with the UnsafeStmt() option and pass
+// the unsafe.Stmt with .Add set to true. If not set, THIS WILL PANIC!
+func (s Stmt) UnsafeAdd(query string) Stmt {
+	if !s.unsafe.Add {
+		panic("Stmt.UnsafeAdd() called, but the unsafe.Stmt.Add ability has not been enabled")
+	}
+
+	s.queryStr = s.queryStr + query
 	return s
 }
 
@@ -534,6 +566,15 @@ func (s Stmt) WithParameters(params Parameters) (Stmt, error) {
 
 	s.params = params
 	return s, nil
+}
+
+// MustParameters is the same as WithParameters with the exceptions that an error causes a panic.
+func (s Stmt) MustParameters(params Parameters) Stmt {
+	stmt, err := s.WithParameters(params)
+	if err != nil {
+		panic(err)
+	}
+	return stmt
 }
 
 // String implements fmt.Stringer. This can be used to see what the query statement to the server will be

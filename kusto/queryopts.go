@@ -4,9 +4,10 @@ package kusto
 // it clogs up the main kusto.go file.
 
 import (
-	"strconv"
-	"strings"
 	"time"
+
+	"github.com/Azure/azure-kusto-go/kusto/data/errors"
+	"github.com/Azure/azure-kusto-go/kusto/data/value"
 )
 
 // requestProperties is a POD used by clients to describe specific needs from the service.
@@ -22,6 +23,59 @@ type queryOptions struct {
 	canWrite          bool
 }
 
+// AllowWrite allows a query that attempts to modify data in a table.
+func AllowWrite() QueryOption {
+	return func(q *queryOptions) error {
+		q.canWrite = true
+		return nil
+	}
+}
+
+// TODO(jdoak/daniel): These really need to be tested.  I didn't find that NoTruncation worked, I had to add the
+// line in the query itself. NoRequestTimeout I'm not sure has value and I don't know how to test it. According to
+// the docs, the server timeout can be set to a max of 1 hour. I'm not sure how that plays with server timeout. Maybe .Net
+// was using this on the client side and if so, that is already taken care of. So not sure what this does. So if a customer
+// needs these in the future, we should look deeper at these.
+/*
+// NoRequestTimeout enables setting the request timeout to its maximum value.
+func NoRequestTimeout() QueryOption {
+	return func(q *queryOptions) error {
+		q.requestProperties.Options["norequesttimeout"] = true
+		return nil
+	}
+}
+
+// NoTruncation enables suppressing truncation of the query results returned to the caller.
+func NoTruncation() QueryOption {
+	return func(q *queryOptions) error {
+		q.requestProperties.Options["notruncation"] = true
+		return nil
+	}
+}
+*/
+
+// ResultsProgressiveDisable disables the progressive query stream.
+func ResultsProgressiveDisable() QueryOption {
+	return func(q *queryOptions) error {
+		delete(q.requestProperties.Options, "results_progressive_enabled")
+		return nil
+	}
+}
+
+// serverTimeout is the amount of time the server will allow a query to take.
+// NOTE: I have made the serverTimeout private. For the moment, I'm going to use the context.Context timer
+// to set timeouts via this private method.
+func serverTimeout(d time.Duration) QueryOption {
+	return func(q *queryOptions) error {
+		if d > 1*time.Hour {
+			return errors.ES(errors.OpQuery, errors.KClientArgs, "ServerTimeout option was set to %v, but can't be more than 1 hour", d)
+		}
+		q.requestProperties.Options["servertimeout"] = value.Timespan{Valid: true, Value: d}.Marshal()
+		return nil
+	}
+}
+
+/*
 // CustomQueryOption exists to allow a QueryOption that is not defined in the Go SDK, as all options
 // are not defined. Please Note: you should always use the type safe options provided below when available.
 // Also note that Kusto does not error on non-existent paramater names or bad values, it simply doesn't
@@ -29,14 +83,6 @@ type queryOptions struct {
 func CustomQueryOption(paramName string, i interface{}) QueryOption {
 	return func(q *queryOptions) {
 		q.requestProperties.Options[paramName] = i
-	}
-}
-
-// AllowWrite allows a query that attempts to modify data in a table. For ease of use it is recommended that
-// using Apply() instead for writes.
-func AllowWrite() QueryOption {
-	return func(q *queryOptions) {
-		q.canWrite = true
 	}
 }
 
@@ -99,20 +145,6 @@ func MaxOutputColumns(i int) QueryOption {
 	}
 }
 
-// NoRequestTimeout enables setting the request timeout to its maximum value.
-func NoRequestTimeout() QueryOption {
-	return func(q *queryOptions) {
-		q.requestProperties.Options["norequesttimeout"] = true
-	}
-}
-
-// NoTruncation enables suppressing truncation of the query results returned to the caller.
-func NoTruncation() QueryOption {
-	return func(q *queryOptions) {
-		q.requestProperties.Options["notruncation"] = true
-	}
-}
-
 // PushSelectionThroughAggregation will push simple selection through aggregation .
 func PushSelectionThroughAggregation() QueryOption {
 	return func(q *queryOptions) {
@@ -165,7 +197,7 @@ func QueryCursorScopedTables(l []string) QueryOption {
 	}
 }
 
-// DataScope is used with QueryDataScope to control a query's datascope.
+// DataScope is used with QueryDataScope() to control a query's datascope.
 type DataScope interface {
 	isDataScope()
 }
@@ -217,50 +249,7 @@ func QueryDateTimeScopeTo(t time.Time) QueryOption {
 		q.requestProperties.Options["query_datetimescope_to"] = t.Format(time.RFC3339Nano)
 	}
 }
-
-// ResultsProgressiveDisable disables the progressive query stream.
-func ResultsProgressiveDisable() QueryOption {
-	return func(q *queryOptions) {
-		delete(q.requestProperties.Options, "results_progressive_enabled")
-	}
-}
-
-// ServerTimeout is the amount of time the server will allow a query to take.
-// Note that Kusto uses TimeSpans for durations, which are measured in ticks (100 nanonseconds).
-// Sub tick durations (which are in nanoseconds) will get rounded.
-func ServerTimeout(d time.Duration) QueryOption {
-	return func(q *queryOptions) {
-		hours := d / time.Hour
-		hoursInNano := (hours * time.Hour)
-
-		mins := (d - (hoursInNano)) / time.Minute
-		minsInNano := hoursInNano + mins*time.Minute
-
-		secs := (d - minsInNano) / time.Second
-		secsInNano := minsInNano + secs*time.Second
-
-		milis := (d - secsInNano) / time.Millisecond
-
-		b := strings.Builder{}
-		if hours > 9 {
-			b.WriteString(strconv.Itoa(int(hours)) + ":")
-		} else {
-			b.WriteString("0" + strconv.Itoa(int(hours)) + ":")
-		}
-		if mins > 9 {
-			b.WriteString(strconv.Itoa(int(mins)) + ":")
-		} else {
-			b.WriteString("0" + strconv.Itoa(int(mins)) + ":")
-		}
-		if secs > 9 {
-			b.WriteString(strconv.Itoa(int(secs)) + ":")
-		} else {
-			b.WriteString("0" + strconv.Itoa(int(secs)) + ":")
-		}
-		b.WriteString("." + strconv.Itoa(int(milis)))
-		q.requestProperties.Options["servertimeout"] = b.String()
-	}
-}
+*/
 
 // Options we have not added.
 /*

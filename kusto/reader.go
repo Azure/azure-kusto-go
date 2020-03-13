@@ -8,133 +8,32 @@ import (
 	"fmt"
 	"io"
 	"net/http"
-	"reflect"
 	"sync"
 
-	"github.com/Azure/azure-kusto-go/kusto/errors"
-	"github.com/Azure/azure-kusto-go/kusto/types"
+	"github.com/Azure/azure-kusto-go/kusto/data/errors"
+	"github.com/Azure/azure-kusto-go/kusto/data/table"
+	"github.com/Azure/azure-kusto-go/kusto/data/value"
+	"github.com/Azure/azure-kusto-go/kusto/internal/frames"
+	v2 "github.com/Azure/azure-kusto-go/kusto/internal/frames/v2"
 )
 
-// Column describes a column descriptor.
-type Column struct {
-	// Name is the name of the column.
-	Name string
-	// Type is the type of value stored in this column. These are described
-	// via constants starting with CT<type>.
-	Type string
+// send allows us to send a table on a channel and know when everything has been written.
+type send struct {
+	inColumns    table.Columns
+	inRows       []value.Values
+	inProgress   v2.TableProgress
+	inNonPrimary v2.DataTable
+	inCompletion v2.DataSetCompletion
+	inErr        error
+
+	wg *sync.WaitGroup
 }
 
-// Columns is a set of columns.
-type Columns []Column
-
-func (c Columns) validate() error {
-	if len(c) == 0 {
-		return fmt.Errorf("Columns is zero length")
+func (s send) done() {
+	if s.wg != nil {
+		s.wg.Done()
 	}
-
-	names := make(map[string]bool, len(c))
-
-	for i, col := range c {
-		if col.Name == "" {
-			return fmt.Errorf("column[%d].Name is empty string", i)
-		}
-		if names[col.Name] {
-			return fmt.Errorf("column[%d].Name(%s) is already defined", i, col.Name)
-		}
-		names[col.Name] = true
-
-		if !validCT[col.Type] {
-			return fmt.Errorf("column[%d] if of type %q, which is not valid", i, col.Type)
-		}
-	}
-	return nil
 }
-
-// Row represents a row of Kusto data. Methods are not thread-safe.
-type Row struct {
-	columns     Columns
-	columnNames []string
-	row         types.KustoValues
-	op          errors.Op
-}
-
-// ColumnNames returns a list of all column names.
-func (r *Row) ColumnNames() []string {
-	if r.columnNames == nil {
-		for _, col := range r.columns {
-			r.columnNames = append(r.columnNames, col.Name)
-		}
-	}
-	return r.columnNames
-}
-
-// Values returns a list of KustoValues that represent the row.
-func (r *Row) Values() types.KustoValues {
-	return r.row
-}
-
-// Size returns the number of columns contained in Row.
-func (r *Row) Size() int {
-	return len(r.columns)
-}
-
-// Columns fetches all the columns in the row at once.
-// The value of the kth column will be decoded into the kth argument to Columns.
-// The number of arguments must be equal to the number of columns.
-// Pass nil to specify that a column should be ignored.
-// ptrs may be either the *string or *types.Column type. An error in decoding may leave
-// some ptrs set and others not.
-func (r *Row) Columns(ptrs ...interface{}) error {
-	if len(ptrs) != len(r.columns) {
-		return errors.E(r.op, errors.KClientArgs, fmt.Errorf(".Columns() requires %d arguments for this row, had %d", len(r.columns), len(ptrs)))
-	}
-
-	for i, col := range r.columns {
-		if ptrs[i] == nil {
-			continue
-		}
-		switch v := ptrs[i].(type) {
-		case *string:
-			*v = col.Name
-		case *Column:
-			v.Name = col.Name
-			v.Type = col.Type
-		default:
-			return errors.E(r.op, errors.KClientArgs, fmt.Errorf(".Columns() received argument at position %d that was not a *string, *types.Columns: was %T", i, ptrs[i]))
-		}
-	}
-
-	return nil
-}
-
-// ToStruct fetches the columns in a row into the fields of a struct. p must be a pointer to struct.
-// The rules for mapping a row's columns into a struct's exported fields are:
-//
-//   1. If a field has a `kusto: "column_name"` tag, then decode column
-//      'column_name' into the field. A special case is the `column_name: "-"`
-//      tag, which instructs ToStruct to ignore the field during decoding.
-//
-//   2. Otherwise, if the name of a field matches the name of a column (ignoring case),
-//      decode the column into the field.
-//
-// Slice and pointer fields will be set to nil if the source column is a null value, and a
-// non-nil value if the column is not NULL. To decode NULL values of other types, use
-// one of the kusto types (Int, Long, Dynamic, ...) as the type of the destination field.
-// You can check the .Valid field of those types to see if the value was set.
-func (r *Row) ToStruct(p interface{}) error {
-	// Check if p is a pointer to a struct
-	if t := reflect.TypeOf(p); t == nil || t.Kind() != reflect.Ptr || t.Elem().Kind() != reflect.Struct {
-		return errors.E(r.op, errors.KClientArgs, fmt.Errorf("type %T is not a pointer to a struct", p))
-	}
-	if len(r.columns) != len(r.row) {
-		return errors.E(r.op, errors.KClientArgs, fmt.Errorf("row does not have the correct number of values(%d) for the number of columns(%d)", len(r.row), len(r.columns)))
-	}
-
-	return decodeToStruct(r.columns, r.row, p)
-}
-
-// Rows is a set of rows.
-type Rows []*Row
 
 // RowIterator is used to iterate over the returned Row objects returned by Kusto.
 type RowIterator struct {
@@ -148,27 +47,27 @@ type RowIterator struct {
 	ResponseHeader http.Header
 
 	// The following channels represent input entering the RowIterator.
-	inColumns    chan Columns
-	inRows       chan []types.KustoValues
-	inProgress   chan tableProgress
-	inNonPrimary chan dataTable
-	inCompletion chan dataSetCompletion
-	inErr        chan error
+	inColumns    chan send
+	inRows       chan send
+	inProgress   chan send
+	inNonPrimary chan send
+	inCompletion chan send
+	inErr        chan send
 
-	rows chan types.KustoValues
+	rows chan value.Values
 
 	mu sync.Mutex
 
 	// progressive indicates if we are receiving a progressive stream or not.
 	progressive bool
 	// progress provides a progress indicator if the frames are progressive.
-	progress tableProgress
+	progress v2.TableProgress
 	// nonPrimary contains dataTables that are not the primary table.
-	nonPrimary map[string]dataTable
+	nonPrimary map[frames.TableKind]v2.DataTable
 	// dsCompletion is the completion frame for a non-progressive query.
-	dsCompletion dataSetCompletion
+	dsCompletion v2.DataSetCompletion
 
-	columns Columns
+	columns table.Columns
 
 	// error holds an error that was encountered. Once this is set, all calls on Rowiterator will
 	// just return the error here.
@@ -178,7 +77,7 @@ type RowIterator struct {
 	mock *MockRows
 }
 
-func newRowIterator(ctx context.Context, cancel context.CancelFunc, execResp execResp, header dataSetHeader, op errors.Op) (*RowIterator, chan struct{}) {
+func newRowIterator(ctx context.Context, cancel context.CancelFunc, execResp execResp, header v2.DataSetHeader, op errors.Op) (*RowIterator, chan struct{}) {
 	ri := &RowIterator{
 		RequestHeader:  execResp.reqHeader,
 		ResponseHeader: execResp.respHeader,
@@ -187,15 +86,15 @@ func newRowIterator(ctx context.Context, cancel context.CancelFunc, execResp exe
 		ctx:          ctx,
 		cancel:       cancel,
 		progressive:  header.IsProgressive,
-		inColumns:    make(chan Columns, 1),
-		inRows:       make(chan []types.KustoValues, 100),
-		inProgress:   make(chan tableProgress, 1),
-		inNonPrimary: make(chan dataTable, 1),
-		inCompletion: make(chan dataSetCompletion, 1),
-		inErr:        make(chan error),
+		inColumns:    make(chan send, 1),
+		inRows:       make(chan send, 100),
+		inProgress:   make(chan send, 1),
+		inNonPrimary: make(chan send, 1),
+		inCompletion: make(chan send, 1),
+		inErr:        make(chan send),
 
-		rows:       make(chan types.KustoValues, 1000),
-		nonPrimary: make(map[string]dataTable),
+		rows:       make(chan value.Values, 1000),
+		nonPrimary: make(map[frames.TableKind]v2.DataTable),
 	}
 	columnsReady := ri.start()
 	return ri, columnsReady
@@ -214,34 +113,40 @@ func (r *RowIterator) start() chan struct{} {
 		for {
 			select {
 			case <-r.ctx.Done():
-			case columns := <-r.inColumns:
-				r.columns = columns
+			case sent := <-r.inColumns:
+				r.columns = sent.inColumns
+				sent.done()
 				closeDone()
-			case inRows, ok := <-r.inRows:
+			case sent, ok := <-r.inRows:
 				if !ok {
 					close(r.rows)
 					return
 				}
-				for _, row := range inRows {
+				for _, row := range sent.inRows {
 					select {
 					case <-r.ctx.Done():
 					case r.rows <- row:
 					}
 				}
-			case table := <-r.inProgress:
+				sent.done()
+			case sent := <-r.inProgress:
 				r.mu.Lock()
-				r.progress = table
+				r.progress = sent.inProgress
+				sent.done()
 				r.mu.Unlock()
-			case table := <-r.inNonPrimary:
+			case sent := <-r.inNonPrimary:
 				r.mu.Lock()
-				r.nonPrimary[table.TableKind] = table
+				r.nonPrimary[sent.inNonPrimary.TableKind] = sent.inNonPrimary
+				sent.done()
 				r.mu.Unlock()
-			case table := <-r.inCompletion:
+			case sent := <-r.inCompletion:
 				r.mu.Lock()
-				r.dsCompletion = table
+				r.dsCompletion = sent.inCompletion
+				sent.done()
 				r.mu.Unlock()
-			case err := <-r.inErr:
-				r.setError(err)
+			case sent := <-r.inErr:
+				r.setError(sent.inErr)
+				sent.done()
 				close(r.rows)
 				return
 			}
@@ -267,7 +172,7 @@ func (r *RowIterator) Mock(m *MockRows) error {
 
 // Do calls f for every row returned by the query. If f returns a non-nil error,
 // iteration stops.
-func (r *RowIterator) Do(f func(r *Row) error) error {
+func (r *RowIterator) Do(f func(r *table.Row) error) error {
 	for {
 		row, err := r.Next()
 		if err != nil {
@@ -291,7 +196,7 @@ func (r *RowIterator) Stop() {
 
 // Next gets the next Row from the query. io.EOF is returned if there are no more entries in the output.
 // Once Next() returns an error, all subsequent calls will return the same error.
-func (r *RowIterator) Next() (*Row, error) {
+func (r *RowIterator) Next() (*table.Row, error) {
 	if err := r.getError(); err != nil {
 		return nil, err
 	}
@@ -313,7 +218,7 @@ func (r *RowIterator) Next() (*Row, error) {
 			}
 			return nil, io.EOF
 		}
-		return &Row{columns: r.columns, row: kvs, op: r.op}, nil
+		return &table.Row{ColumnTypes: r.columns, Values: kvs, Op: r.op}, nil
 	}
 }
 
@@ -344,7 +249,7 @@ func (r *RowIterator) Progressive() bool {
 // getNonPrimary will return a non-primary dataTable if it exists from the last query. The non-primary table kinds
 // are defined as constants starting with TK<name>.
 // Returns io.ErrUnexpectedEOF if not found. May not have all tables until RowIterator has reached io.EOF.
-func (r *RowIterator) getNonPrimary(ctx context.Context, tableKind string, tableName string) (dataTable, error) {
+func (r *RowIterator) getNonPrimary(ctx context.Context, tableKind, tableName frames.TableKind) (v2.DataTable, error) {
 	r.mu.Lock()
 	defer r.mu.Unlock()
 	for _, table := range r.nonPrimary {
@@ -352,7 +257,7 @@ func (r *RowIterator) getNonPrimary(ctx context.Context, tableKind string, table
 			return table, nil
 		}
 	}
-	return dataTable{}, io.ErrUnexpectedEOF
+	return v2.DataTable{}, io.ErrUnexpectedEOF
 }
 
 func isTest() bool {

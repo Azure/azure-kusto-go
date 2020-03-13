@@ -5,7 +5,9 @@ import (
 	"io"
 	"testing"
 
-	"github.com/Azure/azure-kusto-go/kusto/types"
+	"github.com/Azure/azure-kusto-go/kusto/data/table"
+	"github.com/Azure/azure-kusto-go/kusto/data/types"
+	"github.com/Azure/azure-kusto-go/kusto/data/value"
 
 	"github.com/kylelemons/godebug/pretty"
 )
@@ -39,7 +41,7 @@ func TestFromStruct(t *testing.T) {
 	}
 
 	for _, test := range tests {
-		m, err := NewMockRows(Columns{{Name: "Int", Type: CTInt}})
+		m, err := NewMockRows(table.Columns{{Name: "Int", Type: types.Int}})
 		if err != nil {
 			panic(err)
 		}
@@ -61,66 +63,66 @@ func TestFromStruct(t *testing.T) {
 func TestRow(t *testing.T) {
 	tests := []struct {
 		desc       string
-		columns    Columns
+		columns    table.Columns
 		input      []interface{}
-		want       []types.KustoValues
+		want       []value.Values
 		err        bool
 		nextRowErr bool
 	}{
 		{
 			desc: "Row has length 0 ",
-			columns: Columns{
-				{Name: "Int", Type: CTInt},
-				{Name: "String", Type: CTString},
-				{Name: "Long", Type: CTLong},
+			columns: table.Columns{
+				{Name: "Int", Type: types.Int},
+				{Name: "String", Type: types.String},
+				{Name: "Long", Type: types.Long},
 			},
 			input: []interface{}{
-				types.KustoValues{types.Int{Value: 2, Valid: true}, types.String{}, types.Long{}},
-				types.KustoValues{},
+				value.Values{value.Int{Value: 2, Valid: true}, value.String{}, value.Long{}},
+				value.Values{},
 			},
 			err: true,
 		},
 		{
 			desc: "Columns and Rows don't match up",
-			columns: Columns{
-				{Name: "Int", Type: CTInt},
-				{Name: "String", Type: CTReal}, // CTReal won't match the types.String{} in input
-				{Name: "Long", Type: CTLong},
+			columns: table.Columns{
+				{Name: "Int", Type: types.Int},
+				{Name: "String", Type: types.Real}, // CTReal won't match the value.String{} in input
+				{Name: "Long", Type: types.Long},
 			},
 			input: []interface{}{
-				types.KustoValues{types.Int{Value: 2, Valid: true}, types.String{}, types.Long{}},
-				types.KustoValues{types.Int{Value: 2, Valid: true}, types.String{}, types.Long{}},
+				value.Values{value.Int{Value: 2, Valid: true}, value.String{}, value.Long{}},
+				value.Values{value.Int{Value: 2, Valid: true}, value.String{}, value.Long{}},
 			},
 			err: true,
 		},
 		{
 			desc: "Non io.EOF error",
-			columns: Columns{
-				{Name: "Int", Type: CTInt},
-				{Name: "String", Type: CTString},
-				{Name: "Long", Type: CTLong},
+			columns: table.Columns{
+				{Name: "Int", Type: types.Int},
+				{Name: "String", Type: types.String},
+				{Name: "Long", Type: types.Long},
 			},
 			input: []interface{}{
-				types.KustoValues{types.Int{Value: 2, Valid: true}, types.String{}, types.Long{}},
-				types.KustoValues{types.Int{Value: 1, Valid: true}, types.String{}, types.Long{}},
+				value.Values{value.Int{Value: 2, Valid: true}, value.String{}, value.Long{}},
+				value.Values{value.Int{Value: 1, Valid: true}, value.String{}, value.Long{}},
 				fmt.Errorf("non io.EOF error"),
 			},
 			nextRowErr: true,
 		},
 		{
 			desc: "Success",
-			columns: Columns{
-				{Name: "Int", Type: CTInt},
-				{Name: "String", Type: CTString},
-				{Name: "Long", Type: CTLong},
+			columns: table.Columns{
+				{Name: "Int", Type: types.Int},
+				{Name: "String", Type: types.String},
+				{Name: "Long", Type: types.Long},
 			},
 			input: []interface{}{
-				types.KustoValues{types.Int{Value: 2, Valid: true}, types.String{}, types.Long{}},
-				types.KustoValues{types.Int{Value: 1, Valid: true}, types.String{}, types.Long{}},
+				value.Values{value.Int{Value: 2, Valid: true}, value.String{}, value.Long{}},
+				value.Values{value.Int{Value: 1, Valid: true}, value.String{}, value.Long{}},
 			},
-			want: []types.KustoValues{
-				types.KustoValues{types.Int{Value: 2, Valid: true}, types.String{}, types.Long{}},
-				types.KustoValues{types.Int{Value: 1, Valid: true}, types.String{}, types.Long{}},
+			want: []value.Values{
+				value.Values{value.Int{Value: 2, Valid: true}, value.String{}, value.Long{}},
+				value.Values{value.Int{Value: 1, Valid: true}, value.String{}, value.Long{}},
 			},
 		},
 	}
@@ -133,7 +135,7 @@ func TestRow(t *testing.T) {
 
 		for _, in := range test.input {
 			switch v := in.(type) {
-			case types.KustoValues:
+			case value.Values:
 				err = m.Row(v)
 			case error:
 				m.Error(v)
@@ -152,7 +154,7 @@ func TestRow(t *testing.T) {
 			continue
 		}
 
-		var got []types.KustoValues
+		var got []value.Values
 		var nextRowErr error
 		for {
 			r, err := m.nextRow()
@@ -162,7 +164,7 @@ func TestRow(t *testing.T) {
 				}
 				break
 			}
-			got = append(got, r.Values())
+			got = append(got, r.Values)
 		}
 
 		switch {

@@ -8,7 +8,10 @@ import (
 	"fmt"
 	"sync"
 
-	"github.com/Azure/azure-kusto-go/kusto/errors"
+	"github.com/Azure/azure-kusto-go/kusto/data/errors"
+	"github.com/Azure/azure-kusto-go/kusto/internal/frames"
+	v1 "github.com/Azure/azure-kusto-go/kusto/internal/frames/v1"
+	v2 "github.com/Azure/azure-kusto-go/kusto/internal/frames/v2"
 )
 
 // stateFn represents a function that executes at a given state.
@@ -31,7 +34,7 @@ func runSM(sm stateMachine) {
 		fn, err = fn()
 		switch {
 		case err != nil:
-			sm.rowIter().inErr <- err
+			sm.rowIter().inErr <- send{inErr: err} // Unique case, don't send a WaitGroup (also means, design needs to be fixed)
 			return
 		case fn == nil && err == nil:
 			return
@@ -39,14 +42,16 @@ func runSM(sm stateMachine) {
 	}
 }
 
-// nonProgressiveSM implements a stateMachine that processes Kusto data that is not non-streamibng.
+// nonProgressiveSM implements a stateMachine that processes Kusto data that is not non-streaming.
 type nonProgressiveSM struct {
 	op            errors.Op
 	iter          *RowIterator
-	in            chan frame
+	in            chan frames.Frame
 	columnSetOnce sync.Once
 	ctx           context.Context
 	hasCompletion bool
+
+	wg *sync.WaitGroup // Used to know when everything has finished
 }
 
 func (d *nonProgressiveSM) start() (stateFn, error) {
@@ -63,44 +68,49 @@ func (d *nonProgressiveSM) process() (sf stateFn, err error) {
 		return nil, d.ctx.Err()
 	case fr, ok := <-d.in:
 		if !ok {
+			d.wg.Wait()
+
 			if !d.hasCompletion {
-				return nil, errors.E(d.op, errors.KInternal, fmt.Errorf("non-progressive stream did not have dataSetCompletion frame"))
+				return nil, errors.E(d.op, errors.KInternal, fmt.Errorf("non-progressive stream did not have DataSetCompletion frame"))
 			}
 			return nil, nil
 		}
 
 		if d.hasCompletion {
-			return nil, errors.E(d.op, errors.KInternal, fmt.Errorf("saw a dataSetCompletion frame, then received a %T frame", fr))
+			return nil, errors.E(d.op, errors.KInternal, fmt.Errorf("saw a DataSetCompletion frame, then received a %T frame", fr))
 		}
 
 		switch table := fr.(type) {
-		case dataTable:
+		case v2.DataTable:
+			d.wg.Add(1)
 			switch table.TableKind {
-			case tkPrimaryResult:
-				// syncs the flow, waiting for columns to be decoded
+			case frames.PrimaryResult:
 				d.columnSetOnce.Do(func() {
-					d.iter.inColumns <- table.Columns
+					d.wg.Add(1) // We add here as well because two things are sent in this case statement.
+					d.iter.inColumns <- send{inColumns: table.Columns, wg: d.wg}
 				})
 
 				select {
 				case <-d.ctx.Done():
 					return nil, d.ctx.Err()
-				case d.iter.inRows <- table.Rows:
+				case d.iter.inRows <- send{inRows: table.Rows, wg: d.wg}:
 				}
 			default:
 				select {
 				case <-d.ctx.Done():
 					return nil, d.ctx.Err()
-				case d.iter.inNonPrimary <- table:
+				case d.iter.inNonPrimary <- send{inNonPrimary: table, wg: d.wg}:
 				}
 			}
-		case errorFrame:
+		case frames.Error:
 			return nil, table
-		case dataSetCompletion:
+		case v2.DataSetCompletion:
+			d.wg.Add(1)
+
 			select {
 			case <-d.ctx.Done():
 				return nil, d.ctx.Err()
-			case d.iter.inCompletion <- table:
+			case d.iter.inCompletion <- send{inCompletion: table, wg: d.wg}:
 			}
 			d.hasCompletion = true
 		}
@@ -108,17 +118,46 @@ func (d *nonProgressiveSM) process() (sf stateFn, err error) {
 	return d.process, nil
 }
 
-// progressiveSM implements a stateMachine that handles progressive streaming Kusto kusto.
+/*
+progressiveSM implements a stateMachine that handles progressive streaming Kusto data. Progressive streams really add
+support for giving progress to APIs that want to know how far they are into a set of results. A progressive stream
+should have the following structure and anything outside this should cause an error:
+
+Either:
+	TableHeader
+	Progress
+	DataTable
+	DataTableCompletion
+
+	If TableHeader:
+		Followed by Fragment
+		Followed by a Fragment or Completion
+			If Fragment, conintue until Completion
+			If Completion, loop()
+
+	If Progress:
+		Followed by anything
+		loop()
+
+	If DataTable:
+		Must be Non-Primary
+		loop()
+
+	If DataTableCompletion:
+		End, but we had to have had a TableHeader
+*/
 type progressiveSM struct {
 	op            errors.Op
 	iter          *RowIterator
-	in            chan frame
+	in            chan frames.Frame
 	columnSetOnce sync.Once
 	ctx           context.Context
 
-	currentHeader *tableHeader
-	currentFrame  frame
-	nonPrimary    *dataTable
+	currentHeader *v2.TableHeader
+	currentFrame  frames.Frame
+	nonPrimary    *v2.DataTable
+
+	wg *sync.WaitGroup
 }
 
 func (p *progressiveSM) start() (stateFn, error) {
@@ -135,23 +174,24 @@ func (p *progressiveSM) nextFrame() (stateFn, error) {
 		return nil, p.ctx.Err()
 	case fr, ok := <-p.in:
 		if !ok {
-			return nil, errors.E(p.op, errors.KInternal, fmt.Errorf("received a table stream that did not finish before our input channel"))
+			return nil, errors.E(p.op, errors.KInternal, fmt.Errorf("received a table stream that did not finish before our input channel, this is usally a return size or time limit"))
 		}
+
 		p.currentFrame = fr
 		switch table := fr.(type) {
-		case dataTable:
+		case v2.DataTable:
 			return p.dataTable, nil
-		case dataSetCompletion:
+		case v2.DataSetCompletion:
 			return p.dataSetCompletion, nil
-		case tableHeader:
+		case v2.TableHeader:
 			return p.tableHeader, nil
-		case tableFragment:
+		case v2.TableFragment:
 			return p.fragment, nil
-		case tableProgress:
+		case v2.TableProgress:
 			return p.progress, nil
-		case tableCompletion:
+		case v2.TableCompletion:
 			return p.completion, nil
-		case errorFrame:
+		case frames.Error:
 			return nil, table
 		default:
 			return nil, errors.E(p.op, errors.KInternal, fmt.Errorf("received an unknown frame in a progressive table stream we didn't understand: %T", table))
@@ -159,29 +199,36 @@ func (p *progressiveSM) nextFrame() (stateFn, error) {
 	}
 }
 
+// TODO(jdoak/daniel): I'm actually not sure if this is used in a progressive stream.  I remember the docs not being
+// 100% and so you go things that were not in the spec.  The progressiveSM works, but we should go back and verify
+// that this is used.
 func (p *progressiveSM) dataTable() (stateFn, error) {
 	if p.currentHeader != nil {
 		return nil, errors.ES(p.op, errors.KInternal, "received a DatTable between a tableHeader and TableCompletion")
 	}
-	table := p.currentFrame.(dataTable)
-	if table.TableKind == tkPrimaryResult {
+	table := p.currentFrame.(v2.DataTable)
+	if table.TableKind == frames.PrimaryResult {
 		return nil, errors.ES(p.op, errors.KInternal, "progressive stream had dataTable with Kind == PrimaryResult")
 	}
+
+	p.wg.Add(1)
 
 	select {
 	case <-p.ctx.Done():
 		return nil, p.ctx.Err()
-	case p.iter.inNonPrimary <- table:
+	case p.iter.inNonPrimary <- send{inNonPrimary: table, wg: p.wg}:
 	}
 
 	return p.nextFrame, nil
 }
 
 func (p *progressiveSM) dataSetCompletion() (stateFn, error) {
+	p.wg.Add(1)
+
 	select {
 	case <-p.ctx.Done():
 		return nil, p.ctx.Err()
-	case p.iter.inCompletion <- p.currentFrame.(dataSetCompletion):
+	case p.iter.inCompletion <- send{inCompletion: p.currentFrame.(v2.DataSetCompletion), wg: p.wg}:
 	}
 
 	select {
@@ -189,6 +236,7 @@ func (p *progressiveSM) dataSetCompletion() (stateFn, error) {
 		return nil, p.ctx.Err()
 	case frame, ok := <-p.in:
 		if !ok {
+			p.wg.Wait()
 			return nil, nil
 		}
 		return nil, errors.ES(p.op, errors.KInternal, "recieved a dataSetCompletion frame and then a %T frame", frame)
@@ -196,15 +244,16 @@ func (p *progressiveSM) dataSetCompletion() (stateFn, error) {
 }
 
 func (p *progressiveSM) tableHeader() (stateFn, error) {
-	table := p.currentFrame.(tableHeader)
+	table := p.currentFrame.(v2.TableHeader)
 	p.currentHeader = &table
-	if p.currentHeader.TableKind == tkPrimaryResult {
+	if p.currentHeader.TableKind == frames.PrimaryResult {
 		p.columnSetOnce.Do(func() {
-			p.iter.inColumns <- table.Columns
+			p.wg.Add(1)
+			p.iter.inColumns <- send{inColumns: table.Columns, wg: p.wg}
 		})
 	} else {
-		p.nonPrimary = &dataTable{
-			baseFrame: baseFrame{FrameType: ftDataTable},
+		p.nonPrimary = &v2.DataTable{
+			Base:      v2.Base{FrameType: frames.TypeDataTable},
 			TableID:   p.currentHeader.TableID,
 			TableKind: p.currentHeader.TableKind,
 			TableName: p.currentHeader.TableName,
@@ -220,16 +269,17 @@ func (p *progressiveSM) fragment() (stateFn, error) {
 		return nil, errors.ES(p.op, errors.KInternal, "received a TableFragment without a tableHeader")
 	}
 
-	if p.currentHeader.TableKind == tkPrimaryResult {
-		table := p.currentFrame.(tableFragment)
+	if p.currentHeader.TableKind == frames.PrimaryResult {
+		table := p.currentFrame.(v2.TableFragment)
 
+		p.wg.Add(1)
 		select {
 		case <-p.ctx.Done():
 			return nil, p.ctx.Err()
-		case p.iter.inRows <- table.Rows:
+		case p.iter.inRows <- send{inRows: table.Rows, wg: p.wg}:
 		}
 	} else {
-		p.nonPrimary.Rows = append(p.nonPrimary.Rows, p.currentFrame.(tableFragment).Rows...)
+		p.nonPrimary.Rows = append(p.nonPrimary.Rows, p.currentFrame.(v2.TableFragment).Rows...)
 	}
 	return p.nextFrame, nil
 }
@@ -238,7 +288,8 @@ func (p *progressiveSM) progress() (stateFn, error) {
 	if p.currentHeader == nil {
 		return nil, errors.ES(p.op, errors.KInternal, "received a TableProgress without a tableHeader")
 	}
-	p.iter.inProgress <- p.currentFrame.(tableProgress)
+	p.wg.Add(1)
+	p.iter.inProgress <- send{inProgress: p.currentFrame.(v2.TableProgress), wg: p.wg}
 	return p.nextFrame, nil
 }
 
@@ -246,14 +297,80 @@ func (p *progressiveSM) completion() (stateFn, error) {
 	if p.currentHeader == nil {
 		return nil, errors.ES(p.op, errors.KInternal, "received a TableCompletion without a tableHeader")
 	}
-	if p.currentHeader.TableKind == tkPrimaryResult {
+	if p.currentHeader.TableKind == frames.PrimaryResult {
 		// Do nothing here.
 	} else {
-		p.iter.inNonPrimary <- *p.nonPrimary
+		p.wg.Add(1)
+		p.iter.inNonPrimary <- send{inNonPrimary: *p.nonPrimary, wg: p.wg}
 	}
 	p.nonPrimary = nil
 	p.currentHeader = nil
 	p.currentFrame = nil
+
+	return p.nextFrame, nil
+}
+
+// v1SM implements a stateMachine that handles v1 MGMT streaming Kusto data.
+type v1SM struct {
+	op            errors.Op
+	iter          *RowIterator
+	in            chan frames.Frame
+	columnSetOnce sync.Once
+	ctx           context.Context
+
+	currentFrame frames.Frame
+
+	receivedDT bool
+
+	wg *sync.WaitGroup
+}
+
+func (p *v1SM) start() (stateFn, error) {
+	return p.nextFrame, nil
+}
+
+func (p *v1SM) rowIter() *RowIterator {
+	return p.iter
+}
+
+func (p *v1SM) nextFrame() (stateFn, error) {
+	select {
+	case <-p.ctx.Done():
+		return nil, p.ctx.Err()
+	case fr, ok := <-p.in:
+		if !ok {
+			if !p.receivedDT {
+				return nil, errors.E(p.op, errors.KInternal, fmt.Errorf("received a table stream that did not finish before our input channel, this is usally a return size or time limit"))
+			}
+			p.wg.Wait()
+			return nil, nil
+		}
+		p.currentFrame = fr
+		switch table := fr.(type) {
+		case v1.DataTable:
+			p.columnSetOnce.Do(func() {
+				p.wg.Add(1)
+				p.iter.inColumns <- send{inColumns: table.Columns, wg: p.wg}
+			})
+			return p.dataTable, nil
+		case frames.Error:
+			return nil, table
+		default:
+			return nil, errors.E(p.op, errors.KInternal, fmt.Errorf("received an unknown frame in a v1 table stream we didn't understand: %T", table))
+		}
+	}
+}
+
+func (p *v1SM) dataTable() (stateFn, error) {
+	table := p.currentFrame.(v1.DataTable)
+
+	p.wg.Add(1)
+	select {
+	case <-p.ctx.Done():
+		return nil, p.ctx.Err()
+	case p.iter.inRows <- send{inRows: table.Rows, wg: p.wg}:
+		p.receivedDT = true
+	}
 
 	return p.nextFrame, nil
 }

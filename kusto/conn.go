@@ -10,20 +10,25 @@ import (
 	"context"
 	"encoding/json"
 	"fmt"
-	"io"
 	"io/ioutil"
+	"log"
 	"net/http"
 	"net/url"
 	"regexp"
 	"strings"
 	"sync"
-	"time"
 
-	"github.com/Azure/azure-kusto-go/kusto/errors"
+	"github.com/Azure/azure-kusto-go/kusto/data/errors"
+	"github.com/Azure/azure-kusto-go/kusto/internal/frames"
+	v1 "github.com/Azure/azure-kusto-go/kusto/internal/frames/v1"
+	v2 "github.com/Azure/azure-kusto-go/kusto/internal/frames/v2"
+	"github.com/Azure/azure-kusto-go/kusto/internal/version"
 
 	"github.com/Azure/go-autorest/autorest"
 	"github.com/google/uuid"
 )
+
+var validURL = regexp.MustCompile(`https://([a-zA-Z0-9_-]{1,}\.){1,2}.*`)
 
 var bufferPool = sync.Pool{
 	New: func() interface{} {
@@ -42,11 +47,15 @@ type conn struct {
 }
 
 // newConn returns a new conn object.
-func newConn(endpoint string, auth Authorization, timeout time.Duration) (*conn, error) {
+func newConn(endpoint string, auth Authorization) (*conn, error) {
+	if !validURL.MatchString(endpoint) {
+		return nil, errors.E(errors.OpServConn, errors.KClientArgs, fmt.Errorf("endpoint is not valid(%s), should be https://<cluster name>.*", endpoint))
+	}
+
 	headers := http.Header{}
 	headers.Add("Accept", "application/json")
 	headers.Add("Accept-Encoding", "gzip,deflate")
-	headers.Add("x-ms-client-version", "Kusto.Go.Client: "+version)
+	headers.Add("x-ms-client-version", "Kusto.Go.Client: "+version.Kusto)
 
 	u, err := url.Parse(endpoint)
 	if err != nil {
@@ -55,14 +64,12 @@ func newConn(endpoint string, auth Authorization, timeout time.Duration) (*conn,
 
 	c := &conn{
 		auth:        auth.Authorizer,
-		endMgmt:     &url.URL{Scheme: u.Scheme, Host: u.Host, Path: "/v1/rest/mgmt"},
-		endQuery:    &url.URL{Scheme: u.Scheme, Host: u.Host, Path: "/v2/rest/query"},
-		streamQuery: &url.URL{Scheme: u.Scheme, Host: u.Host, Path: "/v1/rest/ingest/"},
+		endMgmt:     &url.URL{Scheme: "https", Host: u.Hostname(), Path: "/v1/rest/mgmt"},
+		endQuery:    &url.URL{Scheme: "https", Host: u.Hostname(), Path: "/v2/rest/query"},
+		streamQuery: &url.URL{Scheme: "https", Host: u.Hostname(), Path: "/v1/rest/ingest/"},
 		reqHeaders:  headers,
 		headersPool: make(chan http.Header, 100),
-		client: &http.Client{
-			Timeout: timeout,
-		},
+		client:      &http.Client{},
 	}
 
 	// Fills a pool of headers to alleviate header copying timing at request time.
@@ -91,6 +98,15 @@ func (c *conn) query(ctx context.Context, db string, query Stmt, options ...Quer
 		return execResp{}, errors.E(errors.OpQuery, errors.KClientArgs, fmt.Errorf("QueryValues in the the Stmt were incorrect: %s", err))
 	}
 
+	// Match our server deadline to our context.Deadline. This should be set from withing kusto.Query() to always have a value.
+	deadline, ok := ctx.Deadline()
+	if ok {
+		options = append(
+			options,
+			serverTimeout(deadline.Sub(nower())),
+		)
+	}
+
 	opt := &queryOptions{
 		requestProperties: &requestProperties{
 			Options: map[string]interface{}{
@@ -101,19 +117,13 @@ func (c *conn) query(ctx context.Context, db string, query Stmt, options ...Quer
 	}
 
 	for _, o := range options {
-		o(opt)
+		if err := o(opt); err != nil {
+			return execResp{}, err
+		}
 	}
 
-	if writeRE.MatchString(query.String()) {
-		if !opt.canWrite {
-			return execResp{}, errors.E(
-				errors.OpQuery,
-				errors.KClientArgs,
-				fmt.Errorf("Query() attempted to do a write operation. "+
-					"This requires the AllowWrite() QueryOption to be passed. "+
-					"Please see documentation on that option before use"),
-			)
-		}
+	if strings.HasPrefix(strings.TrimSpace(query.String()), ".") {
+		return execResp{}, errors.ES(errors.OpQuery, errors.KClientArgs, "a Stmt to Query() cannot begin with a period(.), only Mgmt() calls can do that")
 	}
 
 	return c.execute(ctx, execQuery, db, query, "", *opt.requestProperties)
@@ -121,6 +131,15 @@ func (c *conn) query(ctx context.Context, db string, query Stmt, options ...Quer
 
 // mgmt is used to do management queries to Kusto.
 func (c *conn) mgmt(ctx context.Context, db string, query Stmt, options ...QueryOption) (execResp, error) {
+	// Match our server deadline to our context.Deadline. This should be set from withing kusto.Mgmt() to always have a value.
+	deadline, ok := ctx.Deadline()
+	if ok {
+		options = append(
+			options,
+			serverTimeout(deadline.Sub(nower())),
+		)
+	}
+
 	opt := &queryOptions{
 		requestProperties: &requestProperties{
 			Options:    map[string]interface{}{},
@@ -129,7 +148,21 @@ func (c *conn) mgmt(ctx context.Context, db string, query Stmt, options ...Query
 	}
 
 	for _, o := range options {
-		o(opt)
+		if err := o(opt); err != nil {
+			return execResp{}, err
+		}
+	}
+
+	if writeRE.MatchString(query.String()) {
+		if !opt.canWrite {
+			return execResp{}, errors.ES(
+				errors.OpQuery,
+				errors.KClientArgs,
+				"Mgmt() attempted to do a write operation. "+
+					"This requires the AllowWrite() QueryOption to be passed. "+
+					"Please see documentation on that option before use",
+			)
+		}
 	}
 
 	return c.execute(ctx, execMgmt, db, query, "", *opt.requestProperties)
@@ -144,39 +177,50 @@ const (
 type execResp struct {
 	reqHeader  http.Header
 	respHeader http.Header
-	frameCh    chan frame
+	frameCh    chan frames.Frame
 }
 
-func newKustoRequest(ctx context.Context, c conn, op errors.Op, db string, query Stmt, properties requestProperties) (*http.Request, error) {
+func (c *conn) execute(ctx context.Context, execType int, db string, query Stmt, payload string, properties requestProperties) (execResp, error) {
 	headers := <-c.headersPool
 	go func() {
 		c.headersPool <- copyHeaders(c.reqHeaders)
 	}()
+
+	var op errors.Op
+	if execType == execQuery {
+		op = errors.OpQuery
+	} else if execType == execMgmt {
+		op = errors.OpMgmt
+	}
 
 	var endpoint *url.URL
 	buff := bufferPool.Get().(*bytes.Buffer)
 	buff.Reset()
 	defer bufferPool.Put(buff)
 
-	headers.Add("Content-Type", "application/json; charset=utf-8")
-	headers.Add("x-ms-client-request-id", "KGC.execute;"+uuid.New().String())
+	switch execType {
+	case execQuery, execMgmt:
+		headers.Add("Content-Type", "application/json; charset=utf-8")
+		headers.Add("x-ms-client-request-id", "KGC.execute;"+uuid.New().String())
 
-	var err error
-	err = json.NewEncoder(buff).Encode(
-		queryMsg{
-			DB:         db,
-			CSL:        query.String(),
-			Properties: properties,
-		},
-	)
-	if err != nil {
-		return nil, errors.E(op, errors.KClientInternal, fmt.Errorf("could not JSON marshal the Query message: %s", err))
-	}
-
-	if op == errors.OpQuery {
-		endpoint = c.endQuery
-	} else {
-		endpoint = c.endMgmt
+		var err error
+		err = json.NewEncoder(buff).Encode(
+			queryMsg{
+				DB:         db,
+				CSL:        query.String(),
+				Properties: properties,
+			},
+		)
+		if err != nil {
+			return execResp{}, errors.E(op, errors.KInternal, fmt.Errorf("could not JSON marshal the Query message: %s", err))
+		}
+		if execType == execQuery {
+			endpoint = c.endQuery
+		} else {
+			endpoint = c.endMgmt
+		}
+	default:
+		return execResp{}, errors.E(op, errors.KInternal, fmt.Errorf("internal error: did not understand the type of execType: %d", execType))
 	}
 
 	req := &http.Request{
@@ -186,22 +230,29 @@ func newKustoRequest(ctx context.Context, c conn, op errors.Op, db string, query
 		Body:   ioutil.NopCloser(buff),
 	}
 
-	if c.auth != nil {
-		prep := c.auth.WithAuthorization()
-		req, err = prep(autorest.CreatePreparer()).Prepare(req)
-	}
-
-	if err != nil {
-		return nil, errors.E(op, errors.KClientInternal, err)
-	}
-
-	req.WithContext(ctx)
-
-	return req, nil
-}
-
-func bodyFromResponse(resp http.Response, op errors.Op) (io.Reader, error) {
 	var err error
+	prep := c.auth.WithAuthorization()
+	req, err = prep(autorest.CreatePreparer()).Prepare(req)
+	if err != nil {
+		return execResp{}, errors.E(op, errors.KInternal, err)
+	}
+
+	resp, err := c.client.Do(req.WithContext(ctx))
+	if err != nil {
+		// TODO(jdoak): We need a http error unwrap function that pulls out an *errors.Error.
+		return execResp{}, errors.E(op, errors.KHTTPError, err)
+	}
+
+	if resp.StatusCode != 200 {
+		respBody := "body was empty"
+		b, err := ioutil.ReadAll(resp.Body)
+		if err == nil {
+			respBody = string(b)
+		}
+		log.Printf("resp code %s, response body:\n%s", resp.Status, respBody)
+		return execResp{}, errors.E(op, errors.KHTTPError, fmt.Errorf("received unexpected HTTP code %s, response body:\n%s", resp.Status, respBody))
+	}
+
 	body := resp.Body
 	switch enc := strings.ToLower(resp.Header.Get("Content-Encoding")); enc {
 	case "":
@@ -209,52 +260,27 @@ func bodyFromResponse(resp http.Response, op errors.Op) (io.Reader, error) {
 	case "gzip":
 		body, err = gzip.NewReader(resp.Body)
 		if err != nil {
-			return nil, errors.E(op, errors.KClientInternal, fmt.Errorf("gzip reader error: %s", err))
+			return execResp{}, errors.E(op, errors.KInternal, fmt.Errorf("gzip reader error: %s", err))
 		}
 	case "deflate":
 		body = flate.NewReader(resp.Body)
 	default:
-		return nil, errors.ES(op, errors.KClientInternal, "Content-Encoding was unrecognized: %s", enc)
+		return execResp{}, errors.ES(op, errors.KInternal, "Content-Encoding was unrecognized: %s", enc)
 	}
 
-	return body, nil
-}
-
-func (c *conn) execute(ctx context.Context, execType int, db string, query Stmt, payload string, properties requestProperties) (execResp, error) {
-	var op errors.Op
-	if execType == execQuery {
-		op = errors.OpQuery
-	} else if execType == execMgmt {
-		op = errors.OpMgmt
-	}
-
-	kReq, err := newKustoRequest(ctx, *c, op, db, query, properties)
-
-	resp, err := c.client.Do(kReq)
-
-	if err != nil {
-		// TODO(jdoak): We need a http error unwrap function that pulls out an *errors.Error.
-		return execResp{}, errors.E(op, errors.KHTTPError, err)
-	}
-
-	if resp.StatusCode != 200 {
-		// TODO(jdoak): We need to make this more verbose to be compliant with API guidelines.
-		return execResp{}, errors.E(op, errors.KHTTPError, fmt.Errorf("received non 200 (OK) response from server, got: %s", resp.Status))
-	}
-
-	body, err := bodyFromResponse(*resp, op)
-	dec := newDecoder(body, op)
-
-	switch op {
-	case execQuery:
-		ch := dec.decodeV2(ctx)
-		return execResp{frameCh: ch, reqHeader: kReq.Header, respHeader: resp.Header}, nil
+	var dec frames.Decoder
+	switch execType {
 	case execMgmt:
-		ch := dec.decodeV1(ctx)
-		return execResp{frameCh: ch, reqHeader: kReq.Header, respHeader: resp.Header}, nil
+		dec = &v1.Decoder{}
+	case execQuery:
+		dec = &v2.Decoder{}
 	default:
-		panic(errors.E(op, errors.KOther, fmt.Errorf("Unexpected op type")))
+		return execResp{}, errors.ES(op, errors.KInternal, "unknown execution type was %v", execType)
 	}
+
+	frameCh := dec.Decode(ctx, body, op)
+
+	return execResp{reqHeader: headers, respHeader: resp.Header, frameCh: frameCh}, nil
 }
 
 func copyHeaders(header http.Header) http.Header {

@@ -8,13 +8,15 @@ import (
 	"strings"
 	"time"
 
-	"github.com/Azure/azure-kusto-go/kusto/types"
+	"github.com/Azure/azure-kusto-go/kusto/data/table"
+	"github.com/Azure/azure-kusto-go/kusto/data/types"
+	"github.com/Azure/azure-kusto-go/kusto/data/value"
 
 	"github.com/google/uuid"
 )
 
-// structToKustoValues takes a *struct and encodes to types.KustoValues. At least one column must get set.
-func structToKustoValues(cols Columns, p interface{}) (types.KustoValues, error) {
+// structToKustoValues takes a *struct and encodes to value.Values. At least one column must get set.
+func structToKustoValues(cols table.Columns, p interface{}) (value.Values, error) {
 	t := reflect.TypeOf(p).Elem()
 	v := reflect.ValueOf(p).Elem()
 
@@ -53,63 +55,63 @@ func structToKustoValues(cols Columns, p interface{}) (types.KustoValues, error)
 
 // fieldConvert will attempt to take the value held in v and convert it to the appropriate types.KustoValue
 // that is described in colData in the correct location in row.
-func fieldConvert(colData columnData, v reflect.Value, row types.KustoValues) error {
+func fieldConvert(colData columnData, v reflect.Value, row value.Values) error {
 	switch colData.column.Type {
-	case CTBool:
+	case types.Bool:
 		c, err := convertBool(v)
 		if err != nil {
 			return err
 		}
 		row[colData.position] = c
-	case CTDateTime:
+	case types.DateTime:
 		c, err := convertDateTime(v)
 		if err != nil {
 			return err
 		}
 		row[colData.position] = c
-	case CTDynamic:
+	case types.Dynamic:
 		c, err := convertDynamic(v)
 		if err != nil {
 			return err
 		}
 		row[colData.position] = c
-	case CTGUID:
+	case types.GUID:
 		c, err := convertGUID(v)
 		if err != nil {
 			return err
 		}
 		row[colData.position] = c
-	case CTInt:
+	case types.Int:
 		c, err := convertInt(v)
 		if err != nil {
 			return err
 		}
 		row[colData.position] = c
-	case CTLong:
+	case types.Long:
 		c, err := convertLong(v)
 		if err != nil {
 			return err
 		}
 		row[colData.position] = c
-	case CTReal:
+	case types.Real:
 		c, err := convertReal(v)
 		if err != nil {
 			return err
 		}
 		row[colData.position] = c
-	case CTString:
+	case types.String:
 		c, err := convertString(v)
 		if err != nil {
 			return err
 		}
 		row[colData.position] = c
-	case CTTimespan:
+	case types.Timespan:
 		c, err := convertTimespan(v)
 		if err != nil {
 			return err
 		}
 		row[colData.position] = c
-	case CTDecimal:
+	case types.Decimal:
 		c, err := convertDecimal(v)
 		if err != nil {
 			return err
@@ -123,30 +125,30 @@ func fieldConvert(colData columnData, v reflect.Value, row types.KustoValues) er
 
 // defaultRow creates a complete row of KustoValues set to types outlined with cols. Useful for having
 // default values for fields that are not set.
-func defaultRow(cols Columns) (types.KustoValues, error) {
-	var row = make(types.KustoValues, len(cols))
+func defaultRow(cols table.Columns) (value.Values, error) {
+	var row = make(value.Values, len(cols))
 	for i, col := range cols {
 		switch col.Type {
-		case CTBool:
-			row[i] = types.Bool{}
-		case CTDateTime:
-			row[i] = types.DateTime{}
-		case CTDynamic:
-			row[i] = types.Dynamic{}
-		case CTGUID:
-			row[i] = types.GUID{}
-		case CTInt:
-			row[i] = types.Int{}
-		case CTLong:
-			row[i] = types.Long{}
-		case CTReal:
-			row[i] = types.Real{}
-		case CTString:
-			row[i] = types.String{}
-		case CTTimespan:
-			row[i] = types.Timespan{}
-		case CTDecimal:
-			row[i] = types.Decimal{}
+		case types.Bool:
+			row[i] = value.Bool{}
+		case types.DateTime:
+			row[i] = value.DateTime{}
+		case types.Dynamic:
+			row[i] = value.Dynamic{}
+		case types.GUID:
+			row[i] = value.GUID{}
+		case types.Int:
+			row[i] = value.Int{}
+		case types.Long:
+			row[i] = value.Long{}
+		case types.Real:
+			row[i] = value.Real{}
+		case types.String:
+			row[i] = value.String{}
+		case types.Timespan:
+			row[i] = value.Timespan{}
+		case types.Decimal:
+			row[i] = value.Decimal{}
 		default:
 			return nil, fmt.Errorf("column[%d] was for a column type that we don't understand(%s)", i, col.Type)
 		}
@@ -154,7 +156,7 @@ func defaultRow(cols Columns) (types.KustoValues, error) {
 	return row, nil
 }
 
-func colToValueCheck(cols Columns, values types.KustoValues) error {
+func colToValueCheck(cols table.Columns, values value.Values) error {
 	if len(cols) != len(values) {
 		return fmt.Errorf("the length of columns(%d) is not the same as the length of the row(%d)", len(cols), len(values))
 	}
@@ -163,45 +165,45 @@ func colToValueCheck(cols Columns, values types.KustoValues) error {
 		col := cols[i]
 
 		switch col.Type {
-		case CTBool:
-			if reflect.TypeOf(v) != reflect.TypeOf(types.Bool{}) {
-				return fmt.Errorf("value[%d] was expected to be of a types.Bool, was %T", i, v)
+		case types.Bool:
+			if reflect.TypeOf(v) != reflect.TypeOf(value.Bool{}) {
+				return fmt.Errorf("value[%d] was expected to be of a value.Bool, was %T", i, v)
 			}
-		case CTDateTime:
-			if reflect.TypeOf(v) != reflect.TypeOf(types.DateTime{}) {
-				return fmt.Errorf("value[%d] was expected to be of a types.DateTime, was %T", i, v)
+		case types.DateTime:
+			if reflect.TypeOf(v) != reflect.TypeOf(value.DateTime{}) {
+				return fmt.Errorf("value[%d] was expected to be of a value.DateTime, was %T", i, v)
 			}
-		case CTDynamic:
-			if reflect.TypeOf(v) != reflect.TypeOf(types.Dynamic{}) {
-				return fmt.Errorf("value[%d] was expected to be of a types.Dynamic, was %T", i, v)
+		case types.Dynamic:
+			if reflect.TypeOf(v) != reflect.TypeOf(value.Dynamic{}) {
+				return fmt.Errorf("value[%d] was expected to be of a value.Dynamic, was %T", i, v)
 			}
-		case CTGUID:
-			if reflect.TypeOf(v) != reflect.TypeOf(types.GUID{}) {
-				return fmt.Errorf("value[%d] was expected to be of a types.GUID, was %T", i, v)
+		case types.GUID:
+			if reflect.TypeOf(v) != reflect.TypeOf(value.GUID{}) {
+				return fmt.Errorf("value[%d] was expected to be of a value.GUID, was %T", i, v)
 			}
-		case CTInt:
-			if reflect.TypeOf(v) != reflect.TypeOf(types.Int{}) {
-				return fmt.Errorf("value[%d] was expected to be of a types.Int, was %T", i, v)
+		case types.Int:
+			if reflect.TypeOf(v) != reflect.TypeOf(value.Int{}) {
+				return fmt.Errorf("value[%d] was expected to be of a value.Int, was %T", i, v)
 			}
-		case CTLong:
-			if reflect.TypeOf(v) != reflect.TypeOf(types.Long{}) {
-				return fmt.Errorf("value[%d] was expected to be of a types.Long, was %T", i, v)
+		case types.Long:
+			if reflect.TypeOf(v) != reflect.TypeOf(value.Long{}) {
+				return fmt.Errorf("value[%d] was expected to be of a value.Long, was %T", i, v)
 			}
-		case CTReal:
-			if reflect.TypeOf(v) != reflect.TypeOf(types.Real{}) {
-				return fmt.Errorf("value[%d] was expected to be of a types.Real, was %T", i, v)
+		case types.Real:
+			if reflect.TypeOf(v) != reflect.TypeOf(value.Real{}) {
+				return fmt.Errorf("value[%d] was expected to be of a value.Real, was %T", i, v)
 			}
-		case CTString:
-			if reflect.TypeOf(v) != reflect.TypeOf(types.String{}) {
-				return fmt.Errorf("value[%d] was expected to be of a types.String, was %T", i, v)
+		case types.String:
+			if reflect.TypeOf(v) != reflect.TypeOf(value.String{}) {
+				return fmt.Errorf("value[%d] was expected to be of a value.String, was %T", i, v)
 			}
-		case CTTimespan:
-			if reflect.TypeOf(v) != reflect.TypeOf(types.Timespan{}) {
-				return fmt.Errorf("value[%d] was expected to be of a types.Timespan, was %T", i, v)
+		case types.Timespan:
+			if reflect.TypeOf(v) != reflect.TypeOf(value.Timespan{}) {
+				return fmt.Errorf("value[%d] was expected to be of a value.Timespan, was %T", i, v)
 			}
-		case CTDecimal:
-			if reflect.TypeOf(v) != reflect.TypeOf(types.Decimal{}) {
-				return fmt.Errorf("value[%d] was expected to be of a types.Decimal, was %T", i, v)
+		case types.Decimal:
+			if reflect.TypeOf(v) != reflect.TypeOf(value.Decimal{}) {
+				return fmt.Errorf("value[%d] was expected to be of a value.Decimal, was %T", i, v)
 			}
 		default:
 			return fmt.Errorf("value[%d] was for a column type that MockRow doesn't understand(%s)", i, col.Type)
@@ -210,7 +212,7 @@ func colToValueCheck(cols Columns, values types.KustoValues) error {
 	return nil
 }
 
-func convertBool(v reflect.Value) (types.Bool, error) {
+func convertBool(v reflect.Value) (value.Bool, error) {
 	t := v.Type()
 
 	// If it is a pointer, dereference it.
@@ -219,20 +221,20 @@ func convertBool(v reflect.Value) (types.Bool, error) {
 		v = v.Elem()
 	}
 
-	// Was a types.Bool{}, so return it.
-	if t == reflect.TypeOf(types.Bool{}) {
-		return v.Interface().(types.Bool), nil
+	// Was a value.Bool{}, so return it.
+	if t == reflect.TypeOf(value.Bool{}) {
+		return v.Interface().(value.Bool), nil
 	}
 
 	// Was a Bool, so return its value.
 	if t == reflect.TypeOf(true) {
-		return types.Bool{Value: v.Interface().(bool), Valid: true}, nil
+		return value.Bool{Value: v.Interface().(bool), Valid: true}, nil
 	}
 
-	return types.Bool{}, fmt.Errorf("value was expected to be either a types.Bool, *bool or bool, was %T", v.Interface())
+	return value.Bool{}, fmt.Errorf("value was expected to be either a value.Bool, *bool or bool, was %T", v.Interface())
 }
 
-func convertDateTime(v reflect.Value) (types.DateTime, error) {
+func convertDateTime(v reflect.Value) (value.DateTime, error) {
 	t := v.Type()
 
 	// If it is a pointer, dereference it.
@@ -241,20 +243,20 @@ func convertDateTime(v reflect.Value) (types.DateTime, error) {
 		v = v.Elem()
 	}
 
-	// Was a types.DateTime{}, so return it.
-	if t == reflect.TypeOf(types.DateTime{}) {
-		return v.Interface().(types.DateTime), nil
+	// Was a value.DateTime{}, so return it.
+	if t == reflect.TypeOf(value.DateTime{}) {
+		return v.Interface().(value.DateTime), nil
 	}
 
 	// Was a time.Time, so return its value.
 	if t == reflect.TypeOf(time.Time{}) {
-		return types.DateTime{Value: v.Interface().(time.Time), Valid: true}, nil
+		return value.DateTime{Value: v.Interface().(time.Time), Valid: true}, nil
 	}
 
-	return types.DateTime{}, fmt.Errorf("value was expected to be either a types.DateTime, *time.Time or time.Time, was %T", v.Interface())
+	return value.DateTime{}, fmt.Errorf("value was expected to be either a value.DateTime, *time.Time or time.Time, was %T", v.Interface())
 }
 
-func convertTimespan(v reflect.Value) (types.Timespan, error) {
+func convertTimespan(v reflect.Value) (value.Timespan, error) {
 	t := v.Type()
 
 	// If it is a pointer, dereference it.
@@ -263,20 +265,20 @@ func convertTimespan(v reflect.Value) (types.Timespan, error) {
 		v = v.Elem()
 	}
 
-	// Was a types.Timespan{}, so return it.
-	if t == reflect.TypeOf(types.Timespan{}) {
-		return v.Interface().(types.Timespan), nil
+	// Was a value.Timespan{}, so return it.
+	if t == reflect.TypeOf(value.Timespan{}) {
+		return v.Interface().(value.Timespan), nil
 	}
 
 	// Was a time.Duration, so return its value.
 	if t == reflect.TypeOf(time.Second) {
-		return types.Timespan{Value: v.Interface().(time.Duration), Valid: true}, nil
+		return value.Timespan{Value: v.Interface().(time.Duration), Valid: true}, nil
 	}
 
-	return types.Timespan{}, fmt.Errorf("value was expected to be either a types.Timespan, *time.Duration or time.Duration, was %T", v.Interface())
+	return value.Timespan{}, fmt.Errorf("value was expected to be either a value.Timespan, *time.Duration or time.Duration, was %T", v.Interface())
 }
 
-func convertDynamic(v reflect.Value) (types.Dynamic, error) {
+func convertDynamic(v reflect.Value) (value.Dynamic, error) {
 	t := v.Type()
 	pointer := false
 
@@ -287,35 +289,44 @@ func convertDynamic(v reflect.Value) (types.Dynamic, error) {
 		pointer = true
 	}
 
-	// Was a types.Dynamic{}, so return it.
-	if t == reflect.TypeOf(types.Dynamic{}) {
-		return v.Interface().(types.Dynamic), nil
+	// Was a value.Dynamic{}, so return it.
+	if t == reflect.TypeOf(value.Dynamic{}) {
+		return v.Interface().(value.Dynamic), nil
 	}
 
-	// Was a map[string]interface{}, so convert and return it.
-	if t == reflect.TypeOf(map[string]interface{}{}) {
-		b, err := json.Marshal(v.Interface())
-		if err != nil {
-			return types.Dynamic{}, fmt.Errorf("the map[string]interface{} representing a types.Dynamic could not be JSON encoded: %s", err)
+	// Was a string, so convert it to a map[string]interface{}.
+	if t == reflect.TypeOf("") {
+		m := map[string]interface{}{}
+		if err := json.Unmarshal([]byte(v.Interface().(string)), &m); err != nil {
+			return value.Dynamic{}, fmt.Errorf("the string representing a value.Dynamic was not valid JSON: %s", err)
 		}
-		return types.Dynamic{Value: string(b), Valid: true}, nil
+	}
+
+	// Was a map[string]interface{}, do an assignment.
+	if t == reflect.TypeOf(map[string]interface{}{}) {
+		return value.Dynamic{Value: v.Interface().(map[string]interface{})}, nil
 	}
 
 	if t.Kind() == reflect.Struct {
+		// TODO(Daniel): like some other notes, this is slow.
 		b, err := json.Marshal(v.Interface())
 		if err != nil {
 			if pointer {
-				return types.Dynamic{}, fmt.Errorf("the type *%T used in a types.Dynamic could not be JSON encoded: %s", v.Interface(), err)
+				return value.Dynamic{}, fmt.Errorf("the type *%T used in a value.Dynamic could not be JSON encoded: %s", v.Interface(), err)
 			}
-			return types.Dynamic{}, fmt.Errorf("the type %T used in a types.Dynamic could not be JSON encoded: %s", v.Interface(), err)
+			return value.Dynamic{}, fmt.Errorf("the type %T used in a value.Dynamic could not be JSON encoded: %s", v.Interface(), err)
 		}
-		return types.Dynamic{Value: string(b), Valid: true}, nil
+		m := map[string]interface{}{}
+		if err := json.Unmarshal(b, &m); err != nil {
+			return value.Dynamic{}, fmt.Errorf("the dynamic value in a struct was converted to JSON, but could not be unmarshalled to map[string]interface{} (possible bug)")
+		}
+		return value.Dynamic{Value: m, Valid: true}, nil
 	}
 
-	return types.Dynamic{}, fmt.Errorf("value was expected to be either a types.Dynamic, *map[string]interface{}, map[string]interface{}, *struct, or struct, was %T", v.Interface())
+	return value.Dynamic{}, fmt.Errorf("value was expected to be either a value.Dynamic, *map[string]interface{}, map[string]interface{}, *struct, or struct, was %T", v.Interface())
 }
 
-func convertGUID(v reflect.Value) (types.GUID, error) {
+func convertGUID(v reflect.Value) (value.GUID, error) {
 	t := v.Type()
 
 	// If it is a pointer, dereference it.
@@ -324,20 +335,20 @@ func convertGUID(v reflect.Value) (types.GUID, error) {
 		v = v.Elem()
 	}
 
-	// Was a types.GUID{}, so return it.
-	if t == reflect.TypeOf(types.GUID{}) {
-		return v.Interface().(types.GUID), nil
+	// Was a value.GUID{}, so return it.
+	if t == reflect.TypeOf(value.GUID{}) {
+		return v.Interface().(value.GUID), nil
 	}
 
 	// Was a uuid.UUID, so return its value.
 	if t == reflect.TypeOf(uuid.UUID{}) {
-		return types.GUID{Value: v.Interface().(uuid.UUID), Valid: true}, nil
+		return value.GUID{Value: v.Interface().(uuid.UUID), Valid: true}, nil
 	}
 
-	return types.GUID{}, fmt.Errorf("value was expected to be either a types.BUID, *uuid.UUID or uuid.UUID, was %T", v.Interface())
+	return value.GUID{}, fmt.Errorf("value was expected to be either a value.BUID, *uuid.UUID or uuid.UUID, was %T", v.Interface())
 }
 
-func convertInt(v reflect.Value) (types.Int, error) {
+func convertInt(v reflect.Value) (value.Int, error) {
 	t := v.Type()
 
 	// If it is a pointer, dereference it.
@@ -346,20 +357,20 @@ func convertInt(v reflect.Value) (types.Int, error) {
 		v = v.Elem()
 	}
 
-	// Was a types.Int{}, so return it.
-	if t == reflect.TypeOf(types.Int{}) {
-		return v.Interface().(types.Int), nil
+	// Was a value.Int{}, so return it.
+	if t == reflect.TypeOf(value.Int{}) {
+		return v.Interface().(value.Int), nil
 	}
 
 	// Was a int32, so return its value.
 	if t == reflect.TypeOf(int32(1)) {
-		return types.Int{Value: v.Interface().(int32), Valid: true}, nil
+		return value.Int{Value: v.Interface().(int32), Valid: true}, nil
 	}
 
-	return types.Int{}, fmt.Errorf("value was expected to be either a types.Int, *int32 or int32, was %T", v.Interface())
+	return value.Int{}, fmt.Errorf("value was expected to be either a value.Int, *int32 or int32, was %T", v.Interface())
 }
 
-func convertLong(v reflect.Value) (types.Long, error) {
+func convertLong(v reflect.Value) (value.Long, error) {
 	t := v.Type()
 
 	// If it is a pointer, dereference it.
@@ -368,20 +379,20 @@ func convertLong(v reflect.Value) (types.Long, error) {
 		v = v.Elem()
 	}
 
-	// Was a types.Long{}, so return it.
-	if t == reflect.TypeOf(types.Long{}) {
-		return v.Interface().(types.Long), nil
+	// Was a value.Long{}, so return it.
+	if t == reflect.TypeOf(value.Long{}) {
+		return v.Interface().(value.Long), nil
 	}
 
 	// Was a int64, so return its value.
 	if t == reflect.TypeOf(int64(1)) {
-		return types.Long{Value: v.Interface().(int64), Valid: true}, nil
+		return value.Long{Value: v.Interface().(int64), Valid: true}, nil
 	}
 
-	return types.Long{}, fmt.Errorf("value was expected to be either a types.Long, *int64 or int64, was %T", v.Interface())
+	return value.Long{}, fmt.Errorf("value was expected to be either a value.Long, *int64 or int64, was %T", v.Interface())
 }
 
-func convertReal(v reflect.Value) (types.Real, error) {
+func convertReal(v reflect.Value) (value.Real, error) {
 	t := v.Type()
 
 	// If it is a pointer, dereference it.
@@ -390,20 +401,20 @@ func convertReal(v reflect.Value) (types.Real, error) {
 		v = v.Elem()
 	}
 
-	// Was a types.Real{}, so return it.
-	if t == reflect.TypeOf(types.Real{}) {
-		return v.Interface().(types.Real), nil
+	// Was a value.Real{}, so return it.
+	if t == reflect.TypeOf(value.Real{}) {
+		return v.Interface().(value.Real), nil
 	}
 
 	// Was a float64, so return its value.
 	if t == reflect.TypeOf(float64(1.0)) {
-		return types.Real{Value: v.Interface().(float64), Valid: true}, nil
+		return value.Real{Value: v.Interface().(float64), Valid: true}, nil
 	}
 
-	return types.Real{}, fmt.Errorf("value was expected to be either a types.Real, *float64 or float64, was %T", v.Interface())
+	return value.Real{}, fmt.Errorf("value was expected to be either a value.Real, *float64 or float64, was %T", v.Interface())
 }
 
-func convertString(v reflect.Value) (types.String, error) {
+func convertString(v reflect.Value) (value.String, error) {
 	t := v.Type()
 
 	// If it is a pointer, dereference it.
@@ -413,19 +424,19 @@ func convertString(v reflect.Value) (types.String, error) {
 	}
 
 	// Was a types.String{}, so return it.
-	if t == reflect.TypeOf(types.String{}) {
-		return v.Interface().(types.String), nil
+	if t == reflect.TypeOf(value.String{}) {
+		return v.Interface().(value.String), nil
 	}
 
 	// Was a string, so return its value.
 	if t == reflect.TypeOf("") {
-		return types.String{Value: v.Interface().(string), Valid: true}, nil
+		return value.String{Value: v.Interface().(string), Valid: true}, nil
 	}
 
-	return types.String{}, fmt.Errorf("value was expected to be either a types.String, *string or string, was %T", v.Interface())
+	return value.String{}, fmt.Errorf("value was expected to be either a types.String, *string or string, was %T", v.Interface())
 }
 
-func convertDecimal(v reflect.Value) (types.Decimal, error) {
+func convertDecimal(v reflect.Value) (value.Decimal, error) {
 	t := v.Type()
 
 	// If it is a pointer, dereference it.
@@ -435,14 +446,14 @@ func convertDecimal(v reflect.Value) (types.Decimal, error) {
 	}
 
 	// Was a types.Decimal{}, so return it.
-	if t == reflect.TypeOf(types.Decimal{}) {
-		return v.Interface().(types.Decimal), nil
+	if t == reflect.TypeOf(value.Decimal{}) {
+		return v.Interface().(value.Decimal), nil
 	}
 
 	// Was a string, so return its value.
 	if t == reflect.TypeOf("") {
-		return types.Decimal{Value: v.Interface().(string), Valid: true}, nil
+		return value.Decimal{Value: v.Interface().(string), Valid: true}, nil
 	}
 
-	return types.Decimal{}, fmt.Errorf("value was expected to be either a types.Decimal, *string or string, was %T", v.Interface())
+	return value.Decimal{}, fmt.Errorf("value was expected to be either a types.Decimal, *string or string, was %T", v.Interface())
 }

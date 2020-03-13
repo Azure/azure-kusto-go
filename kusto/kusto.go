@@ -1,7 +1,3 @@
-/*
-Package kusto provides a Kusto client for accessing Kusto storage.
-Author: jdoak@microsoft.com
-*/
 package kusto
 
 import (
@@ -11,29 +7,18 @@ import (
 	"sync"
 	"time"
 
-	"github.com/Azure/azure-kusto-go/kusto/errors"
+	"github.com/Azure/azure-kusto-go/kusto/data/errors"
+	"github.com/Azure/azure-kusto-go/kusto/internal/frames"
+	v2 "github.com/Azure/azure-kusto-go/kusto/internal/frames/v2"
 
 	"github.com/Azure/go-autorest/autorest"
 	"github.com/Azure/go-autorest/autorest/azure/auth"
 )
 
-// version is the version of this client package that is communicated to the server.
-const version = "0.0.1"
-
 // queryer provides for getting a stream of Kusto frames. Exists to allow fake Kusto streams in tests.
 type queryer interface {
-	// Query queries a Kusto database and returns Frames that the server sends.
 	query(ctx context.Context, db string, query Stmt, options ...QueryOption) (execResp, error)
-}
-
-type manager interface {
-	// Mgmt issues commands against a Kusto database and returns Frames that the server sends.
 	mgmt(ctx context.Context, db string, query Stmt, options ...QueryOption) (execResp, error)
-}
-
-type executor interface {
-	queryer
-	manager
 }
 
 // Authorization provides the ADAL authorizer needed to access the resource. You can set Authorizer or
@@ -42,13 +27,16 @@ type Authorization struct {
 	// Authorizer provides an authorizer to use when talking to Kusto. If this is set, the
 	// Authorizer must have its Resource (also called Resource ID) set to the endpoint passed
 	// to the New() constructor. This will be something like "https://somename.westus.kusto.windows.net".
+	// This package will try to set that automatically for you.
 	Authorizer autorest.Authorizer
 	// Config provides the authorizer's config that can create the authorizer. We recommending setting
 	// this instead of Authorizer, as we will automatically set the Resource ID with the endpoint passed.
 	Config auth.AuthorizerConfig
 }
 
-func (a *Authorization) validate(endpoint string) error {
+// Validate validates the Authorization object against the endpoint an preps it for use.
+// For internal use only.
+func (a *Authorization) Validate(endpoint string) error {
 	const rescField = "Resource"
 
 	if a.Authorizer != nil && a.Config != nil {
@@ -66,8 +54,8 @@ func (a *Authorization) validate(endpoint string) error {
 	// support calls, so it is worth attempting.
 	v := reflect.ValueOf(a.Config)
 	switch v.Kind() {
-	// This piece of code is what I call hopeful thinking. The New* in auth.go should return pointers, they don't (bad).
-	// So this is hoping someone passed a pointer in the Authorizer interface.
+	// This piece of code is what I call hopeful thinking. The New*() calls in auth.go should return pointers
+	// (they did an interface which is bad). So this is hoping someone passed a pointer in the Authorizer interface.
 	case reflect.Ptr:
 		if reflect.PtrTo(v.Type()).Kind() == reflect.Struct {
 			v = v.Elem()
@@ -79,7 +67,7 @@ func (a *Authorization) validate(endpoint string) error {
 				return errors.E(errors.OpServConn, errors.KClientArgs, fmt.Errorf("the Authorization.Config passed to the Kusto client did not have an underlying .Resource field"))
 			}
 		} else {
-			return errors.E(errors.OpServConn, errors.KClientArgs, fmt.Errorf("the Authorization.Config passed to the Kusto client was a pointer to a %T, which is not a struct.", a.Config))
+			return errors.E(errors.OpServConn, errors.KClientArgs, fmt.Errorf("the Authorization.Config passed to the Kusto client was a pointer to a %T, which is not a struct", a.Config))
 		}
 		// This is how we are likely to get the Authorizer. So since we can't change the fields, now we have to type assert
 		// to the underlying type and put back a new copy. Note: it seems to me that we should be get a copy of a.Config
@@ -112,37 +100,26 @@ func (a *Authorization) validate(endpoint string) error {
 
 // Client is a client to a Kusto instance.
 type Client struct {
-	conn    executor
-	timeout time.Duration
-	mu      sync.Mutex
+	conn     queryer
+	endpoint string
+	auth     Authorization
+	mu       sync.Mutex
 }
 
 // Option is an optional argument type for New().
 type Option func(c *Client)
 
-// Timeout adjusts the maximum time any query can take from the client side. This defaults to 5 minutes.
-// Note that the server has a timeout of 4 minutes for a query, 10 minutes for a management action.
-// You will need to use the ServerTimeout() QueryOption in order to allow the server to take larger queries.
-func Timeout(d time.Duration) Option {
-	return func(c *Client) {
-		c.timeout = d
-	}
-}
-
-// New returns a new Client.
+// New returns a new Client. endpoint is the Kusto endpoint to use, example: https://somename.westus.kusto.windows.net .
 func New(endpoint string, auth Authorization, options ...Option) (*Client, error) {
-	client := &Client{}
+	client := &Client{auth: auth, endpoint: endpoint}
 	for _, o := range options {
 		o(client)
 	}
 
-	if auth.Config != nil {
-		if err := auth.validate(endpoint); err != nil {
-			return nil, err
-		}
+	if err := auth.Validate(endpoint); err != nil {
+		return nil, err
 	}
-
-	conn, err := newConn(endpoint, auth, client.timeout)
+	conn, err := newConn(endpoint, auth)
 	if err != nil {
 		return nil, err
 	}
@@ -151,29 +128,48 @@ func New(endpoint string, auth Authorization, options ...Option) (*Client, error
 	return client, nil
 }
 
-// QueryOption provides options for Query().
-type QueryOption func(q *queryOptions) // Note, these are defined in queryopts.go file
+// QueryOption is an option type for a call to Query().
+type QueryOption func(q *queryOptions) error
 
-// Query makes a query for the purpose of extracting data from Kusto. The query argument must be a string
-// constant or built using the QueryBuilder.  Context can set a timeout or cancel the query. Queries
-// cannot take longer than 5 minutes by default.
+// Note: QueryOption these are defined in queryopts.go file
+
+// Auth returns the Authorization passed to New().
+func (c *Client) Auth() Authorization {
+	return c.auth
+}
+
+// Endpoint returns the endpoint passed to New().
+func (c *Client) Endpoint() string {
+	return c.endpoint
+}
+
+// Query queries Kusto for data. context can set a timeout or cancel the query.
+// query is a injection safe Stmt object. Queries cannot take longer than 5 minutes by default and have row/size limitations.
+// Note that the server has a timeout of 4 minutes for a query by default unless the context deadline is set. Queries can
+// take a maximum of 1 hour.
 func (c *Client) Query(ctx context.Context, db string, query Stmt, options ...QueryOption) (*RowIterator, error) {
 	c.mu.Lock()
 	defer c.mu.Unlock()
 
-	ctx, cancel := context.WithCancel(context.Background()) // Note: cancel is called when *RowIterator has Stop() called.
+	ctx, cancel, err := c.contextSetup(ctx, false) // Note: cancel is called when *RowIterator has Stop() called.
+	if err != nil {
+		return nil, err
+	}
+
 	execResp, err := c.conn.query(ctx, db, query, options...)
 	if err != nil {
+		cancel()
 		return nil, fmt.Errorf("error with Query: %s", err)
 	}
 
-	var header dataSetHeader
+	var header v2.DataSetHeader
 
 	ff := <-execResp.frameCh
 	switch v := ff.(type) {
-	case dataSetHeader:
+	case v2.DataSetHeader:
 		header = v
-	case errorFrame:
+	case frames.Error:
+		cancel()
 		return nil, v
 	}
 
@@ -186,6 +182,7 @@ func (c *Client) Query(ctx context.Context, db string, query Stmt, options ...Qu
 			iter: iter,
 			in:   execResp.frameCh,
 			ctx:  ctx,
+			wg:   &sync.WaitGroup{},
 		}
 	} else {
 		sm = &nonProgressiveSM{
@@ -193,6 +190,7 @@ func (c *Client) Query(ctx context.Context, db string, query Stmt, options ...Qu
 			iter: iter,
 			in:   execResp.frameCh,
 			ctx:  ctx,
+			wg:   &sync.WaitGroup{},
 		}
 	}
 	go runSM(sm)
@@ -203,43 +201,64 @@ func (c *Client) Query(ctx context.Context, db string, query Stmt, options ...Qu
 }
 
 // Mgmt is used to do management queries to Kusto.
-func (c *Client) Mgmt(ctx context.Context, db string, query Stmt, options ...QueryOption) ([]*Row, error) {
+// Details can be found at: https://docs.microsoft.com/en-us/azure/kusto/management/
+// Mgmt accepts a Stmt, but that Stmt cannot have any query parameters attached at this time.
+// Note that the server has a timeout of 10 minutes for a management call by default unless the context deadline is set.
+// There is a maximum of 1 hour.
+func (c *Client) Mgmt(ctx context.Context, db string, query Stmt, options ...QueryOption) (*RowIterator, error) {
 	c.mu.Lock()
 	defer c.mu.Unlock()
 
-	ctx, _ = context.WithCancel(context.Background())
-	// TODO: support progressive
-	options = append(options, ResultsProgressiveDisable())
+	if !query.params.IsZero() || !query.defs.IsZero() {
+		return nil, errors.ES(errors.OpMgmt, errors.KClientArgs, "a Mgmt() call cannot accept a Stmt object that has Definitions or Parameters attached")
+	}
+
+	ctx, cancel, err := c.contextSetup(ctx, true) // Note: cancel is called when *RowIterator has Stop() called.
+	if err != nil {
+		return nil, err
+	}
+
 	execResp, err := c.conn.mgmt(ctx, db, query, options...)
 	if err != nil {
+		cancel()
 		return nil, fmt.Errorf("error with Query: %s", err)
 	}
 
-	ff := <-execResp.frameCh
-	switch v := ff.(type) {
-	case dataTable:
-		dt := ff.(dataTable)
-		rows := make([]*Row, len(dt.Rows))
-		colNames := make([]string, len(dt.Columns))
-
-		for i, c := range dt.Columns {
-			colNames[i] = c.Name
-		}
-
-		for i, r := range dt.Rows {
-			rows[i] = &Row{
-				columns:     dt.Columns,
-				columnNames: colNames,
-				row:         r,
-				op:          errors.OpMgmt,
-			}
-		}
-
-		return rows, nil
-	case errorFrame:
-		return nil, v
-
-	default:
-		panic("huh?")
+	iter, columnsReady := newRowIterator(ctx, cancel, execResp, v2.DataSetHeader{}, errors.OpMgmt)
+	sm := &v1SM{
+		op:   errors.OpQuery,
+		iter: iter,
+		in:   execResp.frameCh,
+		ctx:  ctx,
+		wg:   &sync.WaitGroup{},
 	}
+
+	go runSM(sm)
+
+	<-columnsReady
+
+	return iter, nil
+}
+
+var nower = time.Now
+
+func (*Client) contextSetup(ctx context.Context, mgmtCall bool) (context.Context, context.CancelFunc, error) {
+	t, ok := ctx.Deadline()
+	if ok {
+		d := t.Sub(nower())
+		if d > 1*time.Hour {
+			if mgmtCall {
+				return ctx, nil, errors.ES(errors.OpMgmt, errors.KClientArgs, "cannot set a deadline greater than 1 hour(%s)", d)
+			}
+			return ctx, nil, errors.ES(errors.OpQuery, errors.KClientArgs, "cannot set a deadline greater than 1 hour(%s)", d)
+		}
+		ctx, cancel := context.WithCancel(ctx)
+		return ctx, cancel, nil
+	}
+	if mgmtCall {
+		ctx, cancel := context.WithTimeout(ctx, 10*time.Minute)
+		return ctx, cancel, nil
+	}
+	ctx, cancel := context.WithTimeout(ctx, 4*time.Minute)
+	return ctx, cancel, nil
 }
