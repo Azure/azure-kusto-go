@@ -1,4 +1,4 @@
-module github.com/Azure/azure-kusto-go/kusto
+module github.com/Azure/azure-kusto-go
 
 go 1.13
 
