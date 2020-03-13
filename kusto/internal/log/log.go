@@ -1,0 +1,29 @@
+package log
+
+import (
+	"log"
+	"strings"
+	"sync/atomic"
+)
+
+var (
+	unsafeWarningIssued int32
+)
+
+const (
+	unSafeWarning = `
+KUSTO UNSAFE SETIINGS HAVE BEEN EXPLICITLY ENABLED. If this has not been done on purpose, remove the import
+of the kusto/unsafe package and all reference to functions or methods with "Unsafe" in their title. Unsafe
+methods have the potential of SQL-like injection attacks from service clients. If you still intend to use
+unsafe methods, be sure to scrub your data inputs before sending them to Kusto.
+`
+)
+
+// UnsafeWarning prints to the log a warning that unsafe methods are being used. UnsafeWarning() should be
+// called on all methods or constructores that do something unsafe. The warning will only issue on the
+// first call.
+func UnsafeWarning() {
+	if atomic.CompareAndSwapInt32(&unsafeWarningIssued, 0, 1) {
+		log.Println(strings.TrimSpace(unSafeWarning))
+	}
+}
