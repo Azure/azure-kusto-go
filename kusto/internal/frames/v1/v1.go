@@ -5,10 +5,10 @@ import (
 	"fmt"
 	"strings"
 
+	"github.com/Azure/azure-kusto-go/kusto/data/errors"
 	"github.com/Azure/azure-kusto-go/kusto/data/table"
 	"github.com/Azure/azure-kusto-go/kusto/data/types"
 	"github.com/Azure/azure-kusto-go/kusto/data/value"
-	"github.com/Azure/azure-kusto-go/kusto/data/errors"
 	"github.com/Azure/azure-kusto-go/kusto/internal/frames"
 )
 
@@ -78,7 +78,7 @@ func (d *DataTable) unmarshalCols(m map[string]interface{}) error {
 		}
 		cn, ok := m[frames.FieldColumnName].(string)
 		if !ok {
-			return errors.E(d.Op, errors.KInternal, fmt.Errorf("DataTable.Columns had entry with .ColumnName set to a %T type", m[frames.FieldColumnName]))
+			return errors.E(d.Op, errors.KInternal, fmt.Errorf("DataTable.Columns(v1) had entry with .ColumnName set to a %T type", m[frames.FieldColumnName]))
 		}
 
 		// Note: The v1 backend doesn't seem to send the ColumnType most of the time. So,
@@ -89,13 +89,13 @@ func (d *DataTable) unmarshalCols(m map[string]interface{}) error {
 		if !ok {
 			dts, ok := m["DataType"].(string)
 			if !ok {
-				return errors.E(d.Op, errors.KInternal, fmt.Errorf("DataTable.Columns had entry with no .ColumnType set or .DataType "))
+				return errors.E(d.Op, errors.KInternal, fmt.Errorf("DataTable.Columns(v1) had entry with no .ColumnType set or .DataType "))
 			}
-			ct = types.Column(strings.ToLower(dts))
-		}
 
-		if !ct.Valid() {
-			return errors.E(d.Op, errors.KInternal, fmt.Errorf("DataTable.Columns had entry with .ColumnType set to a %T type", m[frames.FieldColumnType]))
+			ct, ok = translate[strings.ToLower(dts)]
+			if !ok {
+				return errors.ES(d.Op, errors.KInternal, "DataTable.Columns(v1) had entry with .DataType set to %q type, which is not supported", dts)
+			}
 		}
 
 		col := table.Column{
@@ -137,3 +137,36 @@ func (d *DataTable) unmarshalRows(m map[string]interface{}) error {
 }
 
 func (DataTable) IsFrame() {}
+
+var translate = map[string]types.Column{
+	"bool":                            types.Bool,
+	"boolean":                         types.Bool,
+	"system.boolean":                  types.Bool,
+	"datetime":                        types.DateTime,
+	"date":                            types.DateTime,
+	"system.datetime":                 types.DateTime,
+	"dynamic":                         types.Dynamic,
+	"object":                          types.Dynamic,
+	"system.object":                   types.Dynamic,
+	"guid":                            types.GUID,
+	"uuid":                            types.GUID,
+	"uniqueid":                        types.GUID,
+	"system.guid":                     types.GUID,
+	"int":                             types.Int,
+	"int32":                           types.Int,
+	"system.int32":                    types.Int,
+	"long":                            types.Long,
+	"int64":                           types.Long,
+	"system.int64":                    types.Long,
+	"real":                            types.Real,
+	"double":                          types.Real,
+	"system.double":                   types.Real,
+	"string":                          types.String,
+	"system.string":                   types.String,
+	"timespan":                        types.Timespan,
+	"time":                            types.Timespan,
+	"system.timeSpan":                 types.Timespan,
+	"decimal":                         types.Decimal,
+	"system.data.sqltypes.sqldecimal": types.Decimal,
+	"sqldecimal":                      types.Decimal,
+}

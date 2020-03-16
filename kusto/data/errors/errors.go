@@ -195,9 +195,10 @@ func W(inner error, outer error) error {
 }
 
 // OneToErr translates what we think is a Kusto OneApiError into an Error. If we don't recognize it, we return nil.
-// This tries to wrap the internal errors, but because the errors we see don't conform to the current OneAPIError spec,
-// I'm not sure what is going on.  We shouldn't get a list of errors, but we do.  We should get embedded. So I'm taking the guess
-// that these are supposed to be wrapped errors.
+// This tries to wrap the internal errors, but the errors that are generated are some type of early draft of OneApiError,
+// not the current spec. Because the errors we see don't conform to the current OneAPIError spec, had to take guesses on
+// what we will receive. The spec says we shouldn't get a list of errors, but we do(we should get an embedded error).
+// So I'm taking the guess that these are supposed to be wrapped errors.
 func OneToErr(m map[string]interface{}, op Op) *Error {
 	if m == nil {
 		return nil

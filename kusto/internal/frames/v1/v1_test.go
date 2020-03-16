@@ -255,7 +255,7 @@ func TestDataTableUnmarshal(t *testing.T) {
 				"Columns": []interface{}{
 					map[string]interface{}{
 						"ColumnName": "TableId",
-						"DataType":   "Int", // here is where I did it.
+						"DataType":   "Int32", // here is where I did it.
 					},
 					map[string]interface{}{
 						"ColumnName": "Key",

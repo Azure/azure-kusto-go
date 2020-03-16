@@ -10,7 +10,7 @@ import (
 	"github.com/Azure/azure-kusto-go/kusto/internal/frames"
 )
 
-// Decoder impolements frames.Decoder on the REST v1 frames.
+// Decoder implements frames.Decoder on the REST v1 frames.
 type Decoder struct {
 	dec *json.Decoder
 	op  errors.Op
@@ -87,7 +87,7 @@ func (d *Decoder) findStringToken(s string) error {
 			}
 		}
 	}
-	return fmt.Errorf("(v1)found the end of the delimeter without finding token %q", s)
+	panic("unreachable")
 }
 
 func (d *Decoder) processTables(ctx context.Context, ch chan frames.Frame) error {
