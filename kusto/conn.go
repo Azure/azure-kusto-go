@@ -11,7 +11,6 @@ import (
 	"encoding/json"
 	"fmt"
 	"io/ioutil"
-	"log"
 	"net/http"
 	"net/url"
 	"regexp"
@@ -49,7 +48,7 @@ type conn struct {
 // newConn returns a new conn object.
 func newConn(endpoint string, auth Authorization) (*conn, error) {
 	if !validURL.MatchString(endpoint) {
-		return nil, errors.E(errors.OpServConn, errors.KClientArgs, fmt.Errorf("endpoint is not valid(%s), should be https://<cluster name>.*", endpoint))
+		return nil, errors.E(errors.OpServConn, errors.KClientArgs, fmt.Errorf("endpoint is not valid(%s), should be https://<cluster name>.*", endpoint)).SetNoRetry()
 	}
 
 	headers := http.Header{}
@@ -59,7 +58,7 @@ func newConn(endpoint string, auth Authorization) (*conn, error) {
 
 	u, err := url.Parse(endpoint)
 	if err != nil {
-		return nil, errors.E(errors.OpServConn, errors.KClientArgs, fmt.Errorf("could not parse the endpoint(%s): %s", endpoint, err))
+		return nil, errors.E(errors.OpServConn, errors.KClientArgs, fmt.Errorf("could not parse the endpoint(%s): %s", endpoint, err)).SetNoRetry()
 	}
 
 	c := &conn{
@@ -95,7 +94,7 @@ var writeRE = regexp.MustCompile(`(\.set|\.append|\.set-or-append|\.set-or-repla
 func (c *conn) query(ctx context.Context, db string, query Stmt, options ...QueryOption) (execResp, error) {
 	params, err := query.params.toParameters(query.defs)
 	if err != nil {
-		return execResp{}, errors.E(errors.OpQuery, errors.KClientArgs, fmt.Errorf("QueryValues in the the Stmt were incorrect: %s", err))
+		return execResp{}, errors.E(errors.OpQuery, errors.KClientArgs, fmt.Errorf("QueryValues in the the Stmt were incorrect: %s", err)).SetNoRetry()
 	}
 
 	// Match our server deadline to our context.Deadline. This should be set from withing kusto.Query() to always have a value.
@@ -123,7 +122,7 @@ func (c *conn) query(ctx context.Context, db string, query Stmt, options ...Quer
 	}
 
 	if strings.HasPrefix(strings.TrimSpace(query.String()), ".") {
-		return execResp{}, errors.ES(errors.OpQuery, errors.KClientArgs, "a Stmt to Query() cannot begin with a period(.), only Mgmt() calls can do that")
+		return execResp{}, errors.ES(errors.OpQuery, errors.KClientArgs, "a Stmt to Query() cannot begin with a period(.), only Mgmt() calls can do that").SetNoRetry()
 	}
 
 	return c.execute(ctx, execQuery, db, query, "", *opt.requestProperties)
@@ -161,7 +160,7 @@ func (c *conn) mgmt(ctx context.Context, db string, query Stmt, options ...Query
 				"Mgmt() attempted to do a write operation. "+
 					"This requires the AllowWrite() QueryOption to be passed. "+
 					"Please see documentation on that option before use",
-			)
+			).SetNoRetry()
 		}
 	}
 
@@ -244,13 +243,7 @@ func (c *conn) execute(ctx context.Context, execType int, db string, query Stmt,
 	}
 
 	if resp.StatusCode != 200 {
-		respBody := "body was empty"
-		b, err := ioutil.ReadAll(resp.Body)
-		if err == nil {
-			respBody = string(b)
-		}
-		log.Printf("resp code %s, response body:\n%s", resp.Status, respBody)
-		return execResp{}, errors.E(op, errors.KHTTPError, fmt.Errorf("received unexpected HTTP code %s, response body:\n%s", resp.Status, respBody))
+		return execResp{}, errors.HTTP(op, resp, "error from Kusto endpoint")
 	}
 
 	body := resp.Body
@@ -275,7 +268,7 @@ func (c *conn) execute(ctx context.Context, execType int, db string, query Stmt,
 	case execQuery:
 		dec = &v2.Decoder{}
 	default:
-		return execResp{}, errors.ES(op, errors.KInternal, "unknown execution type was %v", execType)
+		return execResp{}, errors.ES(op, errors.KInternal, "unknown execution type was %v", execType).SetNoRetry()
 	}
 
 	frameCh := dec.Decode(ctx, body, op)

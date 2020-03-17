@@ -67,7 +67,7 @@ func (i *Ingestion) Local(ctx context.Context, from string, props properties.All
 	// We want to check the queue size here so so we don't upload a file and then find we don't have a Kusto queue to stick
 	// it in. If we don't have a container, that is handled by containerQueue().
 	if len(resources.Queues) == 0 {
-		return errors.ES(errors.OpFileIngest, errors.KBlobstore, "no Kusto queue resources are defined, there is no where to upload to")
+		return errors.ES(errors.OpFileIngest, errors.KBlobstore, "no Kusto queue resources are defined, there is no where to upload to").SetNoRetry()
 	}
 
 	blobURL, size, err := i.localToBlob(ctx, from, to, &props)
@@ -112,14 +112,14 @@ func (i *Ingestion) Blob(ctx context.Context, from string, fileSize int64, props
 	if props.Ingestion.Additional.Format == properties.DFUnknown {
 		et := FormatDiscovery(from)
 		if et == properties.DFUnknown {
-			return errors.ES(errors.OpFileIngest, errors.KClientArgs, "could not discover the file format from name of the file(%s)", from)
+			return errors.ES(errors.OpFileIngest, errors.KClientArgs, "could not discover the file format from name of the file(%s)", from).SetNoRetry()
 		}
 		props.Ingestion.Additional.Format = et
 	}
 
 	j, err := props.Ingestion.MarshalJSONString()
 	if err != nil {
-		return errors.ES(errors.OpFileIngest, errors.KInternal, "could not marshal the ingestion blob info: %s", err)
+		return errors.ES(errors.OpFileIngest, errors.KInternal, "could not marshal the ingestion blob info: %s", err).SetNoRetry()
 	}
 
 	if _, err := to.Enqueue(ctx, j, 0, 0); err != nil {
@@ -137,7 +137,11 @@ func (i *Ingestion) upstreamContainer() (azblob.ContainerURL, error) {
 	}
 
 	if len(resources.Containers) == 0 {
-		return azblob.ContainerURL{}, errors.ES(errors.OpFileIngest, errors.KBlobstore, "no blobstore container resources are defined, there is no where to upload to")
+		return azblob.ContainerURL{}, errors.ES(
+			errors.OpFileIngest,
+			errors.KBlobstore,
+			"no blobstore container resources are defined, there is no where to upload to",
+		).SetNoRetry()
 	}
 
 	storageURI := resources.Containers[rand.Intn(len(resources.Containers))]
@@ -156,7 +160,11 @@ func (i *Ingestion) upstreamQueue() (azqueue.MessagesURL, error) {
 	}
 
 	if len(resources.Queues) == 0 {
-		return azqueue.MessagesURL{}, errors.ES(errors.OpFileIngest, errors.KBlobstore, "no Kusto queue resources are defined, there is no where to upload to")
+		return azqueue.MessagesURL{}, errors.ES(
+			errors.OpFileIngest,
+			errors.KBlobstore,
+			"no Kusto queue resources are defined, there is no where to upload to",
+		).SetNoRetry()
 	}
 
 	queue := resources.Queues[rand.Intn(len(resources.Queues))]
@@ -184,12 +192,20 @@ func (i *Ingestion) localToBlob(ctx context.Context, from string, to azblob.Cont
 
 	file, err := os.Open(from)
 	if err != nil {
-		return azblob.BlockBlobURL{}, 0, errors.ES(errors.OpFileIngest, errors.KLocalFileSystem, "problem retrieving source file %q: %s", from, err)
+		return azblob.BlockBlobURL{}, 0, errors.ES(
+			errors.OpFileIngest,
+			errors.KLocalFileSystem,
+			"problem retrieving source file %q: %s", from, err,
+		).SetNoRetry()
 	}
 
 	stat, err := file.Stat()
 	if err != nil {
-		return azblob.BlockBlobURL{}, 0, errors.ES(errors.OpFileIngest, errors.KLocalFileSystem, "could not Stat the file(%s): %s", from, err)
+		return azblob.BlockBlobURL{}, 0, errors.ES(
+			errors.OpFileIngest,
+			errors.KLocalFileSystem,
+			"could not Stat the file(%s): %s", from, err,
+		).SetNoRetry()
 	}
 
 	if compression == properties.CTNone {

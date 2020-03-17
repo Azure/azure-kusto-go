@@ -5,7 +5,6 @@ import (
 	"compress/gzip"
 	"context"
 	"encoding/json"
-	"fmt"
 	"io"
 	"net/url"
 	"sync"
@@ -153,7 +152,11 @@ func IngestionMapping(mapping interface{}, mappingKind DataFormat) FileOption {
 	return propertyOption(
 		func(p *properties.All) error {
 			if !validMappingKind[mappingKind] {
-				return fmt.Errorf("IngestionMapping() option does not support EncodingType %v", mappingKind)
+				return errors.ES(
+					errors.OpUnknown,
+					errors.KClientArgs,
+					"IngestionMapping() option does not support EncodingType %v", mappingKind,
+				).SetNoRetry()
 			}
 
 			var j string
@@ -165,7 +168,11 @@ func IngestionMapping(mapping interface{}, mappingKind DataFormat) FileOption {
 			default:
 				b, err := json.Marshal(mapping)
 				if err != nil {
-					return fmt.Errorf("IngestMapping option was passed to an Ingest.Ingestion call that was not a string, []byte or could be JSON encoded: %s", err)
+					return errors.ES(
+						errors.OpUnknown,
+						errors.KClientArgs,
+						"IngestMapping option was passed to an Ingest.Ingestion call that was not a string, []byte or could be JSON encoded: %s", err,
+					).SetNoRetry()
 				}
 				j = string(b)
 			}
@@ -185,7 +192,7 @@ func IngestionMappingRef(refName string, mappingKind DataFormat) FileOption {
 	return propertyOption(
 		func(p *properties.All) error {
 			if !validMappingKind[mappingKind] {
-				return fmt.Errorf("IngestionMappingRef() option does not support EncodingType %v", mappingKind)
+				return errors.ES(errors.OpUnknown, errors.KClientArgs, "IngestionMappingRef() option does not support EncodingType %v", mappingKind).SetNoRetry()
 			}
 			p.Ingestion.Additional.IngestionMappingRef = refName
 			p.Ingestion.Additional.IngestionMappingType = mappingKind
@@ -281,7 +288,7 @@ func ValidationPolicy(policy ValPolicy) FileOption {
 		func(p *properties.All) error {
 			b, err := json.Marshal(policy)
 			if err != nil {
-				return fmt.Errorf("bug: the ValPolicy provided would not JSON encode")
+				return errors.ES(errors.OpUnknown, errors.KInternal, "bug: the ValPolicy provided would not JSON encode").SetNoRetry()
 			}
 
 			// You might be asking, what if we are just using blobstore? Well, then this option doesn't matter :)
@@ -361,7 +368,7 @@ func (i *Ingestion) Stream(ctx context.Context, payload []byte, format DataForma
 	}
 
 	if err := zw.Close(); err != nil {
-		return errors.E(errors.OpIngestStream, errors.KClientArgs, err)
+		return errors.E(errors.OpIngestStream, errors.KClientArgs, err).SetNoRetry()
 	}
 	if buf.Len() > 4*mib {
 		return ErrTooLarge
