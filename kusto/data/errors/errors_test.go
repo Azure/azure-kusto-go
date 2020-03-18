@@ -53,7 +53,7 @@ func TestW(t *testing.T) {
 	}
 }
 
-func TestRetyr(t *testing.T) {
+func TestRetry(t *testing.T) {
 	tests := []struct {
 		desc string
 		err  error
