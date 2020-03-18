@@ -67,7 +67,7 @@ func (i *Ingestion) Local(ctx context.Context, from string, props properties.All
 	// We want to check the queue size here so so we don't upload a file and then find we don't have a Kusto queue to stick
 	// it in. If we don't have a container, that is handled by containerQueue().
 	if len(resources.Queues) == 0 {
-		return errors.ES(errors.OpFileIngest, errors.KBlobstore, "no Kusto queue resources are defined, there is no where to upload to").SetNoRetry()
+		return errors.ES(errors.OpFileIngest, errors.KBlobstore, "no Kusto queue resources are defined, there is no queue to upload to").SetNoRetry()
 	}
 
 	blobURL, size, err := i.localToBlob(ctx, from, to, &props)
