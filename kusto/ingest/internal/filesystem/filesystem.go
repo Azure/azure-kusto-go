@@ -140,7 +140,7 @@ func (i *Ingestion) upstreamContainer() (azblob.ContainerURL, error) {
 		return azblob.ContainerURL{}, errors.ES(
 			errors.OpFileIngest,
 			errors.KBlobstore,
-			"no Blob Storage container resources are defined, there is no where to upload to",
+			"no Blob Storage container resources are defined, there is no container to upload to",
 		).SetNoRetry()
 	}
 
@@ -163,7 +163,7 @@ func (i *Ingestion) upstreamQueue() (azqueue.MessagesURL, error) {
 		return azqueue.MessagesURL{}, errors.ES(
 			errors.OpFileIngest,
 			errors.KBlobstore,
-			"no Kusto queue resources are defined, there is no where to upload to",
+			"no Kusto queue resources are defined, there is no queue to upload to",
 		).SetNoRetry()
 	}
 
