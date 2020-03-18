@@ -126,9 +126,9 @@ if err := in.FromFile(ctx, "/path/to/a/local/file"); err != nil {
 FromFile() will accept Unix path names on Unix platforms and Windows path names on Windows platforms.
 The file will not be deleted after upload (there is an option that will allow that though).
 
-#### From a Blobstore File
+#### From a Blob Storage File
 
-This pacakge will also accept ingestion from an Azure Blobstore file:
+This pacakge will also accept ingestion from an Azure Blob Storage file:
 
 ```go
 if err := in.FromFile(ctx, "https://myaccount.blob.core.windows.net/$root/myblob"); err != nil {
@@ -136,7 +136,7 @@ if err := in.FromFile(ctx, "https://myaccount.blob.core.windows.net/$root/myblob
 }
 ```
 
-This will ingest a file from Azure Blobstore. We only support https:// paths and your domain name may differ than what is here.
+This will ingest a file from Azure Blob Storage. We only support https:// paths and your domain name may differ than what is here.
 
 #### From a Stream
 

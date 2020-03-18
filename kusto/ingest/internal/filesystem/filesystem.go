@@ -91,7 +91,7 @@ func (i *Ingestion) Local(ctx context.Context, from string, props properties.All
 	return nil
 }
 
-// Blob ingests a file from Azure Blobstore into Kusto.
+// Blob ingests a file from Azure Blob Storage into Kusto.
 func (i *Ingestion) Blob(ctx context.Context, from string, fileSize int64, props properties.All) error {
 	// To learn more about ingestion properties, go to:
 	// https://docs.microsoft.com/en-us/azure/kusto/management/data-ingestion/#ingestion-properties
@@ -140,7 +140,7 @@ func (i *Ingestion) upstreamContainer() (azblob.ContainerURL, error) {
 		return azblob.ContainerURL{}, errors.ES(
 			errors.OpFileIngest,
 			errors.KBlobstore,
-			"no blobstore container resources are defined, there is no where to upload to",
+			"no Blob Storage container resources are defined, there is no where to upload to",
 		).SetNoRetry()
 	}
 
@@ -220,7 +220,7 @@ func (i *Ingestion) localToBlob(ctx context.Context, from string, to azblob.Cont
 		)
 
 		if err != nil {
-			return azblob.BlockBlobURL{}, 0, errors.ES(errors.OpFileIngest, errors.KBlobstore, "problem uploading to blobstore: %s", err)
+			return azblob.BlockBlobURL{}, 0, errors.ES(errors.OpFileIngest, errors.KBlobstore, "problem uploading to Blob Storage: %s", err)
 		}
 		return blobURL, 10, nil
 	}
@@ -238,7 +238,7 @@ func (i *Ingestion) localToBlob(ctx context.Context, from string, to azblob.Cont
 	)
 
 	if err != nil {
-		return azblob.BlockBlobURL{}, 0, errors.ES(errors.OpFileIngest, errors.KBlobstore, "problem uploading to blobstore: %s", err)
+		return azblob.BlockBlobURL{}, 0, errors.ES(errors.OpFileIngest, errors.KBlobstore, "problem uploading to Blob Storage: %s", err)
 	}
 
 	return blobURL, stat.Size(), nil

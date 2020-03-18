@@ -154,7 +154,7 @@ using Kusto's Query Paramaters.
 
 Ingest
 
-Support for Kusto ingestion from local files, Azure Blobstore and streaming is supported in the sub-package ingest.
+Support for Kusto ingestion from local files, Azure Blob Storage and streaming is supported in the sub-package ingest.
 See documentation in that package for more details
 
 Mocking
