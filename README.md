@@ -128,7 +128,7 @@ The file will not be deleted after upload (there is an option that will allow th
 
 #### From a Blob Storage File
 
-This pacakge will also accept ingestion from an Azure Blob Storage file:
+This package will also accept ingestion from an Azure Blob Storage file:
 
 ```go
 if err := in.FromFile(ctx, "https://myaccount.blob.core.windows.net/$root/myblob"); err != nil {
