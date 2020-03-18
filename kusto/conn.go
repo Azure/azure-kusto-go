@@ -48,7 +48,7 @@ type conn struct {
 // newConn returns a new conn object.
 func newConn(endpoint string, auth Authorization) (*conn, error) {
 	if !validURL.MatchString(endpoint) {
-		return nil, errors.E(errors.OpServConn, errors.KClientArgs, fmt.Errorf("endpoint is not valid(%s), should be https://<cluster name>.*", endpoint)).SetNoRetry()
+		return nil, errors.ES(errors.OpServConn, errors.KClientArgs, "endpoint is not valid(%s), should be https://<cluster name>.*", endpoint).SetNoRetry()
 	}
 
 	headers := http.Header{}
@@ -58,7 +58,7 @@ func newConn(endpoint string, auth Authorization) (*conn, error) {
 
 	u, err := url.Parse(endpoint)
 	if err != nil {
-		return nil, errors.E(errors.OpServConn, errors.KClientArgs, fmt.Errorf("could not parse the endpoint(%s): %s", endpoint, err)).SetNoRetry()
+		return nil, errors.ES(errors.OpServConn, errors.KClientArgs, "could not parse the endpoint(%s): %s", endpoint, err).SetNoRetry()
 	}
 
 	c := &conn{
@@ -94,7 +94,7 @@ var writeRE = regexp.MustCompile(`(\.set|\.append|\.set-or-append|\.set-or-repla
 func (c *conn) query(ctx context.Context, db string, query Stmt, options ...QueryOption) (execResp, error) {
 	params, err := query.params.toParameters(query.defs)
 	if err != nil {
-		return execResp{}, errors.E(errors.OpQuery, errors.KClientArgs, fmt.Errorf("QueryValues in the the Stmt were incorrect: %s", err)).SetNoRetry()
+		return execResp{}, errors.ES(errors.OpQuery, errors.KClientArgs, "QueryValues in the the Stmt were incorrect: %s", err).SetNoRetry()
 	}
 
 	// Match our server deadline to our context.Deadline. This should be set from withing kusto.Query() to always have a value.
@@ -211,7 +211,7 @@ func (c *conn) execute(ctx context.Context, execType int, db string, query Stmt,
 			},
 		)
 		if err != nil {
-			return execResp{}, errors.E(op, errors.KInternal, fmt.Errorf("could not JSON marshal the Query message: %s", err))
+			return execResp{}, errors.E(op, errors.KInternal, fmt.Errorf("could not JSON marshal the Query message: %w", err))
 		}
 		if execType == execQuery {
 			endpoint = c.endQuery
@@ -219,7 +219,7 @@ func (c *conn) execute(ctx context.Context, execType int, db string, query Stmt,
 			endpoint = c.endMgmt
 		}
 	default:
-		return execResp{}, errors.E(op, errors.KInternal, fmt.Errorf("internal error: did not understand the type of execType: %d", execType))
+		return execResp{}, errors.ES(op, errors.KInternal, "internal error: did not understand the type of execType: %d", execType)
 	}
 
 	req := &http.Request{
@@ -253,7 +253,7 @@ func (c *conn) execute(ctx context.Context, execType int, db string, query Stmt,
 	case "gzip":
 		body, err = gzip.NewReader(resp.Body)
 		if err != nil {
-			return execResp{}, errors.E(op, errors.KInternal, fmt.Errorf("gzip reader error: %s", err))
+			return execResp{}, errors.E(op, errors.KInternal, fmt.Errorf("gzip reader error: %w", err))
 		}
 	case "deflate":
 		body = flate.NewReader(resp.Body)

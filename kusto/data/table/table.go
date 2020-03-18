@@ -7,9 +7,9 @@ import (
 	"reflect"
 	"strings"
 
+	"github.com/Azure/azure-kusto-go/kusto/data/errors"
 	"github.com/Azure/azure-kusto-go/kusto/data/types"
 	"github.com/Azure/azure-kusto-go/kusto/data/value"
-	"github.com/Azure/azure-kusto-go/kusto/data/errors"
 )
 
 // Column describes a column descriptor.
@@ -82,7 +82,7 @@ func (r *Row) Size() int {
 // some ptrs set and others not.
 func (r *Row) Columns(ptrs ...interface{}) error {
 	if len(ptrs) != len(r.ColumnTypes) {
-		return errors.E(r.Op, errors.KClientArgs, fmt.Errorf(".Columns() requires %d arguments for this row, had %d", len(r.ColumnTypes), len(ptrs)))
+		return errors.ES(r.Op, errors.KClientArgs, ".Columns() requires %d arguments for this row, had %d", len(r.ColumnTypes), len(ptrs))
 	}
 
 	for i, col := range r.ColumnTypes {
@@ -96,7 +96,7 @@ func (r *Row) Columns(ptrs ...interface{}) error {
 			v.Name = col.Name
 			v.Type = col.Type
 		default:
-			return errors.E(r.Op, errors.KClientArgs, fmt.Errorf(".Columns() received argument at position %d that was not a *string, *types.Columns: was %T", i, ptrs[i]))
+			return errors.ES(r.Op, errors.KClientArgs, ".Columns() received argument at position %d that was not a *string, *types.Columns: was %T", i, ptrs[i])
 		}
 	}
 
@@ -120,10 +120,10 @@ func (r *Row) Columns(ptrs ...interface{}) error {
 func (r *Row) ToStruct(p interface{}) error {
 	// Check if p is a pointer to a struct
 	if t := reflect.TypeOf(p); t == nil || t.Kind() != reflect.Ptr || t.Elem().Kind() != reflect.Struct {
-		return errors.E(r.Op, errors.KClientArgs, fmt.Errorf("type %T is not a pointer to a struct", p))
+		return errors.ES(r.Op, errors.KClientArgs, "type %T is not a pointer to a struct", p)
 	}
 	if len(r.ColumnTypes) != len(r.Values) {
-		return errors.E(r.Op, errors.KClientArgs, fmt.Errorf("row does not have the correct number of values(%d) for the number of columns(%d)", len(r.Values), len(r.ColumnTypes)))
+		return errors.ES(r.Op, errors.KClientArgs, "row does not have the correct number of values(%d) for the number of columns(%d)", len(r.Values), len(r.ColumnTypes))
 	}
 
 	return decodeToStruct(r.ColumnTypes, r.Values, p)

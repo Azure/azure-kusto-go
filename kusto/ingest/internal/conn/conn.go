@@ -45,10 +45,10 @@ type Conn struct {
 // New returns a new Conn object.
 func New(endpoint string, auth kusto.Authorization) (*Conn, error) {
 	if !validURL.MatchString(endpoint) {
-		return nil, errors.E(
+		return nil, errors.ES(
 			errors.OpServConn,
 			errors.KClientArgs,
-			fmt.Errorf("endpoint is not valid(%s) for Kusto streaming ingestion", endpoint),
+			"endpoint is not valid(%s) for Kusto streaming ingestion", endpoint,
 		).SetNoRetry()
 	}
 	if err := auth.Validate(endpoint); err != nil {

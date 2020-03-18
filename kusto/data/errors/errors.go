@@ -169,7 +169,8 @@ func (e *Error) Error() string {
 // Retry determines if the error is transient and the action can be retried or not.
 // Some errors that can be retried, such as a timeout, may never succeed, so avoid infinite retries.
 func Retry(err error) bool {
-	if e, ok := err.(*Error); ok {
+	var e *Error
+	if errors.As(err, &e) {
 		// e.permanent can be set multiple ways. If it is true, you can never retry.
 		// If it is false, it does not necessarily mean anything, you have to go a little further.
 		if e.permanent {
