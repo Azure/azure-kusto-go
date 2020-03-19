@@ -26,15 +26,15 @@ FromFile() will accept Unix path names on Unix platforms and Windows path names 
 The file will not be deleted after upload (there is an option that will allow that though).
 
 
-Ingestion from an Azure Blobstore file
+Ingestion from an Azure Blob Storage file
 
-This pacakge will also accept ingestion from an Azure Blobstore file:
+This package will also accept ingestion from an Azure Blob Storage file:
 
 	if err := in.FromFile(ctx, "https://myaccount.blob.core.windows.net/$root/myblob"); err != nil {
 		panic("add error handling")
 	}
 
-This will ingest a file from Azure Blobstore. We only support https:// paths and your domain name may differ than what is here.
+This will ingest a file from Azure Blob Storage. We only support https:// paths and your domain name may differ than what is here.
 
 Ingestion from a Stream
 

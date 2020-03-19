@@ -45,7 +45,11 @@ type Conn struct {
 // New returns a new Conn object.
 func New(endpoint string, auth kusto.Authorization) (*Conn, error) {
 	if !validURL.MatchString(endpoint) {
-		return nil, errors.E(errors.OpServConn, errors.KClientArgs, fmt.Errorf("endpoint is not valid(%s) for Kusto streaming ingestion", endpoint))
+		return nil, errors.ES(
+			errors.OpServConn,
+			errors.KClientArgs,
+			"endpoint is not valid(%s) for Kusto streaming ingestion", endpoint,
+		).SetNoRetry()
 	}
 	if err := auth.Validate(endpoint); err != nil {
 		return nil, err
@@ -64,7 +68,11 @@ func newWithoutValidation(endpoint string, auth kusto.Authorization) (*Conn, err
 	// TODO(daniel/jdoak): Get rid of this Replace stuff. I mean, its just hacky.
 	u, err := url.Parse(strings.Replace(endpoint, "ingest-", "", 1))
 	if err != nil {
-		return nil, errors.E(errors.OpServConn, errors.KClientArgs, fmt.Errorf("could not parse the endpoint(%s): %s", endpoint, err))
+		return nil, errors.E(
+			errors.OpServConn,
+			errors.KClientArgs,
+			fmt.Errorf("could not parse the endpoint(%s): %s", endpoint, err),
+		).SetNoRetry()
 	}
 
 	c := &Conn{
@@ -98,7 +106,11 @@ func (c *Conn) Write(ctx context.Context, db, table string, payload *bytes.Buffe
 	switch format {
 	case properties.JSON, properties.AVRO:
 		if mappingName == "" {
-			return errors.ES(writeOp, errors.KInternal, "if streaming format is %s, must provide mappingName", format)
+			return errors.ES(writeOp,
+				errors.KInternal,
+				"if streaming format is %s, must provide mappingName",
+				format,
+			).SetNoRetry()
 		}
 	case properties.DFUnknown:
 		format = properties.CSV
@@ -145,10 +157,8 @@ func (c *Conn) Write(ctx context.Context, db, table string, payload *bytes.Buffe
 	}
 
 	if resp.StatusCode != 200 {
-		b, _ := ioutil.ReadAll(resp.Body) // Skipping error because it doesn't matter, will just display empty.
-		return errors.ES(writeOp, errors.KHTTPError, "streaming ingest had non-200 status code(%v): %s", resp.StatusCode, string(b))
+		return errors.HTTP(writeOp, resp, "streaming ingest issue")
 	}
-
 	return nil
 }
 

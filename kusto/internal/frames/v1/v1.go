@@ -2,7 +2,6 @@
 package v1
 
 import (
-	"fmt"
 	"strings"
 
 	"github.com/Azure/azure-kusto-go/kusto/data/errors"
@@ -52,18 +51,18 @@ var dataTableFields = []string{frames.FieldTableName, frames.FieldColumns, frame
 func (d *DataTable) unmarshalAttr(m map[string]interface{}) error {
 	for _, key := range dataTableFields {
 		if _, exists := m[key]; !exists {
-			return errors.E(d.Op, errors.KInternal, fmt.Errorf("DataTable.%s was not present", key))
+			return errors.ES(d.Op, errors.KInternal, "DataTable.%s was not present", key)
 		}
 	}
 
 	if v, ok := m[frames.FieldTableName].(string); ok {
 		d.TableName = frames.TableKind(v)
 	} else {
-		return errors.E(d.Op, errors.KInternal, fmt.Errorf("DataTable.%s had non string entry, had type %T", frames.FieldTableName, m[frames.FieldTableName]))
+		return errors.ES(d.Op, errors.KInternal, "DataTable.%s had non string entry, had type %T", frames.FieldTableName, m[frames.FieldTableName])
 	}
 
 	if _, ok := m[frames.FieldColumns].([]interface{}); !ok {
-		return errors.E(d.Op, errors.KInternal, fmt.Errorf("DataTable.Columns had type %T, expected []interface{}", m[frames.FieldColumns]))
+		return errors.ES(d.Op, errors.KInternal, "DataTable.Columns had type %T, expected []interface{}", m[frames.FieldColumns])
 	}
 	return nil
 }
@@ -73,12 +72,12 @@ func (d *DataTable) unmarshalCols(m map[string]interface{}) error {
 		m := inter.(map[string]interface{})
 		for _, name := range []string{frames.FieldColumnName} {
 			if _, exists := m[name]; !exists {
-				return errors.E(d.Op, errors.KInternal, fmt.Errorf("DataTable.Columns had entry without .%s", name))
+				return errors.ES(d.Op, errors.KInternal, "DataTable.Columns had entry without .%s", name)
 			}
 		}
 		cn, ok := m[frames.FieldColumnName].(string)
 		if !ok {
-			return errors.E(d.Op, errors.KInternal, fmt.Errorf("DataTable.Columns(v1) had entry with .ColumnName set to a %T type", m[frames.FieldColumnName]))
+			return errors.ES(d.Op, errors.KInternal, "DataTable.Columns(v1) had entry with .ColumnName set to a %T type", m[frames.FieldColumnName])
 		}
 
 		// Note: The v1 backend doesn't seem to send the ColumnType most of the time. So,
@@ -89,7 +88,7 @@ func (d *DataTable) unmarshalCols(m map[string]interface{}) error {
 		if !ok {
 			dts, ok := m["DataType"].(string)
 			if !ok {
-				return errors.E(d.Op, errors.KInternal, fmt.Errorf("DataTable.Columns(v1) had entry with no .ColumnType set or .DataType "))
+				return errors.ES(d.Op, errors.KInternal, "DataTable.Columns(v1) had entry with no .ColumnType set or .DataType ")
 			}
 
 			ct, ok = translate[strings.ToLower(dts)]
@@ -109,7 +108,7 @@ func (d *DataTable) unmarshalCols(m map[string]interface{}) error {
 
 func (d *DataTable) unmarshalRows(m map[string]interface{}) error {
 	if _, ok := m[frames.FieldRows].([]interface{}); !ok {
-		return errors.E(d.Op, errors.KInternal, fmt.Errorf("DataTable.Rows had type %T, expected []interface{}", m[frames.FieldRows]))
+		return errors.ES(d.Op, errors.KInternal, "DataTable.Rows had type %T, expected []interface{}", m[frames.FieldRows])
 	}
 
 	for x, inter := range m[frames.FieldRows].([]interface{}) {
@@ -117,17 +116,17 @@ func (d *DataTable) unmarshalRows(m map[string]interface{}) error {
 			if err := errors.OneToErr(inter.(map[string]interface{}), d.Op); err != nil {
 				return err
 			}
-			return errors.E(d.Op, errors.KInternal, fmt.Errorf("DataTable.Rows had entry(%d) of type %T, expected []interface{}", x, inter))
+			return errors.ES(d.Op, errors.KInternal, "DataTable.Rows had entry(%d) of type %T, expected []interface{}", x, inter)
 		}
 		var newRow value.Values
 		for i, inner := range inter.([]interface{}) {
 			f := frames.Conversion[d.Columns[i].Type]
 			if f == nil {
-				return errors.E(d.Op, errors.KInternal, fmt.Errorf("in row %d, column %s: had unsupported type %s ", x, d.Columns[i].Name, d.Columns[i].Type))
+				return errors.ES(d.Op, errors.KInternal, "in row %d, column %s: had unsupported type %s ", x, d.Columns[i].Name, d.Columns[i].Type)
 			}
 			inter, err := f(inner)
 			if err != nil {
-				return errors.E(d.Op, errors.KInternal, fmt.Errorf("in row %d, column %s, conversion error: %s", x, d.Columns[i].Name, err))
+				return errors.ES(d.Op, errors.KInternal, "in row %d, column %s, conversion error: %s", x, d.Columns[i].Name, err)
 			}
 			newRow = append(newRow, inter)
 		}

@@ -11,9 +11,12 @@ a string error.  See examples included in the file for more details.
 package errors
 
 import (
+	"encoding/json"
 	"errors"
 	"fmt"
+	"io/ioutil"
 	"log"
+	"net/http"
 	"runtime"
 	"strings"
 )
@@ -61,25 +64,66 @@ type Error struct {
 	Op Op
 	// Kind is the error code we identify the error as.
 	Kind Kind
-	// Err is the wrapped internal error message. This may be of any error
-	// type and may also wrap errors.
+	// Err is the error message. This may be of any error type and may also wrap errors.
 	Err error
 
+	// restErrMsg holds the body of an error messsage that was from a REST endpoint.
+	restErrMsg []byte
+	decoded    map[string]interface{}
+	permanent  bool
+
 	inner *Error
+}
+
+// UnmarshalREST will unmarshal an error message from the server if the message is in
+// JSON format or will return nil. This only occurs when the error is of Kind KHTTPError
+// and the server responded with a JSON error.
+func (e *Error) UnmarshalREST() map[string]interface{} {
+	if e.decoded != nil {
+		return e.decoded
+	}
+
+	m := map[string]interface{}{}
+	if err := json.Unmarshal(e.restErrMsg, &m); err != nil {
+		return nil
+	}
+
+	if m != nil {
+		if v, ok := m["error"]; ok {
+			if errMap, ok := v.(map[string]interface{}); ok {
+				if v, ok := errMap["@permanent"]; ok {
+					if b, ok := v.(bool); ok {
+						e.permanent = b
+					}
+				}
+			}
+		}
+	}
+
+	e.decoded = m
+	return m
+}
+
+// SetNoRetry sets this error so that Retry() will always return false.
+func (e *Error) SetNoRetry() *Error {
+	e.permanent = true
+	return e
 }
 
 func (e *Error) isZero() bool {
 	return e == nil || (e.Op == OpUnknown && e.Kind == KOther && e.Err == nil)
 }
 
-// Unwrap implements "interface {Unwrap() error}" as defined internaly by the go stdlib errors package.
+// Unwrap implements "interface {Unwrap() error}" as defined internally by the go stdlib errors package.
 func (e *Error) Unwrap() error {
 	if e == nil {
 		return nil
 	}
+
 	if e.inner == nil {
 		return e.Err
 	}
+
 	return e.inner
 }
 
@@ -122,10 +166,41 @@ func (e *Error) Error() string {
 	return b.String()
 }
 
+// Retry determines if the error is transient and the action can be retried or not.
+// Some errors that can be retried, such as a timeout, may never succeed, so avoid infinite retries.
+func Retry(err error) bool {
+	var e *Error
+	if errors.As(err, &e) {
+		// e.permanent can be set multiple ways. If it is true, you can never retry.
+		// If it is false, it does not necessarily mean anything, you have to go a little further.
+		if e.permanent {
+			return false
+		}
+
+		switch e.Kind {
+		case KOther, KIO, KInternal, KDBNotExist, KLimitsExceeded, KClientArgs, KLocalFileSystem:
+			return false
+		case KHTTPError:
+			m := e.UnmarshalREST()
+			if m != nil {
+				if e.permanent {
+					return false
+				}
+			}
+		}
+
+		if e.inner != nil {
+			return Retry(e.inner)
+		}
+		return true
+	}
+	return false
+}
+
 // E constructs an Error. You may pass in an Op, Kind and error.  This will strip a *errors.Error(the error in this package) if you
 // pass one of its Kind and Op and wrap it in here. It will wrap a non-*Error implementation of error.
 // If you want to wrap the *Error in an *Error, use W(). If you pass a nil error, it panics.
-func E(o Op, k Kind, err error) error {
+func E(o Op, k Kind, err error) *Error {
 	if err == nil {
 		panic("cannot pass a nil error")
 	}
@@ -134,7 +209,7 @@ func E(o Op, k Kind, err error) error {
 
 // ES constructs an Error. You may pass in an Op, Kind, string and args to the string (like fmt.Sprintf).
 // If the result of strings.TrimSpace(s+args) == "", it panics.
-func ES(o Op, k Kind, s string, args ...interface{}) error {
+func ES(o Op, k Kind, s string, args ...interface{}) *Error {
 	str := fmt.Sprintf(s, args...)
 	if strings.TrimSpace(str) == "" {
 		panic("errors.ES() cannot have an empty string error")
@@ -142,10 +217,24 @@ func ES(o Op, k Kind, s string, args ...interface{}) error {
 	return e(k, o, str)
 }
 
+// HTTP constructs an *Error from an *http.Response and a prefix to the error message.
+func HTTP(o Op, resp *http.Response, prefix string) *Error {
+	b, _ := ioutil.ReadAll(resp.Body) // Error doesn't matter, because there is nothing to do if it errors.
+
+	e := &Error{
+		Op:         o,
+		Kind:       KHTTPError,
+		restErrMsg: b,
+		Err:        fmt.Errorf("%s(%s):\n%s", prefix, resp.Status, string(b)),
+	}
+	e.UnmarshalREST()
+	return e
+}
+
 // e constructs an Error. You may pass in an Op, Kind, string or error.  This will strip an *Error if you
 // pass if of its Kind and Op and put it in here. It will wrap a non-*Error implementation of error.
 // If you want to wrap the *Error in an *Error, use W().
-func e(args ...interface{}) error {
+func e(args ...interface{}) *Error {
 	if len(args) == 0 {
 		panic("call to errors.E with no arguments")
 	}
@@ -171,7 +260,9 @@ func e(args ...interface{}) error {
 			} else {
 				_, file, line, _ := runtime.Caller(1)
 				log.Printf("errors.E: bad call from %s:%d: %v", file, line, args)
-				return fmt.Errorf("unknown type %T, value %v in error call", arg, arg)
+				e.Kind = KOther
+				e.Err = fmt.Errorf("unknown type %T, value %v in error call", arg, arg)
+				return e
 			}
 		}
 	}
@@ -180,7 +271,7 @@ func e(args ...interface{}) error {
 }
 
 // W wraps error outer around inner. Both must be of type *Error or this will panic.
-func W(inner error, outer error) error {
+func W(inner error, outer error) *Error {
 	o, ok := outer.(*Error)
 	if !ok {
 		panic("W() got an outer error that was not of type *Error")
@@ -266,7 +357,7 @@ func oneToErr(m map[string]interface{}, err *Error, op Op) *Error {
 	}
 
 	if err == nil {
-		return ES(op, kind, msg).(*Error)
+		return ES(op, kind, msg)
 	}
 
 	W(ES(op, kind, msg), err)

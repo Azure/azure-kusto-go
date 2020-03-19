@@ -2,7 +2,6 @@ package kusto
 
 import (
 	"context"
-	"fmt"
 	"reflect"
 	"sync"
 	"time"
@@ -40,10 +39,10 @@ func (a *Authorization) Validate(endpoint string) error {
 	const rescField = "Resource"
 
 	if a.Authorizer != nil && a.Config != nil {
-		return errors.E(errors.OpServConn, errors.KClientArgs, fmt.Errorf("cannot set Authoriztion.Authorizer and Authorizer.Config"))
+		return errors.ES(errors.OpServConn, errors.KClientArgs, "cannot set Authoriztion.Authorizer and Authorizer.Config")
 	}
 	if a.Authorizer == nil && a.Config == nil {
-		return errors.E(errors.OpServConn, errors.KClientArgs, fmt.Errorf("cannot leave all Authoriztion fields as zero values"))
+		return errors.ES(errors.OpServConn, errors.KClientArgs, "cannot leave all Authoriztion fields as zero values")
 	}
 	if a.Authorizer != nil {
 		return nil
@@ -64,10 +63,10 @@ func (a *Authorization) Validate(endpoint string) error {
 					f.SetString(endpoint)
 				}
 			} else {
-				return errors.E(errors.OpServConn, errors.KClientArgs, fmt.Errorf("the Authorization.Config passed to the Kusto client did not have an underlying .Resource field"))
+				return errors.ES(errors.OpServConn, errors.KClientArgs, "the Authorization.Config passed to the Kusto client did not have an underlying .Resource field")
 			}
 		} else {
-			return errors.E(errors.OpServConn, errors.KClientArgs, fmt.Errorf("the Authorization.Config passed to the Kusto client was a pointer to a %T, which is not a struct", a.Config))
+			return errors.ES(errors.OpServConn, errors.KClientArgs, "the Authorization.Config passed to the Kusto client was a pointer to a %T, which is not a struct", a.Config)
 		}
 		// This is how we are likely to get the Authorizer. So since we can't change the fields, now we have to type assert
 		// to the underlying type and put back a new copy. Note: it seems to me that we should be get a copy of a.Config
@@ -84,10 +83,10 @@ func (a *Authorization) Validate(endpoint string) error {
 			t.Resource = endpoint
 			a.Config = t
 		default:
-			return errors.E(errors.OpServConn, errors.KClientArgs, fmt.Errorf("the Authiorization.Config passed to the Kusto client  "+"is not a type we know how to deal with: %T", t))
+			return errors.ES(errors.OpServConn, errors.KClientArgs, "the Authiorization.Config passed to the Kusto client is not a type we know how to deal with: %T", t)
 		}
 	default:
-		return errors.E(errors.OpServConn, errors.KClientArgs, fmt.Errorf("the Authorization.Config passed to the Kusto client was not a Pointer to a struct or a struct, is a: %T", a.Config))
+		return errors.ES(errors.OpServConn, errors.KClientArgs, "the Authorization.Config passed to the Kusto client was not a Pointer to a struct or a struct, is a: %T", a.Config)
 
 	}
 	var err error
@@ -159,7 +158,7 @@ func (c *Client) Query(ctx context.Context, db string, query Stmt, options ...Qu
 	execResp, err := c.conn.query(ctx, db, query, options...)
 	if err != nil {
 		cancel()
-		return nil, fmt.Errorf("error with Query: %s", err)
+		return nil, err
 	}
 
 	var header v2.DataSetHeader
@@ -221,7 +220,7 @@ func (c *Client) Mgmt(ctx context.Context, db string, query Stmt, options ...Que
 	execResp, err := c.conn.mgmt(ctx, db, query, options...)
 	if err != nil {
 		cancel()
-		return nil, fmt.Errorf("error with Query: %s", err)
+		return nil, err
 	}
 
 	iter, columnsReady := newRowIterator(ctx, cancel, execResp, v2.DataSetHeader{}, errors.OpMgmt)

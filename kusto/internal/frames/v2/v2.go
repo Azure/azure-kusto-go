@@ -74,42 +74,42 @@ var dataTableFields = []string{frames.FieldFrameType, frames.FieldTableID, frame
 func (d *DataTable) unmarshalAttr(m map[string]interface{}) error {
 	for _, key := range dataTableFields {
 		if _, exists := m[key]; !exists {
-			return errors.E(d.Op, errors.KInternal, fmt.Errorf("dataTable.%s was not present", key))
+			return errors.ES(d.Op, errors.KInternal, "dataTable.%s was not present", key)
 		}
 	}
 
 	if ft, ok := m[frames.FieldFrameType].(string); !ok {
-		return errors.E(d.Op, errors.KInternal, fmt.Errorf("dataTable.Unmarshal received data with no FrameType key"))
+		return errors.ES(d.Op, errors.KInternal, "dataTable.Unmarshal received data with no FrameType key")
 	} else if ft != frames.TypeDataTable {
-		return errors.E(d.Op, errors.KInternal, fmt.Errorf("dataTable.Unmarshal received data with FrameType == %s", ft))
+		return errors.ES(d.Op, errors.KInternal, "dataTable.Unmarshal received data with FrameType == %s", ft)
 	} else {
 		d.Base.FrameType = ft
 	}
 
 	jn, ok := m[frames.FieldTableID].(json.Number)
 	if !ok {
-		return errors.E(d.Op, errors.KInternal, fmt.Errorf("dataTable.TableId was not a json.Number"))
+		return errors.ES(d.Op, errors.KInternal, "dataTable.TableId was not a json.Number")
 	}
 	tblID, err := jn.Int64()
 	if err != nil {
-		return errors.E(d.Op, errors.KInternal, fmt.Errorf("dataTable entry TableID was not an int64, was %s", m[frames.FieldFrameType].(json.Number).String()))
+		return errors.ES(d.Op, errors.KInternal, "dataTable entry TableID was not an int64, was %s", m[frames.FieldFrameType].(json.Number).String())
 	}
 	d.TableID = int(tblID)
 
 	if v, ok := m[frames.FieldTableKind].(string); ok {
 		d.TableKind = frames.TableKind(v)
 	} else {
-		return errors.E(d.Op, errors.KInternal, fmt.Errorf("dataTable.%s had non string entry, had type %T", frames.FieldTableKind, m[frames.FieldTableKind]))
+		return errors.ES(d.Op, errors.KInternal, "dataTable.%s had non string entry, had type %T", frames.FieldTableKind, m[frames.FieldTableKind])
 	}
 
 	if v, ok := m[frames.FieldTableName].(string); ok {
 		d.TableName = frames.TableKind(v)
 	} else {
-		return errors.E(d.Op, errors.KInternal, fmt.Errorf("dataTable.%s had non string entry, had type %T", frames.FieldTableName, m[frames.FieldTableName]))
+		return errors.ES(d.Op, errors.KInternal, "dataTable.%s had non string entry, had type %T", frames.FieldTableName, m[frames.FieldTableName])
 	}
 
 	if _, ok := m[frames.FieldColumns].([]interface{}); !ok {
-		return errors.E(d.Op, errors.KInternal, fmt.Errorf("dataTable.Columns had type %T, expected []interface{}", m[frames.FieldColumns]))
+		return errors.ES(d.Op, errors.KInternal, "dataTable.Columns had type %T, expected []interface{}", m[frames.FieldColumns])
 	}
 	return nil
 }
@@ -119,17 +119,17 @@ func (d *DataTable) unmarshalCols(m map[string]interface{}) error {
 		m := inter.(map[string]interface{})
 		for _, name := range []string{frames.FieldColumnName, frames.FieldColumnType} {
 			if _, exists := m[name]; !exists {
-				return errors.E(d.Op, errors.KInternal, fmt.Errorf("dataTable.Columns had entry without .%s", name))
+				return errors.ES(d.Op, errors.KInternal, "dataTable.Columns had entry without .%s", name)
 			}
 		}
 		cn, ok := m[frames.FieldColumnName].(string)
 		if !ok {
-			return errors.E(d.Op, errors.KInternal, fmt.Errorf("dataTable.Columns had entry with .ColumnName set to a %T type", m[frames.FieldColumnName]))
+			return errors.ES(d.Op, errors.KInternal, "dataTable.Columns had entry with .ColumnName set to a %T type", m[frames.FieldColumnName])
 		}
 		cts, ok := m[frames.FieldColumnType].(string)
 		ct := types.Column(cts)
 		if !ok || !ct.Valid() {
-			return errors.E(d.Op, errors.KInternal, fmt.Errorf("dataTable.Columns had entry with .ColumnType set to a %T type", m[frames.FieldColumnType]))
+			return errors.ES(d.Op, errors.KInternal, "dataTable.Columns had entry with .ColumnType set to a %T type", m[frames.FieldColumnType])
 		}
 
 		col := table.Column{
@@ -143,7 +143,7 @@ func (d *DataTable) unmarshalCols(m map[string]interface{}) error {
 
 func (d *DataTable) unmarshalRows(m map[string]interface{}) error {
 	if _, ok := m[frames.FieldRows].([]interface{}); !ok {
-		return errors.E(d.Op, errors.KInternal, fmt.Errorf("dataTable.Rows had type %T, expected []interface{}", m[frames.FieldRows]))
+		return errors.ES(d.Op, errors.KInternal, "dataTable.Rows had type %T, expected []interface{}", m[frames.FieldRows])
 	}
 
 	for x, inter := range m[frames.FieldRows].([]interface{}) {
@@ -151,17 +151,17 @@ func (d *DataTable) unmarshalRows(m map[string]interface{}) error {
 			if err := errors.OneToErr(inter.(map[string]interface{}), d.Op); err != nil {
 				return err
 			}
-			return errors.E(d.Op, errors.KInternal, fmt.Errorf("dataTable.Rows had entry(%d) of type %T, expected []interface{}", x, inter))
+			return errors.ES(d.Op, errors.KInternal, "dataTable.Rows had entry(%d) of type %T, expected []interface{}", x, inter)
 		}
 		var newRow value.Values
 		for i, inner := range inter.([]interface{}) {
 			f := frames.Conversion[d.Columns[i].Type]
 			if f == nil {
-				return errors.E(d.Op, errors.KInternal, fmt.Errorf("in row %d, column %s: had unsupported type %s ", x, d.Columns[i].Name, d.Columns[i].Type))
+				return errors.ES(d.Op, errors.KInternal, "in row %d, column %s: had unsupported type %s ", x, d.Columns[i].Name, d.Columns[i].Type)
 			}
 			inter, err := f(inner)
 			if err != nil {
-				return errors.E(d.Op, errors.KInternal, fmt.Errorf("in row %d, column %s, conversion error: %s", x, d.Columns[i].Name, err))
+				return errors.ES(d.Op, errors.KInternal, "in row %d, column %s, conversion error: %s", x, d.Columns[i].Name, err.Error())
 			}
 			newRow = append(newRow, inter)
 		}
@@ -198,38 +198,38 @@ func (d *DataSetCompletion) Unmarshal(m map[string]interface{}) (err error) {
 
 	for _, name := range []string{frameType, hasErrors, cancelled} {
 		if _, ok := m[name]; !ok {
-			return errors.E(d.Op, errors.KInternal, fmt.Errorf("DataSetCompletion.%s did not exist", name))
+			return errors.ES(d.Op, errors.KInternal, "DataSetCompletion.%s did not exist", name)
 		}
 	}
 	var ok bool
 
 	d.Base.FrameType, ok = m[frameType].(string)
 	if !ok {
-		return errors.E(d.Op, errors.KInternal, fmt.Errorf("DataSetCompletion.%s was a %T, expected string", frameType, m[frameType]))
+		return errors.ES(d.Op, errors.KInternal, "DataSetCompletion.%s was a %T, expected string", frameType, m[frameType])
 	}
 	if d.FrameType != frames.TypeDataSetCompletion {
-		return errors.E(d.Op, errors.KInternal, fmt.Errorf("DataSetCompletion.FrameType was set to %s", d.FrameType))
+		return errors.ES(d.Op, errors.KInternal, "DataSetCompletion.FrameType was set to %s", d.FrameType)
 	}
 
 	d.HasErrors, ok = m[hasErrors].(bool)
 	if !ok {
-		return errors.E(d.Op, errors.KInternal, fmt.Errorf("DataSetCompletion.%s was a %T, expected string", hasErrors, m[hasErrors]))
+		return errors.ES(d.Op, errors.KInternal, "DataSetCompletion.%s was a %T, expected string", hasErrors, m[hasErrors])
 	}
 
 	d.Cancelled, ok = m[cancelled].(bool)
 	if !ok {
-		return errors.E(d.Op, errors.KTimeout, fmt.Errorf("DataSetCompletion.%s was a %T, expected string", cancelled, m[cancelled]))
+		return errors.ES(d.Op, errors.KTimeout, "DataSetCompletion.%s was a %T, expected string", cancelled, m[cancelled])
 	}
 
 	if _, ok := m[oneAPIKey]; ok {
 		errList, ok := m[oneAPIKey].([]interface{})
 		if !ok {
-			return errors.E(d.Op, errors.KInternal, fmt.Errorf("DataSetCompletion.OneApiErrors was expected to be []interface{}, was %T", m[oneAPIKey]))
+			return errors.ES(d.Op, errors.KInternal, "DataSetCompletion.OneApiErrors was expected to be []interface{}, was %T", m[oneAPIKey])
 		}
 		for _, entry := range errList {
 			str, ok := entry.(string)
 			if !ok {
-				return errors.E(d.Op, errors.KInternal, fmt.Errorf("DataSetCompletion.OneApiErrors had non-string type entry(%v)", entry))
+				return errors.ES(d.Op, errors.KInternal, "DataSetCompletion.OneApiErrors had non-string type entry(%v)", entry)
 			}
 			d.OneAPIErrors = append(d.OneAPIErrors, str)
 		}
@@ -261,62 +261,62 @@ func (t *TableHeader) Unmarshal(m map[string]interface{}) (err error) {
 	for _, key := range []string{frames.FieldTableID, frames.FieldTableKind, frames.FieldTableName,
 		frames.FieldFrameType, frames.FieldColumns} {
 		if _, exists := m[key]; !exists {
-			return errors.E(t.Op, errors.KInternal, fmt.Errorf("TableHeader.%s was not present", key))
+			return errors.ES(t.Op, errors.KInternal, "TableHeader.%s was not present", key)
 		}
 	}
 
 	if ft, ok := m[frames.FieldFrameType].(string); !ok {
-		return errors.E(t.Op, errors.KInternal, fmt.Errorf("TableHeader.Unmarshal received data with no FrameType key"))
+		return errors.ES(t.Op, errors.KInternal, "TableHeader.Unmarshal received data with no FrameType key")
 	} else if ft != frames.TypeTableHeader {
-		return errors.E(t.Op, errors.KInternal, fmt.Errorf("TableHeader.Unmarshal received data with FrameType == %s", ft))
+		return errors.ES(t.Op, errors.KInternal, "TableHeader.Unmarshal received data with FrameType == %s", ft)
 	} else {
 		t.Base.FrameType = ft
 	}
 
 	jn, ok := m[frames.FieldTableID].(json.Number)
 	if !ok {
-		return errors.E(t.Op, errors.KInternal, fmt.Errorf("TableHeader.TableId was not a json.Number"))
+		return errors.ES(t.Op, errors.KInternal, "TableHeader.TableId was not a json.Number")
 	}
 	tblID, err := jn.Int64()
 	if err != nil {
-		return errors.E(t.Op, errors.KInternal, fmt.Errorf("TableHeader entry TableID was not an int64, was %s", m[frames.FieldFrameType].(json.Number).String()))
+		return errors.ES(t.Op, errors.KInternal, "TableHeader entry TableID was not an int64, was %s", m[frames.FieldFrameType].(json.Number).String())
 	}
 	t.TableID = int(tblID)
 
 	if v, ok := m[frames.FieldTableKind].(string); ok {
 		t.TableKind = frames.TableKind(v)
 	} else {
-		return errors.E(t.Op, errors.KInternal, fmt.Errorf("TableHeader.%s had non string entry, had type %T", frames.FieldTableKind, m[frames.FieldTableKind]))
+		return errors.ES(t.Op, errors.KInternal, "TableHeader.%s had non string entry, had type %T", frames.FieldTableKind, m[frames.FieldTableKind])
 	}
 
 	if v, ok := m[frames.FieldTableName].(string); ok {
 		t.TableName = frames.TableKind(v)
 	} else {
-		return errors.E(t.Op, errors.KInternal, fmt.Errorf("TableHeader.%s had non string entry, had type %T", frames.FieldTableName, m[frames.FieldTableName]))
+		return errors.ES(t.Op, errors.KInternal, "TableHeader.%s had non string entry, had type %T", frames.FieldTableName, m[frames.FieldTableName])
 	}
 
 	if _, ok := m[frames.FieldColumns].([]interface{}); !ok {
-		return errors.E(t.Op, errors.KInternal, fmt.Errorf("TableHeader.Columns had type %T, expected []interface{}", m[frames.FieldColumns]))
+		return errors.ES(t.Op, errors.KInternal, "TableHeader.Columns had type %T, expected []interface{}", m[frames.FieldColumns])
 	}
 
 	for _, inter := range m[frames.FieldColumns].([]interface{}) {
 		m := inter.(map[string]interface{})
 		for _, name := range []string{frames.FieldColumnName, frames.FieldColumnType} {
 			if _, exists := m[name]; !exists {
-				return errors.E(t.Op, errors.KInternal, fmt.Errorf("TableHeader.Columns had entry without .%s", name))
+				return errors.ES(t.Op, errors.KInternal, "TableHeader.Columns had entry without .%s", name)
 			}
 		}
 		cn, ok := m[frames.FieldColumnName].(string)
 		if !ok {
-			return errors.E(t.Op, errors.KInternal, fmt.Errorf("TableHeader.Columns had entry with .ColumnName set to a %T type", m[frames.FieldColumnName]))
+			return errors.ES(t.Op, errors.KInternal, "TableHeader.Columns had entry with .ColumnName set to a %T type", m[frames.FieldColumnName])
 		}
 		cts, ok := m[frames.FieldColumnType].(string)
 		if !ok {
-			return errors.E(t.Op, errors.KInternal, fmt.Errorf("TableHeader.Columns had entry with .ColumnType set to a %T type", m[frames.FieldColumnType]))
+			return errors.ES(t.Op, errors.KInternal, "TableHeader.Columns had entry with .ColumnType set to a %T type", m[frames.FieldColumnType])
 		}
 		ct := types.Column(cts)
 		if !ct.Valid() {
-			return errors.E(t.Op, errors.KInternal, fmt.Errorf("TableHeader.Columns had entry with .ColumnType set to a %T type", m[frames.FieldColumnType]))
+			return errors.ES(t.Op, errors.KInternal, "TableHeader.Columns had entry with .ColumnType set to a %T type", m[frames.FieldColumnType])
 		}
 
 		col := table.Column{
@@ -356,25 +356,25 @@ func (TableFragment) IsFrame() {}
 func (t *TableFragment) Unmarshal(m map[string]interface{}) (err error) {
 	for _, key := range []string{frames.FieldFrameType, frames.FieldTableID, frames.FieldTableFragmentType, frames.FieldRows} {
 		if _, exists := m[key]; !exists {
-			return errors.E(t.Op, errors.KInternal, fmt.Errorf("TableFragment.%s was not present", key))
+			return errors.ES(t.Op, errors.KInternal, "TableFragment.%s was not present", key)
 		}
 	}
 
 	if ft, ok := m[frames.FieldFrameType].(string); !ok {
-		return errors.E(t.Op, errors.KInternal, fmt.Errorf("TableFragment.Unmarshal received data with no FrameType key"))
+		return errors.ES(t.Op, errors.KInternal, "TableFragment.Unmarshal received data with no FrameType key")
 	} else if ft != frames.TypeTableFragment {
-		return errors.E(t.Op, errors.KInternal, fmt.Errorf("TableFragment.Unmarshal received data with FrameType == %s", ft))
+		return errors.ES(t.Op, errors.KInternal, "TableFragment.Unmarshal received data with FrameType == %s", ft)
 	} else {
 		t.Base.FrameType = ft
 	}
 
 	jn, ok := m[frames.FieldTableID].(json.Number)
 	if !ok {
-		return errors.E(t.Op, errors.KInternal, fmt.Errorf("TableFragment.TableId was not a json.Number"))
+		return errors.ES(t.Op, errors.KInternal, "TableFragment.TableId was not a json.Number")
 	}
 	tblID, err := jn.Int64()
 	if err != nil {
-		return errors.E(t.Op, errors.KInternal, fmt.Errorf("TableFragment entry TableID was not an int64, was %s", m[frames.FieldFrameType].(json.Number).String()))
+		return errors.ES(t.Op, errors.KInternal, "TableFragment entry TableID was not an int64, was %s", m[frames.FieldFrameType].(json.Number).String())
 	}
 	t.TableID = int(tblID)
 
@@ -382,33 +382,33 @@ func (t *TableFragment) Unmarshal(m map[string]interface{}) (err error) {
 	if fc, ok := m[frames.FieldCount]; ok {
 		jn, ok = fc.(json.Number)
 		if !ok {
-			return errors.E(t.Op, errors.KInternal, fmt.Errorf("TableFragment.FieldCount was not a json.Number"))
+			return errors.ES(t.Op, errors.KInternal, "TableFragment.FieldCount was not a json.Number")
 		}
 	}
 
 	fieldCount, err := jn.Int64()
 	if err != nil {
-		return errors.E(t.Op, errors.KInternal, fmt.Errorf("TableFragment entry FieldCount was not an int64, was %s", m[frames.FieldCount].(json.Number).String()))
+		return errors.ES(t.Op, errors.KInternal, "TableFragment entry FieldCount was not an int64, was %s", m[frames.FieldCount].(json.Number).String())
 	}
 	t.FieldCount = int(fieldCount)
 
 	if v, ok := m[frames.FieldTableFragmentType].(string); ok {
 		t.TableFragmentType = v
 	} else {
-		return errors.E(t.Op, errors.KInternal, fmt.Errorf("TableFragment.%s had non string entry, had type %T", frames.FieldTableFragmentType, m[frames.FieldTableFragmentType]))
+		return errors.ES(t.Op, errors.KInternal, "TableFragment.%s had non string entry, had type %T", frames.FieldTableFragmentType, m[frames.FieldTableFragmentType])
 	}
 
 	if _, ok := m[frames.FieldRows].([]interface{}); !ok {
-		return errors.E(t.Op, errors.KInternal, fmt.Errorf("TableFragment.Rows had type %T, expected []interface{}", m[frames.FieldRows]))
+		return errors.ES(t.Op, errors.KInternal, "TableFragment.Rows had type %T, expected []interface{}", m[frames.FieldRows])
 	}
 
 	for x, inter := range m[frames.FieldRows].([]interface{}) {
 		if _, ok := inter.([]interface{}); !ok {
-			return errors.E(t.Op, errors.KInternal, fmt.Errorf("TableFragment.Rows had entry(%d) of type %T, expected []interface{}", x, inter))
+			return errors.ES(t.Op, errors.KInternal, "TableFragment.Rows had entry(%d) of type %T, expected []interface{}", x, inter)
 		}
 		newRow, err := t.rowConversion(inter.([]interface{}))
 		if err != nil {
-			return errors.ES(t.Op, errors.KInternal, "in row %d: %s", x, err)
+			return errors.ES(t.Op, errors.KInternal, "in row %d: %s", x, err.Error())
 		}
 		t.Rows = append(t.Rows, newRow)
 	}
@@ -449,36 +449,36 @@ func (TableProgress) IsFrame() {}
 func (t *TableProgress) Unmarshal(m map[string]interface{}) (err error) {
 	for _, key := range []string{frames.FieldFrameType, frames.FieldTableID, frames.FieldTableProgress} {
 		if _, exists := m[key]; !exists {
-			return errors.E(t.Op, errors.KInternal, fmt.Errorf("TableProgress.%s was not present", key))
+			return errors.ES(t.Op, errors.KInternal, "TableProgress.%s was not present", key)
 		}
 	}
 
 	if ft, ok := m[frames.FieldFrameType].(string); !ok {
-		return errors.E(t.Op, errors.KInternal, fmt.Errorf("TableProgress.Unmarshal received data with no FrameType key"))
+		return errors.ES(t.Op, errors.KInternal, "TableProgress.Unmarshal received data with no FrameType key")
 	} else if ft != frames.TypeTableProgress {
-		return errors.E(t.Op, errors.KInternal, fmt.Errorf("TableProgress.Unmarshal received data with FrameType == %s", ft))
+		return errors.ES(t.Op, errors.KInternal, "TableProgress.Unmarshal received data with FrameType == %s", ft)
 	} else {
 		t.Base.FrameType = ft
 	}
 
 	jn, ok := m[frames.FieldTableID].(json.Number)
 	if !ok {
-		return errors.E(t.Op, errors.KInternal, fmt.Errorf("TableProgress.TableId was not a json.Number"))
+		return errors.ES(t.Op, errors.KInternal, "TableProgress.TableId was not a json.Number")
 	}
 	tblID, err := jn.Int64()
 	if err != nil {
-		return errors.E(t.Op, errors.KInternal, fmt.Errorf("TableProgress entry TableID was not an int64, was %s", m[frames.FieldFrameType].(json.Number).String()))
+		return errors.ES(t.Op, errors.KInternal, "TableProgress entry TableID was not an int64, was %s", m[frames.FieldFrameType].(json.Number).String())
 	}
 	t.TableID = int(tblID)
 
 	jn, ok = m[frames.FieldTableProgress].(json.Number)
 	if !ok {
 
-		return errors.E(t.Op, errors.KInternal, fmt.Errorf("TableProgress.TableProgress was not a json.Number"))
+		return errors.ES(t.Op, errors.KInternal, "TableProgress.TableProgress was not a json.Number")
 	}
 	progress, err := jn.Float64()
 	if err != nil {
-		return errors.E(t.Op, errors.KInternal, fmt.Errorf("TableProgress.TableProgress was not an int64, was %s", m[frames.FieldTableProgress].(json.Number).String()))
+		return errors.ES(t.Op, errors.KInternal, "TableProgress.TableProgress was not an int64, was %s", m[frames.FieldTableProgress].(json.Number).String())
 	}
 	t.TableProgress = progress
 
@@ -502,35 +502,35 @@ func (TableCompletion) IsFrame() {}
 func (t *TableCompletion) Unmarshal(m map[string]interface{}) (err error) {
 	for _, key := range []string{frames.FieldFrameType, frames.FieldTableID, frames.FieldRowCount} {
 		if _, exists := m[key]; !exists {
-			return errors.E(t.Op, errors.KInternal, fmt.Errorf("TableCompletion.%s was not present", key))
+			return errors.ES(t.Op, errors.KInternal, "TableCompletion.%s was not present", key)
 		}
 	}
 
 	if ft, ok := m[frames.FieldFrameType].(string); !ok {
-		return errors.E(t.Op, errors.KInternal, fmt.Errorf("TableCompletion.Unmarshal received data with no FrameType key"))
+		return errors.ES(t.Op, errors.KInternal, "TableCompletion.Unmarshal received data with no FrameType key")
 	} else if ft != frames.TypeTableCompletion {
-		return errors.E(t.Op, errors.KInternal, fmt.Errorf("TableCompletion.Unmarshal received data with FrameType == %s", ft))
+		return errors.ES(t.Op, errors.KInternal, "TableCompletion.Unmarshal received data with FrameType == %s", ft)
 	} else {
 		t.Base.FrameType = ft
 	}
 
 	jn, ok := m[frames.FieldTableID].(json.Number)
 	if !ok {
-		return errors.E(t.Op, errors.KInternal, fmt.Errorf("TableCompletion.TableId was not a json.Number"))
+		return errors.ES(t.Op, errors.KInternal, "TableCompletion.TableId was not a json.Number")
 	}
 	tblID, err := jn.Int64()
 	if err != nil {
-		return errors.E(t.Op, errors.KInternal, fmt.Errorf("TableCompletion entry TableID was not an int64, was %s", m[frames.FieldFrameType].(json.Number).String()))
+		return errors.ES(t.Op, errors.KInternal, "TableCompletion entry TableID was not an int64, was %s", m[frames.FieldFrameType].(json.Number).String())
 	}
 	t.TableID = int(tblID)
 
 	jn, ok = m[frames.FieldRowCount].(json.Number)
 	if !ok {
-		return errors.E(t.Op, errors.KInternal, fmt.Errorf("TableCompletion.RowCount was not a json.Number"))
+		return errors.ES(t.Op, errors.KInternal, "TableCompletion.RowCount was not a json.Number")
 	}
 	rc, err := jn.Int64()
 	if err != nil {
-		return errors.E(t.Op, errors.KInternal, fmt.Errorf("TableCompletion entry RowCount was not an int64, was %s", m[frames.FieldRowCount].(json.Number).String()))
+		return errors.ES(t.Op, errors.KInternal, "TableCompletion entry RowCount was not an int64, was %s", m[frames.FieldRowCount].(json.Number).String())
 	}
 	t.RowCount = int(rc)
 

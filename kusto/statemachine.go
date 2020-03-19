@@ -5,7 +5,6 @@ package kusto
 
 import (
 	"context"
-	"fmt"
 	"sync"
 
 	"github.com/Azure/azure-kusto-go/kusto/data/errors"
@@ -71,13 +70,13 @@ func (d *nonProgressiveSM) process() (sf stateFn, err error) {
 			d.wg.Wait()
 
 			if !d.hasCompletion {
-				return nil, errors.E(d.op, errors.KInternal, fmt.Errorf("non-progressive stream did not have DataSetCompletion frame"))
+				return nil, errors.ES(d.op, errors.KInternal, "non-progressive stream did not have DataSetCompletion frame")
 			}
 			return nil, nil
 		}
 
 		if d.hasCompletion {
-			return nil, errors.E(d.op, errors.KInternal, fmt.Errorf("saw a DataSetCompletion frame, then received a %T frame", fr))
+			return nil, errors.ES(d.op, errors.KInternal, "saw a DataSetCompletion frame, then received a %T frame", fr)
 		}
 
 		switch table := fr.(type) {
@@ -174,7 +173,7 @@ func (p *progressiveSM) nextFrame() (stateFn, error) {
 		return nil, p.ctx.Err()
 	case fr, ok := <-p.in:
 		if !ok {
-			return nil, errors.E(p.op, errors.KInternal, fmt.Errorf("received a table stream that did not finish before our input channel, this is usally a return size or time limit"))
+			return nil, errors.ES(p.op, errors.KInternal, "received a table stream that did not finish before our input channel, this is usally a return size or time limit")
 		}
 
 		p.currentFrame = fr
@@ -194,7 +193,7 @@ func (p *progressiveSM) nextFrame() (stateFn, error) {
 		case frames.Error:
 			return nil, table
 		default:
-			return nil, errors.E(p.op, errors.KInternal, fmt.Errorf("received an unknown frame in a progressive table stream we didn't understand: %T", table))
+			return nil, errors.ES(p.op, errors.KInternal, "received an unknown frame in a progressive table stream we didn't understand: %T", table)
 		}
 	}
 }
@@ -340,7 +339,7 @@ func (p *v1SM) nextFrame() (stateFn, error) {
 	case fr, ok := <-p.in:
 		if !ok {
 			if !p.receivedDT {
-				return nil, errors.E(p.op, errors.KInternal, fmt.Errorf("received a table stream that did not finish before our input channel, this is usally a return size or time limit"))
+				return nil, errors.ES(p.op, errors.KInternal, "received a table stream that did not finish before our input channel, this is usally a return size or time limit")
 			}
 			p.wg.Wait()
 			return nil, nil
@@ -356,7 +355,7 @@ func (p *v1SM) nextFrame() (stateFn, error) {
 		case frames.Error:
 			return nil, table
 		default:
-			return nil, errors.E(p.op, errors.KInternal, fmt.Errorf("received an unknown frame in a v1 table stream we didn't understand: %T", table))
+			return nil, errors.ES(p.op, errors.KInternal, "received an unknown frame in a v1 table stream we didn't understand: %T", table)
 		}
 	}
 }
