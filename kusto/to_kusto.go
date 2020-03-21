@@ -3,7 +3,6 @@ package kusto
 import (
 	"encoding/json"
 	"fmt"
-	"log"
 	"reflect"
 	"strings"
 	"time"
@@ -32,7 +31,6 @@ func structToKustoValues(cols table.Columns, p interface{}) (value.Values, error
 		if tag := field.Tag.Get("kusto"); strings.TrimSpace(tag) != "" {
 			colData, ok := m[tag]
 			if !ok {
-				log.Printf("did not find tag %q in our columnMap", tag)
 				continue
 			}
 			if err := fieldConvert(colData, v.Field(i), row); err != nil {

@@ -493,7 +493,7 @@ type StmtOption func(s *Stmt)
 // USE AT YOUR OWN RISK!
 func UnsafeStmt(options unsafe.Stmt) StmtOption {
 	return func(s *Stmt) {
-		ilog.UnsafeWarning()
+		ilog.UnsafeWarning(options.SuppressWarning)
 		s.unsafe.Add = true
 	}
 }

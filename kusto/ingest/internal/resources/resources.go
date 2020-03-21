@@ -6,7 +6,6 @@ import (
 	"context"
 	"errors"
 	"fmt"
-	"log"
 	"net/url"
 	"strings"
 	"sync/atomic"
@@ -266,7 +265,7 @@ func (m *Manager) fetchRetry(ctx context.Context) {
 		cancel()
 		if err != nil {
 			attempts++
-			log.Printf("problem fetching the resources from Kusto Mgmt(attempt %d): %s", attempts, err)
+			//log.Printf("problem fetching the resources from Kusto Mgmt(attempt %d): %s", attempts, err)
 			time.Sleep(10 * time.Second)
 			continue
 		}
