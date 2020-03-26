@@ -20,7 +20,7 @@ unsafe methods, be sure to scrub your data inputs before sending them to Kusto.
 )
 
 // UnsafeWarning prints to the log a warning that unsafe methods are being used. UnsafeWarning() should be
-// called on all methods or constructores that do something unsafe. The warning will only issue on the
+// called on all methods or constructors that do something unsafe. The warning will only issue on the
 // first call.
 func UnsafeWarning(suppress bool) {
 	if !suppress {
