@@ -7,4 +7,6 @@ type Stmt struct {
 	// Adds indicates if a Stmt is allowed to use Unsafe.Add().
 	// This removes SQL-like injection attack prevention.
 	Add bool
+	// SuppressWarning allows the Unsafe warning log message to be suppressed for this Stmt.
+	SuppressWarning bool
 }

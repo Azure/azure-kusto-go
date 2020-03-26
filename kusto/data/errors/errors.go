@@ -15,7 +15,6 @@ import (
 	"errors"
 	"fmt"
 	"io/ioutil"
-	"log"
 	"net/http"
 	"runtime"
 	"strings"
@@ -259,9 +258,8 @@ func e(args ...interface{}) *Error {
 				e.Err = err
 			} else {
 				_, file, line, _ := runtime.Caller(1)
-				log.Printf("errors.E: bad call from %s:%d: %v", file, line, args)
 				e.Kind = KOther
-				e.Err = fmt.Errorf("unknown type %T, value %v in error call", arg, arg)
+				e.Err = fmt.Errorf("errors.E: bad call from %s:%d: %v, unknown type %T, value %v in error call", file, line, args, arg, arg)
 				return e
 			}
 		}
