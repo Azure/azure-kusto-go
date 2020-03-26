@@ -488,7 +488,7 @@ type Stmt struct {
 // StmtOption is an optional argument to NewStmt().
 type StmtOption func(s *Stmt)
 
-// UnsafeStmt provides enables unsafe actions on a Stmt and all Stmts derived from that Stmt.
+// UnsafeStmt enables unsafe actions on a Stmt and all Stmts derived from that Stmt.
 // This turns off safety features that could allow a service client to compromise your data store.
 // USE AT YOUR OWN RISK!
 func UnsafeStmt(options unsafe.Stmt) StmtOption {
