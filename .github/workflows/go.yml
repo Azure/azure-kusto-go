@@ -32,4 +32,10 @@ jobs:
         fi
 
     - name: Build
-      run: go build -v .
+      run: |
+        cd kusto
+        go build -v .
+    - name: Test
+      run: |
+        cd kusto
+        go test ./...
