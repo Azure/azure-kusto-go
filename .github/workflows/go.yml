@@ -26,15 +26,11 @@ jobs:
       run: |
         cd kusto
         go get -v -t -d ./...
-        if [ -f Gopkg.toml ]; then
-            curl https://raw.githubusercontent.com/golang/dep/master/install.sh | sh
-            dep ensure
-        fi
 
     - name: Build
       run: |
         cd kusto
-        go build -v .
+        go build -v ./...
     - name: Test
       run: |
         cd kusto
