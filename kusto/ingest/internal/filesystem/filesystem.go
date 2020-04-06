@@ -184,6 +184,11 @@ func (i *Ingestion) localToBlob(ctx context.Context, from string, to azblob.Cont
 	const (
 		_1MiB = 1024 * 1024
 
+		// The numbers below are magic numbers. They were derived from doing Azure to Azure tests of azcopy for various file sizes
+		// to prove that changes weren't going to make azcopy slower. It was found that multipying azcopy's concurrency by 10x (to 50)
+		// made a 5x improvement in speed. We don't have any numbers from the service side to give us numbers we should use, so this
+		// is our best guess from observation. DO NOT CHANGE UNLESS YOU KNOW BETTER.		
+
 		blockSize   = 8 * _1MiB
 		concurrency = 50
 	)
