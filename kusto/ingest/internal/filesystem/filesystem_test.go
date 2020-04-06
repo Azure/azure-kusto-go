@@ -7,7 +7,6 @@ import (
 	"fmt"
 	"io"
 	"io/ioutil"
-	"log"
 	"net/url"
 	"os"
 	"testing"
@@ -117,11 +116,10 @@ func TestLocalToBlob(t *testing.T) {
 	}
 	zw.Close()
 
-	b, err := ioutil.ReadFile(f.Name())
+	_, err = ioutil.ReadFile(f.Name())
 	if err != nil {
 		panic(err)
 	}
-	log.Println(string(b))
 
 	tests := []struct {
 		desc      string

@@ -181,6 +181,18 @@ var nower = time.Now
 // localToBlob copies from a local to to an Azure Blobstore blob. It returns the URL of the Blob, the local file info and an
 // error if there was one.
 func (i *Ingestion) localToBlob(ctx context.Context, from string, to azblob.ContainerURL, props *properties.All) (azblob.BlockBlobURL, int64, error) {
+	const (
+		_1MiB = 1024 * 1024
+
+		// The numbers below are magic numbers. They were derived from doing Azure to Azure tests of azcopy for various file sizes
+		// to prove that changes weren't going to make azcopy slower. It was found that multipying azcopy's concurrency by 10x (to 50)
+		// made a 5x improvement in speed. We don't have any numbers from the service side to give us numbers we should use, so this
+		// is our best guess from observation. DO NOT CHANGE UNLESS YOU KNOW BETTER.		
+
+		blockSize   = 8 * _1MiB
+		concurrency = 50
+	)
+
 	compression := CompressionDiscovery(from)
 	blobName := fmt.Sprintf("%s_%s_%s_%s", filepath.Base(from), nower(), i.db, i.table)
 	if compression == properties.CTNone {
@@ -216,7 +228,7 @@ func (i *Ingestion) localToBlob(ctx context.Context, from string, to azblob.Cont
 			ctx,
 			gstream,
 			blobURL,
-			azblob.UploadStreamToBlockBlobOptions{BufferSize: 1, MaxBuffers: 1},
+			azblob.UploadStreamToBlockBlobOptions{BufferSize: blockSize, MaxBuffers: concurrency},
 		)
 
 		if err != nil {
@@ -232,8 +244,8 @@ func (i *Ingestion) localToBlob(ctx context.Context, from string, to azblob.Cont
 		file,
 		blobURL,
 		azblob.UploadToBlockBlobOptions{
-			BlockSize:   4 * 1024 * 1024,
-			Parallelism: 16,
+			BlockSize:   blockSize,
+			Parallelism: concurrency,
 		},
 	)
 
