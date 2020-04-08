@@ -2,6 +2,7 @@ package kusto
 
 import (
 	"context"
+	"fmt"
 	"net/url"
 	"reflect"
 	"strings"
@@ -173,6 +174,9 @@ func (c *Client) Query(ctx context.Context, db string, query Stmt, options ...Qu
 	opts, err := c.setOptions(ctx, errors.OpQuery, query, options...)
 	if err != nil {
 		return nil, err
+	}
+	if len(opts.mgmtOnly) > 0 {
+		return nil, fmt.Errorf("provided a QueryOption(%s()) that can only be used in a Mgmt() call", opts.mgmtOnly[0])
 	}
 
 	conn, err := c.getConn(opts)

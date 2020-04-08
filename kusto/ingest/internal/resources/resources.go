@@ -164,7 +164,7 @@ func (m *Manager) renewResources() {
 // AuthContext returns a string representing the authorization context. This auth token is a temporary token
 // that can be used to write a message via ingestion.  This is different than the ADAL token.
 func (m *Manager) AuthContext(ctx context.Context) (string, error) {
-	rows, err := m.client.Mgmt(ctx, "NetDefaultDB", kusto.NewStmt(".get kusto identity token"), kusto.QueryIngestion())
+	rows, err := m.client.Mgmt(ctx, "NetDefaultDB", kusto.NewStmt(".get kusto identity token"), kusto.IngestionEndpoint())
 	if err != nil {
 		return "", fmt.Errorf("problem getting authorization context from Kusto via Mgmt: %s", err)
 	}
@@ -224,7 +224,7 @@ func (i *Ingestion) importRec(rec ingestResc) error {
 
 // fetch makes a kusto.Client.Mgmt() call to retrieve the resources used for Ingestion.
 func (m *Manager) fetch(ctx context.Context) error {
-	rows, err := m.client.Mgmt(ctx, "NetDefaultDB", kusto.NewStmt(".get ingestion resources"), kusto.QueryIngestion())
+	rows, err := m.client.Mgmt(ctx, "NetDefaultDB", kusto.NewStmt(".get ingestion resources"), kusto.IngestionEndpoint())
 	if err != nil {
 		return fmt.Errorf("problem getting ingestion resources from Kusto: %s", err)
 	}

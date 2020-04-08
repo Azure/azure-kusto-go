@@ -22,6 +22,7 @@ type queryOptions struct {
 	requestProperties *requestProperties
 	canWrite          bool
 	queryIngestion    bool
+	mgmtOnly          []string
 }
 
 // AllowWrite allows a query that attempts to modify data in a table.
@@ -32,11 +33,12 @@ func AllowWrite() QueryOption {
 	}
 }
 
-// QueryIngestion will instruct the query to connect to the ingest-[endpoint] instead of [endpoint].
-// This is not often used by end users.
-func QueryIngestion() QueryOption {
+// IngestionEndpoint will instruct the Mgmt call to connect to the ingest-[endpoint] instead of [endpoint].
+// This is not often used by end users and can only be used with a Mgmt() call.
+func IngestionEndpoint() QueryOption {
 	return func(q *queryOptions) error {
 		q.queryIngestion = true
+		q.mgmtOnly = append(q.mgmtOnly, "IngestionEndpoint")
 		return nil
 	}
 }
