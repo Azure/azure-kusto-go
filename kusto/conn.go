@@ -91,69 +91,18 @@ var writeRE = regexp.MustCompile(`(\.set|\.append|\.set-or-append|\.set-or-repla
 
 // query makes a query for the purpose of extracting data from Kusto. Context can be used to set
 // a timeout or cancel the query. Queries cannot take longer than 5 minutes.
-func (c *conn) query(ctx context.Context, db string, query Stmt, options ...QueryOption) (execResp, error) {
-	params, err := query.params.toParameters(query.defs)
-	if err != nil {
-		return execResp{}, errors.ES(errors.OpQuery, errors.KClientArgs, "QueryValues in the the Stmt were incorrect: %s", err).SetNoRetry()
-	}
-
-	// Match our server deadline to our context.Deadline. This should be set from withing kusto.Query() to always have a value.
-	deadline, ok := ctx.Deadline()
-	if ok {
-		options = append(
-			options,
-			serverTimeout(deadline.Sub(nower())),
-		)
-	}
-
-	opt := &queryOptions{
-		requestProperties: &requestProperties{
-			Options: map[string]interface{}{
-				"results_progressive_enabled": true, // We want progressive frames by default.
-			},
-			Parameters: params,
-		},
-	}
-
-	for _, o := range options {
-		if err := o(opt); err != nil {
-			return execResp{}, err
-		}
-	}
-
+func (c *conn) query(ctx context.Context, db string, query Stmt, options *queryOptions) (execResp, error) {
 	if strings.HasPrefix(strings.TrimSpace(query.String()), ".") {
 		return execResp{}, errors.ES(errors.OpQuery, errors.KClientArgs, "a Stmt to Query() cannot begin with a period(.), only Mgmt() calls can do that").SetNoRetry()
 	}
 
-	return c.execute(ctx, execQuery, db, query, "", *opt.requestProperties)
+	return c.execute(ctx, execQuery, db, query, "", *options.requestProperties)
 }
 
 // mgmt is used to do management queries to Kusto.
-func (c *conn) mgmt(ctx context.Context, db string, query Stmt, options ...QueryOption) (execResp, error) {
-	// Match our server deadline to our context.Deadline. This should be set from withing kusto.Mgmt() to always have a value.
-	deadline, ok := ctx.Deadline()
-	if ok {
-		options = append(
-			options,
-			serverTimeout(deadline.Sub(nower())),
-		)
-	}
-
-	opt := &queryOptions{
-		requestProperties: &requestProperties{
-			Options:    map[string]interface{}{},
-			Parameters: map[string]string{},
-		},
-	}
-
-	for _, o := range options {
-		if err := o(opt); err != nil {
-			return execResp{}, err
-		}
-	}
-
+func (c *conn) mgmt(ctx context.Context, db string, query Stmt, options *queryOptions) (execResp, error) {
 	if writeRE.MatchString(query.String()) {
-		if !opt.canWrite {
+		if !options.canWrite {
 			return execResp{}, errors.ES(
 				errors.OpQuery,
 				errors.KClientArgs,
@@ -164,7 +113,7 @@ func (c *conn) mgmt(ctx context.Context, db string, query Stmt, options ...Query
 		}
 	}
 
-	return c.execute(ctx, execMgmt, db, query, "", *opt.requestProperties)
+	return c.execute(ctx, execMgmt, db, query, "", *options.requestProperties)
 }
 
 const (
@@ -239,11 +188,11 @@ func (c *conn) execute(ctx context.Context, execType int, db string, query Stmt,
 	resp, err := c.client.Do(req.WithContext(ctx))
 	if err != nil {
 		// TODO(jdoak): We need a http error unwrap function that pulls out an *errors.Error.
-		return execResp{}, errors.E(op, errors.KHTTPError, err)
+		return execResp{}, errors.E(op, errors.KHTTPError, fmt.Errorf("with query %q: %w", query.String(), err))
 	}
 
 	if resp.StatusCode != 200 {
-		return execResp{}, errors.HTTP(op, resp, "error from Kusto endpoint")
+		return execResp{}, errors.HTTP(op, resp, fmt.Sprintf("error from Kusto endpoint for query %q: ", query.String()))
 	}
 
 	body := resp.Body

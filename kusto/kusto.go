@@ -2,7 +2,9 @@ package kusto
 
 import (
 	"context"
+	"net/url"
 	"reflect"
+	"strings"
 	"sync"
 	"time"
 
@@ -16,8 +18,8 @@ import (
 
 // queryer provides for getting a stream of Kusto frames. Exists to allow fake Kusto streams in tests.
 type queryer interface {
-	query(ctx context.Context, db string, query Stmt, options ...QueryOption) (execResp, error)
-	mgmt(ctx context.Context, db string, query Stmt, options ...QueryOption) (execResp, error)
+	query(ctx context.Context, db string, query Stmt, options *queryOptions) (execResp, error)
+	mgmt(ctx context.Context, db string, query Stmt, options *queryOptions) (execResp, error)
 }
 
 // Authorization provides the ADAL authorizer needed to access the resource. You can set Authorizer or
@@ -99,10 +101,10 @@ func (a *Authorization) Validate(endpoint string) error {
 
 // Client is a client to a Kusto instance.
 type Client struct {
-	conn     queryer
-	endpoint string
-	auth     Authorization
-	mu       sync.Mutex
+	conn, ingestConn queryer
+	endpoint         string
+	auth             Authorization
+	mu               sync.Mutex
 }
 
 // Option is an optional argument type for New().
@@ -110,6 +112,19 @@ type Option func(c *Client)
 
 // New returns a new Client. endpoint is the Kusto endpoint to use, example: https://somename.westus.kusto.windows.net .
 func New(endpoint string, auth Authorization, options ...Option) (*Client, error) {
+	u, err := url.Parse(endpoint)
+	if err != nil {
+		return nil, errors.ES(errors.OpServConn, errors.KClientArgs, "could not parse the endpoint(%s): %s", endpoint, err).SetNoRetry()
+	}
+	if strings.HasPrefix(u.Hostname(), "ingest-") {
+		return nil, errors.ES(
+			errors.OpServConn,
+			errors.KClientArgs,
+			"endpoint argument started with 'ingest-'. Adding 'ingest-' is taken care of by the client. "+
+				"If using Mgmt() on an ingestion endpoint, use option QueryIngestion(). This is very uncommon",
+		)
+	}
+
 	client := &Client{auth: auth, endpoint: endpoint}
 	for _, o := range options {
 		o(client)
@@ -155,7 +170,17 @@ func (c *Client) Query(ctx context.Context, db string, query Stmt, options ...Qu
 		return nil, err
 	}
 
-	execResp, err := c.conn.query(ctx, db, query, options...)
+	opts, err := c.setOptions(ctx, errors.OpQuery, query, options...)
+	if err != nil {
+		return nil, err
+	}
+
+	conn, err := c.getConn(opts)
+	if err != nil {
+		return nil, err
+	}
+
+	execResp, err := conn.query(ctx, db, query, opts)
 	if err != nil {
 		cancel()
 		return nil, err
@@ -217,7 +242,17 @@ func (c *Client) Mgmt(ctx context.Context, db string, query Stmt, options ...Que
 		return nil, err
 	}
 
-	execResp, err := c.conn.mgmt(ctx, db, query, options...)
+	opts, err := c.setOptions(ctx, errors.OpMgmt, query, options...)
+	if err != nil {
+		return nil, err
+	}
+
+	conn, err := c.getConn(opts)
+	if err != nil {
+		return nil, err
+	}
+
+	execResp, err := conn.mgmt(ctx, db, query, opts)
 	if err != nil {
 		cancel()
 		return nil, err
@@ -237,6 +272,64 @@ func (c *Client) Mgmt(ctx context.Context, db string, query Stmt, options ...Que
 	<-columnsReady
 
 	return iter, nil
+}
+
+func (c *Client) setOptions(ctx context.Context, op errors.Op, query Stmt, options ...QueryOption) (*queryOptions, error) {
+	params, err := query.params.toParameters(query.defs)
+	if err != nil {
+		return nil, errors.ES(op, errors.KClientArgs, "QueryValues in the the Stmt were incorrect: %s", err).SetNoRetry()
+	}
+
+	// Match our server deadline to our context.Deadline. This should be set from withing kusto.Query() to always have a value.
+	deadline, ok := ctx.Deadline()
+	if ok {
+		options = append(
+			options,
+			serverTimeout(deadline.Sub(nower())),
+		)
+	}
+
+	opt := &queryOptions{
+		requestProperties: &requestProperties{
+			Options:    map[string]interface{}{},
+			Parameters: params,
+		},
+	}
+	if op == errors.OpQuery {
+		// We want progressive frames by default for Query(), but not Mgmt() because it uses v1 framing and ingestion endpoints
+		// do not support it.
+		opt.requestProperties.Options["results_progressive_enabled"] = true
+	}
+
+	for _, o := range options {
+		if err := o(opt); err != nil {
+			return nil, errors.ES(op, errors.KClientArgs, "QueryValues in the the Stmt were incorrect: %s", err).SetNoRetry()
+		}
+	}
+	return opt, nil
+}
+
+func (c *Client) getConn(options *queryOptions) (queryer, error) {
+	conn := c.conn
+	if options.queryIngestion {
+		delete(options.requestProperties.Options, "results_progressive_enabled")
+
+		if c.ingestConn == nil {
+			u, _ := url.Parse(c.endpoint) // Don't care about the error
+			u.Host = "ingest-" + u.Host
+			auth := c.auth
+			if err := auth.Validate(u.String()); err != nil {
+				return nil, err
+			}
+			iconn, err := newConn(u.String(), auth)
+			if err != nil {
+				return nil, err
+			}
+			c.ingestConn = iconn
+		}
+		conn = c.ingestConn
+	}
+	return conn, nil
 }
 
 var nower = time.Now

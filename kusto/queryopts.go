@@ -21,12 +21,22 @@ type requestProperties struct {
 type queryOptions struct {
 	requestProperties *requestProperties
 	canWrite          bool
+	queryIngestion    bool
 }
 
 // AllowWrite allows a query that attempts to modify data in a table.
 func AllowWrite() QueryOption {
 	return func(q *queryOptions) error {
 		q.canWrite = true
+		return nil
+	}
+}
+
+// QueryIngestion will instruct the query to connect to the ingest-[endpoint] instead of [endpoint].
+// This is not often used by end users.
+func QueryIngestion() QueryOption {
+	return func(q *queryOptions) error {
+		q.queryIngestion = true
 		return nil
 	}
 }

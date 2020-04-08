@@ -12,6 +12,7 @@ import (
 
 	"github.com/Azure/azure-kusto-go/kusto"
 	"github.com/Azure/azure-kusto-go/kusto/data/errors"
+	"github.com/Azure/azure-kusto-go/kusto/data/table"
 	"github.com/Azure/azure-kusto-go/kusto/ingest/internal/conn"
 	"github.com/Azure/azure-kusto-go/kusto/ingest/internal/filesystem"
 	"github.com/Azure/azure-kusto-go/kusto/ingest/internal/properties"
@@ -58,6 +59,11 @@ type Ingestion struct {
 
 	connMu     sync.Mutex
 	streamConn *conn.Conn
+
+	// mappingNamesMu protects mappingNames.
+	mappingNamesMu sync.Mutex
+	// mappingNames stores mapping names that have been used and we have seen on the server.
+	mappingNames map[string]bool
 }
 
 // New is the constructor for Ingestion.
@@ -73,11 +79,12 @@ func New(client *kusto.Client, db, table string) (*Ingestion, error) {
 	}
 
 	i := &Ingestion{
-		client: client,
-		mgr:    mgr,
-		db:     db,
-		table:  table,
-		fs:     fs,
+		client:       client,
+		mgr:          mgr,
+		db:           db,
+		table:        table,
+		fs:           fs,
+		mappingNames: map[string]bool{},
 	}
 
 	return i, nil
@@ -310,6 +317,11 @@ func FileFormat(et DataFormat) FileOption {
 	)
 }
 
+type mapEntry struct {
+	Name string
+	Kind string
+}
+
 // FromFile allows uploading a data file for Kusto from either a local path or a blobstore URI path.
 // This method is thread-safe.
 func (i *Ingestion) FromFile(ctx context.Context, fPath string, options ...FileOption) error {
@@ -329,6 +341,12 @@ func (i *Ingestion) FromFile(ctx context.Context, fPath string, options ...FileO
 			if err := propOpt(&props); err != nil {
 				return err
 			}
+		}
+	}
+
+	if props.Ingestion.Additional.IngestionMappingRef != "" {
+		if err := i.haveMappingRef(ctx, props.Ingestion.Additional.IngestionMappingRef); err != nil {
+			return err
 		}
 	}
 
@@ -354,6 +372,10 @@ const mib = 1024 * 1024
 // https://docs.microsoft.com/en-us/azure/kusto/management/create-ingestion-mapping-command
 // The context object can be used with a timeout or cancel to limit the request time.
 func (i *Ingestion) Stream(ctx context.Context, payload []byte, format DataFormat, mappingName string) error {
+	if err := i.haveMappingRef(ctx, mappingName); err != nil {
+		return err
+	}
+
 	c, err := i.getStreamConn()
 	if err != nil {
 		return err
@@ -404,4 +426,38 @@ func (i *Ingestion) newProp(auth string) properties.All {
 			},
 		},
 	}
+}
+
+func (i *Ingestion) haveMappingRef(ctx context.Context, ref string) error {
+	i.mappingNamesMu.Lock()
+	defer i.mappingNamesMu.Unlock()
+
+	if i.mappingNames[ref] {
+		return nil
+	}
+
+	iter, err := i.client.Mgmt(ctx, i.db, kusto.NewStmt(".show ingestion mappings"))
+	if err != nil {
+		return err
+	}
+	m := map[string]mapEntry{}
+	err = iter.Do(
+		func(row *table.Row) error {
+			mapping := mapEntry{}
+			if err := row.ToStruct(&mapping); err != nil {
+				return errors.ES(errors.OpFileIngest, errors.KInternal, "problem converting .show ingestion mappings to struct: %s", err)
+			}
+			m[mapping.Name] = mapping
+			return nil
+		},
+	)
+	if err != nil {
+		return err
+	}
+	_, ok := m[ref]
+	if !ok {
+		return errors.ES(errors.OpFileIngest, errors.KClientArgs, "could not find a mapping reference for %q", ref)
+	}
+	i.mappingNames[ref] = true
+	return nil
 }

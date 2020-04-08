@@ -106,6 +106,7 @@ const (
 	TXT DataFormat = 11
 )
 
+// dfToExt takes a DataFormat and returns the file extension that it would use.
 func dfToExt(et DataFormat) (string, error) {
 	switch et {
 	case CSV:
@@ -131,7 +132,7 @@ func dfToExt(et DataFormat) (string, error) {
 	case TXT:
 		return "txt", nil
 	default:
-		return "", fmt.Errorf("EncodingType(%v) was no one we understand", et)
+		return "", fmt.Errorf("EncodingType(%d) was no one we understand", et)
 	}
 }
 
@@ -160,7 +161,7 @@ func dfToCamel(et DataFormat) (string, error) {
 	case TXT:
 		return "Txt", nil
 	default:
-		return "", fmt.Errorf("EncodingType(%v) was no one we understand", et)
+		return "", fmt.Errorf("EncodingType(%d) was no one we understand", et)
 	}
 }
 
