@@ -139,6 +139,10 @@ func (lr LogRow) CSVMarshal() []string {
 	}
 }
 
+type queryFunc func(ctx context.Context, db string, query kusto.Stmt, options ...kusto.QueryOption) (*kusto.RowIterator, error)
+
+type mgmtFunc func(ctx context.Context, db string, query kusto.Stmt, options ...kusto.MgmtOption) (*kusto.RowIterator, error)
+
 func TestQueries(t *testing.T) {
 	if skipETOE || testing.Short() {
 		t.Skipf("end to end tests disabled: missing config.json file in etoe directory")
@@ -170,10 +174,9 @@ func TestQueries(t *testing.T) {
 		setup func() error
 		// teardown is a functiont that will be called before the test ends.
 		teardown func() error
-		// call is the type of call to make. Either client.Query() or client.Mgmt().
-		call func(context.Context, string, kusto.Stmt, ...kusto.QueryOption) (*kusto.RowIterator, error)
-		// options is options to pass to the call.
-		options []kusto.QueryOption
+		qcall    queryFunc
+		mcall    mgmtFunc
+		options  interface{} // either []kusto.QueryOption or []kusto.MgmtOption
 		// doer is called from within the function passed to RowIterator.Do(). It allows us to collect the data we receive.
 		doer func(row *table.Row, update interface{}) error
 		// gotInit creates the variable that will be used by doer's update argument.
@@ -192,7 +195,7 @@ func TestQueries(t *testing.T) {
 			setup: func() error {
 				return createAllDataTypesTable(client)
 			},
-			call: client.Query,
+			qcall: client.Query,
 			doer: func(row *table.Row, update interface{}) error {
 				rec := CountResult{}
 				if err := row.ToStruct(&rec); err != nil {
@@ -209,9 +212,9 @@ func TestQueries(t *testing.T) {
 			want: []CountResult{{Count: 1}},
 		},
 		{
-			desc: "Mgmt(regression github.com/Azure/azure-kusto-go/issues/11): make sure we can retrieve .show databases, but we do not check the results at this time",
-			stmt: kusto.NewStmt(`.show databases`),
-			call: client.Mgmt,
+			desc:  "Mgmt(regression github.com/Azure/azure-kusto-go/issues/11): make sure we can retrieve .show databases, but we do not check the results at this time",
+			stmt:  kusto.NewStmt(`.show databases`),
+			mcall: client.Mgmt,
 			doer: func(row *table.Row, update interface{}) error {
 				return nil
 			},
@@ -220,9 +223,9 @@ func TestQueries(t *testing.T) {
 			},
 		},
 		{
-			desc: "Query: Progressive query: make sure we can convert all data types from a row",
-			stmt: kusto.NewStmt("AllDataTypes"),
-			call: client.Query,
+			desc:  "Query: Progressive query: make sure we can convert all data types from a row",
+			stmt:  kusto.NewStmt("AllDataTypes"),
+			qcall: client.Query,
 			doer: func(row *table.Row, update interface{}) error {
 				rec := AllDataType{}
 				if err := row.ToStruct(&rec); err != nil {
@@ -241,7 +244,7 @@ func TestQueries(t *testing.T) {
 		{
 			desc:    "Query: Non-Progressive query: make sure we can convert all data types from a row",
 			stmt:    kusto.NewStmt("AllDataTypes"),
-			call:    client.Query,
+			qcall:   client.Query,
 			options: []kusto.QueryOption{kusto.ResultsProgressiveDisable()},
 			doer: func(row *table.Row, update interface{}) error {
 				rec := AllDataType{}
@@ -265,7 +268,7 @@ func TestQueries(t *testing.T) {
 				_, err := client.Mgmt(ctx, testConfig.Database, dropStmt)
 				return err
 			},
-			call: client.Mgmt,
+			mcall: client.Mgmt,
 			doer: func(row *table.Row, update interface{}) error {
 				rec := principal{}
 				if err := row.ToStruct(&rec); err != nil {
@@ -320,10 +323,23 @@ func TestQueries(t *testing.T) {
 				}()
 			}
 
-			iter, err := test.call(context.Background(), testConfig.Database, test.stmt, test.options...)
-			if err != nil {
-				t.Errorf("TestQueries(%s): had client.Query() error: %s", test.desc, err)
-				return
+			var iter *kusto.RowIterator
+			var err error
+			switch {
+			case test.qcall != nil:
+				var options []kusto.QueryOption
+				if test.options != nil {
+					options = test.options.([]kusto.QueryOption)
+				}
+				iter, err = test.qcall(context.Background(), testConfig.Database, test.stmt, options...)
+			case test.mcall != nil:
+				var options []kusto.MgmtOption
+				if test.options != nil {
+					options = test.options.([]kusto.MgmtOption)
+				}
+				iter, err = test.mcall(context.Background(), testConfig.Database, test.stmt, options...)
+			default:
+				panic("test setup failure")
 			}
 
 			defer iter.Stop()

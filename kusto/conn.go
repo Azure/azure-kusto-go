@@ -89,6 +89,11 @@ type queryMsg struct {
 
 var writeRE = regexp.MustCompile(`(\.set|\.append|\.set-or-append|\.set-or-replace)`)
 
+type connOptions struct {
+	queryOptions *queryOptions
+	mgmtOptions  *mgmtOptions
+}
+
 // query makes a query for the purpose of extracting data from Kusto. Context can be used to set
 // a timeout or cancel the query. Queries cannot take longer than 5 minutes.
 func (c *conn) query(ctx context.Context, db string, query Stmt, options *queryOptions) (execResp, error) {
@@ -100,7 +105,7 @@ func (c *conn) query(ctx context.Context, db string, query Stmt, options *queryO
 }
 
 // mgmt is used to do management queries to Kusto.
-func (c *conn) mgmt(ctx context.Context, db string, query Stmt, options *queryOptions) (execResp, error) {
+func (c *conn) mgmt(ctx context.Context, db string, query Stmt, options *mgmtOptions) (execResp, error) {
 	if writeRE.MatchString(query.String()) {
 		if !options.canWrite {
 			return execResp{}, errors.ES(

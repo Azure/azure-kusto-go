@@ -2,7 +2,6 @@ package kusto
 
 import (
 	"context"
-	"fmt"
 	"net/url"
 	"reflect"
 	"strings"
@@ -20,7 +19,7 @@ import (
 // queryer provides for getting a stream of Kusto frames. Exists to allow fake Kusto streams in tests.
 type queryer interface {
 	query(ctx context.Context, db string, query Stmt, options *queryOptions) (execResp, error)
-	mgmt(ctx context.Context, db string, query Stmt, options *queryOptions) (execResp, error)
+	mgmt(ctx context.Context, db string, query Stmt, options *mgmtOptions) (execResp, error)
 }
 
 // Authorization provides the ADAL authorizer needed to access the resource. You can set Authorizer or
@@ -146,7 +145,12 @@ func New(endpoint string, auth Authorization, options ...Option) (*Client, error
 // QueryOption is an option type for a call to Query().
 type QueryOption func(q *queryOptions) error
 
-// Note: QueryOption these are defined in queryopts.go file
+// Note: QueryOption are defined in queryopts.go file
+
+// MgmtOption is an option type for a call to Mgmt().
+type MgmtOption func(m *mgmtOptions) error
+
+// Note: MgmtOption are defined in queryopts.go file
 
 // Auth returns the Authorization passed to New().
 func (c *Client) Auth() Authorization {
@@ -157,6 +161,14 @@ func (c *Client) Auth() Authorization {
 func (c *Client) Endpoint() string {
 	return c.endpoint
 }
+
+type callType int8
+
+const (
+	unknownCallType = 0
+	queryCall       = 1
+	mgmtCall        = 2
+)
 
 // Query queries Kusto for data. context can set a timeout or cancel the query.
 // query is a injection safe Stmt object. Queries cannot take longer than 5 minutes by default and have row/size limitations.
@@ -171,15 +183,12 @@ func (c *Client) Query(ctx context.Context, db string, query Stmt, options ...Qu
 		return nil, err
 	}
 
-	opts, err := c.setOptions(ctx, errors.OpQuery, query, options...)
+	opts, err := c.setQueryOptions(ctx, errors.OpQuery, query, options...)
 	if err != nil {
 		return nil, err
 	}
-	if len(opts.mgmtOnly) > 0 {
-		return nil, fmt.Errorf("provided a QueryOption(%s()) that can only be used in a Mgmt() call", opts.mgmtOnly[0])
-	}
 
-	conn, err := c.getConn(opts)
+	conn, err := c.getConn(queryCall, connOptions{queryOptions: opts})
 	if err != nil {
 		return nil, err
 	}
@@ -233,7 +242,7 @@ func (c *Client) Query(ctx context.Context, db string, query Stmt, options ...Qu
 // Mgmt accepts a Stmt, but that Stmt cannot have any query parameters attached at this time.
 // Note that the server has a timeout of 10 minutes for a management call by default unless the context deadline is set.
 // There is a maximum of 1 hour.
-func (c *Client) Mgmt(ctx context.Context, db string, query Stmt, options ...QueryOption) (*RowIterator, error) {
+func (c *Client) Mgmt(ctx context.Context, db string, query Stmt, options ...MgmtOption) (*RowIterator, error) {
 	c.mu.Lock()
 	defer c.mu.Unlock()
 
@@ -246,12 +255,12 @@ func (c *Client) Mgmt(ctx context.Context, db string, query Stmt, options ...Que
 		return nil, err
 	}
 
-	opts, err := c.setOptions(ctx, errors.OpMgmt, query, options...)
+	opts, err := c.setMgmtOptions(ctx, errors.OpMgmt, query, options...)
 	if err != nil {
 		return nil, err
 	}
 
-	conn, err := c.getConn(opts)
+	conn, err := c.getConn(mgmtCall, connOptions{mgmtOptions: opts})
 	if err != nil {
 		return nil, err
 	}
@@ -278,7 +287,7 @@ func (c *Client) Mgmt(ctx context.Context, db string, query Stmt, options ...Que
 	return iter, nil
 }
 
-func (c *Client) setOptions(ctx context.Context, op errors.Op, query Stmt, options ...QueryOption) (*queryOptions, error) {
+func (c *Client) setQueryOptions(ctx context.Context, op errors.Op, query Stmt, options ...QueryOption) (*queryOptions, error) {
 	params, err := query.params.toParameters(query.defs)
 	if err != nil {
 		return nil, errors.ES(op, errors.KClientArgs, "QueryValues in the the Stmt were incorrect: %s", err).SetNoRetry()
@@ -289,7 +298,7 @@ func (c *Client) setOptions(ctx context.Context, op errors.Op, query Stmt, optio
 	if ok {
 		options = append(
 			options,
-			serverTimeout(deadline.Sub(nower())),
+			queryServerTimeout(deadline.Sub(nower())),
 		)
 	}
 
@@ -313,12 +322,52 @@ func (c *Client) setOptions(ctx context.Context, op errors.Op, query Stmt, optio
 	return opt, nil
 }
 
-func (c *Client) getConn(options *queryOptions) (queryer, error) {
-	conn := c.conn
-	if options.queryIngestion {
-		delete(options.requestProperties.Options, "results_progressive_enabled")
+func (c *Client) setMgmtOptions(ctx context.Context, op errors.Op, query Stmt, options ...MgmtOption) (*mgmtOptions, error) {
+	params, err := query.params.toParameters(query.defs)
+	if err != nil {
+		return nil, errors.ES(op, errors.KClientArgs, "QueryValues in the the Stmt were incorrect: %s", err).SetNoRetry()
+	}
 
-		if c.ingestConn == nil {
+	// Match our server deadline to our context.Deadline. This should be set from withing kusto.Query() to always have a value.
+	deadline, ok := ctx.Deadline()
+	if ok {
+		options = append(
+			options,
+			mgmtServerTimeout(deadline.Sub(nower())),
+		)
+	}
+
+	opt := &mgmtOptions{
+		requestProperties: &requestProperties{
+			Options:    map[string]interface{}{},
+			Parameters: params,
+		},
+	}
+	if op == errors.OpQuery {
+		// We want progressive frames by default for Query(), but not Mgmt() because it uses v1 framing and ingestion endpoints
+		// do not support it.
+		opt.requestProperties.Options["results_progressive_enabled"] = true
+	}
+
+	for _, o := range options {
+		if err := o(opt); err != nil {
+			return nil, errors.ES(op, errors.KClientArgs, "QueryValues in the the Stmt were incorrect: %s", err).SetNoRetry()
+		}
+	}
+	return opt, nil
+}
+
+func (c *Client) getConn(callType callType, options connOptions) (queryer, error) {
+	switch callType {
+	case queryCall:
+		return c.conn, nil
+	case mgmtCall:
+		delete(options.mgmtOptions.requestProperties.Options, "results_progressive_enabled")
+		if options.mgmtOptions.queryIngestion {
+			if c.ingestConn != nil {
+				return c.ingestConn, nil
+			}
+
 			u, _ := url.Parse(c.endpoint) // Don't care about the error
 			u.Host = "ingest-" + u.Host
 			auth := c.auth
@@ -330,10 +379,13 @@ func (c *Client) getConn(options *queryOptions) (queryer, error) {
 				return nil, err
 			}
 			c.ingestConn = iconn
+
+			return iconn, nil
 		}
-		conn = c.ingestConn
+		return c.conn, nil
+	default:
+		return nil, errors.ES(errors.OpServConn, errors.KInternal, "an unknown calltype was passed to getConn()")
 	}
-	return conn, nil
 }
 
 var nower = time.Now
