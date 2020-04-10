@@ -20,15 +20,6 @@ type requestProperties struct {
 
 type queryOptions struct {
 	requestProperties *requestProperties
-	canWrite          bool
-}
-
-// AllowWrite allows a query that attempts to modify data in a table.
-func AllowWrite() QueryOption {
-	return func(q *queryOptions) error {
-		q.canWrite = true
-		return nil
-	}
 }
 
 // TODO(jdoak/daniel): These really need to be tested.  I didn't find that NoTruncation worked, I had to add the
@@ -62,10 +53,10 @@ func ResultsProgressiveDisable() QueryOption {
 	}
 }
 
-// serverTimeout is the amount of time the server will allow a query to take.
+// queryServerTimeout is the amount of time the server will allow a query to take.
 // NOTE: I have made the serverTimeout private. For the moment, I'm going to use the context.Context timer
 // to set timeouts via this private method.
-func serverTimeout(d time.Duration) QueryOption {
+func queryServerTimeout(d time.Duration) QueryOption {
 	return func(q *queryOptions) error {
 		if d > 1*time.Hour {
 			return errors.ES(errors.OpQuery, errors.KClientArgs, "ServerTimeout option was set to %v, but can't be more than 1 hour", d)
