@@ -40,8 +40,6 @@ type conn struct {
 	endpoint                       string
 	auth                           autorest.Authorizer
 	endMgmt, endQuery, streamQuery *url.URL
-	reqHeaders                     http.Header
-	headersPool                    chan http.Header
 	client                         *http.Client
 }
 
@@ -50,11 +48,6 @@ func newConn(endpoint string, auth Authorization) (*conn, error) {
 	if !validURL.MatchString(endpoint) {
 		return nil, errors.ES(errors.OpServConn, errors.KClientArgs, "endpoint is not valid(%s), should be https://<cluster name>.*", endpoint).SetNoRetry()
 	}
-
-	headers := http.Header{}
-	headers.Add("Accept", "application/json")
-	headers.Add("Accept-Encoding", "gzip,deflate")
-	headers.Add("x-ms-client-version", "Kusto.Go.Client: "+version.Kusto)
 
 	u, err := url.Parse(endpoint)
 	if err != nil {
@@ -66,16 +59,7 @@ func newConn(endpoint string, auth Authorization) (*conn, error) {
 		endMgmt:     &url.URL{Scheme: "https", Host: u.Hostname(), Path: "/v1/rest/mgmt"},
 		endQuery:    &url.URL{Scheme: "https", Host: u.Hostname(), Path: "/v2/rest/query"},
 		streamQuery: &url.URL{Scheme: "https", Host: u.Hostname(), Path: "/v1/rest/ingest/"},
-		reqHeaders:  headers,
-		headersPool: make(chan http.Header, 100),
 		client:      &http.Client{},
-	}
-
-	// Fills a pool of headers to alleviate header copying timing at request time.
-	// These are automatically renewed by spun off goroutines when a header is pulled.
-	// TODO(jdoak): Decide if a sync.Pool would be better. In 1.13 they aren't triggering GC nearly as much.
-	for i := 0; i < 100; i++ {
-		c.headersPool <- copyHeaders(headers)
 	}
 
 	return c, nil
@@ -134,17 +118,19 @@ type execResp struct {
 }
 
 func (c *conn) execute(ctx context.Context, execType int, db string, query Stmt, payload string, properties requestProperties) (execResp, error) {
-	headers := <-c.headersPool
-	go func() {
-		c.headersPool <- copyHeaders(c.reqHeaders)
-	}()
-
 	var op errors.Op
 	if execType == execQuery {
 		op = errors.OpQuery
 	} else if execType == execMgmt {
 		op = errors.OpMgmt
 	}
+
+	header := http.Header{}
+	header.Add("Accept", "application/json")
+	header.Add("Accept-Encoding", "gzip")
+	header.Add("x-ms-client-version", "Kusto.Go.Client: "+version.Kusto)
+	header.Add("Content-Type", "application/json; charset=utf-8")
+	header.Add("x-ms-client-request-id", "KGC.execute;"+uuid.New().String())
 
 	var endpoint *url.URL
 	buff := bufferPool.Get().(*bytes.Buffer)
@@ -153,9 +139,6 @@ func (c *conn) execute(ctx context.Context, execType int, db string, query Stmt,
 
 	switch execType {
 	case execQuery, execMgmt:
-		headers.Add("Content-Type", "application/json; charset=utf-8")
-		headers.Add("x-ms-client-request-id", "KGC.execute;"+uuid.New().String())
-
 		var err error
 		err = json.NewEncoder(buff).Encode(
 			queryMsg{
@@ -179,7 +162,7 @@ func (c *conn) execute(ctx context.Context, execType int, db string, query Stmt,
 	req := &http.Request{
 		Method: http.MethodPost,
 		URL:    endpoint,
-		Header: headers,
+		Header: header,
 		Body:   ioutil.NopCloser(buff),
 	}
 
@@ -227,13 +210,5 @@ func (c *conn) execute(ctx context.Context, execType int, db string, query Stmt,
 
 	frameCh := dec.Decode(ctx, body, op)
 
-	return execResp{reqHeader: headers, respHeader: resp.Header, frameCh: frameCh}, nil
-}
-
-func copyHeaders(header http.Header) http.Header {
-	headers := make(http.Header, len(header))
-	for k, v := range header {
-		headers[k] = v
-	}
-	return headers
+	return execResp{reqHeader: header, respHeader: resp.Header, frameCh: frameCh}, nil
 }
