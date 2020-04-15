@@ -17,6 +17,8 @@ import (
 )
 
 func TestNormalDecode(t *testing.T) {
+	t.Parallel()
+
 	ctx := context.Background()
 
 	jsonStr := `[
@@ -113,7 +115,7 @@ func TestNormalDecode(t *testing.T) {
 				Type: "dynamic",
 			},
 		},
-		Rows: []value.Values{
+		KustoRows: []value.Values{
 			{
 				value.Int{Value: 1, Valid: true},
 				value.String{Value: "Visualization", Valid: true},
@@ -145,7 +147,7 @@ func TestNormalDecode(t *testing.T) {
 				Type: "guid",
 			},
 		},
-		Rows: []value.Values{
+		KustoRows: []value.Values{
 			{
 				value.DateTime{Value: timeMustParse(time.RFC3339Nano, "2019-08-27T04:14:55.302919Z"), Valid: true},
 				value.String{Value: "KPC.execute;752dd747-5f6a-45c6-9ee2-e6662530ecc3", Valid: true},

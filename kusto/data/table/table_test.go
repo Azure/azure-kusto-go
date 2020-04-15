@@ -11,6 +11,8 @@ import (
 )
 
 func TestRowColumns(t *testing.T) {
+	t.Parallel()
+
 	str := ""
 	strPtr := new(string)
 	colPtr := new(Column)
@@ -64,6 +66,8 @@ func TestRowColumns(t *testing.T) {
 }
 
 func TestRowToStruct(t *testing.T) {
+	t.Parallel()
+
 	firstName := new(string)
 	*firstName = "John"
 

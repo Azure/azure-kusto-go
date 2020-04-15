@@ -15,6 +15,8 @@ import (
 )
 
 func TestParse(t *testing.T) {
+	t.Parallel()
+
 	tests := []struct {
 		desc           string
 		url            string
@@ -165,6 +167,8 @@ func FakeAuthContext(rows []value.Values, setErr bool) *FakeMgmt {
 }
 
 func TestAuthContext(t *testing.T) {
+	t.Parallel()
+
 	tests := []struct {
 		desc     string
 		fakeMgmt *FakeMgmt
@@ -270,6 +274,8 @@ func mustParse(s string) *URI {
 }
 
 func TestResources(t *testing.T) {
+	t.Parallel()
+
 	tests := []struct {
 		desc     string
 		fakeMgmt *FakeMgmt

@@ -2,13 +2,23 @@ package v1
 
 import (
 	"context"
-	"encoding/json"
 	"fmt"
 	"io"
+
+	"github.com/Azure/azure-kusto-go/kusto/internal/frames/unmarshal"
+	"github.com/Azure/azure-kusto-go/kusto/internal/frames/unmarshal/json"
 
 	"github.com/Azure/azure-kusto-go/kusto/data/errors"
 	"github.com/Azure/azure-kusto-go/kusto/internal/frames"
 )
+
+// Reference: This is what the top level data structure looks like for a V1 query. However, we are
+// not using it because we want to stream the DataTable(s) back instead of reading all into memory.
+/*
+type DataSet struct {
+	Tables []DataTable
+}
+*/
 
 // Decoder implements frames.Decoder on the REST v1 frames.
 type Decoder struct {
@@ -91,29 +101,32 @@ func (d *Decoder) findStringToken(s string) error {
 }
 
 func (d *Decoder) processTables(ctx context.Context, ch chan frames.Frame) error {
+	rows := unmarshal.GetRows()
+	defer unmarshal.PutRows(rows)
+
 	for d.dec.More() {
 		if ctx.Err() != nil {
 			return ctx.Err()
 		}
 
-		dt := DataTable{Op: d.op}
+		dt := DataTable{Rows: rows, Op: d.op}
 
-		m := frames.Pool.Get().(map[string]interface{})
-		defer func() {
-			select {
-			case frames.PoolCh <- m:
-			default:
-			}
-		}()
-
-		err := d.dec.Decode(&m)
+		err := d.dec.Decode(&dt)
 		if err != nil {
 			return err
 		}
 
-		if err := dt.Unmarshal(m); err != nil {
+		columns, err := dt.DataTypes.ToColumns()
+		if err != nil {
 			return err
 		}
+
+		dt.KustoRows, err = unmarshal.Rows(columns, dt.Rows)
+		if err != nil {
+			return err
+		}
+		dt.Rows = nil
+
 		ch <- dt
 	}
 	return nil

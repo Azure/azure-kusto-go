@@ -48,6 +48,12 @@ import (
 	"github.com/google/uuid"
 )
 
+var (
+	null   = []byte("null")
+	bTrue  = []byte("true")
+	bFalse = []byte("false")
+)
+
 // Kusto represents a Kusto value.
 type Kusto interface {
 	isKustoVal()
@@ -69,27 +75,29 @@ type Bool struct {
 func (Bool) isKustoVal() {}
 
 // String implements fmt.Stringer.
-func (b Bool) String() string {
-	if !b.Valid {
+func (bo Bool) String() string {
+	if !bo.Valid {
 		return ""
 	}
-	if b.Value {
+	if bo.Value {
 		return "true"
 	}
 	return "false"
 }
 
 // Unmarshal unmarshals i into Bool. i must be a bool or nil.
-func (b *Bool) Unmarshal(i interface{}) error {
+func (bo *Bool) Unmarshal(i interface{}) error {
 	if i == nil {
+		bo.Value = false
+		bo.Valid = false
 		return nil
 	}
 	v, ok := i.(bool)
 	if !ok {
 		return fmt.Errorf("Column with type 'bool' had value that was %T", i)
 	}
-	b.Value = v
-	b.Valid = true
+	bo.Value = v
+	bo.Valid = true
 	return nil
 }
 
@@ -122,6 +130,8 @@ func (d DateTime) Marshal() string {
 // Unmarshal unmarshals i into DateTime. i must be a string representing RFC3339Nano or nil.
 func (d *DateTime) Unmarshal(i interface{}) error {
 	if i == nil {
+		d.Value = time.Time{}
+		d.Valid = false
 		return nil
 	}
 
@@ -167,6 +177,8 @@ func (d Dynamic) String() string {
 // Unmarshal unmarshal's i into Dynamic. i must be a map[string]interface{}, string representing JSON or nil.
 func (d *Dynamic) Unmarshal(i interface{}) error {
 	if i == nil {
+		d.Value = nil
+		d.Valid = false
 		return nil
 	}
 	if v, ok := i.(map[string]interface{}); ok {
@@ -210,6 +222,8 @@ func (g GUID) String() string {
 // Unmarshal unmarshals i into GUID. i must be a string representing a GUID or nil.
 func (g *GUID) Unmarshal(i interface{}) error {
 	if i == nil {
+		g.Value = uuid.UUID{}
+		g.Valid = false
 		return nil
 	}
 	str, ok := i.(string)
@@ -246,6 +260,8 @@ func (in Int) String() string {
 // Unmarshal unmarshals i into Int. i must be an int32 or nil.
 func (in *Int) Unmarshal(i interface{}) error {
 	if i == nil {
+		in.Value = 0
+		in.Valid = false
 		return nil
 	}
 
@@ -258,6 +274,11 @@ func (in *Int) Unmarshal(i interface{}) error {
 		if err != nil {
 			return fmt.Errorf("Column with type 'int' had value json.Number that had error on .Int64(): %s", err)
 		}
+	case float64:
+		if v != math.Trunc(v) {
+			return fmt.Errorf("Column with type 'int' had value float64(%v) that did not represent a whole number", v)
+		}
+		myInt = int64(v)
 	case int:
 		myInt = int64(v)
 	default:
@@ -293,6 +314,8 @@ func (l Long) String() string {
 // Unmarshal unmarshals i into Long. i must be an int64 or nil.
 func (l *Long) Unmarshal(i interface{}) error {
 	if i == nil {
+		l.Value = 0
+		l.Valid = false
 		return nil
 	}
 
@@ -306,6 +329,11 @@ func (l *Long) Unmarshal(i interface{}) error {
 			return fmt.Errorf("Column with type 'long' had value json.Number that had error on .Int64(): %s", err)
 		}
 	case int:
+		myInt = int64(v)
+	case float64:
+		if v != math.Trunc(v) {
+			return fmt.Errorf("Column with type 'int' had value float64(%v) that did not represent a whole number", v)
+		}
 		myInt = int64(v)
 	default:
 		return fmt.Errorf("Column with type 'ong' had value that was not a json.Number or int, was %T", i)
@@ -337,6 +365,8 @@ func (r Real) String() string {
 // Unmarshal unmarshals i into Real. i must be a json.Number(that is a float64), float64 or nil.
 func (r *Real) Unmarshal(i interface{}) error {
 	if i == nil {
+		r.Value = 0.0
+		r.Valid = false
 		return nil
 	}
 
@@ -381,6 +411,8 @@ func (s String) String() string {
 // Unmarshal unmarshals i into String. i must be a string or nil.
 func (s *String) Unmarshal(i interface{}) error {
 	if i == nil {
+		s.Value = ""
+		s.Valid = false
 		return nil
 	}
 
@@ -424,6 +456,8 @@ var decRE = regexp.MustCompile(`^\d*\.\d+$`)
 // Unmarshal unmarshals i into Decimal. i must be a string representing a decimal type or nil.
 func (d *Decimal) Unmarshal(i interface{}) error {
 	if i == nil {
+		d.Value = ""
+		d.Valid = false
 		return nil
 	}
 
@@ -559,6 +593,8 @@ func (t *Timespan) Unmarshal(i interface{}) error {
 	)
 
 	if i == nil {
+		t.Value = 0
+		t.Valid = false
 		return nil
 	}
 

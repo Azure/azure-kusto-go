@@ -15,10 +15,10 @@ import (
 // Column describes a column descriptor.
 type Column struct {
 	// Name is the name of the column.
-	Name string
+	Name string `json:"ColumnName"`
 	// Type is the type of value stored in this column. These are described
 	// via constants starting with CT<type>.
-	Type types.Column
+	Type types.Column `json:"ColumnType"`
 }
 
 // Columns is a set of columns.
