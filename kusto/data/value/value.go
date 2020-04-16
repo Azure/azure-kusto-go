@@ -48,12 +48,6 @@ import (
 	"github.com/google/uuid"
 )
 
-var (
-	null   = []byte("null")
-	bTrue  = []byte("true")
-	bFalse = []byte("false")
-)
-
 // Kusto represents a Kusto value.
 type Kusto interface {
 	isKustoVal()
