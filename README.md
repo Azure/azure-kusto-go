@@ -3,6 +3,7 @@
 - [About Azure Data Explorer](https://azure.microsoft.com/en-us/services/data-explorer/)
 - [Go Client documentation](https://godoc.org/github.com/Azure/azure-kusto-go) (Not available until public release, must use a local godoc server)
 
+This is a data plane SDK (it is for interacting with Azure Data Explorer service). For the control plane (resource administration), go to: https://github.com/Azure/azure-sdk-for-go/tree/master/services/kusto/mgmt
 
 ## Install
 
