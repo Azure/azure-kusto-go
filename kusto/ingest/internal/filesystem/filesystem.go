@@ -6,6 +6,7 @@ import (
 	"context"
 	"fmt"
 	"io"
+	"io/ioutil"
 	"math/rand"
 	"net/url"
 	"os"
@@ -18,9 +19,22 @@ import (
 	"github.com/Azure/azure-kusto-go/kusto/ingest/internal/gzip"
 	"github.com/Azure/azure-kusto-go/kusto/ingest/internal/properties"
 	"github.com/Azure/azure-kusto-go/kusto/ingest/internal/resources"
+	"github.com/google/uuid"
 
 	"github.com/Azure/azure-storage-blob-go/azblob"
 	"github.com/Azure/azure-storage-queue-go/azqueue"
+)
+
+const (
+	_1MiB = 1024 * 1024
+
+	// The numbers below are magic numbers. They were derived from doing Azure to Azure tests of azcopy for various file sizes
+	// to prove that changes weren't going to make azcopy slower. It was found that multipying azcopy's concurrency by 10x (to 50)
+	// made a 5x improvement in speed. We don't have any numbers from the service side to give us numbers we should use, so this
+	// is our best guess from observation. DO NOT CHANGE UNLESS YOU KNOW BETTER.
+
+	blockSize   = 8 * _1MiB
+	concurrency = 50
 )
 
 // uploadBlobStream provides a type that mimics azblob.UploadStreamToBlockBlob to allow fakes for testing.
@@ -86,6 +100,53 @@ func (i *Ingestion) Local(ctx context.Context, from string, props properties.All
 		if err := os.Remove(from); err != nil {
 			return errors.ES(errors.OpFileIngest, errors.KLocalFileSystem, "file was uploaded successfully, but we could not delete the local file: %s", err)
 		}
+	}
+
+	return nil
+}
+
+// Reader uploads a file via an io.Reader.
+func (i *Ingestion) Reader(ctx context.Context, reader io.Reader, props properties.All) error {
+	to, err := i.upstreamContainer()
+	if err != nil {
+		return err
+	}
+
+	resources, err := i.mgr.Resources()
+	if err != nil {
+		return err
+	}
+
+	// We want to check the queue size here so so we don't upload a file and then find we don't have a Kusto queue to stick
+	// it in. If we don't have a container, that is handled by containerQueue().
+	if len(resources.Queues) == 0 {
+		return errors.ES(errors.OpFileIngest, errors.KBlobstore, "no Kusto queue resources are defined, there is no queue to upload to").SetNoRetry()
+	}
+
+	blobName := fmt.Sprintf("%s_%s_%s_%s.gz", filepath.Base(uuid.New().String()), nower(), i.db, i.table)
+
+	// Here's how to upload a blob.
+	blobURL := to.NewBlockBlobURL(blobName)
+
+	gstream := gzip.New()
+	gstream.Reset(ioutil.NopCloser(reader))
+
+	_, err = i.uploadBlobStream(
+		ctx,
+		gstream,
+		blobURL,
+		azblob.UploadStreamToBlockBlobOptions{BufferSize: blockSize, MaxBuffers: concurrency},
+	)
+
+	if err != nil {
+		return errors.ES(errors.OpFileIngest, errors.KBlobstore, "problem uploading to Blob Storage: %s", err)
+	}
+
+	// We always want to delete the blob we create when we ingest from a local file.
+	props.Ingestion.RetainBlobOnSuccess = false
+
+	if err := i.Blob(ctx, blobURL.String(), gstream.Size(), props); err != nil {
+		return err
 	}
 
 	return nil
@@ -181,18 +242,6 @@ var nower = time.Now
 // localToBlob copies from a local to to an Azure Blobstore blob. It returns the URL of the Blob, the local file info and an
 // error if there was one.
 func (i *Ingestion) localToBlob(ctx context.Context, from string, to azblob.ContainerURL, props *properties.All) (azblob.BlockBlobURL, int64, error) {
-	const (
-		_1MiB = 1024 * 1024
-
-		// The numbers below are magic numbers. They were derived from doing Azure to Azure tests of azcopy for various file sizes
-		// to prove that changes weren't going to make azcopy slower. It was found that multipying azcopy's concurrency by 10x (to 50)
-		// made a 5x improvement in speed. We don't have any numbers from the service side to give us numbers we should use, so this
-		// is our best guess from observation. DO NOT CHANGE UNLESS YOU KNOW BETTER.		
-
-		blockSize   = 8 * _1MiB
-		concurrency = 50
-	)
-
 	compression := CompressionDiscovery(from)
 	blobName := fmt.Sprintf("%s_%s_%s_%s", filepath.Base(from), nower(), i.db, i.table)
 	if compression == properties.CTNone {
@@ -234,7 +283,7 @@ func (i *Ingestion) localToBlob(ctx context.Context, from string, to azblob.Cont
 		if err != nil {
 			return azblob.BlockBlobURL{}, 0, errors.ES(errors.OpFileIngest, errors.KBlobstore, "problem uploading to Blob Storage: %s", err)
 		}
-		return blobURL, 10, nil
+		return blobURL, gstream.Size(), nil
 	}
 
 	// The high-level API UploadFileToBlockBlob function uploads blocks in parallel for optimal performance, and can handle large files as well.
