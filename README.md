@@ -116,7 +116,8 @@ Kusto's ingestion service makes no guarantees on when the data will show up in t
 large chunks of data and not small uploads at a high rate.
 
 If ingesting data from memory, it is suggested that you stream the data in via FromReader() passing in the reader
-from an io.Pipe().  The data will not be begin ingestion until the writer closes.
+from an io.Pipe(). The data will not begin ingestion until the writer closes.
+
 
 #### Setup an ingestion client
 
