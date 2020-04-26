@@ -8,7 +8,7 @@ Create a client
 
 Creating a client simply requires a *kusto.Client, the name of the database and the name of the table to be ingested into.
 
-	in, err := kusto.New(kustoClient, "database", "table")
+	in, err := ingest.New(kustoClient, "database", "table")
 	if err != nil {
 		panic("add error handling")
 	}
@@ -35,6 +35,30 @@ This package will also accept ingestion from an Azure Blob Storage file:
 	}
 
 This will ingest a file from Azure Blob Storage. We only support https:// paths and your domain name may differ than what is here.
+
+Ingestion from an io.Reader
+
+Sometimes you want to ingest a stream of data that you have in memory without writing to disk.  You can do this simply by chunking the
+data via an io.Reader.
+
+	r, w := io.Pipe()
+
+	enc := json.NewEncoder(w)
+	go func() {
+		defer w.Close()
+		for _, data := range dataSet {
+			if err := enc.Encode(data); err != nil {
+				panic("add error handling")
+			}
+		}
+	}()
+
+	if err := in.FromReader(ctx, r); err != nil {
+		panic("add error handling")
+	}
+
+It is important to remember that FromReader() will terminate when it receives an io.EOF from the io.Reader.  Use io.Readers that won't
+return io.EOF until the io.Writer is closed (such as io.Pipe).
 
 Ingestion from a Stream
 
