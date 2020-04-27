@@ -80,7 +80,7 @@ func (d *Decoder) nextDelimEquals(r rune) error {
 	return nil
 }
 
-// findStringToken looks within the current delimeter for a string token.
+// findStringToken looks within the current delimiter for a string token.
 func (d *Decoder) findStringToken(s string) error {
 	for {
 		if !d.dec.More() {
