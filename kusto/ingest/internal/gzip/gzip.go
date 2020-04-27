@@ -71,7 +71,7 @@ func (s *Streamer) Read(b []byte) (int, error) {
 	return amount, err
 }
 
-// Close implements io.Closer, but is a no-op.
+// Close implements io.Closer.
 func (s *Streamer) Close() error {
 	return s.outputRead.Close()
 }

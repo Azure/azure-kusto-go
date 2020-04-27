@@ -5,6 +5,7 @@ import (
 	"compress/gzip"
 	"context"
 	"encoding/json"
+	"fmt"
 	"io"
 	"net/url"
 	"sync"
@@ -94,6 +95,9 @@ func New(client *kusto.Client, db, table string) (*Ingestion, error) {
 
 // FileOption is an optional argument to FromFile().
 type FileOption interface {
+	// TODO(jdoak, daniel): We need to refactor this into options that can work for FileOption and work
+	// for ReaderOption(which doesn't exist yet).  Right now we are doing some checks in FromReader() to
+	// make sure that the user doesn't pass options we don't like.  But it would be better to have the compiler do this.
 	isFileOption()
 }
 
@@ -357,6 +361,46 @@ func (i *Ingestion) FromFile(ctx context.Context, fPath string, options ...FileO
 	}
 
 	return i.fs.Local(ctx, fPath, props)
+}
+
+// FromReader allows uploading a data file for Kusto from an io.Reader. The content is uploaded to Blobstore and
+// ingested after all data in the reader is processed. Content should not use compression as the content will be
+// compressed with gzip. This method is thread-safe.
+func (i *Ingestion) FromReader(ctx context.Context, reader io.Reader, options ...FileOption) error {
+	manager, err := getManager(i.client)
+	if err != nil {
+		return err
+	}
+
+	auth, err := manager.AuthContext(ctx)
+	if err != nil {
+		return err
+	}
+
+	props := i.newProp(auth)
+	for _, o := range options {
+		if propOpt, ok := o.(propertyOption); ok {
+			if err := propOpt(&props); err != nil {
+				return err
+			}
+		}
+	}
+
+	if props.Ingestion.Additional.Format == DFUnknown {
+		return fmt.Errorf("must provide option FileFormat() when using FromReader()")
+	}
+
+	if props.Source.DeleteLocalSource {
+		return fmt.Errorf("cannot use DeleteLocalSource() with FromReader()")
+	}
+
+	if props.Ingestion.Additional.IngestionMappingRef != "" {
+		if err := i.haveMappingRef(ctx, props.Ingestion.Additional.IngestionMappingRef); err != nil {
+			return err
+		}
+	}
+
+	return i.fs.Reader(ctx, reader, props)
 }
 
 var (
