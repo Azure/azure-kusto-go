@@ -12,7 +12,7 @@ import (
 	"github.com/Azure/azure-kusto-go/kusto/internal/frames/unmarshal/json"
 )
 
-// Decoder impolements frames.Decoder on the REST v2 frames.
+// Decoder implements frames.Decoder on the REST v2 frames.
 type Decoder struct {
 	columns table.Columns
 	dec     *json.Decoder
@@ -172,7 +172,7 @@ var (
 
 // getFrameType looks through a raw frame to extract the type of frame. This allows us to decode the frame
 // without decoding to a map first.
-// Note: This is a fast implemenation that is benchmarked, as it is on the hot path. But it is not the
+// Note: This is a fast implementation that is benchmarked, as it is on the hot path. But it is not the
 // most robust. If we get problems, we can uncomment var frameTypeRE and the code below to do this. It takes
 // 5x as long, but in the scheme it won't matter.
 func getFrameType(message json.RawMessage) ([]byte, error) {

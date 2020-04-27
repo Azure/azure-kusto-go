@@ -5,10 +5,12 @@ import (
 	"compress/gzip"
 	"context"
 	"encoding/json"
+	"fmt"
 	"io"
 	"net/url"
 	"sync"
 	"sync/atomic"
+	"time"
 
 	"github.com/Azure/azure-kusto-go/kusto"
 	"github.com/Azure/azure-kusto-go/kusto/data/errors"
@@ -60,10 +62,11 @@ type Ingestion struct {
 	connMu     sync.Mutex
 	streamConn *conn.Conn
 
-	// mappingNamesMu protects mappingNames.
-	mappingNamesMu sync.Mutex
-	// mappingNames stores mapping names that have been used and we have seen on the server.
-	mappingNames map[string]bool
+	// mappingMu protects mappingNames.
+	mappingsMu sync.Mutex
+	// mappings stores mappings on the server.
+	mappings          map[string]mapEntry
+	lastMappingLookup time.Time
 }
 
 // New is the constructor for Ingestion.
@@ -79,12 +82,12 @@ func New(client *kusto.Client, db, table string) (*Ingestion, error) {
 	}
 
 	i := &Ingestion{
-		client:       client,
-		mgr:          mgr,
-		db:           db,
-		table:        table,
-		fs:           fs,
-		mappingNames: map[string]bool{},
+		client:   client,
+		mgr:      mgr,
+		db:       db,
+		table:    table,
+		fs:       fs,
+		mappings: map[string]mapEntry{},
 	}
 
 	return i, nil
@@ -92,6 +95,9 @@ func New(client *kusto.Client, db, table string) (*Ingestion, error) {
 
 // FileOption is an optional argument to FromFile().
 type FileOption interface {
+	// TODO(jdoak, daniel): We need to refactor this into options that can work for FileOption and work
+	// for ReaderOption(which doesn't exist yet).  Right now we are doing some checks in FromReader() to
+	// make sure that the user doesn't pass options we don't like.  But it would be better to have the compiler do this.
 	isFileOption()
 }
 
@@ -357,6 +363,46 @@ func (i *Ingestion) FromFile(ctx context.Context, fPath string, options ...FileO
 	return i.fs.Local(ctx, fPath, props)
 }
 
+// FromReader allows uploading a data file for Kusto from an io.Reader. The content is uploaded to Blobstore and
+// ingested after all data in the reader is processed. Content should not use compression as the content will be
+// compressed with gzip. This method is thread-safe.
+func (i *Ingestion) FromReader(ctx context.Context, reader io.Reader, options ...FileOption) error {
+	manager, err := getManager(i.client)
+	if err != nil {
+		return err
+	}
+
+	auth, err := manager.AuthContext(ctx)
+	if err != nil {
+		return err
+	}
+
+	props := i.newProp(auth)
+	for _, o := range options {
+		if propOpt, ok := o.(propertyOption); ok {
+			if err := propOpt(&props); err != nil {
+				return err
+			}
+		}
+	}
+
+	if props.Ingestion.Additional.Format == DFUnknown {
+		return fmt.Errorf("must provide option FileFormat() when using FromReader()")
+	}
+
+	if props.Source.DeleteLocalSource {
+		return fmt.Errorf("cannot use DeleteLocalSource() with FromReader()")
+	}
+
+	if props.Ingestion.Additional.IngestionMappingRef != "" {
+		if err := i.haveMappingRef(ctx, props.Ingestion.Additional.IngestionMappingRef); err != nil {
+			return err
+		}
+	}
+
+	return i.fs.Reader(ctx, reader, props)
+}
+
 var (
 	// ErrTooLarge indicates that the data being passed to a StreamBlock is larger than the maximum StreamBlock size of 4MiB.
 	ErrTooLarge = errors.ES(errors.OpIngestStream, errors.KClientArgs, "cannot add data larger than 4MiB")
@@ -428,12 +474,17 @@ func (i *Ingestion) newProp(auth string) properties.All {
 	}
 }
 
-func (i *Ingestion) haveMappingRef(ctx context.Context, ref string) error {
-	i.mappingNamesMu.Lock()
-	defer i.mappingNamesMu.Unlock()
+var mapCacheDur = 5 * time.Minute
 
-	if i.mappingNames[ref] {
-		return nil
+func (i *Ingestion) haveMappingRef(ctx context.Context, ref string) error {
+	i.mappingsMu.Lock()
+	defer i.mappingsMu.Unlock()
+
+	if time.Now().Sub(i.lastMappingLookup) < mapCacheDur {
+		if _, ok := i.mappings[ref]; ok {
+			return nil
+		}
+		return errors.ES(errors.OpFileIngest, errors.KClientArgs, "could not find a mapping reference for %q", ref)
 	}
 
 	iter, err := i.client.Mgmt(ctx, i.db, kusto.NewStmt(".show ingestion mappings"))
@@ -458,6 +509,6 @@ func (i *Ingestion) haveMappingRef(ctx context.Context, ref string) error {
 	if !ok {
 		return errors.ES(errors.OpFileIngest, errors.KClientArgs, "could not find a mapping reference for %q", ref)
 	}
-	i.mappingNames[ref] = true
+	i.mappings = m
 	return nil
 }

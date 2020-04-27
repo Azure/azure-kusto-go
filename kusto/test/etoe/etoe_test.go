@@ -555,6 +555,188 @@ func TestFileIngestion(t *testing.T) {
 	}
 }
 
+func TestReaderIngestion(t *testing.T) {
+	if skipETOE || testing.Short() {
+		t.SkipNow()
+	}
+
+	ctx, cancel := context.WithCancel(context.Background())
+	defer cancel()
+
+	client, err := kusto.New(testConfig.Endpoint, authorizer)
+	if err != nil {
+		panic(err)
+	}
+
+	ingestor, err := ingest.New(client, testConfig.Database, "Logs")
+	if err != nil {
+		panic(err)
+	}
+
+	mockRows := createMockLogRows()
+
+	tests := []struct {
+		// desc describes the test.
+		desc string
+		// src represents where we are getting our data.
+		src string
+		// options are options used on ingesting.
+		options []ingest.FileOption
+		// stmt is used to query for the results.
+		stmt kusto.Stmt
+		// setup is a function that will be called before the test runs.
+		setup func() error
+		// teardown is a function that will be called before the test ends.
+		teardown func() error
+		// doer is called from within the function passed to RowIterator.Do(). It allows us to collect the data we receive.
+		doer func(row *table.Row, update interface{}) error
+		// gotInit creates the variable that will be used by doer's update argument.
+		gotInit func() interface{}
+		// want is the data we want to receive from the query.
+		want interface{}
+		// wantErr indicates that we want the ingestion to fail before the query.
+		wantErr bool
+		// compare allows the test to have a custom compare operation. If nil, the data from doer's update argument is
+		// compared against want using pretty.Compare().
+		compare func(got, want interface{}) error
+	}{
+		{
+			desc:    "Ingest from blob with bad existing mapping",
+			src:     "testdata/demo.json",
+			options: []ingest.FileOption{ingest.IngestionMappingRef("Logs_bad_mapping", ingest.JSON)},
+			wantErr: true,
+		},
+		{
+			desc: "Ingest with existing mapping",
+			src:  "testdata/demo.json",
+			options: []ingest.FileOption{
+				ingest.FileFormat(ingest.JSON),
+				ingest.IngestionMappingRef("Logs_mapping", ingest.JSON),
+			},
+			stmt: pCountStmt.MustParameters(
+				kusto.NewParameters().Must(
+					kusto.QueryValues{"tableName": "Logs"},
+				),
+			),
+			setup: func() error { return createIngestionTable(client) },
+			doer: func(row *table.Row, update interface{}) error {
+				rec := CountResult{}
+				if err := row.ToStruct(&rec); err != nil {
+					return err
+				}
+				recs := update.(*[]CountResult)
+				*recs = append(*recs, rec)
+				return nil
+			},
+			gotInit: func() interface{} {
+				v := []CountResult{}
+				return &v
+			},
+			want: []CountResult{{Count: 500}},
+		},
+		{
+			desc: "Ingest with inline mapping",
+			src:  "testdata/demo.json",
+			options: []ingest.FileOption{
+				ingest.FileFormat(ingest.JSON),
+				ingest.IngestionMapping(
+					"[{\"column\":\"header_time\",\"datatype\":\"datetime\",\"Properties\":{\"path\":\"$.header.time\"}},{\"column\":\"header_id\",\"datatype\":\"guid\",\"Properties\":{\"path\":\"$.header.id\"}},{\"column\":\"header_api_version\",\"Properties\":{\"path\":\"$.header.api_version\"},\"datatype\":\"string\"},{\"column\":\"payload_data\",\"datatype\":\"string\",\"Properties\":{\"path\":\"$.payload.data\"}},{\"column\":\"payload_user\",\"datatype\":\"string\",\"Properties\":{\"path\":\"$.payload.user\"}}]",
+					ingest.JSON,
+				),
+			},
+			stmt: pCountStmt.MustParameters(
+				kusto.NewParameters().Must(
+					kusto.QueryValues{"tableName": "Logs"},
+				),
+			),
+			doer: func(row *table.Row, update interface{}) error {
+				rec := CountResult{}
+				if err := row.ToStruct(&rec); err != nil {
+					return err
+				}
+				recs := update.(*[]CountResult)
+				*recs = append(*recs, rec)
+				return nil
+			},
+			gotInit: func() interface{} {
+				v := []CountResult{}
+				return &v
+			},
+			want: []CountResult{{Count: 1000}}, // The count is the last ingestion + this one (500).
+		},
+		{
+			desc: "Ingestion from mock data",
+			src:  createCsvFileFromData(mockRows),
+			options: []ingest.FileOption{
+				ingest.FileFormat(ingest.CSV),
+			},
+			stmt:  kusto.NewStmt("Logs | order by header_api_version asc"),
+			setup: func() error { return createIngestionTable(client) },
+			doer: func(row *table.Row, update interface{}) error {
+				rec := LogRow{}
+				if err := row.ToStruct(&rec); err != nil {
+					return err
+				}
+				recs := update.(*[]LogRow)
+				*recs = append(*recs, rec)
+				return nil
+			},
+			gotInit: func() interface{} {
+				v := []LogRow{}
+				return &v
+			},
+			want: mockRows,
+		},
+	}
+
+	for _, test := range tests {
+		func() {
+			if test.setup != nil {
+				if err := test.setup(); err != nil {
+					panic(err)
+				}
+			}
+			if test.teardown != nil {
+				defer func() {
+					if err := test.teardown(); err != nil {
+						panic(err)
+					}
+				}()
+			}
+
+			test.options = append(test.options, ingest.FlushImmediately())
+
+			f, err := os.Open(test.src)
+			if err != nil {
+				panic(err)
+			}
+
+			// We could do this other ways that are simplier for testing, but this mimics what the user will likely do.
+			reader, writer := io.Pipe()
+			go func() {
+				defer writer.Close()
+				io.Copy(writer, f)
+			}()
+
+			err = ingestor.FromReader(ctx, reader, test.options...)
+			switch {
+			case err == nil && test.wantErr:
+				t.Errorf("TestReaderIngestion(%s): ingestor.FromFile(): got err == nil, want err != nil", test.desc)
+				return
+			case err != nil && !test.wantErr:
+				t.Errorf("TestReaderIngestion(%s): ingestor.FromFile(): got err == %s, want err == nil", test.desc, err)
+				return
+			case err != nil:
+				return
+			}
+
+			if err := waitForIngest(ctx, client, test.stmt, test.compare, test.doer, test.want, test.gotInit); err != nil {
+				t.Errorf("TestReaderIngestion(%s): %s", test.desc, err)
+			}
+		}()
+	}
+}
+
 func TestStreamingIngestion(t *testing.T) {
 	t.Parallel()
 	if skipETOE || testing.Short() {

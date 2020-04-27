@@ -10,7 +10,7 @@ So we decode into a json.RawMessage, extract the frametype from the message, and
 
 Wrong, because json.RawMessage makes a copy of the bytes that were sent in.  That costs us a huge amount in allocation per frame on 100's of thousands or millions of frames.
 
-Next, for some reason which I can't explain, Go translates numbers in a json.Unmarshal() call into float64 if the target is an interface{}.  I'm sure this is a good reason for it, I just don't understand it.  I would think it would just be an int64 or float64.  Or, because they made it, a json.Number.  The decoder itself can translate to json.Number, if you enable it.  But not Unmarshal.
+Next, for some reason which I can't explain, Go translates numbers in a json.Unmarshal() call into float64 if the target is an interface{}.  I'm sure there is a good reason for it, I just don't understand it.  I would think it would just be an int64 or float64.  Or, because they made it, a json.Number.  The decoder itself can translate to json.Number, if you enable it.  But not Unmarshal.
 
 Because we need to unmarshal to a [][]interface{} so we can translate to a []value.Values(also an interface) that represent rows in a frame, the unmarshal call couldn't hold all numbers we support in a float64.  So Unmarshal was changed to always unmarshal into a json.Number.
 

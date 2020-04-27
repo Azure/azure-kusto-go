@@ -1,20 +1,18 @@
-# Microsoft Azure Data Explorer (Kusto) [![GoDoc](https://godoc.org/github.com/Azure/azure-kusto-go?status.svg)](https://godoc.org/github.com/Azure/azure-kusto-go)
+# Microsoft Azure Data Explorer Public Preview (Kusto) [![GoDoc](https://godoc.org/github.com/Azure/azure-kusto-go?status.svg)](https://godoc.org/github.com/Azure/azure-kusto-go)
 
 - [About Azure Data Explorer](https://azure.microsoft.com/en-us/services/data-explorer/)
-- [Go Client documentation](https://godoc.org/github.com/Azure/azure-kusto-go) (Not available until public release, must use a local godoc server)
+- [Go Client documentation](https://godoc.org/github.com/Azure/azure-kusto-go)
 
-This is a data plane SDK (it is for interacting with Azure Data Explorer service). For the control plane (resource administration), go to: https://github.com/Azure/azure-sdk-for-go/tree/master/services/kusto/mgmt
+This is a data plane SDK (it is for interacting with Azure Data Explorer service). For the control plane (resource administration), go [here](https://github.com/Azure/azure-sdk-for-go/tree/master/services/kusto/mgmt)
 
 ## Install
 
 * `go get github.com/Azure/azure-kusto-go/kusto`
 
-While in private preview, this will require authenication.  Please see this [Go FAQ](https://golang.org/doc/faq#git_https)
-
 
 ## Minimum Requirements
 
-* go version go1.13
+* go version 1.13
 
 ## Examples
 
@@ -114,6 +112,24 @@ some prerequisite knowledge of acceptable data formats, mapping references, ...
 
 That documentation can be found [here](https://docs.microsoft.com/en-us/azure/kusto/management/data-ingestion/)
 
+Kusto's ingestion service makes no guarantees on when the data will show up in the table and is optimized for
+large chunks of data and not small uploads at a high rate.
+
+If ingesting data from memory, it is suggested that you stream the data in via FromReader() passing in the reader
+from an io.Pipe(). The data will not begin ingestion until the writer closes.
+
+
+#### Setup an ingestion client
+
+Setup is quite simple, simply pass a *kusto.Client, the name of the database and table you wish to ingest into.
+
+```go
+in, err := ingest.New(kustoClient, "database", "table")
+if err != nil {
+	panic("add error handling")
+}
+```
+
 #### From a File
 
 Ingesting a local file requires simply passing the path to the file to be ingested:
@@ -138,6 +154,32 @@ if err := in.FromFile(ctx, "https://myaccount.blob.core.windows.net/$root/myblob
 ```
 
 This will ingest a file from Azure Blob Storage. We only support https:// paths and your domain name may differ than what is here.
+
+#### Ingestion from an io.Reader
+
+Sometimes you want to ingest a stream of data that you have in memory without writing to disk.  You can do this simply by chunking the
+data via an io.Reader.
+
+```go
+r, w := io.Pipe()
+
+enc := json.NewEncoder(w)
+go func() {
+	defer w.Close()
+	for _, data := range dataSet {
+		if err := enc.Encode(data); err != nil {
+			panic("add error handling")
+		}
+	}
+}()
+
+if err := in.FromReader(ctx, r); err != nil {
+	panic("add error handling")
+}
+```
+
+It is important to remember that FromReader() will terminate when it receives an io.EOF from the io.Reader.  Use io.Readers that won't
+return io.EOF until the io.Writer is closed (such as io.Pipe).
 
 #### From a Stream
 
