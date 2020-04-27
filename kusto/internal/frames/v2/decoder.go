@@ -12,7 +12,7 @@ import (
 	"github.com/Azure/azure-kusto-go/kusto/internal/frames/unmarshal/json"
 )
 
-// Decoder impolements frames.Decoder on the REST v2 frames.
+// Decoder implements frames.Decoder on the REST v2 frames.
 type Decoder struct {
 	columns table.Columns
 	dec     *json.Decoder
