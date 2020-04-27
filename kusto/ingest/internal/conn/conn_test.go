@@ -79,6 +79,8 @@ type fakeContent struct {
 }
 
 func TestStream(t *testing.T) {
+	t.Parallel()
+
 	tests := []struct {
 		desc        string
 		payload     fakeContent

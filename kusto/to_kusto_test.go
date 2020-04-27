@@ -15,6 +15,8 @@ import (
 )
 
 func TestStructToKustoValues(t *testing.T) {
+	t.Parallel()
+
 	type testStruct struct {
 		MyInt  int32 `kusto:"Int"`
 		String string
@@ -114,6 +116,8 @@ func TestStructToKustoValues(t *testing.T) {
 }
 
 func TestDefaultRow(t *testing.T) {
+	t.Parallel()
+
 	columns := table.Columns{
 		table.Column{Type: types.Bool},
 		table.Column{Type: types.DateTime},
@@ -150,6 +154,8 @@ func TestDefaultRow(t *testing.T) {
 }
 
 func TestColToValueCheck(t *testing.T) {
+	t.Parallel()
+
 	matchers := []struct {
 		column table.Column
 		kt     value.Kusto
@@ -184,6 +190,8 @@ func TestColToValueCheck(t *testing.T) {
 }
 
 func TestConvertBool(t *testing.T) {
+	t.Parallel()
+
 	var (
 		val = true
 		ptr = new(bool)
@@ -255,6 +263,8 @@ func TestConvertDateTime(t *testing.T) {
 }
 
 func TestConvertTimespan(t *testing.T) {
+	t.Parallel()
+
 	var (
 		val = 1 * time.Second
 		ptr = new(time.Duration)
@@ -295,6 +305,8 @@ type SampleDynamic struct {
 }
 
 func TestConvertDynamic(t *testing.T) {
+	t.Parallel()
+
 	v := SampleDynamic{"John", "Doak"}
 	j, err := json.Marshal(v)
 	if err != nil {
@@ -335,6 +347,8 @@ func TestConvertDynamic(t *testing.T) {
 }
 
 func TestConvertGUID(t *testing.T) {
+	t.Parallel()
+
 	u := uuid.New()
 	var (
 		val = u
@@ -371,6 +385,8 @@ func TestConvertGUID(t *testing.T) {
 }
 
 func TestConvertInt(t *testing.T) {
+	t.Parallel()
+
 	var (
 		val = int32(1)
 		ptr = new(int32)
@@ -406,6 +422,8 @@ func TestConvertInt(t *testing.T) {
 }
 
 func TestConvertLong(t *testing.T) {
+	t.Parallel()
+
 	var (
 		val = int64(1)
 		ptr = new(int64)
@@ -441,6 +459,8 @@ func TestConvertLong(t *testing.T) {
 }
 
 func TestConvertReal(t *testing.T) {
+	t.Parallel()
+
 	var (
 		val = float64(1.0)
 		ptr = new(float64)
@@ -476,6 +496,8 @@ func TestConvertReal(t *testing.T) {
 }
 
 func TestConvertString(t *testing.T) {
+	t.Parallel()
+
 	var (
 		val = string("hello")
 		ptr = new(string)
@@ -511,6 +533,8 @@ func TestConvertString(t *testing.T) {
 }
 
 func TestConvertDecimal(t *testing.T) {
+	t.Parallel()
+
 	var (
 		val = string("1.3333333333")
 		ptr = new(string)

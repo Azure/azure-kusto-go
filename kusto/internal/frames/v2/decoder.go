@@ -1,21 +1,24 @@
 package v2
 
 import (
+	"bytes"
 	"context"
-	"encoding/json"
 	"fmt"
 	"io"
 
-	"github.com/Azure/azure-kusto-go/kusto/data/table"
 	"github.com/Azure/azure-kusto-go/kusto/data/errors"
+	"github.com/Azure/azure-kusto-go/kusto/data/table"
 	"github.com/Azure/azure-kusto-go/kusto/internal/frames"
+	"github.com/Azure/azure-kusto-go/kusto/internal/frames/unmarshal/json"
 )
 
-// Decoder impolements frames.Decoder on the REST v2 frames.
+// Decoder implements frames.Decoder on the REST v2 frames.
 type Decoder struct {
 	columns table.Columns
 	dec     *json.Decoder
 	op      errors.Op
+
+	frameRaw json.RawMessage
 }
 
 // Decode implements frames.Decoder.Decode(). This is not thread safe.
@@ -55,6 +58,13 @@ func (d *Decoder) Decode(ctx context.Context, r io.ReadCloser, op errors.Op) cha
 
 		// Start decoding the rest of the frames.
 		d.decodeFrames(ctx, ch)
+
+		// Expect to recieve the end of our JSON list of frames, marked by the ']' delimiter.
+		t, err = d.dec.Token()
+		if err != nil {
+			frames.Errorf(ctx, ch, err.Error())
+			return
+		}
 	}()
 
 	return ch
@@ -70,90 +80,77 @@ func (d *Decoder) dataSetHeader(ctx context.Context) (DataSetHeader, error) {
 // decodeFrames is used to decode incoming frames after the DataSetHeader has been received.
 func (d *Decoder) decodeFrames(ctx context.Context, ch chan frames.Frame) {
 	for d.dec.More() {
-		if err := d.decodetoMap(ctx, ch); err != nil {
+		if err := d.decode(ctx, ch); err != nil {
 			frames.Errorf(ctx, ch, err.Error())
 			return
 		}
 	}
-
-	// Expect to recieve the end of our JSON list of frames, marked by the ']' delimiter.
-	t, err := d.dec.Token()
-	if err != nil {
-		frames.Errorf(ctx, ch, err.Error())
-		return
-	}
-
-	if t != json.Delim(']') {
-		frames.Errorf(ctx, ch, "Expected ']' delimiter")
-		return
-	}
 }
 
-func (d *Decoder) decodetoMap(ctx context.Context, ch chan frames.Frame) error {
+var (
+	ftDataTable         = []byte(frames.TypeDataTable)
+	ftDataSetCompletion = []byte(frames.TypeDataSetCompletion)
+	ftTableHeader       = []byte(frames.TypeTableHeader)
+	ftTableFragment     = []byte(frames.TypeTableFragment)
+	ftTableProgress     = []byte(frames.TypeTableProgress)
+	ftTableCompletion   = []byte(frames.TypeTableCompletion)
+)
+
+func (d *Decoder) decode(ctx context.Context, ch chan frames.Frame) error {
 	if ctx.Err() != nil {
 		return ctx.Err()
 	}
 
-	m := frames.Pool.Get().(map[string]interface{})
-	defer func() {
-		select {
-		case frames.PoolCh <- m:
-		default:
-		}
-	}()
-
-	err := d.dec.Decode(&m)
+	err := d.dec.Decode(&d.frameRaw)
 	if err != nil {
 		return err
 	}
 
-	if _, ok := m[frames.FieldFrameType]; !ok {
-		return fmt.Errorf("incoming frame did not have .FrameType")
-	}
-	if _, ok := m[frames.FieldFrameType].(string); !ok {
-		return fmt.Errorf("incoming frame had FrameType that was not a string, was %T", m[frames.FieldFrameType])
+	ft, err := getFrameType(d.frameRaw)
+	if err != nil {
+		return err
 	}
 
-	switch ft := m[frames.FieldFrameType].(string); ft {
-	case frames.TypeDataTable:
+	switch {
+	case bytes.Equal(ft, ftDataTable):
 		dt := DataTable{}
-		if err := dt.Unmarshal(m); err != nil {
+		if err := dt.UnmarshalRaw(d.frameRaw); err != nil {
 			return err
 		}
 		dt.Op = d.op
 		ch <- dt
-	case frames.TypeDataSetCompletion:
+	case bytes.Equal(ft, ftDataSetCompletion):
 		dc := DataSetCompletion{}
-		if err := dc.Unmarshal(m); err != nil {
+		if err := dc.UnmarshalRaw(d.frameRaw); err != nil {
 			return err
 		}
 		dc.Op = d.op
 		ch <- dc
-	case frames.TypeTableHeader:
+	case bytes.Equal(ft, ftTableHeader):
 		th := TableHeader{}
-		if err := th.Unmarshal(m); err != nil {
+		if err := th.UnmarshalRaw(d.frameRaw); err != nil {
 			return err
 		}
 		th.Op = d.op
 		d.columns = th.Columns
 		ch <- th
-	case frames.TypeTableFragment:
+	case bytes.Equal(ft, ftTableFragment):
 		tf := TableFragment{Columns: d.columns}
-		if err := tf.Unmarshal(m); err != nil {
+		if err := tf.UnmarshalRaw(d.frameRaw); err != nil {
 			return err
 		}
 		tf.Op = d.op
 		ch <- tf
-	case frames.TypeTableProgress:
+	case bytes.Equal(ft, ftTableProgress):
 		tp := TableProgress{}
-		if err := tp.Unmarshal(m); err != nil {
+		if err := tp.UnmarshalRaw(d.frameRaw); err != nil {
 			return err
 		}
 		tp.Op = d.op
 		ch <- tp
-	case frames.TypeTableCompletion:
+	case bytes.Equal(ft, ftTableCompletion):
 		tc := TableCompletion{}
-		if err := tc.Unmarshal(m); err != nil {
+		if err := tc.UnmarshalRaw(d.frameRaw); err != nil {
 			return err
 		}
 		tc.Op = d.op
@@ -163,4 +160,47 @@ func (d *Decoder) decodetoMap(ctx context.Context, ch chan frames.Frame) error {
 		return fmt.Errorf("received FrameType %s, which we did not expect", ft)
 	}
 	return nil
+}
+
+var (
+	frameType = []byte(fmt.Sprintf("%q:", frames.FieldFrameType))
+	comma     = []byte(`,`)
+	semicolon = []byte(`:`)
+)
+
+// var frameTypeRE = regexp.MustCompile(`"FrameType"\s*:\s*"([a-zA-Z]+)"`)
+
+// getFrameType looks through a raw frame to extract the type of frame. This allows us to decode the frame
+// without decoding to a map first.
+// Note: This is a fast implementation that is benchmarked, as it is on the hot path. But it is not the
+// most robust. If we get problems, we can uncomment var frameTypeRE and the code below to do this. It takes
+// 5x as long, but in the scheme it won't matter.
+func getFrameType(message json.RawMessage) ([]byte, error) {
+	/*
+		matches := frameTypeRE.FindSubmatch(message)
+		if len(matches) < 2 {
+			return nil, fmt.Errorf("FrameType was missing in a frame")
+		}
+		return matches[1], nil
+	*/
+
+	message = bytes.TrimSpace(message)
+	message = bytes.TrimLeft(message, "{")
+	message = bytes.TrimSpace(message)
+
+	for {
+		index := bytes.Index(message, comma)
+		if index == -1 {
+			return nil, fmt.Errorf("FrameType was not present in a frame")
+		}
+		search := bytes.TrimSpace(message[:index])
+		if bytes.HasPrefix(search, frameType) {
+			typeIndex := bytes.Index(search, semicolon)
+			if typeIndex == -1 {
+				return nil, fmt.Errorf("problem finding expected value FrameType in frame")
+			}
+			search = search[typeIndex:]
+			return search[2 : len(search)-1], nil // Removes :"" around :"<frameType>"
+		}
+	}
 }

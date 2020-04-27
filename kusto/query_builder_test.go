@@ -13,6 +13,8 @@ import (
 )
 
 func TestParamType(t *testing.T) {
+	t.Parallel()
+
 	now := time.Now()
 	uu := uuid.New()
 
@@ -222,6 +224,8 @@ func TestParamType(t *testing.T) {
 }
 
 func TestDefinitions(t *testing.T) {
+	t.Parallel()
+
 	tests := []struct {
 		desc    string
 		with    map[string]ParamType
@@ -287,6 +291,8 @@ func TestDefinitions(t *testing.T) {
 }
 
 func TestParameters(t *testing.T) {
+	t.Parallel()
+
 	now := time.Now()
 	uu := uuid.New()
 
@@ -309,12 +315,6 @@ func TestParameters(t *testing.T) {
 			qValues: NewParameters().Must(map[string]interface{}{"key1": 1}),
 			err:     true,
 		},
-		/*
-			{
-				desc: "Should be JSON marshalable, isn't",
-
-			},
-		*/
 		{
 			desc:    "Should be uuid.UUID, isn't",
 			qParams: NewDefinitions().Must(map[string]ParamType{"key1": ParamType{Type: types.GUID}}),
@@ -363,11 +363,6 @@ func TestParameters(t *testing.T) {
 			qValues: NewParameters().Must(map[string]interface{}{"key1": now}),
 			want:    map[string]string{"key1": fmt.Sprintf("datetime(%s)", now.Format(time.RFC3339Nano))},
 		},
-		/*
-			{
-				desc: "Success json marshallable",
-			},
-		*/
 		{
 			desc:    "Success uuid.UUID",
 			qParams: NewDefinitions().Must(map[string]ParamType{"key1": ParamType{Type: types.GUID}}),
@@ -398,14 +393,12 @@ func TestParameters(t *testing.T) {
 			qValues: NewParameters().Must(map[string]interface{}{"key1": "string"}),
 			want:    map[string]string{"key1": "string"},
 		},
-		/*
-			{
-				desc:    "Success time.Duration",
-				qParams: NewQueryParameters().MustAdd("key1", ParamType{Type: types.Timespan}),
-				qValues: QueryValues{"key1": 3 * time.Second},
-				want: map[string]interface{"key1": 3 * time.Second},
-			},
-		*/
+		{
+			desc:    "Success time.Duration",
+			qParams: NewDefinitions().Must(map[string]ParamType{"key1": ParamType{Type: types.Timespan}}),
+			qValues: NewParameters().Must(map[string]interface{}{"key1": 3 * time.Second}),
+			want:    map[string]string{"key1": "timespan(00:00:03)"},
+		},
 		{
 			desc:    "Success string representing decimal",
 			qParams: NewDefinitions().Must(map[string]ParamType{"key1": ParamType{Type: types.Decimal}}),
@@ -440,6 +433,8 @@ func TestParameters(t *testing.T) {
 }
 
 func TestStmt(t *testing.T) {
+	t.Parallel()
+
 	stmt := NewStmt("|query")
 
 	tests := []struct {

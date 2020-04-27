@@ -18,6 +18,8 @@ import (
 )
 
 func TestFormatDiscovery(t *testing.T) {
+	t.Parallel()
+
 	tests := []struct {
 		input string
 		want  properties.DataFormat
@@ -46,6 +48,8 @@ func TestFormatDiscovery(t *testing.T) {
 }
 
 func TestCompressionDiscovery(t *testing.T) {
+	t.Parallel()
+
 	tests := []struct {
 		input string
 		want  properties.CompressionType
@@ -87,6 +91,8 @@ func (f *fakeBlobstore) uploadBlobFile(ctx context.Context, fi *os.File, url azb
 }
 
 func TestLocalToBlob(t *testing.T) {
+	t.Parallel()
+
 	content := "hello world"
 	u, err := url.Parse("https://account.windows.net")
 	if err != nil {

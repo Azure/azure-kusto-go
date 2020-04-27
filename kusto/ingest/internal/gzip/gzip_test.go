@@ -21,6 +21,8 @@ func randStringBytes(n int) string {
 }
 
 func TestStreamer(t *testing.T) {
+	t.Parallel()
+
 	str := randStringBytes(4 * 1024 * 1024)
 
 	f, err := ioutil.TempFile("", "")

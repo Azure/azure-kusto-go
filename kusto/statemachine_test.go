@@ -22,6 +22,8 @@ func init() {
 }
 
 func TestNonProgressive(t *testing.T) {
+	t.Parallel()
+
 	nowish := time.Now().UTC()
 
 	tests := []struct {
@@ -77,7 +79,7 @@ func TestNonProgressive(t *testing.T) {
 						{Name: "Key", Type: "string"},
 						{Name: "Value", Type: "dynamic"},
 					},
-					Rows: []value.Values{
+					KustoRows: []value.Values{
 						{
 							value.Int{Value: 1, Valid: true},
 							value.String{Value: "Visualization", Valid: true},
@@ -94,7 +96,7 @@ func TestNonProgressive(t *testing.T) {
 						{Name: "Name", Type: "string"},
 						{Name: "ID", Type: "long"},
 					},
-					Rows: []value.Values{
+					KustoRows: []value.Values{
 						{
 							value.DateTime{Value: nowish, Valid: true},
 							value.String{Value: "Doak", Valid: true},
@@ -147,7 +149,7 @@ func TestNonProgressive(t *testing.T) {
 						{Name: "Key", Type: "string"},
 						{Name: "Value", Type: "dynamic"},
 					},
-					Rows: []value.Values{
+					KustoRows: []value.Values{
 						{
 							value.Int{Value: 1, Valid: true},
 							value.String{Value: "Visualization", Valid: true},
@@ -217,6 +219,8 @@ func TestNonProgressive(t *testing.T) {
 }
 
 func TestProgressive(t *testing.T) {
+	t.Parallel()
+
 	// TODO(jdoak/daniel): There are other edge cases worth testing for, like TableHeader/Fragments with nonPrimary tables.
 
 	nowish := time.Now().UTC()
@@ -293,7 +297,7 @@ func TestProgressive(t *testing.T) {
 						{Name: "Key", Type: "string"},
 						{Name: "Value", Type: "dynamic"},
 					},
-					Rows: []value.Values{
+					KustoRows: []value.Values{
 						{
 							value.Int{Value: 1, Valid: true},
 							value.String{Value: "Visualization", Valid: true},
@@ -310,7 +314,7 @@ func TestProgressive(t *testing.T) {
 						{Name: "Name", Type: "string"},
 						{Name: "ID", Type: "long"},
 					},
-					Rows: []value.Values{
+					KustoRows: []value.Values{
 						{
 							value.DateTime{Value: nowish, Valid: true},
 							value.String{Value: "Doak", Valid: true},
@@ -363,7 +367,7 @@ func TestProgressive(t *testing.T) {
 						{Name: "Key", Type: "string"},
 						{Name: "Value", Type: "dynamic"},
 					},
-					Rows: []value.Values{
+					KustoRows: []value.Values{
 						{
 							value.Int{Value: 1, Valid: true},
 							value.String{Value: "Visualization", Valid: true},
@@ -387,7 +391,7 @@ func TestProgressive(t *testing.T) {
 					},
 				},
 				v2.TableFragment{
-					Rows: []value.Values{
+					KustoRows: []value.Values{
 						{
 							value.DateTime{Value: nowish, Valid: true},
 							value.String{Value: "Doak", Valid: true},
@@ -396,7 +400,7 @@ func TestProgressive(t *testing.T) {
 					},
 				},
 				v2.TableFragment{
-					Rows: []value.Values{
+					KustoRows: []value.Values{
 						{
 							value.DateTime{Value: nowish, Valid: true},
 							value.String{Value: "Dubovski", Valid: true},
@@ -414,7 +418,7 @@ func TestProgressive(t *testing.T) {
 						{Name: "Key", Type: "string"},
 						{Name: "Value", Type: "dynamic"},
 					},
-					Rows: []value.Values{
+					KustoRows: []value.Values{
 						{
 							value.Int{Value: 1, Valid: true},
 							value.String{Value: "Visualization", Valid: true},
@@ -462,7 +466,7 @@ func TestProgressive(t *testing.T) {
 						{Name: "Key", Type: "string"},
 						{Name: "Value", Type: "dynamic"},
 					},
-					Rows: []value.Values{
+					KustoRows: []value.Values{
 						{
 							value.Int{Value: 1, Valid: true},
 							value.String{Value: "Visualization", Valid: true},
@@ -543,6 +547,8 @@ func TestProgressive(t *testing.T) {
 }
 
 func TestV1SM(t *testing.T) {
+	t.Parallel()
+
 	nowish := time.Now().UTC()
 
 	tests := []struct {
@@ -573,12 +579,12 @@ func TestV1SM(t *testing.T) {
 			ctx:  context.Background(),
 			stream: []frames.Frame{
 				v1.DataTable{
-					Columns: table.Columns{
-						{Name: "Timestamp", Type: "datetime"},
-						{Name: "Name", Type: "string"},
-						{Name: "ID", Type: "long"},
+					DataTypes: v1.DataTypes{
+						{ColumnName: "Timestamp", ColumnType: "datetime"},
+						{ColumnName: "Name", ColumnType: "string"},
+						{ColumnName: "ID", ColumnType: "long"},
 					},
-					Rows: []value.Values{
+					KustoRows: []value.Values{
 						{
 							value.DateTime{Value: nowish, Valid: true},
 							value.String{Value: "Doak", Valid: true},
@@ -587,12 +593,12 @@ func TestV1SM(t *testing.T) {
 					},
 				},
 				v1.DataTable{
-					Columns: table.Columns{
-						{Name: "Timestamp", Type: "datetime"},
-						{Name: "Name", Type: "string"},
-						{Name: "ID", Type: "long"},
+					DataTypes: v1.DataTypes{
+						{ColumnName: "Timestamp", ColumnType: "datetime"},
+						{ColumnName: "Name", ColumnType: "string"},
+						{ColumnName: "ID", ColumnType: "long"},
 					},
-					Rows: []value.Values{
+					KustoRows: []value.Values{
 						{
 							value.DateTime{Value: nowish, Valid: true},
 							value.String{Value: "Dubovski", Valid: true},

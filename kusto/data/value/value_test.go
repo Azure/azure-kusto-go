@@ -13,6 +13,8 @@ import (
 )
 
 func TestBool(t *testing.T) {
+	t.Parallel()
+
 	tests := []struct {
 		desc string
 		i    interface{}
@@ -62,6 +64,8 @@ func TestBool(t *testing.T) {
 }
 
 func TestDateTime(t *testing.T) {
+	t.Parallel()
+
 	tests := []struct {
 		desc string
 		i    interface{}
@@ -114,6 +118,8 @@ func TestDateTime(t *testing.T) {
 }
 
 func TestDynamic(t *testing.T) {
+	t.Parallel()
+
 	tests := []struct {
 		desc string
 		i    interface{}
@@ -180,6 +186,8 @@ func TestDynamic(t *testing.T) {
 }
 
 func TestGUID(t *testing.T) {
+	t.Parallel()
+
 	goodUUID := uuid.New()
 	tests := []struct {
 		desc string
@@ -230,6 +238,8 @@ func TestGUID(t *testing.T) {
 }
 
 func TestInt(t *testing.T) {
+	t.Parallel()
+
 	tests := []struct {
 		desc string
 		i    interface{}
@@ -289,6 +299,8 @@ func TestInt(t *testing.T) {
 }
 
 func TestLong(t *testing.T) {
+	t.Parallel()
+
 	tests := []struct {
 		desc string
 		i    interface{}
@@ -343,6 +355,8 @@ func TestLong(t *testing.T) {
 }
 
 func TestReal(t *testing.T) {
+	t.Parallel()
+
 	tests := []struct {
 		desc string
 		i    interface{}
@@ -397,6 +411,8 @@ func TestReal(t *testing.T) {
 }
 
 func TestString(t *testing.T) {
+	t.Parallel()
+
 	tests := []struct {
 		desc string
 		i    interface{}
@@ -441,6 +457,8 @@ func TestString(t *testing.T) {
 }
 
 func TestTimespan(t *testing.T) {
+	t.Parallel()
+
 	tests := []struct {
 		desc string
 		i    interface{}
@@ -518,6 +536,8 @@ func TestTimespan(t *testing.T) {
 }
 
 func TestDecimal(t *testing.T) {
+	t.Parallel()
+
 	tests := []struct {
 		desc string
 		i    interface{}

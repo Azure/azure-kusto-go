@@ -8,15 +8,16 @@ import (
 	"testing"
 	"time"
 
-	"github.com/Azure/azure-kusto-go/kusto/data/table"
-	"github.com/Azure/azure-kusto-go/kusto/data/value"
 	"github.com/Azure/azure-kusto-go/kusto/data/errors"
+	"github.com/Azure/azure-kusto-go/kusto/data/value"
 
 	"github.com/google/uuid"
 	"github.com/kylelemons/godebug/pretty"
 )
 
 func TestNormalDecode(t *testing.T) {
+	t.Parallel()
+
 	ctx := context.Background()
 
 	jsonStr := `{
@@ -89,21 +90,21 @@ func TestNormalDecode(t *testing.T) {
 
 	frame1Want := DataTable{
 		TableName: "QueryCompletionInformation",
-		Columns: []table.Column{
+		DataTypes: DataTypes{
 			{
-				Name: "Timestamp",
-				Type: "datetime",
+				ColumnName: "Timestamp",
+				ColumnType: "datetime",
 			},
 			{
-				Name: "ClientRequestId",
-				Type: "string",
+				ColumnName: "ClientRequestId",
+				ColumnType: "string",
 			},
 			{
-				Name: "ActivityId",
-				Type: "guid",
+				ColumnName: "ActivityId",
+				ColumnType: "guid",
 			},
 		},
-		Rows: []value.Values{
+		KustoRows: []value.Values{
 			{
 				value.DateTime{Value: timeMustParse(time.RFC3339Nano, "2019-08-27T04:14:55.302919Z"), Valid: true},
 				value.String{Value: "KPC.execute;752dd747-5f6a-45c6-9ee2-e6662530ecc3", Valid: true},
@@ -120,21 +121,21 @@ func TestNormalDecode(t *testing.T) {
 
 	frame2Want := DataTable{
 		TableName: "QueryCompletionInformation",
-		Columns: []table.Column{
+		DataTypes: DataTypes{
 			{
-				Name: "Timestamp",
-				Type: "datetime",
+				ColumnName: "Timestamp",
+				ColumnType: "datetime",
 			},
 			{
-				Name: "ClientRequestId",
-				Type: "string",
+				ColumnName: "ClientRequestId",
+				ColumnType: "string",
 			},
 			{
-				Name: "ActivityId",
-				Type: "guid",
+				ColumnName: "ActivityId",
+				ColumnType: "guid",
 			},
 		},
-		Rows: []value.Values{
+		KustoRows: []value.Values{
 			{
 				value.DateTime{Value: timeMustParse(time.RFC3339Nano, "2021-08-27T04:14:55.302919Z"), Valid: true},
 				value.String{Value: "KPF.execute;752dd747-5f6a-45c6-9ee2-e6662530ecc3", Valid: true},

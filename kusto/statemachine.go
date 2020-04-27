@@ -7,6 +7,8 @@ import (
 	"context"
 	"sync"
 
+	"github.com/Azure/azure-kusto-go/kusto/data/table"
+
 	"github.com/Azure/azure-kusto-go/kusto/data/errors"
 	"github.com/Azure/azure-kusto-go/kusto/internal/frames"
 	v1 "github.com/Azure/azure-kusto-go/kusto/internal/frames/v1"
@@ -92,7 +94,7 @@ func (d *nonProgressiveSM) process() (sf stateFn, err error) {
 				select {
 				case <-d.ctx.Done():
 					return nil, d.ctx.Err()
-				case d.iter.inRows <- send{inRows: table.Rows, wg: d.wg}:
+				case d.iter.inRows <- send{inRows: table.KustoRows, wg: d.wg}:
 				}
 			default:
 				select {
@@ -198,9 +200,6 @@ func (p *progressiveSM) nextFrame() (stateFn, error) {
 	}
 }
 
-// TODO(jdoak/daniel): I'm actually not sure if this is used in a progressive stream.  I remember the docs not being
-// 100% and so you go things that were not in the spec.  The progressiveSM works, but we should go back and verify
-// that this is used.
 func (p *progressiveSM) dataTable() (stateFn, error) {
 	if p.currentHeader != nil {
 		return nil, errors.ES(p.op, errors.KInternal, "received a DatTable between a tableHeader and TableCompletion")
@@ -275,7 +274,7 @@ func (p *progressiveSM) fragment() (stateFn, error) {
 		select {
 		case <-p.ctx.Done():
 			return nil, p.ctx.Err()
-		case p.iter.inRows <- send{inRows: table.Rows, wg: p.wg}:
+		case p.iter.inRows <- send{inRows: table.KustoRows, wg: p.wg}:
 		}
 	} else {
 		p.nonPrimary.Rows = append(p.nonPrimary.Rows, p.currentFrame.(v2.TableFragment).Rows...)
@@ -345,17 +344,23 @@ func (p *v1SM) nextFrame() (stateFn, error) {
 			return nil, nil
 		}
 		p.currentFrame = fr
-		switch table := fr.(type) {
+		switch tbl := fr.(type) {
 		case v1.DataTable:
+			var err error
 			p.columnSetOnce.Do(func() {
+				var cols table.Columns
+				cols, err = tbl.DataTypes.ToColumns()
+				if err != nil {
+					return
+				}
 				p.wg.Add(1)
-				p.iter.inColumns <- send{inColumns: table.Columns, wg: p.wg}
+				p.iter.inColumns <- send{inColumns: cols, wg: p.wg}
 			})
-			return p.dataTable, nil
+			return p.dataTable, err
 		case frames.Error:
-			return nil, table
+			return nil, tbl
 		default:
-			return nil, errors.ES(p.op, errors.KInternal, "received an unknown frame in a v1 table stream we didn't understand: %T", table)
+			return nil, errors.ES(p.op, errors.KInternal, "received an unknown frame in a v1 table stream we didn't understand: %T", tbl)
 		}
 	}
 }
@@ -367,7 +372,7 @@ func (p *v1SM) dataTable() (stateFn, error) {
 	select {
 	case <-p.ctx.Done():
 		return nil, p.ctx.Err()
-	case p.iter.inRows <- send{inRows: table.Rows, wg: p.wg}:
+	case p.iter.inRows <- send{inRows: table.KustoRows, wg: p.wg}:
 		p.receivedDT = true
 	}
 

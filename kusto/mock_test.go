@@ -13,6 +13,8 @@ import (
 )
 
 func TestFromStruct(t *testing.T) {
+	t.Parallel()
+
 	// Note: we have covered everything else used here in other tests, so this is just input validation.
 	tests := []struct {
 		desc  string
@@ -61,6 +63,8 @@ func TestFromStruct(t *testing.T) {
 }
 
 func TestRow(t *testing.T) {
+	t.Parallel()
+
 	tests := []struct {
 		desc       string
 		columns    table.Columns

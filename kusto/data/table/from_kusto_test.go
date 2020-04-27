@@ -22,6 +22,8 @@ type SomeJSON struct {
 }
 
 func TestFieldsConvert(t *testing.T) {
+	t.Parallel()
+
 	myStruct := SomeJSON{
 		Name: "Adam",
 		ID:   1,
