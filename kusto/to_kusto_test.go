@@ -314,9 +314,15 @@ func TestConvertDynamic(t *testing.T) {
 	}
 
 	var (
-		val = v
-		ptr = &v
-		ty  = value.Dynamic{Value: mustMapInter(j), Valid: true}
+		val    = v
+		ptr    = &v
+		ty     = value.Dynamic{Value: j, Valid: true}
+		str    = string(j)
+		ptrStr = &str
+		m      = mustMapInter(j)
+		ptrM   = &m
+
+		want = value.Dynamic{Value: j, Valid: true}
 	)
 
 	tests := []struct {
@@ -324,10 +330,15 @@ func TestConvertDynamic(t *testing.T) {
 		want  value.Dynamic
 		err   bool
 	}{
-		{value: 1, err: true},
-		{value: val, want: value.Dynamic{Value: mustMapInter(j), Valid: true}},
-		{value: ptr, want: value.Dynamic{Value: mustMapInter(j), Valid: true}},
-		{value: ty, want: value.Dynamic{Value: mustMapInter(j), Valid: true}},
+		{value: 1, want: value.Dynamic{Value: mustMarshal(1), Valid: true}},
+		{value: val},
+		{value: ptr},
+		{value: ty},
+		{value: str},
+		{value: ptrStr},
+		{value: m},
+		{value: ptrM},
+		{value: []SampleDynamic{v, v}, want: value.Dynamic{Value: mustMarshal([]SampleDynamic{v, v}), Valid: true}},
 	}
 	for _, test := range tests {
 		got, err := convertDynamic(reflect.ValueOf(test.value))
@@ -340,8 +351,13 @@ func TestConvertDynamic(t *testing.T) {
 		case err != nil:
 			continue
 		}
+		if test.want.Value == nil {
+			test.want = want
+		}
 		if diff := pretty.Compare(test.want, got); diff != "" {
 			t.Errorf("TestConvertDynamic(%v): -want/+got:\n%s", test.value, diff)
+			t.Errorf("TestConvertDynamic(%v): got == %s", test.value, string(got.Value))
+			t.Errorf("TestConvertDynamic(%v): want == %s", test.value, string(want.Value))
 		}
 	}
 }
@@ -593,4 +609,12 @@ func mustMapInter(i interface{}) map[string]interface{} {
 		panic(err)
 	}
 	return m
+}
+
+func mustMarshal(i interface{}) []byte {
+	b, err := json.Marshal(i)
+	if err != nil {
+		panic(err)
+	}
+	return b
 }

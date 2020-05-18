@@ -201,67 +201,74 @@ func dynamicConvert(fieldName string, col Column, k value.Kusto, t reflect.Type,
 	case sf.Type.ConvertibleTo(reflect.TypeOf(&value.Dynamic{})):
 		v.Elem().FieldByName(fieldName).Set(reflect.ValueOf(&val))
 		return nil
-	case sf.Type.Kind() == reflect.Ptr && sf.Type.Elem().Kind() == reflect.Struct:
-		if !val.Valid {
+	case sf.Type.ConvertibleTo(reflect.TypeOf([]byte{})):
+		if sf.Type.Kind() == reflect.String {
+			s := string(val.Value)
+			v.Elem().FieldByName(fieldName).Set(reflect.ValueOf(s))
 			return nil
 		}
-		store := reflect.New(sf.Type.Elem())
-
-		// TODO(Daniel): This is slow/hacky. Taking an already made map[string]interface{} and marshalling it to
-		// a struct by converting to a []byte and then using the JSON library.  We really need an unmarshal for
-		// map[string]interface{} directly into a struct.  Externally, there is: https://github.com/mitchellh/mapstructure ,
-		// but this is where we should roll our own and stay away from third party stuff.
-		b, err := json.Marshal(val.Value)
-		if err != nil {
-			fmt.Errorf("Column %s of type dynamic could not unmarshal into the passed *struct: %s", col.Name, err)
-		}
-		if err := json.Unmarshal(b, store.Interface()); err != nil {
-			return fmt.Errorf("Column %s of type dynamic could not unmarshal into the passed *struct: %s", col.Name, err)
-		}
-		v.Elem().FieldByName(fieldName).Set(store)
-		return nil
-	case sf.Type.Kind() == reflect.Ptr && sf.Type.Elem().Kind() == reflect.Map:
-		if !val.Valid {
-			return nil
-		}
-		if sf.Type.Elem().Key().Kind() != reflect.String {
-			return fmt.Errorf("Column %s is type dymanic and can only be stored in a *map[string]interface{} or *struct", col.Name)
-		}
-		if sf.Type.Elem().Elem().Kind() != reflect.Interface {
-			return fmt.Errorf("Column %s is type dymanic and can only be stored in a *map[string]interface{} or *struct", col.Name)
-		}
-
-		// TODO(jdoak): Think about copying the map[string]interface{} instead of passing the value for safety.
-		v.Elem().FieldByName(fieldName).Set(reflect.ValueOf(&val.Value))
+		v.Elem().FieldByName(fieldName).Set(reflect.ValueOf(val.Value))
 		return nil
 	case sf.Type.Kind() == reflect.Map:
 		if !val.Valid {
 			return nil
 		}
 		if sf.Type.Key().Kind() != reflect.String {
-			return fmt.Errorf("Column %s is type dymanic and can only be stored in a *map[string]interface{} or *struct", col.Name)
+			return fmt.Errorf("Column %s is type dymanic and can only be stored in a string, *string, map[string]interface{}, *map[string]interface{}, struct or *struct", col.Name)
 		}
 		if sf.Type.Elem().Kind() != reflect.Interface {
-			return fmt.Errorf("Column %s is type dymanic and can only be stored in a *map[string]interface{} or *struct", col.Name)
+			return fmt.Errorf("Column %s is type dymanic and can only be stored in a string, *string, map[string]interface{}, *map[string]interface{}, struct or *struct", col.Name)
 		}
 
-		v.Elem().FieldByName(fieldName).Set(reflect.ValueOf(val.Value))
+		m := map[string]interface{}{}
+		if err := json.Unmarshal([]byte(val.Value), &m); err != nil {
+			return fmt.Errorf("Column %s is type dymanic and had an error tyring to marshal into a map[string]interface{}: %s", col.Name, err)
+		}
+
+		v.Elem().FieldByName(fieldName).Set(reflect.ValueOf(m))
 		return nil
 	case sf.Type.Kind() == reflect.Struct:
 		structPtr := reflect.New(sf.Type)
 
-		// TODO(Daniel): Ditto to above.
-		b, err := json.Marshal(val.Value)
-		if err != nil {
-			fmt.Errorf("Column %s of type dynamic could not unmarshal into the passed struct: %s", col.Name, err)
-		}
-
-		if err := json.Unmarshal(b, structPtr.Interface()); err != nil {
+		if err := json.Unmarshal([]byte(val.Value), structPtr.Interface()); err != nil {
 			return fmt.Errorf("Column %s of type dynamic could not unmarshal into the passed struct: %s", col.Name, err)
 		}
 
 		v.Elem().FieldByName(fieldName).Set(structPtr.Elem())
 		return nil
+	case sf.Type.Kind() == reflect.Ptr:
+		if !val.Valid {
+			return nil
+		}
+
+		switch {
+		case sf.Type.Elem().Kind() == reflect.String:
+			str := string(val.Value)
+			v.Elem().FieldByName(fieldName).Set(reflect.ValueOf(&str))
+			return nil
+		case sf.Type.Elem().Kind() == reflect.Struct:
+			store := reflect.New(sf.Type.Elem())
+
+			if err := json.Unmarshal([]byte(val.Value), store.Interface()); err != nil {
+				return fmt.Errorf("Column %s of type dynamic could not unmarshal into the passed *struct: %s", col.Name, err)
+			}
+			v.Elem().FieldByName(fieldName).Set(store)
+			return nil
+		case sf.Type.Elem().Kind() == reflect.Map:
+			if sf.Type.Elem().Key().Kind() != reflect.String {
+				return fmt.Errorf("Column %s is type dymanic and can only be stored in a map of type map[string]interface{}", col.Name)
+			}
+			if sf.Type.Elem().Elem().Kind() != reflect.Interface {
+				return fmt.Errorf("Column %s is type dymanic and can only be stored in a of type map[string]interface{}", col.Name)
+			}
+
+			m := map[string]interface{}{}
+			if err := json.Unmarshal([]byte(val.Value), &m); err != nil {
+				return fmt.Errorf("Column %s is type dymanic and had an error tyring to marshal into a map[string]interface{}: %s", col.Name, err)
+			}
+			v.Elem().FieldByName(fieldName).Set(reflect.ValueOf(&m))
+			return nil
+		}
 	}
 	return fmt.Errorf("column %s could not store in struct.%s: column was type Kusto.Dynamic, struct had base Kind %s ", col.Name, fieldName, sf.Type.Kind())
 }
