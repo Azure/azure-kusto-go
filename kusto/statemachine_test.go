@@ -83,7 +83,7 @@ func TestNonProgressive(t *testing.T) {
 						{
 							value.Int{Value: 1, Valid: true},
 							value.String{Value: "Visualization", Valid: true},
-							value.Dynamic{Value: mustMapInter(`{"Visualization":null,"Title":null,"XColumn":null,"Series":null,"YColumns":null,"XTitle":null}`), Valid: true},
+							value.Dynamic{Value: []byte(`{"Visualization":null,"Title":null,"XColumn":null,"Series":null,"YColumns":null,"XTitle":null}`), Valid: true},
 						},
 					},
 				},
@@ -153,7 +153,7 @@ func TestNonProgressive(t *testing.T) {
 						{
 							value.Int{Value: 1, Valid: true},
 							value.String{Value: "Visualization", Valid: true},
-							value.Dynamic{Value: mustMapInter(`{"Visualization":null,"Title":null,"XColumn":null,"Series":null,"YColumns":null,"XTitle":null}`), Valid: true},
+							value.Dynamic{Value: []byte(`{"Visualization":null,"Title":null,"XColumn":null,"Series":null,"YColumns":null,"XTitle":null}`), Valid: true},
 						},
 					},
 				},
@@ -301,7 +301,7 @@ func TestProgressive(t *testing.T) {
 						{
 							value.Int{Value: 1, Valid: true},
 							value.String{Value: "Visualization", Valid: true},
-							value.Dynamic{Value: mustMapInter(`{"Visualization":null,"Title":null,"XColumn":null,"Series":null,"YColumns":null,"XTitle":null}`), Valid: true},
+							value.Dynamic{Value: []byte(`{"Visualization":null,"Title":null,"XColumn":null,"Series":null,"YColumns":null,"XTitle":null}`), Valid: true},
 						},
 					},
 				},
@@ -371,7 +371,7 @@ func TestProgressive(t *testing.T) {
 						{
 							value.Int{Value: 1, Valid: true},
 							value.String{Value: "Visualization", Valid: true},
-							value.Dynamic{Value: mustMapInter(`{"Visualization":null,"Title":null,"XColumn":null,"Series":null,"YColumns":null,"XTitle":null}`), Valid: true},
+							value.Dynamic{Value: []byte(`{"Visualization":null,"Title":null,"XColumn":null,"Series":null,"YColumns":null,"XTitle":null}`), Valid: true},
 						},
 					},
 				},
@@ -422,7 +422,7 @@ func TestProgressive(t *testing.T) {
 						{
 							value.Int{Value: 1, Valid: true},
 							value.String{Value: "Visualization", Valid: true},
-							value.Dynamic{Value: mustMapInter(`{"Visualization":null,"Title":null,"XColumn":null,"Series":null,"YColumns":null,"XTitle":null}`), Valid: true},
+							value.Dynamic{Value: []byte(`{"Visualization":null,"Title":null,"XColumn":null,"Series":null,"YColumns":null,"XTitle":null}`), Valid: true},
 						},
 					},
 				},
@@ -470,7 +470,7 @@ func TestProgressive(t *testing.T) {
 						{
 							value.Int{Value: 1, Valid: true},
 							value.String{Value: "Visualization", Valid: true},
-							value.Dynamic{Value: mustMapInter(`{"Visualization":null,"Title":null,"XColumn":null,"Series":null,"YColumns":null,"XTitle":null}`), Valid: true},
+							value.Dynamic{Value: []byte(`{"Visualization":null,"Title":null,"XColumn":null,"Series":null,"YColumns":null,"XTitle":null}`), Valid: true},
 						},
 					},
 				},

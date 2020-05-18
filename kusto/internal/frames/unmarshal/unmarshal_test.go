@@ -33,7 +33,7 @@ func TestUnmarshalRows(t *testing.T) {
 		{types.Decimal, nil, value.Decimal{"", false}},
 		{types.Decimal, "3.2", value.Decimal{"3.2", true}},
 		{types.Dynamic, nil, value.Dynamic{nil, false}},
-		{types.Dynamic, `{"key":"value"}`, value.Dynamic{map[string]interface{}{"key": "value"}, true}},
+		{types.Dynamic, `{"key":"value"}`, value.Dynamic{[]byte(`{"key":"value"}`), true}},
 		{types.GUID, nil, value.GUID{uuid.UUID{}, false}},
 		{types.GUID, aUUID.String(), value.GUID{aUUID, true}},
 		{types.Int, nil, value.Int{0, false}},

@@ -127,39 +127,39 @@ func TestDynamic(t *testing.T) {
 		want Dynamic
 	}{
 		{
-			desc: "value is non-nil and non-string",
-			i:    23,
-			err:  true,
-		},
-		{
-			desc: "value is string, but is not valid JSON",
-			i:    "{\"Visualization\":null", // Missing closing }
-			err:  true,
-		},
-		{
 			desc: "value is nil",
 			i:    nil,
 			want: Dynamic{},
 		},
 		{
 			desc: "value is string",
-			i:    "{\"Visualization\":null}",
+			i:    `{"Visualization":null}`,
 			want: Dynamic{
-				Value: map[string]interface{}{
-					"Visualization": nil,
-				},
+				Value: []byte(`{"Visualization":null}`),
 				Valid: true,
 			},
 		},
 		{
-			desc: "value is map[string]string",
-			i: map[string]interface{}{
-				"Visualization": "null",
-			},
+			desc: "value is []byte",
+			i:    []byte(`{"Visualization":null}`),
 			want: Dynamic{
-				Value: map[string]interface{}{
-					"Visualization": "null",
-				},
+				Value: []byte(`{"Visualization":null}`),
+				Valid: true,
+			},
+		},
+		{
+			desc: "value is map[string]interface{}",
+			i:    map[string]interface{}{"Visualization": nil},
+			want: Dynamic{
+				Value: []byte(`{"Visualization":null}`),
+				Valid: true,
+			},
+		},
+		{
+			desc: "value is a []interface{}",
+			i:    []interface{}{1, "hello", 2.3},
+			want: Dynamic{
+				Value: []byte(`[1,"hello",2.3]`),
 				Valid: true,
 			},
 		},
@@ -181,6 +181,8 @@ func TestDynamic(t *testing.T) {
 
 		if diff := pretty.Compare(test.want, got); diff != "" {
 			t.Errorf("TestDynamic(%s): -want/+got:\n%s", test.desc, diff)
+			t.Errorf("want: %s", string(test.want.Value))
+			t.Errorf("got: %s", string(got.Value))
 		}
 	}
 }

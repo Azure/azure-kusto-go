@@ -10,4 +10,5 @@ require (
 	github.com/google/uuid v1.1.1
 	github.com/kylelemons/godebug v1.1.0
 	github.com/pkg/errors v0.9.1 // indirect
+	golang.org/x/net v0.0.0-20200226121028-0de0cce0169b // indirect
 )

@@ -278,13 +278,11 @@ func convertTimespan(v reflect.Value) (value.Timespan, error) {
 
 func convertDynamic(v reflect.Value) (value.Dynamic, error) {
 	t := v.Type()
-	pointer := false
 
 	// If it is a pointer, dereference it.
 	if t.Kind() == reflect.Ptr {
 		t = t.Elem()
 		v = v.Elem()
-		pointer = true
 	}
 
 	// Was a value.Dynamic{}, so return it.
@@ -292,36 +290,22 @@ func convertDynamic(v reflect.Value) (value.Dynamic, error) {
 		return v.Interface().(value.Dynamic), nil
 	}
 
-	// Was a string, so convert it to a map[string]interface{}.
+	// Was a string, so return it as []byte.
 	if t == reflect.TypeOf("") {
-		m := map[string]interface{}{}
-		if err := json.Unmarshal([]byte(v.Interface().(string)), &m); err != nil {
-			return value.Dynamic{}, fmt.Errorf("the string representing a value.Dynamic was not valid JSON: %s", err)
-		}
+		return value.Dynamic{Value: []byte(v.Interface().(string)), Valid: true}, nil
 	}
 
-	// Was a map[string]interface{}, do an assignment.
-	if t == reflect.TypeOf(map[string]interface{}{}) {
-		return value.Dynamic{Value: v.Interface().(map[string]interface{})}, nil
+	// Was a []byte, so return it.
+	if t == reflect.TypeOf([]byte{}) {
+		return value.Dynamic{Value: v.Interface().([]byte), Valid: true}, nil
 	}
 
-	if t.Kind() == reflect.Struct {
-		// TODO(Daniel): like some other notes, this is slow.
-		b, err := json.Marshal(v.Interface())
-		if err != nil {
-			if pointer {
-				return value.Dynamic{}, fmt.Errorf("the type *%T used in a value.Dynamic could not be JSON encoded: %s", v.Interface(), err)
-			}
-			return value.Dynamic{}, fmt.Errorf("the type %T used in a value.Dynamic could not be JSON encoded: %s", v.Interface(), err)
-		}
-		m := map[string]interface{}{}
-		if err := json.Unmarshal(b, &m); err != nil {
-			return value.Dynamic{}, fmt.Errorf("the dynamic value in a struct was converted to JSON, but could not be unmarshalled to map[string]interface{} (possible bug)")
-		}
-		return value.Dynamic{Value: m, Valid: true}, nil
+	// Anything else, try to marshal it.
+	b, err := json.Marshal(v.Interface())
+	if err != nil {
+		return value.Dynamic{}, fmt.Errorf("the type *%T used in a value.Dynamic could not be JSON encoded: %s", v.Interface(), err)
 	}
-
-	return value.Dynamic{}, fmt.Errorf("value was expected to be either a value.Dynamic, *map[string]interface{}, map[string]interface{}, *struct, or struct, was %T", v.Interface())
+	return value.Dynamic{Value: b, Valid: true}, nil
 }
 
 func convertGUID(v reflect.Value) (value.GUID, error) {

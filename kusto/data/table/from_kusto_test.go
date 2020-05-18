@@ -28,10 +28,13 @@ func TestFieldsConvert(t *testing.T) {
 		Name: "Adam",
 		ID:   1,
 	}
+
 	myJSON, err := json.Marshal(myStruct)
 	if err != nil {
 		panic(err)
 	}
+	myJSONStr := string(myJSON)
+	myJSONStrPtr := &myJSONStr
 	jsonMap := map[string]interface{}{}
 	if err := json.Unmarshal(myJSON, &jsonMap); err != nil {
 		panic(err)
@@ -142,15 +145,19 @@ func TestFieldsConvert(t *testing.T) {
 			columns: Columns{
 				{Type: types.Dynamic, Name: "Struct"},
 				{Type: types.Dynamic, Name: "PtrStruct"},
+				{Type: types.Dynamic, Name: "String"},
+				{Type: types.Dynamic, Name: "PtrString"},
 				{Type: types.Dynamic, Name: "Map"},
 				{Type: types.Dynamic, Name: "PtrMap"},
 				{Type: types.Dynamic, Name: "Dynamic"},
 				{Type: types.Dynamic, Name: "PtrDynamic"},
 			},
-			k: value.Dynamic{Value: jsonMap, Valid: true},
+			k: value.Dynamic{Value: myJSON, Valid: true},
 			ptrStruct: &struct {
 				Struct     SomeJSON
 				PtrStruct  *SomeJSON
+				String     string
+				PtrString  *string
 				Map        map[string]interface{}
 				PtrMap     *map[string]interface{}
 				Dynamic    value.Dynamic
@@ -160,6 +167,8 @@ func TestFieldsConvert(t *testing.T) {
 			want: &struct {
 				Struct     SomeJSON
 				PtrStruct  *SomeJSON
+				String     string
+				PtrString  *string
 				Map        map[string]interface{}
 				PtrMap     *map[string]interface{}
 				Dynamic    value.Dynamic
@@ -167,6 +176,8 @@ func TestFieldsConvert(t *testing.T) {
 			}{
 				myStruct,
 				&myStruct,
+				myJSONStr,
+				myJSONStrPtr,
 				map[string]interface{}{
 					"Name": "Adam",
 					"ID":   1,
@@ -175,8 +186,8 @@ func TestFieldsConvert(t *testing.T) {
 					"Name": "Adam",
 					"ID":   1,
 				},
-				value.Dynamic{Value: jsonMap, Valid: true},
-				&value.Dynamic{Value: jsonMap, Valid: true},
+				value.Dynamic{Value: myJSON, Valid: true},
+				&value.Dynamic{Value: myJSON, Valid: true},
 			},
 		},
 		{

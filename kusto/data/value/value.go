@@ -147,7 +147,7 @@ func (d *DateTime) Unmarshal(i interface{}) error {
 // Dynamic represents a Kusto dynamic type.  Dynamic implements Kusto.
 type Dynamic struct {
 	// Value holds the value of the type.
-	Value map[string]interface{}
+	Value []byte
 	// Valid indicates if this value was set.
 	Valid bool
 }
@@ -160,37 +160,35 @@ func (d Dynamic) String() string {
 		return ""
 	}
 
-	b, err := json.MarshalIndent(d.Value, "", "  ")
-	if err != nil {
-		return fmt.Sprintf("Dynamic value is invalid(cannot JSON marshal): %s", err)
-	}
-
-	return string(b)
+	return string(d.Value)
 }
 
-// Unmarshal unmarshal's i into Dynamic. i must be a map[string]interface{}, string representing JSON or nil.
+// Unmarshal unmarshal's i into Dynamic. i must be a string, []byte, map[string]interface{}, []interface{}, other JSON serializable value or nil.
+// If []byte or string, must be a JSON representation of a value.
 func (d *Dynamic) Unmarshal(i interface{}) error {
 	if i == nil {
 		d.Value = nil
 		d.Valid = false
 		return nil
 	}
-	if v, ok := i.(map[string]interface{}); ok {
+
+	switch v := i.(type) {
+	case []byte:
 		d.Value = v
+		d.Valid = true
+		return nil
+	case string:
+		d.Value = []byte(v)
 		d.Valid = true
 		return nil
 	}
 
-	v, ok := i.(string)
-	if !ok {
-		return fmt.Errorf("Column with type 'dynamic' was not stored as a string, was %T", i)
+	b, err := json.Marshal(i)
+	if err != nil {
+		return fmt.Errorf("Column with type 'dynamic' was a %T that could not be JSON encoded: %s", i, err)
 	}
 
-	m := map[string]interface{}{}
-	if err := json.Unmarshal([]byte(v), &m); err != nil {
-		return fmt.Errorf("Column with type 'dynamic' is storing string that cannot be JSON unmarshalled: %s", err)
-	}
-	d.Value = m
+	d.Value = b
 	d.Valid = true
 	return nil
 }
