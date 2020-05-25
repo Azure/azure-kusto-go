@@ -282,7 +282,7 @@ func TestQueries(t *testing.T) {
 		},
 		{
 			desc:    "Query: make sure Dynamic data type variations can be parsed",
-			stmt:    kusto.NewStmt(`print PlainValue = dynamic('1'), PlainArray = dynamic('[1,2,3]'), PlainJson= dynamic('{ "a": 1}'), JsonArray= dynamic('[{ "a": 1}, { "a": 2}]`),
+			stmt:    kusto.NewStmt(`print PlainValue = dynamic('1'), PlainArray = dynamic('[1,2,3]'), PlainJson= dynamic('{ "a": 1}'), JsonArray= dynamic('[{ "a": 1}, { "a": 2}]')`),
 			qcall:   client.Query,
 			options: []kusto.QueryOption{kusto.ResultsProgressiveDisable()},
 			doer: func(row *table.Row, update interface{}) error {
@@ -379,15 +379,27 @@ func TestQueries(t *testing.T) {
 					options = test.options.([]kusto.QueryOption)
 				}
 				iter, err = test.qcall(context.Background(), testConfig.Database, test.stmt, options...)
+
+				if err != nil {
+					t.Errorf("TestQueries(%s): had test.qcall error: %s", test.desc, err)
+					return
+				}
+
 			case test.mcall != nil:
 				var options []kusto.MgmtOption
 				if test.options != nil {
 					options = test.options.([]kusto.MgmtOption)
 				}
 				iter, err = test.mcall(context.Background(), testConfig.Database, test.stmt, options...)
+
+				if err != nil {
+					t.Errorf("TestQueries(%s): had test.mcall error: %s", test.desc, err)
+					return
+				}
 			default:
 				panic("test setup failure")
 			}
+
 
 			defer iter.Stop()
 
