@@ -10,7 +10,6 @@ import (
 	"os"
 	"path/filepath"
 	"runtime"
-	"sort"
 	"testing"
 	"time"
 
@@ -26,7 +25,7 @@ import (
 	"github.com/kylelemons/godebug/pretty"
 )
 
-// config represents a config.json file that must be in the directory and hold information to do the integraiton tests.
+// config represents a config.json file that must be in the directory and hold information to do the integration tests.
 type config struct {
 	Endpoint     string
 	Database     string
@@ -41,9 +40,9 @@ func (c *config) validate() error {
 	case c.Endpoint, c.Database, c.ClientID, c.ClientSecret, c.TenantID:
 		return fmt.Errorf("no field in the end to end test config.json file can be empty")
 	}
-	if len(c.Principals) == 0 {
-		return fmt.Errorf("config.json cannot have an empty Principals field")
-	}
+	//if len(c.Principals) == 0 {
+	//	return fmt.Errorf("config.json cannot have an empty Principals field")
+	//}
 	return nil
 }
 
@@ -65,13 +64,26 @@ func init() {
 	p := filepath.Join(filepath.Dir(filename), "config.json")
 
 	b, err := ioutil.ReadFile(p)
+
 	if err != nil {
-		skipETOE = true
-		return
-	}
-	if err := json.Unmarshal(b, &testConfig); err != nil {
+		// if couldn't find a config file, we try to read them from env
+		testConfig = config{
+			Endpoint: os.Getenv("ENGINE_CONNECTION_STRING"),
+			Database: os.Getenv("TEST_DATABASE"),
+			ClientID: os.Getenv("APP_ID"),
+			ClientSecret: os.Getenv("APP_KEY"),
+			TenantID: os.Getenv("AUTH_ID"),
+		}
+
+		if testConfig.Endpoint == "" {
+			skipETOE = true
+			return
+		}
+
+	} else if err := json.Unmarshal(b, &testConfig); err != nil {
 		panic(err)
 	}
+
 	if err := testConfig.validate(); err != nil {
 		panic(err)
 	}
@@ -109,6 +121,13 @@ type AllDataType struct {
 	Vstr  string                 `kusto:"vstr"`
 	Vlong int64                  `kusto:"vlong"`
 	Vguid value.GUID             `kusto:"vguid"`
+}
+
+type DynamicTypeVariations struct {
+	PlainValue value.Dynamic
+	PlainArray value.Dynamic
+	PlainJson value.Dynamic
+	JsonArray value.Dynamic
 }
 
 type principal struct {
@@ -149,7 +168,7 @@ func TestQueries(t *testing.T) {
 	}
 	t.Parallel()
 
-	ctx, cancel := context.WithCancel(context.Background())
+	_, cancel := context.WithCancel(context.Background())
 	defer cancel()
 
 	client, err := kusto.New(testConfig.Endpoint, authorizer)
@@ -262,50 +281,78 @@ func TestQueries(t *testing.T) {
 			want: []AllDataType{getExpectedResult()},
 		},
 		{
-			desc: "Mgmt: Check our principals",
-			stmt: kusto.NewStmt(".show database e2e principals"),
-			teardown: func() error {
-				_, err := client.Mgmt(ctx, testConfig.Database, dropStmt)
-				return err
-			},
-			mcall: client.Mgmt,
+			desc:    "Query: make sure Dynamic data type variations can be parsed",
+			stmt:    kusto.NewStmt(`print PlainValue = dynamic('1'), PlainArray = dynamic('[1,2,3]'), PlainJson= dynamic('{ "a": 1}'), JsonArray= dynamic('[{ "a": 1}, { "a": 2}]`),
+			qcall:   client.Query,
+			options: []kusto.QueryOption{kusto.ResultsProgressiveDisable()},
 			doer: func(row *table.Row, update interface{}) error {
-				rec := principal{}
+				rec := DynamicTypeVariations{}
 				if err := row.ToStruct(&rec); err != nil {
 					return err
 				}
-				recs := update.(*[]principal)
+				recs := update.(*[]DynamicTypeVariations)
 				*recs = append(*recs, rec)
 				return nil
 			},
 			gotInit: func() interface{} {
-				v := []principal{}
-				return &v
+				ad := []DynamicTypeVariations{}
+				return &ad
 			},
-			compare: func(got, want interface{}) error {
-				rgot := got.(*[]principal)
-
-				lookingFor := map[string]bool{}
-				for _, principal := range testConfig.Principals {
-					lookingFor[principal] = true
-				}
-
-				found := []string{}
-
-				for _, rec := range *rgot {
-					if lookingFor[rec.PrincipalDisplayName] {
-						delete(lookingFor, rec.PrincipalDisplayName) // There are duplicates for different priviledge levels
-						found = append(found, rec.PrincipalDisplayName)
-					}
-				}
-				sort.Strings(found)
-				sort.Strings(testConfig.Principals)
-				if diff := pretty.Compare(testConfig.Principals, found); diff != "" {
-					return fmt.Errorf("-want/+got:\n%s", diff)
-				}
-				return nil
+			want: []DynamicTypeVariations{
+				{
+					PlainValue: value.Dynamic{Value: []byte("1"), Valid: true},
+					PlainArray: value.Dynamic{Value: []byte("[1,2,3]"), Valid: true},
+					PlainJson: value.Dynamic{Value: []byte(`{ "a": 1}`), Valid: true},
+					JsonArray: value.Dynamic{Value: []byte(`[{ "a": 1}, { "a": 2}]`), Valid: true},
+				},
 			},
 		},
+		// TODO (daniel): we should replace this test with a less sensitive query (security wise)
+		//{
+		//	desc: "Mgmt: Check our principals",
+		//	stmt: kusto.NewStmt(".show database e2e principals"),
+		//	teardown: func() error {
+		//		_, err := client.Mgmt(ctx, testConfig.Database, dropStmt)
+		//		return err
+		//	},
+		//	mcall: client.Mgmt,
+		//	doer: func(row *table.Row, update interface{}) error {
+		//		rec := principal{}
+		//		if err := row.ToStruct(&rec); err != nil {
+		//			return err
+		//		}
+		//		recs := update.(*[]principal)
+		//		*recs = append(*recs, rec)
+		//		return nil
+		//	},
+		//	gotInit: func() interface{} {
+		//		v := []principal{}
+		//		return &v
+		//	},
+		//	compare: func(got, want interface{}) error {
+		//		rgot := got.(*[]principal)
+		//
+		//		lookingFor := map[string]bool{}
+		//		for _, principal := range testConfig.Principals {
+		//			lookingFor[principal] = true
+		//		}
+		//
+		//		found := []string{}
+		//
+		//		for _, rec := range *rgot {
+		//			if lookingFor[rec.PrincipalDisplayName] {
+		//				delete(lookingFor, rec.PrincipalDisplayName) // There are duplicates for different priviledge levels
+		//				found = append(found, rec.PrincipalDisplayName)
+		//			}
+		//		}
+		//		sort.Strings(found)
+		//		sort.Strings(testConfig.Principals)
+		//		if diff := pretty.Compare(testConfig.Principals, found); diff != "" {
+		//			return fmt.Errorf("-want/+got:\n%s", diff)
+		//		}
+		//		return nil
+		//	},
+		//},
 	}
 
 	for _, test := range tests {
