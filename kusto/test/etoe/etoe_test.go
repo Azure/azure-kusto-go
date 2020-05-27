@@ -32,7 +32,6 @@ type config struct {
 	ClientID     string
 	ClientSecret string
 	TenantID     string
-	Principals   []string
 }
 
 func (c *config) validate() error {
@@ -40,9 +39,7 @@ func (c *config) validate() error {
 	case c.Endpoint, c.Database, c.ClientID, c.ClientSecret, c.TenantID:
 		return fmt.Errorf("no field in the end to end test config.json file can be empty")
 	}
-	//if len(c.Principals) == 0 {
-	//	return fmt.Errorf("config.json cannot have an empty Principals field")
-	//}
+
 	return nil
 }
 
@@ -128,16 +125,6 @@ type DynamicTypeVariations struct {
 	PlainArray value.Dynamic
 	PlainJson value.Dynamic
 	JsonArray value.Dynamic
-}
-
-type principal struct {
-	Role                     string
-	PrincipalType            string
-	PrincipalDisplayName     string
-	PrincipalObjectId        string
-	PrincipalFQN             string
-	Notes                    string
-	RoleAssignmentIdentifier string
 }
 
 type LogRow struct {
@@ -307,52 +294,6 @@ func TestQueries(t *testing.T) {
 				},
 			},
 		},
-		// TODO (daniel): we should replace this test with a less sensitive query (security wise)
-		//{
-		//	desc: "Mgmt: Check our principals",
-		//	stmt: kusto.NewStmt(".show database e2e principals"),
-		//	teardown: func() error {
-		//		_, err := client.Mgmt(ctx, testConfig.Database, dropStmt)
-		//		return err
-		//	},
-		//	mcall: client.Mgmt,
-		//	doer: func(row *table.Row, update interface{}) error {
-		//		rec := principal{}
-		//		if err := row.ToStruct(&rec); err != nil {
-		//			return err
-		//		}
-		//		recs := update.(*[]principal)
-		//		*recs = append(*recs, rec)
-		//		return nil
-		//	},
-		//	gotInit: func() interface{} {
-		//		v := []principal{}
-		//		return &v
-		//	},
-		//	compare: func(got, want interface{}) error {
-		//		rgot := got.(*[]principal)
-		//
-		//		lookingFor := map[string]bool{}
-		//		for _, principal := range testConfig.Principals {
-		//			lookingFor[principal] = true
-		//		}
-		//
-		//		found := []string{}
-		//
-		//		for _, rec := range *rgot {
-		//			if lookingFor[rec.PrincipalDisplayName] {
-		//				delete(lookingFor, rec.PrincipalDisplayName) // There are duplicates for different priviledge levels
-		//				found = append(found, rec.PrincipalDisplayName)
-		//			}
-		//		}
-		//		sort.Strings(found)
-		//		sort.Strings(testConfig.Principals)
-		//		if diff := pretty.Compare(testConfig.Principals, found); diff != "" {
-		//			return fmt.Errorf("-want/+got:\n%s", diff)
-		//		}
-		//		return nil
-		//	},
-		//},
 	}
 
 	for _, test := range tests {
