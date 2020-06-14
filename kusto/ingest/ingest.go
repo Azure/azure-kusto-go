@@ -394,12 +394,12 @@ func (i *Ingestion) FromFile(ctx context.Context, fPath string, options ...FileO
 		}
 	}
 
-	if isFileSystem {
-		return i.fs.Local(ctx, fPath, props)	
+	if isFileSystem(fPath) {
+		return i.fs.Local(ctx, fPath, props)
 	}
 
-	return i.fs.Blob(ctx, fPath, 0, props}
-
+	return i.fs.Blob(ctx, fPath, 0, props)
+}
 
 // FromReader allows uploading a data file for Kusto from an io.Reader. The content is uploaded to Blobstore and
 // ingested after all data in the reader is processed. Content should not use compression as the content will be
