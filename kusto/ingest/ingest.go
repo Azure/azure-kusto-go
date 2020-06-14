@@ -8,6 +8,9 @@ import (
 	"fmt"
 	"io"
 	"net/url"
+	"regexp"
+	"runtime"
+	"strings"
 	"sync"
 	"sync/atomic"
 	"time"
@@ -25,6 +28,41 @@ var (
 	manager   atomic.Value // *resources.Manager
 	managerMu sync.Mutex
 )
+
+// One time OS Check
+var gIsWin bool = false
+var gOsChecked bool = false
+
+func isWin() bool {
+	if !gOsChecked {
+		gIsWin = runtime.GOOS == "windows"
+	}
+
+	return gIsWin
+}
+
+// Created outside the fucntion inorder to pay once for regexp creation
+var gIsWinDrive = regexp.MustCompile(`^[a-zA-Z]:\\[^\\].*`)
+
+func isFileSystem(path string) bool {
+	res := false
+
+	if isWin() {
+		switch {
+		case strings.HasPrefix(path, `\\`):
+		case gIsWinDrive.MatchString(path):
+			res = true
+
+		default:
+			res = false
+		}
+	} else {
+		_, err := url.ParseRequestURI(path)
+		res = err != nil
+	}
+
+	return res
+}
 
 // getManager retrieves a Manager or creates a new one with client. Clients, other than having timeout options,
 // are all the same. Managers all have the same context. This acts as a singleton to prevent propogating
@@ -356,12 +394,12 @@ func (i *Ingestion) FromFile(ctx context.Context, fPath string, options ...FileO
 		}
 	}
 
-	if _, err := url.ParseRequestURI(fPath); err == nil {
-		return i.fs.Blob(ctx, fPath, 0, props)
+	if isFileSystem {
+		return i.fs.Local(ctx, fPath, props)	
 	}
 
-	return i.fs.Local(ctx, fPath, props)
-}
+	return i.fs.Blob(ctx, fPath, 0, props}
+
 
 // FromReader allows uploading a data file for Kusto from an io.Reader. The content is uploaded to Blobstore and
 // ingested after all data in the reader is processed. Content should not use compression as the content will be
