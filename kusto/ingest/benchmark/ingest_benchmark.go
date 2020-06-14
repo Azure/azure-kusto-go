@@ -35,14 +35,17 @@ var jsonMappingFilePath = strings.Join([]string{artifactFolderPath, "json_mappin
 var jsonMappingName = "benchmark_json_mapping"
 
 func main() {
-	fmt.Println("Starting memory benchmark")
+	pprofEndpoint := "localhost:6060"
 
-	// PPROF Endpoint will be here
+	fmt.Println("Starting memory benchmark")
+	fmt.Println("Please make sure az-cli is installed and 'az login' was called")
+	fmt.Printf("PPROF Endpoint is %s\n", pprofEndpoint)
+
 	go func() {
-		log.Println(http.ListenAndServe("localhost:6060", nil))
+		log.Println(http.ListenAndServe(pprofEndpoint, nil))
 	}()
 
-	client, err := createKustoClient(os.Args[1], os.Args[2], os.Args[3])
+	client, err := createKustoClient()
 	if err != nil {
 		fmt.Println("Exit")
 		return
@@ -54,25 +57,21 @@ func main() {
 		return
 	}
 
-	benchmarkIngestFromFile(client, 1)
+	benchmarkIngestFromFile(client, 10)
 
 	fmt.Println("Press enter to exit")
 	fmt.Scanln()
 }
 
-func createKustoClient(user, pass, tenant string) (*kusto.Client, error) {
-	/* This does not work
-	authorizer, err := auth.NewAuthorizerFromCLI()
+func createKustoClient() (*kusto.Client, error) {
+	// This requires az-cli installed and az-cli login to succeed
+	authorizer, err := auth.NewAuthorizerFromCLIWithResource(targetCluster)
 	if err != nil {
-		fmt.Println("failed to acquire auth token from az-cli\n")
+		fmt.Println("failed to acquire auth token from az-cli")
 		return nil, err
 	}
 
 	authorization := kusto.Authorization{Authorizer: authorizer}
-	*/
-
-	authConfig := auth.NewClientCredentialsConfig(user, pass, tenant)
-	authorization := kusto.Authorization{Config: authConfig}
 
 	client, err := kusto.New(targetCluster, authorization)
 	if err != nil {
@@ -94,7 +93,6 @@ func setupBenchmarkDatabase(client *kusto.Client) error {
 	createDbUnsafe := kusto.NewStmt(".create database ", kusto.UnsafeStmt(unsafe.Stmt{Add: true})).UnsafeAdd(databaseName).Add(" volatile ifnotexists")
 	createTableUnsafe := kusto.NewStmt(".create table ", kusto.UnsafeStmt(unsafe.Stmt{Add: true})).UnsafeAdd(tableName).UnsafeAdd(tableScheme)
 	createJSONMapping := kusto.NewStmt(".create-or-alter table ", kusto.UnsafeStmt(unsafe.Stmt{Add: true})).UnsafeAdd(tableName).Add(" ingestion json mapping '").UnsafeAdd(jsonMappingName).Add("' '").UnsafeAdd(string(jsonMapping)).Add("'")
-	//ret = m_engineAdminProvider.ExecuteControlCommand(E2eEnv.TestDatabase, $".create-or-alter table {m_tableName} ingestion json mapping '{m_jsonMappingRefName}' '{m_jsonMapping}'");
 
 	if !databaseExists {
 		if _, err := client.Mgmt(context.Background(), "", createDbUnsafe); err != nil {
