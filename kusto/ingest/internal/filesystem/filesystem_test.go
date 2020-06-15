@@ -40,9 +40,9 @@ func TestFormatDiscovery(t *testing.T) {
 	}
 
 	for _, test := range tests {
-		got := FormatDiscovery(test.input)
+		got := properties.DataFormatDiscovery(test.input)
 		if got != test.want {
-			t.Errorf("TestFormatDiscovery(%s): got %s, want %s", test.input, got, test.want)
+			t.Errorf("TestFormatDiscovery(%s): got '%s', want '%s'", test.input, got, test.want)
 		}
 	}
 }
@@ -64,7 +64,7 @@ func TestCompressionDiscovery(t *testing.T) {
 	for _, test := range tests {
 		got := CompressionDiscovery(test.input)
 		if got != test.want {
-			t.Errorf("TestCompressionDiscoveryy(%s): got %s, want %s", test.input, got, test.want)
+			t.Errorf("TestCompressionDiscoveryy(%s): got '%s', want '%s'", test.input, got, test.want)
 		}
 	}
 }
@@ -209,6 +209,34 @@ func TestLocalToBlob(t *testing.T) {
 
 		if gotBuf.String() != content {
 			t.Errorf("TestLocalToBlob(%s): got %q, want %q", test.desc, gotBuf.String(), content)
+		}
+	}
+}
+
+func TestIsLocalFileSystem(t *testing.T) {
+	t.Parallel()
+
+	tests := []struct {
+		input string
+		want  bool
+	}{
+		{"c:\\dir\\file", true},
+		{"\\drive\\dir\\file", true},
+		{"dir\\dir\\file", true},
+		{"/mnt/dir/file", true},
+		{"/dir/dir/file", true},
+		{"./dir/file", true},
+		{"./file", true},
+		{"file", true},
+		{"file:///drive/dir/file", true},
+		{"https://server/resource", false},
+		{"ftp://server/resource", false},
+	}
+
+	for _, test := range tests {
+		got := IsFileSystem(test.input)
+		if got != test.want {
+			t.Errorf("TestIsLocalFileSystem(%s): got '%t', want '%t'", test.input, got, test.want)
 		}
 	}
 }

@@ -7,10 +7,6 @@ import (
 	"encoding/json"
 	"fmt"
 	"io"
-	"net/url"
-	"regexp"
-	"runtime"
-	"strings"
 	"sync"
 	"sync/atomic"
 	"time"
@@ -28,41 +24,6 @@ var (
 	manager   atomic.Value // *resources.Manager
 	managerMu sync.Mutex
 )
-
-// One time OS Check
-var gIsWin bool = false
-var gOsChecked bool = false
-
-func isWin() bool {
-	if !gOsChecked {
-		gIsWin = runtime.GOOS == "windows"
-	}
-
-	return gIsWin
-}
-
-// Created outside the fucntion inorder to pay once for regexp creation
-var gIsWinDrive = regexp.MustCompile(`^[a-zA-Z]:\\[^\\].*`)
-
-func isFileSystem(path string) bool {
-	res := false
-
-	if isWin() {
-		switch {
-		case strings.HasPrefix(path, `\\`):
-		case gIsWinDrive.MatchString(path):
-			res = true
-
-		default:
-			res = false
-		}
-	} else {
-		_, err := url.ParseRequestURI(path)
-		res = err != nil
-	}
-
-	return res
-}
 
 // getManager retrieves a Manager or creates a new one with client. Clients, other than having timeout options,
 // are all the same. Managers all have the same context. This acts as a singleton to prevent propogating
@@ -157,43 +118,51 @@ func FlushImmediately() FileOption {
 // Not all options can be used in every method.
 type DataFormat = properties.DataFormat
 
+// [Yochai 15.06.2020]
+// John, I want to delete this and use properties.DataFormat insetad, but I get the feeling this will cause a breaking change.
+// WDYT?
+
 // note: any change here needs to be kept up to date with the properties version.
 // I'm not a fan of having two copies, but I don't think it is worth moving to its own package
 // to allow properties and ingest to both import without a cycle.
 const (
 	// DFUnknown indicates the EncodingType is not set.
-	DFUnknown DataFormat = 0
-	// CSV indicates the source is encoded in comma seperated values.
-	CSV DataFormat = 1
-	// JSON indicates the source is encoded in Javscript Object Notation.
-	JSON DataFormat = 2
+	DFUnknown DataFormat = properties.DFUnknown
 	// AVRO indicates the source is encoded in Apache Avro format.
-	AVRO DataFormat = 3
-	// Parquet indicates the source is encoded in Apache Parquet format.
-	Parquet DataFormat = 4
+	AVRO DataFormat = properties.AVRO
+	// APACHE AVRO indicates the source is encoded in Apache avro2json format.
+	APACHEAVRO DataFormat = properties.APACHEAVRO
+	// CSV indicates the source is encoded in comma seperated values.
+	CSV DataFormat = properties.CSV
+	// JSON indicates the source is encoded as one or more lines, each containing a record in Javscript Object Notation.
+	JSON DataFormat = properties.JSON
+	// JSON indicates the source is encoded in JSON-Array of individual records in Javscript Object Notation.
+	MULTIJSON DataFormat = properties.MULTIJSON
 	// ORC indicates the source is encoded in Apache Optimized Row Columnar format.
-	ORC DataFormat = 5
+	ORC DataFormat = properties.ORC
+	// Parquet indicates the source is encoded in Apache Parquet format.
+	Parquet DataFormat = properties.Parquet
 	// PSV is pipe "|" separated values.
-	PSV DataFormat = 6
+	PSV DataFormat = properties.PSV
 	// Raw is a text file that has only a single string value.
-	Raw DataFormat = 7
+	Raw DataFormat = properties.Raw
 	// SCSV is a file containing semicolon ";" separated values.
-	SCSV DataFormat = 8
+	SCSV DataFormat = properties.SCSV
 	// SOHSV is a file containing SOH-separated values(ASCII codepont 1).
-	SOHSV DataFormat = 9
-	// TSV is a file containing table seperated values ("\t").
-	TSV DataFormat = 10
+	SOHSV DataFormat = properties.SOHSV
+	// SINGLEJSON indicates the source containg a single Javascript Object Notation encoded record, newlines are treated as whitespace
+	SINGLEJSON DataFormat = properties.SINGLEJSON
+	// SSTREAM indicats the source is encoded as a Microsoft Cosmos Structured Streams format
+	SSTREAM DataFormat = properties.SSTREAM
+	// TSV is a file containing tab seperated values ("\t").
+	TSV DataFormat = properties.TSV
+	// TSV is a file containing escaped-tab seperated values ("\t").
+	TSVE DataFormat = properties.TSVE
 	// TXT is a text file with lines deliminated by "\n".
-	TXT DataFormat = 11
+	TXT DataFormat = properties.TXT
+	// WCLOGFILE indicates the source is encoded using W3C Extended Log File format
+	WCLOGFILE DataFormat = properties.WCLOGFILE
 )
-
-var validMappingKind = map[DataFormat]bool{
-	CSV:     true,
-	JSON:    true,
-	AVRO:    true,
-	Parquet: true,
-	ORC:     true,
-}
 
 // IngestionMapping provides runtime mapping of the data being imported to the fields in the table.
 // "ref" will be JSON encoded, so it can be any type that can be JSON marshalled. If you pass a string
@@ -202,7 +171,7 @@ var validMappingKind = map[DataFormat]bool{
 func IngestionMapping(mapping interface{}, mappingKind DataFormat) FileOption {
 	return propertyOption(
 		func(p *properties.All) error {
-			if !validMappingKind[mappingKind] {
+			if !properties.DataFormatIsValidMappingKind(mappingKind) {
 				return errors.ES(
 					errors.OpUnknown,
 					errors.KClientArgs,
@@ -242,7 +211,7 @@ func IngestionMapping(mapping interface{}, mappingKind DataFormat) FileOption {
 func IngestionMappingRef(refName string, mappingKind DataFormat) FileOption {
 	return propertyOption(
 		func(p *properties.All) error {
-			if !validMappingKind[mappingKind] {
+			if !properties.DataFormatIsValidMappingKind(mappingKind) {
 				return errors.ES(errors.OpUnknown, errors.KClientArgs, "IngestionMappingRef() option does not support EncodingType %v", mappingKind).SetNoRetry()
 			}
 			p.Ingestion.Additional.IngestionMappingRef = refName
@@ -394,7 +363,7 @@ func (i *Ingestion) FromFile(ctx context.Context, fPath string, options ...FileO
 		}
 	}
 
-	if isFileSystem(fPath) {
+	if filesystem.IsFileSystem(fPath) {
 		return i.fs.Local(ctx, fPath, props)
 	}
 

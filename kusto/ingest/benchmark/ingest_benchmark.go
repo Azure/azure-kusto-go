@@ -125,22 +125,54 @@ func benchmarkIngestFromFile(client *kusto.Client, times int) {
 		return
 	}
 
+	testType := 1
+
 	// Run the test
 	for i := 1; i <= times; i++ {
-		//err := ingestor.FromFile(ctx, filepathToIngest, ingest.FlushImmediately())
+		switch testType {
 
-		reader, err := os.Open(jsonFilepath)
-		if err != nil {
-			fmt.Printf("failed to open thefile '%s' due to error - %s\n", jsonFilepath, err.Error())
+		case 1:
+			// CSV Ingest from file
+			err := ingestor.FromFile(ctx, csvFilepath, ingest.FlushImmediately())
+			if err != nil {
+				fmt.Printf("failed to upload '%s' due to error - %s\n", csvFilepath, err.Error())
+			} else {
+				fmt.Printf("%d of %d\n", i, times)
+			}
+
+		case 2:
+			// JSON ingest from reader
+			reader, err := os.Open(jsonFilepath)
+			if err != nil {
+				fmt.Printf("failed to open thefile '%s' due to error - %s\n", jsonFilepath, err.Error())
+				return
+			}
+
+			err = ingestor.FromReader(ctx, reader, ingest.IngestionMappingRef(jsonMappingName, ingest.JSON), ingest.FileFormat(ingest.JSON), ingest.FlushImmediately())
+			if err != nil {
+				fmt.Printf("failed to upload '%s' due to error - %s\n", jsonFilepath, err.Error())
+			} else {
+				fmt.Printf("%d of %d\n", i, times)
+			}
+
+		case 3:
+			// CSV ingest from reader
+			reader, err := os.Open(csvFilepath)
+			if err != nil {
+				fmt.Printf("failed to open thefile '%s' due to error - %s\n", csvFilepath, err.Error())
+				return
+			}
+
+			err = ingestor.FromReader(ctx, reader, ingest.FlushImmediately(), ingest.FileFormat(ingest.CSV))
+			if err != nil {
+				fmt.Printf("failed to upload '%s' due to error - %s\n", csvFilepath, err.Error())
+			} else {
+				fmt.Printf("%d of %d\n", i, times)
+			}
+
+		default:
 			return
-		}
 
-		//err = ingestor.FromReader(ctx, reader, ingest.FlushImmediately(), ingest.FileFormat(ingest.CSV))
-		err = ingestor.FromReader(ctx, reader, ingest.IngestionMappingRef(jsonMappingName, ingest.JSON), ingest.FileFormat(ingest.JSON), ingest.FlushImmediately())
-		if err != nil {
-			fmt.Printf("failed to upload '%s' due to error - %s\n", jsonFilepath, err.Error())
-		} else {
-			fmt.Printf("%d of %d\n", i, times)
 		}
 	}
 }
