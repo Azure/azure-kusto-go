@@ -13,7 +13,6 @@ import (
 	"path"
 	"path/filepath"
 	"regexp"
-	"runtime"
 	"strings"
 	"time"
 
@@ -328,39 +327,21 @@ func CompressionDiscovery(fName string) properties.CompressionType {
 }
 
 var (
-	// One time OS Check
-	gIsWin     bool = false
-	gOsChecked bool = false
-
 	// Created outside the fucntion inorder to pay once for regexp creation
 	gExtractURIProtocol = regexp.MustCompile(`^(.*)://`)
 )
 
-func isWin() bool {
-	if !gOsChecked {
-		gIsWin = runtime.GOOS == "windows"
-		gOsChecked = true
-	}
-
-	return gIsWin
-}
-
 // IsFileSystem detects whether a path points to a file system accessiable file
 // If this file requires another protocol (ftp, https, etc), it will return false
 func IsFileSystem(path string) bool {
-	res := false
-
-	if isWin() {
-		protocol := gExtractURIProtocol.FindStringSubmatch(path)
-		if len(protocol) == 0 {
-			res = true
-		} else if strings.ToLower(protocol[1]) == "file" {
-			res = true
-		}
-	} else {
-		_, err := url.ParseRequestURI(path)
-		res = err != nil
+	protocol := gExtractURIProtocol.FindStringSubmatch(path)
+	if len(protocol) == 0 {
+		return true
 	}
 
-	return res
+	if strings.ToLower(protocol[1]) == "file" {
+		return true
+	}
+
+	return false
 }
