@@ -236,7 +236,7 @@ func TestIsLocalFileSystem(t *testing.T) {
 	for _, test := range tests {
 		got := IsFileSystem(test.input)
 		if got != test.want {
-			t.Errorf("TestIsLocalFileSystem(%s): got '%t', want '%t'", test.input, got, test.want)
+			t.Errorf("TestIsLocalFileSystem(%s): got %v, want %v", test.input, got, test.want)
 		}
 	}
 }

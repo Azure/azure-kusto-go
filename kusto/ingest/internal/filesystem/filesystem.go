@@ -327,7 +327,7 @@ func CompressionDiscovery(fName string) properties.CompressionType {
 }
 
 var (
-	// Created outside the fucntion inorder to pay once for regexp creation
+	// gExtractURIProtocol is created outside the fucntion inorder to pay once for regexp creation.
 	gExtractURIProtocol = regexp.MustCompile(`^(.*)://`)
 )
 

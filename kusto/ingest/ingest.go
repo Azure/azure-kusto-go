@@ -118,26 +118,19 @@ func FlushImmediately() FileOption {
 // Not all options can be used in every method.
 type DataFormat = properties.DataFormat
 
-// [Yochai 15.06.2020]
-// John, I want to delete this and use properties.DataFormat insetad, but I get the feeling this will cause a breaking change.
-// WDYT?
-
-// note: any change here needs to be kept up to date with the properties version.
-// I'm not a fan of having two copies, but I don't think it is worth moving to its own package
-// to allow properties and ingest to both import without a cycle.
 const (
 	// DFUnknown indicates the EncodingType is not set.
 	DFUnknown DataFormat = properties.DFUnknown
 	// AVRO indicates the source is encoded in Apache Avro format.
 	AVRO DataFormat = properties.AVRO
-	// APACHE AVRO indicates the source is encoded in Apache avro2json format.
-	APACHEAVRO DataFormat = properties.APACHEAVRO
+	// ApacheAVRO indicates the source is encoded in Apache avro2json format.
+	ApacheAVRO DataFormat = properties.ApacheAVRO
 	// CSV indicates the source is encoded in comma seperated values.
 	CSV DataFormat = properties.CSV
 	// JSON indicates the source is encoded as one or more lines, each containing a record in Javscript Object Notation.
 	JSON DataFormat = properties.JSON
-	// JSON indicates the source is encoded in JSON-Array of individual records in Javscript Object Notation.
-	MULTIJSON DataFormat = properties.MULTIJSON
+	// MultiJSON indicates the source is encoded in JSON-Array of individual records in Javscript Object Notation.
+	MultiJSON DataFormat = properties.MultiJSON
 	// ORC indicates the source is encoded in Apache Optimized Row Columnar format.
 	ORC DataFormat = properties.ORC
 	// Parquet indicates the source is encoded in Apache Parquet format.
@@ -150,18 +143,18 @@ const (
 	SCSV DataFormat = properties.SCSV
 	// SOHSV is a file containing SOH-separated values(ASCII codepont 1).
 	SOHSV DataFormat = properties.SOHSV
-	// SINGLEJSON indicates the source containg a single Javascript Object Notation encoded record, newlines are treated as whitespace
-	SINGLEJSON DataFormat = properties.SINGLEJSON
-	// SSTREAM indicats the source is encoded as a Microsoft Cosmos Structured Streams format
-	SSTREAM DataFormat = properties.SSTREAM
+	// SingleJSON indicates the source containg a single Javascript Object Notation encoded record, newlines are treated as whitespace
+	SingleJSON DataFormat = properties.SingleJSON
+	// SStream indicats the source is encoded as a Microsoft Cosmos Structured Streams format
+	SStream DataFormat = properties.SStream
 	// TSV is a file containing tab seperated values ("\t").
 	TSV DataFormat = properties.TSV
-	// TSV is a file containing escaped-tab seperated values ("\t").
+	// TSVE is a file containing escaped-tab seperated values ("\t").
 	TSVE DataFormat = properties.TSVE
 	// TXT is a text file with lines deliminated by "\n".
 	TXT DataFormat = properties.TXT
-	// WCLOGFILE indicates the source is encoded using W3C Extended Log File format
-	WCLOGFILE DataFormat = properties.WCLOGFILE
+	// WCLogFile indicates the source is encoded using W3C Extended Log File format
+	WCLogFile DataFormat = properties.WCLogFile
 )
 
 // IngestionMapping provides runtime mapping of the data being imported to the fields in the table.
@@ -171,7 +164,7 @@ const (
 func IngestionMapping(mapping interface{}, mappingKind DataFormat) FileOption {
 	return propertyOption(
 		func(p *properties.All) error {
-			if !properties.DataFormatIsValidMappingKind(mappingKind) {
+			if !mappingKind.IsValidMappingKind() {
 				return errors.ES(
 					errors.OpUnknown,
 					errors.KClientArgs,
@@ -211,7 +204,7 @@ func IngestionMapping(mapping interface{}, mappingKind DataFormat) FileOption {
 func IngestionMappingRef(refName string, mappingKind DataFormat) FileOption {
 	return propertyOption(
 		func(p *properties.All) error {
-			if !properties.DataFormatIsValidMappingKind(mappingKind) {
+			if !mappingKind.IsValidMappingKind() {
 				return errors.ES(errors.OpUnknown, errors.KClientArgs, "IngestionMappingRef() option does not support EncodingType %v", mappingKind).SetNoRetry()
 			}
 			p.Ingestion.Additional.IngestionMappingRef = refName

@@ -55,9 +55,77 @@ const (
 // More info here: https://docs.microsoft.com/en-us/azure/kusto/management/data-ingestion/
 type DataFormat int
 
+const (
+	// DFUnknown indicates the EncodingType is not set.
+	DFUnknown DataFormat = 0
+	// AVRO indicates the source is encoded in Apache Avro format.
+	AVRO DataFormat = 1
+	// ApacheAVRO indicates the source is encoded in Apache avro2json format.
+	ApacheAVRO DataFormat = 2
+	// CSV indicates the source is encoded in comma seperated values.
+	CSV DataFormat = 3
+	// JSON indicates the source is encoded as one or more lines, each containing a record in Javscript Object Notation.
+	JSON DataFormat = 4
+	// MultiJSON indicates the source is encoded in JSON-Array of individual records in Javscript Object Notation.
+	MultiJSON DataFormat = 5
+	// ORC indicates the source is encoded in Apache Optimized Row Columnar format.
+	ORC DataFormat = 6
+	// Parquet indicates the source is encoded in Apache Parquet format.
+	Parquet DataFormat = 7
+	// PSV is pipe "|" separated values.
+	PSV DataFormat = 8
+	// Raw is a text file that has only a single string value.
+	Raw DataFormat = 9
+	// SCSV is a file containing semicolon ";" separated values.
+	SCSV DataFormat = 10
+	// SOHSV is a file containing SOH-separated values(ASCII codepont 1).
+	SOHSV DataFormat = 11
+	// SingleJSON indicates the source containg a single Javascript Object Notation encoded record, newlines are treated as whitespace
+	SingleJSON DataFormat = 12
+	// SStream indicats the source is encoded as a Microsoft Cosmos Structured Streams format
+	SStream DataFormat = 13
+	// TSV is a file containing tab seperated values ("\t").
+	TSV DataFormat = 14
+	// TSVE is a file containing escaped-tab seperated values ("\t").
+	TSVE DataFormat = 15
+	// TXT is a text file with lines deliminated by "\n".
+	TXT DataFormat = 16
+	// WCLogFile indicates the source is encoded using W3C Extended Log File format
+	WCLogFile DataFormat = 17
+)
+
+type dfDescriptor struct {
+	camelName        string
+	jsonName         string
+	detectableExt    string
+	MappingReq       bool
+	validMappingKind bool
+}
+
+var dfDescriptions = []dfDescriptor{
+	{"", "", "", false, false},
+	{"Avro", "avro", ".avro", true, true},
+	{"ApacheAvro", "avro", "", true, false},
+	{"Csv", "csv", ".csv", false, true},
+	{"Json", "json", ".json", true, true},
+	{"MultiJson", "json", "", true, false},
+	{"Orc", "orc", ".orc", false, true},
+	{"Parquet", "parquet", ".parquet", false, true},
+	{"Psv", "psv", ".psv", false, false},
+	{"Raw", "raw", ".raw", false, false},
+	{"Scsv", "scsv", ".scsv", false, false},
+	{"Sohsv", "sohsv", ".sohsv", false, false},
+	{"SingleJson", "json", "", true, false},
+	{"SStream", "sstream", ".sstream", false, false},
+	{"Tsv", "tsv", ".tsv", false, false},
+	{"Tsve", "tsve", ".tsve", false, false},
+	{"Txt", "txt", ".txt", false, false},
+	{"EcLogFile", "eclogfile", ".eclogfile", false, false},
+}
+
 // String implements fmt.Stringer.
 func (d DataFormat) String() string {
-	ext, err := dfGetJSONName(d)
+	ext, err := d.jsonName()
 	if err != nil {
 		return ""
 	}
@@ -68,7 +136,7 @@ func (d DataFormat) String() string {
 // CamelCase returns the CamelCase version. This is for internal use, do not use.
 // This can be removed in future versions.
 func (d DataFormat) CamelCase() string {
-	cc, err := dfToCamel(d)
+	cc, err := d.camelCase()
 	if err != nil {
 		return ""
 	}
@@ -85,104 +153,36 @@ func (d DataFormat) MarshalJSON() ([]byte, error) {
 	return []byte(fmt.Sprintf("%q", d.String())), nil
 }
 
-const (
-	// DFUnknown indicates the EncodingType is not set.
-	DFUnknown DataFormat = 0
-	// AVRO indicates the source is encoded in Apache Avro format.
-	AVRO DataFormat = 1
-	// APACHEAVRO indicates the source is encoded in Apache avro2json format.
-	APACHEAVRO DataFormat = 2
-	// CSV indicates the source is encoded in comma seperated values.
-	CSV DataFormat = 3
-	// JSON indicates the source is encoded as one or more lines, each containing a record in Javscript Object Notation.
-	JSON DataFormat = 4
-	// MULTIJSON indicates the source is encoded in JSON-Array of individual records in Javscript Object Notation.
-	MULTIJSON DataFormat = 5
-	// ORC indicates the source is encoded in Apache Optimized Row Columnar format.
-	ORC DataFormat = 6
-	// Parquet indicates the source is encoded in Apache Parquet format.
-	Parquet DataFormat = 7
-	// PSV is pipe "|" separated values.
-	PSV DataFormat = 8
-	// Raw is a text file that has only a single string value.
-	Raw DataFormat = 9
-	// SCSV is a file containing semicolon ";" separated values.
-	SCSV DataFormat = 10
-	// SOHSV is a file containing SOH-separated values(ASCII codepont 1).
-	SOHSV DataFormat = 11
-	// SINGLEJSON indicates the source containg a single Javascript Object Notation encoded record, newlines are treated as whitespace
-	SINGLEJSON DataFormat = 12
-	// SSTREAM indicats the source is encoded as a Microsoft Cosmos Structured Streams format
-	SSTREAM DataFormat = 13
-	// TSV is a file containing tab seperated values ("\t").
-	TSV DataFormat = 14
-	// TSVE is a file containing escaped-tab seperated values ("\t").
-	TSVE DataFormat = 15
-	// TXT is a text file with lines deliminated by "\n".
-	TXT DataFormat = 16
-	// WCLOGFILE indicates the source is encoded using W3C Extended Log File format
-	WCLOGFILE DataFormat = 17
-)
-
-type dataFormatDescriptior struct {
-	CamelCaseName    string
-	JSONName         string
-	Extension        string
-	MappingRequired  bool
-	ValidMappingKind bool
-}
-
-var dataFormatDescriptionVec = []dataFormatDescriptior{
-	{"", "", "", false, false},
-	{"Avro", "avro", ".avro", true, true}, // Ke Avro before ApacheAvro so that fileformat detection would prefer it
-	{"ApacheAvro", "avro", ".avro", true, false},
-	{"Csv", "csv", ".csv", false, true},
-	{"Json", "json", ".json", true, true}, // Keep Json before Single or Multi Json, so that fileformat detection would prefer it
-	{"MultiJson", "json", ".json", true, false},
-	{"Orc", "orc", ".orc", false, true},
-	{"Parquet", "parquet", ".parquet", false, true},
-	{"Psv", "psv", ".psv", false, false},
-	{"Raw", "raw", ".raw", false, false},
-	{"Scsv", "scsv", ".scsv", false, false},
-	{"Sohsv", "sohsv", ".sohsv", false, false},
-	{"SingleJson", "json", ".json", true, false},
-	{"SStream", "sstream", ".sstream", false, false},
-	{"Tsv", "tsv", ".tsv", false, false},
-	{"Tsve", "tsve", ".tsve", false, false},
-	{"Txt", "txt", ".txt", false, false},
-	{"EcLogFile", "eclogfile", ".eclogfile", false, false},
-}
-
-// dfToExt takes a DataFormat and returns the file extension that it would use.
-func dfGetJSONName(et DataFormat) (string, error) {
-	if et > 0 && int(et) < len(dataFormatDescriptionVec) {
-		return dataFormatDescriptionVec[et].JSONName, nil
+// jsonName returns the file extension that it would use.
+func (d DataFormat) jsonName() (string, error) {
+	if d > 0 && int(d) < len(dfDescriptions) {
+		return dfDescriptions[d].jsonName, nil
 	}
 
-	return "", fmt.Errorf("EncodingType(%d) was no one we understand", et)
+	return "", fmt.Errorf("EncodingType(%d) was no one we understand", d)
 }
 
-func dfToCamel(et DataFormat) (string, error) {
-	if et > 0 && int(et) < len(dataFormatDescriptionVec) {
-		return dataFormatDescriptionVec[et].CamelCaseName, nil
+func (d DataFormat) camelCase() (string, error) {
+	if d > 0 && int(d) < len(dfDescriptions) {
+		return dfDescriptions[d].camelName, nil
 	}
 
-	return "", fmt.Errorf("EncodingType(%d) was no one we understand", et)
+	return "", fmt.Errorf("EncodingType(%d) was no one we understand", d)
 }
 
-// DataFormatRequiresMapping indicates whether a data format must be provided with valid mapping file information
-func DataFormatRequiresMapping(et DataFormat) bool {
-	if et > 0 && int(et) < len(dataFormatDescriptionVec) {
-		return dataFormatDescriptionVec[et].MappingRequired
+// RequiresMapping indicates whether a data format must be provided with valid mapping file information.
+func (d DataFormat) RequiresMapping() bool {
+	if d > 0 && int(d) < len(dfDescriptions) {
+		return dfDescriptions[d].MappingReq
 	}
 
 	return false
 }
 
-// DataFormatIsValidMappingKind returns true if a dataformat can be used as a MappingKind
-func DataFormatIsValidMappingKind(et DataFormat) bool {
-	if et > 0 && int(et) < len(dataFormatDescriptionVec) {
-		return dataFormatDescriptionVec[et].ValidMappingKind
+// IsValidMappingKind returns true if a dataformat can be used as a MappingKind
+func (d DataFormat) IsValidMappingKind() bool {
+	if d > 0 && int(d) < len(dfDescriptions) {
+		return dfDescriptions[d].validMappingKind
 	}
 
 	return false
@@ -199,8 +199,12 @@ func DataFormatDiscovery(fName string) DataFormat {
 
 	ext := strings.ToLower(filepath.Ext(strings.TrimSuffix(strings.TrimSuffix(strings.ToLower(name), ".zip"), ".gz")))
 
-	for i := 1; i < len(dataFormatDescriptionVec); i++ {
-		if ext == dataFormatDescriptionVec[i].Extension {
+	if ext == "" {
+		return DFUnknown
+	}
+
+	for i := 1; i < len(dfDescriptions); i++ {
+		if ext == dfDescriptions[i].detectableExt {
 			return DataFormat(i)
 		}
 	}

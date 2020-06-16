@@ -104,7 +104,7 @@ func (c *Conn) Write(ctx context.Context, db, table string, payload *bytes.Buffe
 	}()
 
 	switch {
-	case properties.DataFormatRequiresMapping(format):
+	case format.RequiresMapping():
 		if mappingName == "" {
 			return errors.ES(writeOp,
 				errors.KInternal,

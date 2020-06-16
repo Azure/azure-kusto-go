@@ -1,40 +1,43 @@
 package main
 
 import (
-	// Common
 	"context"
 	"fmt"
 	"io/ioutil"
+	"log"
+	"net/http"
 	"os"
+	"strconv"
 	"strings"
 	"time"
 
-	// for PPROF
-	"log"
-	"net/http"
 	_ "net/http/pprof"
 
-	//Kusto
 	"github.com/Azure/azure-kusto-go/kusto"
 	"github.com/Azure/azure-kusto-go/kusto/ingest"
 	"github.com/Azure/azure-kusto-go/kusto/unsafe"
 	"github.com/Azure/go-autorest/autorest/azure/auth"
 )
 
-//var databaseName = "benchmark_db"
-//var targetCluster = "https://yogiladadx.dev.kusto.windows.net"
-
-var databaseName = "e2e"
-var targetCluster = "https://sdkse2etest.eastus.kusto.windows.net"
-var tableName = "benchmark_table"
-var databaseExists = true
-var artifactFolderPath = "artifacts"
-var csvFilepath = strings.Join([]string{artifactFolderPath, "dataset.csv"}, "/")
-var jsonFilepath = strings.Join([]string{artifactFolderPath, "dataset.json"}, "/")
-var jsonMappingFilePath = strings.Join([]string{artifactFolderPath, "json_mapping.json"}, "/")
-var jsonMappingName = "benchmark_json_mapping"
+var (
+	targetCluster       = "https://sdkse2etest.eastus.kusto.windows.net"
+	databaseName        = "e2e"
+	tableName           = "benchmark_table"
+	databaseExists      = true
+	artifactFolderPath  = "artifacts"
+	csvFilepath         = strings.Join([]string{artifactFolderPath, "dataset.csv"}, "/")
+	jsonFilepath        = strings.Join([]string{artifactFolderPath, "dataset.json"}, "/")
+	jsonMappingFilePath = strings.Join([]string{artifactFolderPath, "json_mapping.json"}, "/")
+	jsonMappingName     = "benchmark_json_mapping"
+	testType            = 1
+	repetitions         = 10
+)
 
 func main() {
+	if !validateArgs() {
+		return
+	}
+
 	pprofEndpoint := "localhost:6060"
 
 	fmt.Println("Starting memory benchmark")
@@ -57,10 +60,97 @@ func main() {
 		return
 	}
 
-	benchmarkIngestFromFile(client, 10)
+	benchmarkIngestFromFile(client)
 
 	fmt.Println("Press enter to exit")
 	fmt.Scanln()
+}
+
+func validateArgs() bool {
+	usage := `
+	The Benchmark tool allows developers to manually test changes to the code for memory usage and performane.
+	It runs repetitive calls to SDK APIs and opens a pprof server in port 6060 for memory analysis.
+	You may modify the tool to your own needs while developping.
+	If you feel the modification is worth publishing to others, please submit a PR with the suggested change
+
+	Note 1: 
+		The tool currently requires permissions to ingest, query and create tables on the taregt cluster database.
+
+	Note 2: 
+		Authorization relys on Az-Cli integration. To use it:
+		1. Install az-cli on your machine
+		2. Run 'az login' and  login with your credentials
+		3. Run the benchmark tool
+
+	Test Numbers:
+		1. Ingest a CSV File
+		2. Ingest a Json file from Reader
+		3. Ingest a CSV File from Reader
+	
+	Usage:
+		ingest_benchmark [-h|/?|--help] 
+			print usage 
+
+		ingest_benchmark <cluster_uri> <databasename> [testNumber [repetitions]]
+			runs against a user provided server 
+
+		ingest_benchmark default [testNumber [repetitions]]
+			runs against a kusto internal server (permissions required)
+	`
+	argCount := len(os.Args)
+	if argCount == 1 || argCount > 5 {
+		fmt.Print(usage)
+		return false
+	}
+
+	var err error
+	switch os.Args[1] {
+	case "-h", "/?", "--help":
+		fmt.Print(usage)
+		return false
+
+	case "default":
+		if argCount >= 3 {
+			if testType, err = strconv.Atoi(os.Args[2]); err != nil {
+				fmt.Print(usage)
+				return false
+			}
+		}
+
+		if argCount == 4 {
+			if repetitions, err = strconv.Atoi(os.Args[3]); err != nil {
+				fmt.Print(usage)
+				return false
+			}
+		}
+
+		return true
+
+	default:
+		if argCount < 3 {
+			fmt.Print(usage)
+			return false
+		}
+
+		targetCluster = os.Args[1]
+		databaseName = os.Args[2]
+
+		if argCount >= 4 {
+			if testType, err = strconv.Atoi(os.Args[3]); err != nil {
+				fmt.Print(usage)
+				return false
+			}
+		}
+
+		if argCount == 5 {
+			if repetitions, err = strconv.Atoi(os.Args[4]); err != nil {
+				fmt.Print(usage)
+				return false
+			}
+		}
+
+		return true
+	}
 }
 
 func createKustoClient() (*kusto.Client, error) {
@@ -114,7 +204,7 @@ func setupBenchmarkDatabase(client *kusto.Client) error {
 	return nil
 }
 
-func benchmarkIngestFromFile(client *kusto.Client, times int) {
+func benchmarkIngestFromFile(client *kusto.Client) {
 	// Setup a maximum time for completion to be 10 minutes.
 	ctx, cancel := context.WithTimeout(context.Background(), 10*time.Minute)
 	defer cancel()
@@ -125,10 +215,8 @@ func benchmarkIngestFromFile(client *kusto.Client, times int) {
 		return
 	}
 
-	testType := 1
-
 	// Run the test
-	for i := 1; i <= times; i++ {
+	for i := 1; i <= repetitions; i++ {
 		switch testType {
 
 		case 1:
@@ -137,7 +225,7 @@ func benchmarkIngestFromFile(client *kusto.Client, times int) {
 			if err != nil {
 				fmt.Printf("failed to upload '%s' due to error - %s\n", csvFilepath, err.Error())
 			} else {
-				fmt.Printf("%d of %d\n", i, times)
+				fmt.Printf("%d of %d\n", i, repetitions)
 			}
 
 		case 2:
@@ -152,7 +240,7 @@ func benchmarkIngestFromFile(client *kusto.Client, times int) {
 			if err != nil {
 				fmt.Printf("failed to upload '%s' due to error - %s\n", jsonFilepath, err.Error())
 			} else {
-				fmt.Printf("%d of %d\n", i, times)
+				fmt.Printf("%d of %d\n", i, repetitions)
 			}
 
 		case 3:
@@ -167,10 +255,11 @@ func benchmarkIngestFromFile(client *kusto.Client, times int) {
 			if err != nil {
 				fmt.Printf("failed to upload '%s' due to error - %s\n", csvFilepath, err.Error())
 			} else {
-				fmt.Printf("%d of %d\n", i, times)
+				fmt.Printf("%d of %d\n", i, repetitions)
 			}
 
 		default:
+			fmt.Printf("Undefined Test Number %d\n", i)
 			return
 
 		}
