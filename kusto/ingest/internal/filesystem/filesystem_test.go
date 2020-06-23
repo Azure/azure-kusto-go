@@ -42,7 +42,7 @@ func TestFormatDiscovery(t *testing.T) {
 	for _, test := range tests {
 		got := properties.DataFormatDiscovery(test.input)
 		if got != test.want {
-			t.Errorf("TestFormatDiscovery(%s): got '%s', want '%s'", test.input, got, test.want)
+			t.Errorf("TestFormatDiscovery(%s): got %q, want %q", test.input, got, test.want)
 		}
 	}
 }
@@ -64,7 +64,7 @@ func TestCompressionDiscovery(t *testing.T) {
 	for _, test := range tests {
 		got := CompressionDiscovery(test.input)
 		if got != test.want {
-			t.Errorf("TestCompressionDiscoveryy(%s): got '%s', want '%s'", test.input, got, test.want)
+			t.Errorf("TestCompressionDiscoveryy(%s): got %q, want %q", test.input, got, test.want)
 		}
 	}
 }

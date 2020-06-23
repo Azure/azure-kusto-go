@@ -118,6 +118,9 @@ func FlushImmediately() FileOption {
 // Not all options can be used in every method.
 type DataFormat = properties.DataFormat
 
+// note: any change here needs to be kept up to date with the properties version.
+// I'm not a fan of having two copies, but I don't think it is worth moving to its own package
+// to allow properties and ingest to both import without a cycle.
 const (
 	// DFUnknown indicates the EncodingType is not set.
 	DFUnknown DataFormat = properties.DFUnknown

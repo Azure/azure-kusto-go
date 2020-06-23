@@ -125,23 +125,21 @@ var dfDescriptions = []dfDescriptor{
 
 // String implements fmt.Stringer.
 func (d DataFormat) String() string {
-	ext, err := d.jsonName()
-	if err != nil {
-		return ""
+	if d > 0 && int(d) < len(dfDescriptions) {
+		return dfDescriptions[d].jsonName
 	}
 
-	return ext
+	return ""
 }
 
 // CamelCase returns the CamelCase version. This is for internal use, do not use.
 // This can be removed in future versions.
 func (d DataFormat) CamelCase() string {
-	cc, err := d.camelCase()
-	if err != nil {
-		return ""
+	if d > 0 && int(d) < len(dfDescriptions) {
+		return dfDescriptions[d].camelName
 	}
 
-	return cc
+	return ""
 }
 
 // MarshalJSON implements json.Marshaler.MarshalJSON.
@@ -151,23 +149,6 @@ func (d DataFormat) MarshalJSON() ([]byte, error) {
 	}
 
 	return []byte(fmt.Sprintf("%q", d.String())), nil
-}
-
-// jsonName returns the file extension that it would use.
-func (d DataFormat) jsonName() (string, error) {
-	if d > 0 && int(d) < len(dfDescriptions) {
-		return dfDescriptions[d].jsonName, nil
-	}
-
-	return "", fmt.Errorf("EncodingType(%d) was no one we understand", d)
-}
-
-func (d DataFormat) camelCase() (string, error) {
-	if d > 0 && int(d) < len(dfDescriptions) {
-		return dfDescriptions[d].camelName, nil
-	}
-
-	return "", fmt.Errorf("EncodingType(%d) was no one we understand", d)
 }
 
 // RequiresMapping indicates whether a data format must be provided with valid mapping file information.
