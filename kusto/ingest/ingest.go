@@ -146,8 +146,6 @@ const (
 	SCSV DataFormat = properties.SCSV
 	// SOHSV is a file containing SOH-separated values(ASCII codepont 1).
 	SOHSV DataFormat = properties.SOHSV
-	// SingleJSON indicates the source containg a single Javascript Object Notation encoded record, newlines are treated as whitespace
-	SingleJSON DataFormat = properties.SingleJSON
 	// SStream indicats the source is encoded as a Microsoft Cosmos Structured Streams format
 	SStream DataFormat = properties.SStream
 	// TSV is a file containing tab seperated values ("\t").
@@ -157,7 +155,7 @@ const (
 	// TXT is a text file with lines deliminated by "\n".
 	TXT DataFormat = properties.TXT
 	// WCLogFile indicates the source is encoded using W3C Extended Log File format
-	WCLogFile DataFormat = properties.WCLogFile
+	W3CLogFile DataFormat = properties.W3CLogFile
 )
 
 // IngestionMapping provides runtime mapping of the data being imported to the fields in the table.

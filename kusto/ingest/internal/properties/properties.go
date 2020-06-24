@@ -80,18 +80,16 @@ const (
 	SCSV DataFormat = 10
 	// SOHSV is a file containing SOH-separated values(ASCII codepont 1).
 	SOHSV DataFormat = 11
-	// SingleJSON indicates the source containg a single Javascript Object Notation encoded record, newlines are treated as whitespace
-	SingleJSON DataFormat = 12
 	// SStream indicats the source is encoded as a Microsoft Cosmos Structured Streams format
-	SStream DataFormat = 13
+	SStream DataFormat = 12
 	// TSV is a file containing tab seperated values ("\t").
-	TSV DataFormat = 14
+	TSV DataFormat = 13
 	// TSVE is a file containing escaped-tab seperated values ("\t").
-	TSVE DataFormat = 15
+	TSVE DataFormat = 14
 	// TXT is a text file with lines deliminated by "\n".
-	TXT DataFormat = 16
-	// WCLogFile indicates the source is encoded using W3C Extended Log File format
-	WCLogFile DataFormat = 17
+	TXT DataFormat = 15
+	// W3CLogFile indicates the source is encoded using W3C Extended Log File format
+	W3CLogFile DataFormat = 16
 )
 
 type dfDescriptor struct {
@@ -115,12 +113,11 @@ var dfDescriptions = []dfDescriptor{
 	{"Raw", "raw", ".raw", false, false},
 	{"Scsv", "scsv", ".scsv", false, false},
 	{"Sohsv", "sohsv", ".sohsv", false, false},
-	{"SingleJson", "json", "", true, false},
 	{"SStream", "sstream", ".sstream", false, false},
 	{"Tsv", "tsv", ".tsv", false, false},
 	{"Tsve", "tsve", ".tsve", false, false},
 	{"Txt", "txt", ".txt", false, false},
-	{"EcLogFile", "eclogfile", ".eclogfile", false, false},
+	{"E3cLogFile", "e3clogfile", ".e3clogfile", false, false},
 }
 
 // String implements fmt.Stringer.
