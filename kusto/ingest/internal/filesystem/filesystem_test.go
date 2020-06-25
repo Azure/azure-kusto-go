@@ -214,30 +214,78 @@ func TestLocalToBlob(t *testing.T) {
 	}
 }
 
-func TestIsLocalFileSystem(t *testing.T) {
-	t.Parallel()
+type fileInfo struct {
+	os.FileInfo
+	isDir bool
+}
+
+func (f fileInfo) IsDir() bool {
+	return f.isDir
+}
+
+func fakeStat(name string) (os.FileInfo, error) {
+	switch name {
+	case "c:\\dir\\file":
+		return fileInfo{}, nil
+	case "/mnt/dir/":
+		return fileInfo{isDir: true}, nil
+	}
+	return nil, fmt.Errorf("error")
+}
+
+func TestIsLocalPath(t *testing.T) {
+	statFunc = fakeStat
+	defer func() {
+		statFunc = os.Stat
+	}()
 
 	tests := []struct {
-		input string
-		want  bool
+		desc string
+		path string
+		err  bool
+		want bool
 	}{
-		{"c:\\dir\\file", true},
-		{"\\drive\\dir\\file", true},
-		{"dir\\dir\\file", true},
-		{"/mnt/dir/file", true},
-		{"/dir/dir/file", true},
-		{"./dir/file", true},
-		{"./file", true},
-		{"file", true},
-		{"file:///drive/dir/file", true},
-		{"https://server/resource", false},
-		{"ftp://server/resource", false},
+		{
+			desc: "error: valid path to local dir",
+			path: "/mnt/dir",
+			err:  true,
+		},
+		{
+			desc: "error: invalid remote path ftp",
+			path: "ftp://some.ftp.com",
+			err:  true,
+		},
+		{
+			desc: "success: valid http path",
+			path: "http://some.http.com/path",
+			want: false,
+		},
+		{
+			desc: "success: valid https path",
+			path: "https://some.https.com/path",
+			want: false,
+		},
+		{
+			desc: "success: valid path to local file",
+			path: "c:\\dir\\file",
+			want: true,
+		},
 	}
 
 	for _, test := range tests {
-		got := IsFileSystem(test.input)
+		got, err := IsLocalPath(test.path)
+		switch {
+		case err == nil && test.err:
+			t.Errorf("TestIsLocalPath(%s): got err == nil, want err != nil", test.desc)
+			continue
+		case err != nil && !test.err:
+			t.Errorf("TestIsLocalPath(%s): got err == %s, want err == nil", test.desc, err)
+			continue
+		case err == nil:
+			continue
+		}
 		if got != test.want {
-			t.Errorf("TestIsLocalFileSystem(%s): got %v, want %v", test.input, got, test.want)
+			t.Errorf("TestIsLocalPath(%s): got %v, want %v", test.desc, got, test.want)
 		}
 	}
 }

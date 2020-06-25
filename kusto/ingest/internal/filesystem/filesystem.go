@@ -331,17 +331,34 @@ var (
 	gExtractURIProtocol = regexp.MustCompile(`^(.*)://`)
 )
 
-// IsFileSystem detects whether a path points to a file system accessiable file
-// If this file requires another protocol (ftp, https, etc), it will return false
-func IsFileSystem(path string) bool {
-	protocol := gExtractURIProtocol.FindStringSubmatch(path)
-	if len(protocol) == 0 {
-		return true
+// This allows mocking the stat func later on
+var statFunc = os.Stat
+
+// IsLocalPath detects whether a path points to a file system accessiable file
+// If this file requires another protocol http protocol it will return false
+// If the file requires another protocol(ftp, https, etc) it will return an error
+func IsLocalPath(s string) (bool, error) {
+	u, err := url.Parse(s)
+	if err == nil {
+		switch u.Scheme {
+		// With this we know it SHOULD be a blobstore path.  It might not be, but I think that is a fine assumption to make.
+		case "http", "https":
+			return false, nil
+		}
 	}
 
-	if strings.ToLower(protocol[1]) == "file" {
-		return true
+	// By this point, we know its not blobstore, so it needs to be something that gets resolved to a file.
+	// So we are going to Stat() the file and see if it exists and is not a directory.
+	// In your tests, this would fail "file://" which we don't support.  Also, because of this method, your tests
+	// are going to be broken.   Again, fileystems, blah....
+	stat, err := statFunc(s)
+	if err != nil {
+		return false, fmt.Errorf("It is not a valid local file path (could not stat file) and not a valid blob path")
 	}
 
-	return false
+	if stat.IsDir() {
+		return false, fmt.Errorf("path is a local directory and not a valid file")
+	}
+
+	return true, nil
 }

@@ -357,7 +357,12 @@ func (i *Ingestion) FromFile(ctx context.Context, fPath string, options ...FileO
 		}
 	}
 
-	if filesystem.IsFileSystem(fPath) {
+	local, err := filesystem.IsLocalPath(fPath)
+	if err != nil {
+		return err
+	}
+
+	if local {
 		return i.fs.Local(ctx, fPath, props)
 	}
 
