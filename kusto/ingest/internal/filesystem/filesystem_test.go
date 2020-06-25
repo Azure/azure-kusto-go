@@ -37,12 +37,13 @@ func TestFormatDiscovery(t *testing.T) {
 		{".tsv", properties.TSV},
 		{".txt", properties.TXT},
 		{".whatever", properties.DFUnknown},
+		{".e3clogfile", properties.W3CLogFile},
 	}
 
 	for _, test := range tests {
-		got := FormatDiscovery(test.input)
+		got := properties.DataFormatDiscovery(test.input)
 		if got != test.want {
-			t.Errorf("TestFormatDiscovery(%s): got %s, want %s", test.input, got, test.want)
+			t.Errorf("TestFormatDiscovery(%s): got %q, want %q", test.input, got, test.want)
 		}
 	}
 }
@@ -64,7 +65,7 @@ func TestCompressionDiscovery(t *testing.T) {
 	for _, test := range tests {
 		got := CompressionDiscovery(test.input)
 		if got != test.want {
-			t.Errorf("TestCompressionDiscoveryy(%s): got %s, want %s", test.input, got, test.want)
+			t.Errorf("TestCompressionDiscoveryy(%s): got %q, want %q", test.input, got, test.want)
 		}
 	}
 }
@@ -209,6 +210,82 @@ func TestLocalToBlob(t *testing.T) {
 
 		if gotBuf.String() != content {
 			t.Errorf("TestLocalToBlob(%s): got %q, want %q", test.desc, gotBuf.String(), content)
+		}
+	}
+}
+
+type fileInfo struct {
+	os.FileInfo
+	isDir bool
+}
+
+func (f fileInfo) IsDir() bool {
+	return f.isDir
+}
+
+func fakeStat(name string) (os.FileInfo, error) {
+	switch name {
+	case "c:\\dir\\file":
+		return fileInfo{}, nil
+	case "/mnt/dir/":
+		return fileInfo{isDir: true}, nil
+	}
+	return nil, fmt.Errorf("error")
+}
+
+func TestIsLocalPath(t *testing.T) {
+	statFunc = fakeStat
+	defer func() {
+		statFunc = os.Stat
+	}()
+
+	tests := []struct {
+		desc string
+		path string
+		err  bool
+		want bool
+	}{
+		{
+			desc: "error: valid path to local dir",
+			path: "/mnt/dir",
+			err:  true,
+		},
+		{
+			desc: "error: invalid remote path ftp",
+			path: "ftp://some.ftp.com",
+			err:  true,
+		},
+		{
+			desc: "success: valid http path",
+			path: "http://some.http.com/path",
+			want: false,
+		},
+		{
+			desc: "success: valid https path",
+			path: "https://some.https.com/path",
+			want: false,
+		},
+		{
+			desc: "success: valid path to local file",
+			path: "c:\\dir\\file",
+			want: true,
+		},
+	}
+
+	for _, test := range tests {
+		got, err := IsLocalPath(test.path)
+		switch {
+		case err == nil && test.err:
+			t.Errorf("TestIsLocalPath(%s): got err == nil, want err != nil", test.desc)
+			continue
+		case err != nil && !test.err:
+			t.Errorf("TestIsLocalPath(%s): got err == %s, want err == nil", test.desc, err)
+			continue
+		case err == nil:
+			continue
+		}
+		if got != test.want {
+			t.Errorf("TestIsLocalPath(%s): got %v, want %v", test.desc, got, test.want)
 		}
 	}
 }

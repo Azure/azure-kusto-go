@@ -12,6 +12,7 @@ import (
 	"os"
 	"path"
 	"path/filepath"
+	"regexp"
 	"strings"
 	"time"
 
@@ -171,7 +172,7 @@ func (i *Ingestion) Blob(ctx context.Context, from string, fileSize int64, props
 
 	// If they did not tell us how the file was encoded, try to discover it from the file extension.
 	if props.Ingestion.Additional.Format == properties.DFUnknown {
-		et := FormatDiscovery(from)
+		et := properties.DataFormatDiscovery(from)
 		if et == properties.DFUnknown {
 			return errors.ES(errors.OpFileIngest, errors.KClientArgs, "could not discover the file format from name of the file(%s)", from).SetNoRetry()
 		}
@@ -305,44 +306,6 @@ func (i *Ingestion) localToBlob(ctx context.Context, from string, to azblob.Cont
 	return blobURL, stat.Size(), nil
 }
 
-// FormatDiscovery looks at the file name and tries to discern what the file format is.
-func FormatDiscovery(fName string) properties.DataFormat {
-	name := fName
-
-	u, err := url.Parse(fName)
-	if err == nil && u.Scheme != "" {
-		name = u.Path
-	}
-
-	ext := filepath.Ext(strings.TrimSuffix(strings.TrimSuffix(strings.ToLower(name), ".zip"), ".gz"))
-
-	switch ext {
-	case ".avro":
-		return properties.AVRO
-	case ".csv":
-		return properties.CSV
-	case ".json":
-		return properties.JSON
-	case ".orc":
-		return properties.ORC
-	case ".parquet":
-		return properties.Parquet
-	case ".psv":
-		return properties.PSV
-	case ".raw":
-		return properties.Raw
-	case ".scsv":
-		return properties.SCSV
-	case ".sohsv":
-		return properties.SOHSV
-	case ".tsv":
-		return properties.TSV
-	case ".txt":
-		return properties.TXT
-	}
-	return properties.DFUnknown
-}
-
 // CompressionDiscovery looks at the file extension. If it is one we support, we return that
 // CompressionType that represents that value. Otherwise we return CTNone to indicate that the
 // file should not be compressed.
@@ -361,4 +324,41 @@ func CompressionDiscovery(fName string) properties.CompressionType {
 		return properties.ZIP
 	}
 	return properties.CTNone
+}
+
+var (
+	// gExtractURIProtocol is created outside the fucntion inorder to pay once for regexp creation.
+	gExtractURIProtocol = regexp.MustCompile(`^(.*)://`)
+)
+
+// This allows mocking the stat func later on
+var statFunc = os.Stat
+
+// IsLocalPath detects whether a path points to a file system accessiable file
+// If this file requires another protocol http protocol it will return false
+// If the file requires another protocol(ftp, https, etc) it will return an error
+func IsLocalPath(s string) (bool, error) {
+	u, err := url.Parse(s)
+	if err == nil {
+		switch u.Scheme {
+		// With this we know it SHOULD be a blobstore path.  It might not be, but I think that is a fine assumption to make.
+		case "http", "https":
+			return false, nil
+		}
+	}
+
+	// By this point, we know its not blobstore, so it needs to be something that gets resolved to a file.
+	// So we are going to Stat() the file and see if it exists and is not a directory.
+	// In your tests, this would fail "file://" which we don't support.  Also, because of this method, your tests
+	// are going to be broken.   Again, fileystems, blah....
+	stat, err := statFunc(s)
+	if err != nil {
+		return false, fmt.Errorf("It is not a valid local file path (could not stat file) and not a valid blob path")
+	}
+
+	if stat.IsDir() {
+		return false, fmt.Errorf("path is a local directory and not a valid file")
+	}
+
+	return true, nil
 }

@@ -36,7 +36,7 @@ type config struct {
 
 func (c *config) validate() error {
 	switch "" {
-	case c.Endpoint, c.Database, c.ClientID, c.ClientSecret, c.TenantID:
+	case c.Endpoint, c.Database:
 		return fmt.Errorf("no field in the end to end test config.json file can be empty")
 	}
 
@@ -65,11 +65,11 @@ func init() {
 	if err != nil {
 		// if couldn't find a config file, we try to read them from env
 		testConfig = config{
-			Endpoint: os.Getenv("ENGINE_CONNECTION_STRING"),
-			Database: os.Getenv("TEST_DATABASE"),
-			ClientID: os.Getenv("APP_ID"),
+			Endpoint:     os.Getenv("ENGINE_CONNECTION_STRING"),
+			Database:     os.Getenv("TEST_DATABASE"),
+			ClientID:     os.Getenv("APP_ID"),
 			ClientSecret: os.Getenv("APP_KEY"),
-			TenantID: os.Getenv("AUTH_ID"),
+			TenantID:     os.Getenv("AUTH_ID"),
 		}
 
 		if testConfig.Endpoint == "" {
@@ -84,8 +84,17 @@ func init() {
 	if err := testConfig.validate(); err != nil {
 		panic(err)
 	}
-	authorizer = kusto.Authorization{
-		Config: auth.NewClientCredentialsConfig(testConfig.ClientID, testConfig.ClientSecret, testConfig.TenantID),
+
+	if testConfig.ClientID == "" {
+		azAuthorizer, err := auth.NewAuthorizerFromCLIWithResource(testConfig.Endpoint)
+		if err != nil {
+			fmt.Println("failed to acquire auth token from az-cli")
+			panic(err)
+		}
+
+		authorizer = kusto.Authorization{Authorizer: azAuthorizer}
+	} else {
+		authorizer = kusto.Authorization{Config: auth.NewClientCredentialsConfig(testConfig.ClientID, testConfig.ClientSecret, testConfig.TenantID)}
 	}
 }
 
@@ -123,8 +132,8 @@ type AllDataType struct {
 type DynamicTypeVariations struct {
 	PlainValue value.Dynamic
 	PlainArray value.Dynamic
-	PlainJson value.Dynamic
-	JsonArray value.Dynamic
+	PlainJson  value.Dynamic
+	JsonArray  value.Dynamic
 }
 
 type LogRow struct {
@@ -289,8 +298,8 @@ func TestQueries(t *testing.T) {
 				{
 					PlainValue: value.Dynamic{Value: []byte("1"), Valid: true},
 					PlainArray: value.Dynamic{Value: []byte("[1,2,3]"), Valid: true},
-					PlainJson: value.Dynamic{Value: []byte(`{ "a": 1}`), Valid: true},
-					JsonArray: value.Dynamic{Value: []byte(`[{ "a": 1}, { "a": 2}]`), Valid: true},
+					PlainJson:  value.Dynamic{Value: []byte(`{ "a": 1}`), Valid: true},
+					JsonArray:  value.Dynamic{Value: []byte(`[{ "a": 1}, { "a": 2}]`), Valid: true},
 				},
 			},
 		},
@@ -340,7 +349,6 @@ func TestQueries(t *testing.T) {
 			default:
 				panic("test setup failure")
 			}
-
 
 			defer iter.Stop()
 

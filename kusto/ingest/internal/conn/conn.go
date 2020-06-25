@@ -103,8 +103,8 @@ func (c *Conn) Write(ctx context.Context, db, table string, payload *bytes.Buffe
 		BuffPool.Put(payload)
 	}()
 
-	switch format {
-	case properties.JSON, properties.AVRO:
+	switch {
+	case format.RequiresMapping():
 		if mappingName == "" {
 			return errors.ES(writeOp,
 				errors.KInternal,
@@ -112,7 +112,8 @@ func (c *Conn) Write(ctx context.Context, db, table string, payload *bytes.Buffe
 				format,
 			).SetNoRetry()
 		}
-	case properties.DFUnknown:
+
+	case format == properties.DFUnknown:
 		format = properties.CSV
 	}
 

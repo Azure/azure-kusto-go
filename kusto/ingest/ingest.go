@@ -7,7 +7,6 @@ import (
 	"encoding/json"
 	"fmt"
 	"io"
-	"net/url"
 	"sync"
 	"sync/atomic"
 	"time"
@@ -124,38 +123,40 @@ type DataFormat = properties.DataFormat
 // to allow properties and ingest to both import without a cycle.
 const (
 	// DFUnknown indicates the EncodingType is not set.
-	DFUnknown DataFormat = 0
-	// CSV indicates the source is encoded in comma seperated values.
-	CSV DataFormat = 1
-	// JSON indicates the source is encoded in Javscript Object Notation.
-	JSON DataFormat = 2
+	DFUnknown DataFormat = properties.DFUnknown
 	// AVRO indicates the source is encoded in Apache Avro format.
-	AVRO DataFormat = 3
-	// Parquet indicates the source is encoded in Apache Parquet format.
-	Parquet DataFormat = 4
+	AVRO DataFormat = properties.AVRO
+	// ApacheAVRO indicates the source is encoded in Apache avro2json format.
+	ApacheAVRO DataFormat = properties.ApacheAVRO
+	// CSV indicates the source is encoded in comma seperated values.
+	CSV DataFormat = properties.CSV
+	// JSON indicates the source is encoded as one or more lines, each containing a record in Javscript Object Notation.
+	JSON DataFormat = properties.JSON
+	// MultiJSON indicates the source is encoded in JSON-Array of individual records in Javscript Object Notation.
+	MultiJSON DataFormat = properties.MultiJSON
 	// ORC indicates the source is encoded in Apache Optimized Row Columnar format.
-	ORC DataFormat = 5
+	ORC DataFormat = properties.ORC
+	// Parquet indicates the source is encoded in Apache Parquet format.
+	Parquet DataFormat = properties.Parquet
 	// PSV is pipe "|" separated values.
-	PSV DataFormat = 6
+	PSV DataFormat = properties.PSV
 	// Raw is a text file that has only a single string value.
-	Raw DataFormat = 7
+	Raw DataFormat = properties.Raw
 	// SCSV is a file containing semicolon ";" separated values.
-	SCSV DataFormat = 8
+	SCSV DataFormat = properties.SCSV
 	// SOHSV is a file containing SOH-separated values(ASCII codepont 1).
-	SOHSV DataFormat = 9
-	// TSV is a file containing table seperated values ("\t").
-	TSV DataFormat = 10
+	SOHSV DataFormat = properties.SOHSV
+	// SStream indicats the source is encoded as a Microsoft Cosmos Structured Streams format
+	SStream DataFormat = properties.SStream
+	// TSV is a file containing tab seperated values ("\t").
+	TSV DataFormat = properties.TSV
+	// TSVE is a file containing escaped-tab seperated values ("\t").
+	TSVE DataFormat = properties.TSVE
 	// TXT is a text file with lines deliminated by "\n".
-	TXT DataFormat = 11
+	TXT DataFormat = properties.TXT
+	// WCLogFile indicates the source is encoded using W3C Extended Log File format
+	W3CLogFile DataFormat = properties.W3CLogFile
 )
-
-var validMappingKind = map[DataFormat]bool{
-	CSV:     true,
-	JSON:    true,
-	AVRO:    true,
-	Parquet: true,
-	ORC:     true,
-}
 
 // IngestionMapping provides runtime mapping of the data being imported to the fields in the table.
 // "ref" will be JSON encoded, so it can be any type that can be JSON marshalled. If you pass a string
@@ -164,7 +165,7 @@ var validMappingKind = map[DataFormat]bool{
 func IngestionMapping(mapping interface{}, mappingKind DataFormat) FileOption {
 	return propertyOption(
 		func(p *properties.All) error {
-			if !validMappingKind[mappingKind] {
+			if !mappingKind.IsValidMappingKind() {
 				return errors.ES(
 					errors.OpUnknown,
 					errors.KClientArgs,
@@ -204,7 +205,7 @@ func IngestionMapping(mapping interface{}, mappingKind DataFormat) FileOption {
 func IngestionMappingRef(refName string, mappingKind DataFormat) FileOption {
 	return propertyOption(
 		func(p *properties.All) error {
-			if !validMappingKind[mappingKind] {
+			if !mappingKind.IsValidMappingKind() {
 				return errors.ES(errors.OpUnknown, errors.KClientArgs, "IngestionMappingRef() option does not support EncodingType %v", mappingKind).SetNoRetry()
 			}
 			p.Ingestion.Additional.IngestionMappingRef = refName
@@ -356,11 +357,16 @@ func (i *Ingestion) FromFile(ctx context.Context, fPath string, options ...FileO
 		}
 	}
 
-	if _, err := url.ParseRequestURI(fPath); err == nil {
-		return i.fs.Blob(ctx, fPath, 0, props)
+	local, err := filesystem.IsLocalPath(fPath)
+	if err != nil {
+		return err
 	}
 
-	return i.fs.Local(ctx, fPath, props)
+	if local {
+		return i.fs.Local(ctx, fPath, props)
+	}
+
+	return i.fs.Blob(ctx, fPath, 0, props)
 }
 
 // FromReader allows uploading a data file for Kusto from an io.Reader. The content is uploaded to Blobstore and
