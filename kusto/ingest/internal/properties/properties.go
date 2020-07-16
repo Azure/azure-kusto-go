@@ -120,6 +120,30 @@ var dfDescriptions = []dfDescriptor{
 	{"E3cLogFile", "e3clogfile", ".e3clogfile", false, false},
 }
 
+// IngestionReportLevel defines which ingestion statuses are reported by the DM
+type IngestionReportLevel int
+
+const (
+	// FailuresOnly tells to the DM to report the ingestion sytatus of failed ingestions only
+	FailuresOnly IngestionReportLevel = 0
+	// None tells to the DM not to report ingestion status
+	None IngestionReportLevel = 1
+	// FailureAndSuccess tells to the DM to report ingestion status for failed and successfull ingestions
+	FailureAndSuccess IngestionReportLevel = 2
+)
+
+// IngestionReportMthod defines where the DM reports ingestion statuses to
+type IngestionReportMthod int
+
+const (
+	// Queue tells the DM to report ingestion status to the a queue
+	Queue IngestionReportMthod = 0
+	// Table tells the DM to report ingestion status to the a table
+	Table IngestionReportMthod = 1
+	// QueueAndTable tells the DM to report ingestion status to both queues and tables
+	QueueAndTable IngestionReportMthod = 2
+)
+
 // String implements fmt.Stringer.
 func (d DataFormat) String() string {
 	if d > 0 && int(d) < len(dfDescriptions) {
@@ -228,9 +252,9 @@ type Ingestion struct {
 	FlushImmediately bool
 	// Daniel:
 	// IgnoreSizeLimit
-	IgnoreSizeLimit bool `json:",omitempty"`
-	ReportLevel     int  `json:",omitempty"`
-	ReportMethod    int  `json:",omitempty"`
+	IgnoreSizeLimit bool                 `json:",omitempty"`
+	ReportLevel     IngestionReportLevel `json:",omitempty"`
+	ReportMethod    IngestionReportMthod `json:",omitempty"`
 	// SourceMessageCreationTime is when we created the blob.
 	SourceMessageCreationTime time.Time  `json:",omitempty"`
 	Additional                Additional `json:"AdditionalProperties"`

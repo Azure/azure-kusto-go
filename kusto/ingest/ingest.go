@@ -261,6 +261,18 @@ func IfNotExists(ingestByTag string) FileOption {
 	)
 }
 
+// Tags are tags to be associated with the ingested ata.
+func ReportResultToTable(tags []string) FileOption {
+	return propertyOption(
+		func(p *properties.All) error {
+			// You might be asking, what if we are just using blobstore? Well, then this option doesn't matter :)
+			p.Ingestion.ReportLevel = properties.FailureAndSuccess
+			p.Ingestion.ReportMethod = properties.Table
+			return nil
+		},
+	)
+}
+
 // ValidationOption is an an option for validating the ingestion input data.
 // These are defined as constants within this package.
 type ValidationOption int8
