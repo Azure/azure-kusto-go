@@ -7,7 +7,7 @@ import (
 )
 
 // IngestionStatus is the ingestion status
-type IngestionStatus = int
+type IngestionStatus int
 
 const (
 	// Pending status represents a temporary status.
@@ -21,7 +21,7 @@ const (
 	// The data has not been ingested to Kusto.
 	Failed IngestionStatus = 2
 	// Queued status represents a permanent status.
-	// The data has been queued for ingestion.
+	// The data has been queued for ingestion &  status tracking was not requested.
 	// (This does not indicate that the ingestion was successful.)
 	Queued IngestionStatus = 4
 	// Skipped status represents a permanent status.
@@ -32,8 +32,13 @@ const (
 	PartiallySucceeded IngestionStatus = 6
 )
 
+// IsFinal returns true if the ingestion status is a final status, or false if the status is temporary
+func (i IngestionStatus) IsFinal() bool {
+	return i != Pending
+}
+
 // IngestionFailureStatus indicates the status of failuted ingestion attempts
-type IngestionFailureStatus = int
+type IngestionFailureStatus int
 
 const (
 	// Unknown represents an undefined or unset failure state
@@ -92,4 +97,60 @@ type IngestionStatusRecord struct {
 
 	// In case of a failure, indicates whether or not the failure originated from an Update Policy.
 	OriginatesFromUpdatePolicy bool
+}
+
+// NewRecord creates a new record initialized with defaults and user provided data
+func NewRecord(sourceID uuid.UUID, sourcePath string, database string, table string, opID uuid.UUID, actID uuid.UUID) *IngestionStatusRecord {
+	rec := &IngestionStatusRecord{
+		Status:                     Pending,
+		IngestionSourceID:          sourceID,
+		IngestionSourcePath:        sourcePath,
+		Database:                   database,
+		Table:                      table,
+		UpdatedOn:                  time.Now(),
+		OperationID:                opID,
+		ActivityID:                 actID,
+		ErrorCode:                  0,
+		FailureStatus:              Unknown,
+		Details:                    "",
+		OriginatesFromUpdatePolicy: false,
+	}
+
+	return rec
+}
+
+// ToMap converts an ingestion status record to a key value map
+func (r *IngestionStatusRecord) ToMap() map[string]interface{} {
+	data := make(map[string]interface{})
+
+	data["Status"] = r.Status
+	data["IngestionSourceID"] = r.IngestionSourceID
+	data["IngestionSourcePath"] = r.IngestionSourcePath
+	data["Database"] = r.Database
+	data["Table"] = r.Table
+	data["UpdatedOn"] = r.UpdatedOn
+	data["OperationID"] = r.OperationID
+	data["ActivityID"] = r.ActivityID
+	data["ErrorCode"] = r.ErrorCode
+	data["FailureStatus"] = r.FailureStatus
+	data["Details"] = r.Details
+	data["OriginatesFromUpdatePolicy"] = r.OriginatesFromUpdatePolicy
+
+	return data
+}
+
+// FromMap converts an ingestion status record to a key value map
+func (r *IngestionStatusRecord) FromMap(data map[string]interface{}) {
+	r.Status = data["Status"].(IngestionStatus)
+	r.IngestionSourceID = data["IngestionSourceID"].(uuid.UUID)
+	r.IngestionSourcePath = data["IngestionSourcePath"].(string)
+	r.Database = data["Database"].(string)
+	r.Table = data["Table"].(string)
+	r.UpdatedOn = data["UpdatedOn"].(time.Time)
+	r.OperationID = data["OperationID"].(uuid.UUID)
+	r.ActivityID = data["ActivityID"].(uuid.UUID)
+	r.ErrorCode = data["ErrorCode"].(int)
+	r.FailureStatus = data["FailureStatus"].(IngestionFailureStatus)
+	r.Details = data["Details"].(string)
+	r.OriginatesFromUpdatePolicy = data["OriginatesFromUpdatePolicy"].(bool)
 }
