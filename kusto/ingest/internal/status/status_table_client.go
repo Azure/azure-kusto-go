@@ -11,16 +11,16 @@ const (
 	metadataLevel  = "fullmetadata"
 )
 
-// AzureTableClient allows reading ana writing to azure tables
-type AzureTableClient struct {
+// TableClient allows reading ana writing to azure tables
+type TableClient struct {
 	tableURI resources.URI
 	client   storage.Client
 	service  storage.TableServiceClient
 	table    *storage.Table
 }
 
-// New Creates an azure table client
-func NewAzureTableClient(uri resources.URI) (*AzureTableClient, error) {
+// NewTableClient Creates an azure table client
+func NewTableClient(uri resources.URI) (*TableClient, error) {
 	// Create a table client
 	c, err := storage.NewAccountSASClientFromEndpointToken(uri.URL().String(), uri.SAS().Get("SAS"))
 	if err != nil {
@@ -30,7 +30,7 @@ func NewAzureTableClient(uri resources.URI) (*AzureTableClient, error) {
 	ts := c.GetTableService()
 	tc := ts.GetTableReference(uri.ObjectName())
 
-	atc := &AzureTableClient{
+	atc := &TableClient{
 		tableURI: uri,
 		client:   c,
 		service:  ts,
@@ -41,7 +41,7 @@ func NewAzureTableClient(uri resources.URI) (*AzureTableClient, error) {
 }
 
 // ReadIngestionStatus reads a table record cotaining ingestion status
-func (c *AzureTableClient) ReadIngestionStatus(ingestionSourceID uuid.UUID, data *IngestionStatusRecord) error {
+func (c *TableClient) ReadIngestionStatus(ingestionSourceID uuid.UUID) (map[string]interface{}, error) {
 	entity := storage.Entity{
 		PartitionKey: ingestionSourceID.String(),
 		RowKey:       "0",
@@ -52,20 +52,19 @@ func (c *AzureTableClient) ReadIngestionStatus(ingestionSourceID uuid.UUID, data
 
 	err := entity.Get(defaultTimeout, metadataLevel, options)
 	if err != nil {
-		return err
+		return nil, err
 	}
 
-	data.FromMap(entity.Properties)
-	return nil
+	return entity.Properties, nil
 }
 
 // WriteIngestionStatus reads a table record cotaining ingestion status
-func (c *AzureTableClient) WriteIngestionStatus(ingestionSourceID uuid.UUID, data *IngestionStatusRecord) error {
+func (c *TableClient) WriteIngestionStatus(ingestionSourceID uuid.UUID, data map[string]interface{}) error {
 	entity := storage.Entity{
 		PartitionKey: ingestionSourceID.String(),
 		RowKey:       "0",
 		Table:        c.table,
-		Properties:   data.ToMap(),
+		Properties:   data,
 	}
 
 	options := &storage.EntityOptions{}

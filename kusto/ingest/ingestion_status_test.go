@@ -1,4 +1,4 @@
-package status
+package ingest
 
 import (
 	"testing"
@@ -7,14 +7,14 @@ import (
 )
 
 func TestRecordMapConversion(t *testing.T) {
-	sourceRec := NewRecord(uuid.New(), "/mnt/somewhere/file", "database", "table", uuid.New(), uuid.New())
+	sourceRec := newStatusRecord(uuid.New(), "/mnt/somewhere/file", "database", "table", uuid.New(), uuid.New())
 	sourceRec.Status = PartiallySucceeded
 	sourceRec.Details = "bla bla"
 	sourceRec.ErrorCode = 3
 
 	props := sourceRec.ToMap()
 
-	targetRec := IngestionStatusRecord{}
+	targetRec := StatusRecord{}
 	targetRec.FromMap(props)
 
 	if *sourceRec != targetRec {

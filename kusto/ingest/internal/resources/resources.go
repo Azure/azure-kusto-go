@@ -219,7 +219,7 @@ func (i *Ingestion) importRec(rec ingestResc) error {
 	case "SecuredReadyForAggregationQueue":
 		i.Queues = append(i.Queues, u)
 	case "IngestionsStatusTable":
-		i.Tables = append(i.Queues, u)
+		i.Tables = append(i.Tables, u)
 	default:
 		return errDoNotCare
 	}
