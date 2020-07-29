@@ -1,6 +1,7 @@
 package ingest
 
 import (
+	"fmt"
 	"time"
 
 	"github.com/google/uuid"
@@ -30,11 +31,47 @@ const (
 	// PartiallySucceeded status represents a permanent status.
 	// Part of the data was successfully ingested to Kusto, while other parts failed.
 	PartiallySucceeded StatusCode = 6
+
+	// StatusRetrievalFailed means the client ran into truble reading the status from the service
+	StatusRetrievalFailed StatusCode = 100
+	// StatusRetrievalCanceled means the user canceld the status check
+	StatusRetrievalCanceled StatusCode = 101
 )
 
 // IsFinal returns true if the ingestion status is a final status, or false if the status is temporary
 func (i StatusCode) IsFinal() bool {
 	return i != Pending
+}
+
+// ToString returns a string represnetation of StatusCode
+func (i StatusCode) ToString() string {
+	switch i {
+	case Pending:
+		return "Pending"
+
+	case Succeeded:
+		return "Succeeded"
+
+	case Failed:
+		return "Failed"
+
+	case Queued:
+		return "Queued"
+
+	case Skipped:
+		return "Skipped"
+
+	case PartiallySucceeded:
+		return "PartiallySucceeded"
+
+	case StatusRetrievalCanceled:
+		return "StatusRetrievalCanceled"
+
+	case StatusRetrievalFailed:
+		return "StatusRetrievalFailed"
+	}
+
+	return "Undefined Status Code Value: " + i.ToString()
 }
 
 // FailureStatusCode indicates the status of failuted ingestion attempts
@@ -50,6 +87,25 @@ const (
 	// Exhausted represents a retryable failure that has exhusted all retry attempts
 	Exhausted FailureStatusCode = 3
 )
+
+// ToString returns a string represnetation of FailureStatusCode
+func (f FailureStatusCode) ToString() string {
+	switch f {
+	case Unknown:
+		return "Unknown"
+
+	case Permanent:
+		return "Permanent"
+
+	case Transient:
+		return "Transient"
+
+	case Exhausted:
+		return "Exhausted"
+	}
+
+	return "Undefined Failure Status Code Value: " + f.ToString()
+}
 
 // StatusRecord is a record containing information regarding the status of an ingation command
 type StatusRecord struct {
@@ -153,4 +209,24 @@ func (r *StatusRecord) FromMap(data map[string]interface{}) {
 	r.FailureStatus = data["FailureStatus"].(FailureStatusCode)
 	r.Details = data["Details"].(string)
 	r.OriginatesFromUpdatePolicy = data["OriginatesFromUpdatePolicy"].(bool)
+}
+
+// ToString converts an ingestion status record a printable  string
+func (r *StatusRecord) ToString() string {
+
+	str := fmt.Sprintf("IngestionSourceID: '%s', IngestionSourcePath: '%s', Status: '%s',  FailureStatus: '%s', ErrorCode: '%d', Database: '%s', Table: '%s', UpdatedOn: '%s', OperationID: '%s', ActivityID: '%s', OriginatesFromUpdatePolicy: '%t', Details: '%s'",
+		r.IngestionSourceID,
+		r.IngestionSourcePath,
+		r.Status.ToString(),
+		r.FailureStatus.ToString(),
+		r.ErrorCode,
+		r.Database,
+		r.Table,
+		r.UpdatedOn,
+		r.OperationID,
+		r.ActivityID,
+		r.OriginatesFromUpdatePolicy,
+		r.Details)
+
+	return str
 }
