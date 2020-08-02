@@ -17,7 +17,7 @@ type IngestionResult struct {
 }
 
 // NewIngestionResult creates an initial ingestion status record
-func NewIngestionResult(record StatusRecord, uri resources.URI) (*IngestionResult, error) {
+func NewIngestionResult(record StatusRecord, uri resources.URI) *IngestionResult {
 	ret := &IngestionResult{}
 
 	ret.record = record
@@ -29,7 +29,7 @@ func NewIngestionResult(record StatusRecord, uri resources.URI) (*IngestionResul
 	// report to queue not supported at the moment
 	ret.reportToQueue = false
 
-	return ret, nil
+	return ret
 }
 
 // WaitForIngestionComplete returns a channel that can be checked for ingestion results
@@ -37,7 +37,7 @@ func NewIngestionResult(record StatusRecord, uri resources.URI) (*IngestionResul
 func (r *IngestionResult) WaitForIngestionComplete(ctx context.Context) chan StatusRecord {
 	ch := make(chan StatusRecord, 1)
 
-	if r.record.Status.IsFinal() || !r.reportToTable {
+	if r.record.Status.IsFinal() || r.reportToTable == false {
 		ch <- r.record
 		close(ch)
 	} else {
@@ -54,44 +54,42 @@ func (r *IngestionResult) pollIngestionStatusTable(ctx context.Context, ch chan 
 		r.record.Status = StatusRetrievalFailed
 		r.record.FailureStatus = Transient
 		r.record.Details = "Failed Creating a Status Table client: " + err.Error()
-		ch <- r.record
-		close(ch)
-	}
+	} else {
+		// Create a ticker to poll the table in 10 second intervals
+		ticker := time.NewTicker(10 * time.Second)
+		run := true
 
-	// Create a ticker to poll the table in 10 second intervals
-	ticker := time.NewTicker(10 * time.Second)
-	run := true
-
-	for run {
-		select {
-		// In case the user canceled the wait, return current known state
-		case <-ctx.Done():
-			// return a canceld state
-			r.record.Status = StatusRetrievalCanceled
-			r.record.FailureStatus = Transient
-			ch <- r.record
-			close(ch)
-			run = false
-
-		// Whenever the ticker fires
-		case <-ticker.C:
-			// read the current state
-			smap, err := client.ReadIngestionStatus(r.record.IngestionSourceID)
-			if err != nil {
-				// Read failure
-				r.record.Status = StatusRetrievalFailed
+		for run {
+			select {
+			// In case the user canceled the wait, return current known state
+			case <-ctx.Done():
+				// return a canceld state
+				r.record.Status = StatusRetrievalCanceled
 				r.record.FailureStatus = Transient
-				r.record.Details = "Failed reading from Status Table: " + err.Error()
-				ch <- r.record
-				close(ch)
-			} else {
-				// convert the data into a record and send it if the state is final
-				r.record.FromMap(smap)
-				if r.record.Status.IsFinal() {
-					ch <- r.record
-					close(ch)
+				run = false
+
+			// Whenever the ticker fires
+			case <-ticker.C:
+				// read the current state
+				smap, err := client.ReadIngestionStatus(r.record.IngestionSourceID)
+				if err != nil {
+					// Read failure
+					r.record.Status = StatusRetrievalFailed
+					r.record.FailureStatus = Transient
+					r.record.Details = "Failed reading from Status Table: " + err.Error()
+					run = false
+
+				} else {
+					// convert the data into a record and send it if the state is final
+					r.record.FromMap(smap)
+					if r.record.Status.IsFinal() {
+						run = false
+					}
 				}
 			}
 		}
 	}
+
+	ch <- r.record
+	close(ch)
 }

@@ -230,3 +230,17 @@ func (r *StatusRecord) ToString() string {
 
 	return str
 }
+
+// ToError converts an ingestion status to an error if failed or partially succeeded, or nil if succeeded
+func (r *StatusRecord) ToError() error {
+	switch r.Status {
+	case Succeeded:
+	case Queued:
+		return nil
+
+	case PartiallySucceeded:
+		return fmt.Errorf("Ingestion succeeded partially\n" + r.ToString())
+	}
+
+	return fmt.Errorf("Ingestion Failed\n" + r.ToString())
+}

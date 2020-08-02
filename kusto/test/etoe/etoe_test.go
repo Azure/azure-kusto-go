@@ -1,15 +1,11 @@
-package main
+package etoe
 
 import (
 	"context"
 	"encoding/csv"
-	"encoding/json"
 	"fmt"
 	"io"
-	"io/ioutil"
 	"os"
-	"path/filepath"
-	"runtime"
 	"testing"
 	"time"
 
@@ -19,84 +15,10 @@ import (
 	"github.com/Azure/azure-kusto-go/kusto/data/value"
 	"github.com/Azure/azure-kusto-go/kusto/ingest"
 	"github.com/Azure/azure-kusto-go/kusto/unsafe"
-	"github.com/Azure/go-autorest/autorest/azure/auth"
 
 	"github.com/google/uuid"
 	"github.com/kylelemons/godebug/pretty"
 )
-
-// config represents a config.json file that must be in the directory and hold information to do the integration tests.
-type config struct {
-	Endpoint     string
-	Database     string
-	ClientID     string
-	ClientSecret string
-	TenantID     string
-}
-
-func (c *config) validate() error {
-	switch "" {
-	case c.Endpoint, c.Database:
-		return fmt.Errorf("no field in the end to end test config.json file can be empty")
-	}
-
-	return nil
-}
-
-var (
-	// skipETOE will be set if the ./config.json file does not exist to let us suppress these tests.
-	skipETOE bool
-	// testConfig is the configuration file that we read in via init().
-	testConfig config
-	// authorizer is the authorizer that will be used throughout all tests.
-	authorizer kusto.Authorization
-)
-
-// init will read in our config file and if it can't be read, will set skipETOE so the tests will be suppressed.
-func init() {
-	_, filename, _, ok := runtime.Caller(0)
-	if !ok {
-		panic("cannot determine etoe_test.go's path")
-	}
-	p := filepath.Join(filepath.Dir(filename), "config.json")
-
-	b, err := ioutil.ReadFile(p)
-
-	if err != nil {
-		// if couldn't find a config file, we try to read them from env
-		testConfig = config{
-			Endpoint:     os.Getenv("ENGINE_CONNECTION_STRING"),
-			Database:     os.Getenv("TEST_DATABASE"),
-			ClientID:     os.Getenv("APP_ID"),
-			ClientSecret: os.Getenv("APP_KEY"),
-			TenantID:     os.Getenv("AUTH_ID"),
-		}
-
-		if testConfig.Endpoint == "" {
-			skipETOE = true
-			return
-		}
-
-	} else if err := json.Unmarshal(b, &testConfig); err != nil {
-		panic(err)
-	}
-
-	if err := testConfig.validate(); err != nil {
-		panic(err)
-	}
-
-	if testConfig.ClientID == "" {
-		azAuthorizer, err := auth.NewAuthorizerFromCLIWithResource(testConfig.Endpoint)
-		if err != nil {
-			fmt.Println("failed to acquire auth token from az-cli")
-			panic(err)
-		}
-
-		authorizer = kusto.Authorization{Authorizer: azAuthorizer}
-	} else {
-		authorizer = kusto.Authorization{Config: auth.NewClientCredentialsConfig(testConfig.ClientID, testConfig.ClientSecret, testConfig.TenantID)}
-	}
-}
 
 var (
 	pCountStmt = kusto.NewStmt("table(tableName) | count").MustDefinitions(
@@ -159,15 +81,17 @@ type queryFunc func(ctx context.Context, db string, query kusto.Stmt, options ..
 type mgmtFunc func(ctx context.Context, db string, query kusto.Stmt, options ...kusto.MgmtOption) (*kusto.RowIterator, error)
 
 func TestQueries(t *testing.T) {
-	if skipETOE || testing.Short() {
+	testConfig, err := NewConfig()
+	if err != nil || testing.Short() {
 		t.Skipf("end to end tests disabled: missing config.json file in etoe directory")
 	}
+
 	t.Parallel()
 
 	_, cancel := context.WithCancel(context.Background())
 	defer cancel()
 
-	client, err := kusto.New(testConfig.Endpoint, authorizer)
+	client, err := kusto.New(testConfig.Endpoint, testConfig.Authorizer)
 	if err != nil {
 		panic(err)
 	}
@@ -378,14 +302,15 @@ func TestQueries(t *testing.T) {
 func TestFileIngestion(t *testing.T) {
 	t.Parallel()
 
-	if skipETOE || testing.Short() {
-		t.SkipNow()
+	testConfig, err := NewConfig()
+	if err != nil || testing.Short() {
+		t.Skipf("end to end tests disabled: missing config.json file in etoe directory")
 	}
 
 	ctx, cancel := context.WithCancel(context.Background())
 	defer cancel()
 
-	client, err := kusto.New(testConfig.Endpoint, authorizer)
+	client, err := kusto.New(testConfig.Endpoint, testConfig.Authorizer)
 	if err != nil {
 		panic(err)
 	}
@@ -564,14 +489,15 @@ func TestFileIngestion(t *testing.T) {
 }
 
 func TestReaderIngestion(t *testing.T) {
-	if skipETOE || testing.Short() {
+	testConfig, err := NewConfig()
+	if err != nil || testing.Short() {
 		t.SkipNow()
 	}
 
 	ctx, cancel := context.WithCancel(context.Background())
 	defer cancel()
 
-	client, err := kusto.New(testConfig.Endpoint, authorizer)
+	client, err := kusto.New(testConfig.Endpoint, testConfig.Authorizer)
 	if err != nil {
 		panic(err)
 	}
@@ -747,13 +673,15 @@ func TestReaderIngestion(t *testing.T) {
 
 func TestStreamingIngestion(t *testing.T) {
 	t.Parallel()
-	if skipETOE || testing.Short() {
+
+	testConfig, err := NewConfig()
+	if err != nil || testing.Short() {
 		t.SkipNow()
 	}
 	ctx, cancel := context.WithCancel(context.Background())
 	defer cancel()
 
-	client, err := kusto.New(testConfig.Endpoint, authorizer)
+	client, err := kusto.New(testConfig.Endpoint, testConfig.Authorizer)
 	if err != nil {
 		panic(err)
 	}
