@@ -4,6 +4,7 @@ import (
 	"context"
 	"time"
 
+	"github.com/Azure/azure-kusto-go/kusto/ingest/internal/properties"
 	"github.com/Azure/azure-kusto-go/kusto/ingest/internal/resources"
 	"github.com/Azure/azure-kusto-go/kusto/ingest/internal/status"
 )
@@ -16,20 +17,37 @@ type IngestionResult struct {
 	reportToQueue bool
 }
 
-// NewIngestionResult creates an initial ingestion status record
-func NewIngestionResult(record StatusRecord, uri resources.URI) *IngestionResult {
+// newIngestionResult creates an initial ingestion status record
+func newIngestionResult() *IngestionResult {
 	ret := &IngestionResult{}
 
-	ret.record = record
-	ret.uri = uri
-
-	// TODO [Yochai] get this from options
-	ret.reportToTable = true
-
-	// report to queue not supported at the moment
+	ret.record = newStatusRecord()
+	ret.reportToTable = false
 	ret.reportToQueue = false
 
 	return ret
+}
+
+// updateFromError sets the record to a failure state and adds the error to the record details
+func (r *IngestionResult) updateFromError(err error) *IngestionResult {
+	return r.updateFromErrorString(err.Error())
+}
+
+// updateFromErrorString sets the record to a failure state and adds the error to the record details
+func (r *IngestionResult) updateFromErrorString(err string) *IngestionResult {
+	r.record.Status = ClientError
+	r.record.FailureStatus = Permanent
+	r.record.Details = err
+
+	return r
+}
+
+// updateFromProps sets the record to a failure state and adds the error to the record details
+func (r *IngestionResult) updateFromProps(props properties.All) *IngestionResult {
+	r.reportToTable = props.Ingestion.ReportMethod == properties.ReportStatusToTable || props.Ingestion.ReportMethod == properties.ReportStatusToQueueAndTable
+	r.record.FromProps(props)
+
+	return r
 }
 
 // WaitForIngestionComplete returns a channel that can be checked for ingestion results

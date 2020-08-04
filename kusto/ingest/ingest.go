@@ -5,7 +5,6 @@ import (
 	"compress/gzip"
 	"context"
 	"encoding/json"
-	"fmt"
 	"io"
 	"sync"
 	"sync/atomic"
@@ -261,13 +260,13 @@ func IfNotExists(ingestByTag string) FileOption {
 	)
 }
 
-// Tags are tags to be associated with the ingested ata.
+// ReportResultToTable requests that tyhe instestion status will be tracked in an table
 func ReportResultToTable(tags []string) FileOption {
 	return propertyOption(
 		func(p *properties.All) error {
 			// You might be asking, what if we are just using blobstore? Well, then this option doesn't matter :)
 			p.Ingestion.ReportLevel = properties.FailureAndSuccess
-			p.Ingestion.ReportMethod = properties.Table
+			p.Ingestion.ReportMethod = properties.ReportStatusToTable
 			return nil
 		},
 	)
@@ -343,82 +342,107 @@ type mapEntry struct {
 
 // FromFile allows uploading a data file for Kusto from either a local path or a blobstore URI path.
 // This method is thread-safe.
-func (i *Ingestion) FromFile(ctx context.Context, fPath string, options ...FileOption) error {
+func (i *Ingestion) FromFile(ctx context.Context, fPath string, options ...FileOption) *IngestionResult {
+	result := newIngestionResult()
+	result.record.IngestionSourcePath = fPath
+
 	manager, err := getManager(i.client)
 	if err != nil {
-		return err
+		return result.updateFromError(err)
 	}
 
 	auth, err := manager.AuthContext(ctx)
 	if err != nil {
-		return err
+		return result.updateFromError(err)
 	}
 
 	props := i.newProp(auth)
 	for _, o := range options {
 		if propOpt, ok := o.(propertyOption); ok {
 			if err := propOpt(&props); err != nil {
-				return err
+				return result.updateFromError(err)
 			}
 		}
 	}
 
+	result.updateFromProps(props)
+
 	if props.Ingestion.Additional.IngestionMappingRef != "" {
 		if err := i.haveMappingRef(ctx, props.Ingestion.Additional.IngestionMappingRef); err != nil {
-			return err
+			return result.updateFromError(err)
 		}
 	}
 
 	local, err := filesystem.IsLocalPath(fPath)
 	if err != nil {
-		return err
+		return result.updateFromError(err)
 	}
 
 	if local {
-		return i.fs.Local(ctx, fPath, props)
+		err = i.fs.Local(ctx, fPath, props)
+	} else {
+
+		err = i.fs.Blob(ctx, fPath, 0, props)
 	}
 
-	return i.fs.Blob(ctx, fPath, 0, props)
+	if err != nil {
+		result.updateFromError(err)
+	} else {
+		result.record.Status = Queued
+	}
+
+	return result
 }
 
 // FromReader allows uploading a data file for Kusto from an io.Reader. The content is uploaded to Blobstore and
 // ingested after all data in the reader is processed. Content should not use compression as the content will be
 // compressed with gzip. This method is thread-safe.
-func (i *Ingestion) FromReader(ctx context.Context, reader io.Reader, options ...FileOption) error {
+func (i *Ingestion) FromReader(ctx context.Context, reader io.Reader, options ...FileOption) *IngestionResult {
+	result := newIngestionResult()
 	manager, err := getManager(i.client)
+
 	if err != nil {
-		return err
+		return result.updateFromError(err)
 	}
 
 	auth, err := manager.AuthContext(ctx)
 	if err != nil {
-		return err
+		return result.updateFromError(err)
 	}
 
 	props := i.newProp(auth)
 	for _, o := range options {
 		if propOpt, ok := o.(propertyOption); ok {
 			if err := propOpt(&props); err != nil {
-				return err
+				return result.updateFromError(err)
 			}
 		}
 	}
 
+	result.updateFromProps(props)
+
 	if props.Ingestion.Additional.Format == DFUnknown {
-		return fmt.Errorf("must provide option FileFormat() when using FromReader()")
+		return result.updateFromErrorString("must provide option FileFormat() when using FromReader()")
 	}
 
 	if props.Source.DeleteLocalSource {
-		return fmt.Errorf("cannot use DeleteLocalSource() with FromReader()")
+		return result.updateFromErrorString("cannot use DeleteLocalSource() with FromReader()")
 	}
 
 	if props.Ingestion.Additional.IngestionMappingRef != "" {
 		if err := i.haveMappingRef(ctx, props.Ingestion.Additional.IngestionMappingRef); err != nil {
-			return err
+			return result.updateFromError(err)
 		}
 	}
 
-	return i.fs.Reader(ctx, reader, props)
+	err = i.fs.Reader(ctx, reader, props)
+	if err != nil {
+		result.updateFromError(err)
+	} else {
+		result.record.Status = Queued
+	}
+
+	return result
 }
 
 var (

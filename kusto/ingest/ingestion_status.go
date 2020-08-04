@@ -4,6 +4,7 @@ import (
 	"fmt"
 	"time"
 
+	"github.com/Azure/azure-kusto-go/kusto/ingest/internal/properties"
 	"github.com/google/uuid"
 )
 
@@ -36,6 +37,8 @@ const (
 	StatusRetrievalFailed StatusCode = 100
 	// StatusRetrievalCanceled means the user canceld the status check
 	StatusRetrievalCanceled StatusCode = 101
+	// ClientError an error was detected on the client side
+	ClientError StatusCode = 102
 )
 
 // IsFinal returns true if the ingestion status is a final status, or false if the status is temporary
@@ -69,6 +72,9 @@ func (i StatusCode) ToString() string {
 
 	case StatusRetrievalFailed:
 		return "StatusRetrievalFailed"
+
+	case ClientError:
+		return "ClientError"
 	}
 
 	return "Undefined Status Code Value: " + i.ToString()
@@ -156,16 +162,16 @@ type StatusRecord struct {
 }
 
 // newStatusRecord creates a new record initialized with defaults and user provided data
-func newStatusRecord(sourceID uuid.UUID, sourcePath string, database string, table string, opID uuid.UUID, actID uuid.UUID) *StatusRecord {
-	rec := &StatusRecord{
-		Status:                     Pending,
-		IngestionSourceID:          sourceID,
-		IngestionSourcePath:        sourcePath,
-		Database:                   database,
-		Table:                      table,
+func newStatusRecord() StatusRecord {
+	rec := StatusRecord{
+		Status:                     Failed,
+		IngestionSourceID:          uuid.Nil,
+		IngestionSourcePath:        "Undefined",
+		Database:                   "Undefined",
+		Table:                      "Undefined",
 		UpdatedOn:                  time.Now(),
-		OperationID:                opID,
-		ActivityID:                 actID,
+		OperationID:                uuid.Nil,
+		ActivityID:                 uuid.Nil,
 		ErrorCode:                  0,
 		FailureStatus:              Unknown,
 		Details:                    "",
@@ -173,6 +179,34 @@ func newStatusRecord(sourceID uuid.UUID, sourcePath string, database string, tab
 	}
 
 	return rec
+}
+
+// FromProps takes in data from ingestion options
+func (r *StatusRecord) FromProps(props properties.All) {
+	r.IngestionSourceID = props.Source.ID
+	r.Database = props.Ingestion.DatabaseName
+	r.Table = props.Ingestion.TableName
+	r.UpdatedOn = time.Now()
+
+	if props.Ingestion.BlobPath != "" && r.IngestionSourcePath == "Undefined" {
+		r.IngestionSourcePath = props.Ingestion.BlobPath
+	}
+}
+
+// FromMap converts an ingestion status record to a key value map
+func (r *StatusRecord) FromMap(data map[string]interface{}) {
+	r.Status = data["Status"].(StatusCode)
+	r.IngestionSourceID = data["IngestionSourceID"].(uuid.UUID)
+	r.IngestionSourcePath = data["IngestionSourcePath"].(string)
+	r.Database = data["Database"].(string)
+	r.Table = data["Table"].(string)
+	r.UpdatedOn = data["UpdatedOn"].(time.Time)
+	r.OperationID = data["OperationID"].(uuid.UUID)
+	r.ActivityID = data["ActivityID"].(uuid.UUID)
+	r.ErrorCode = data["ErrorCode"].(int)
+	r.FailureStatus = data["FailureStatus"].(FailureStatusCode)
+	r.Details = data["Details"].(string)
+	r.OriginatesFromUpdatePolicy = data["OriginatesFromUpdatePolicy"].(bool)
 }
 
 // ToMap converts an ingestion status record to a key value map
@@ -193,22 +227,6 @@ func (r *StatusRecord) ToMap() map[string]interface{} {
 	data["OriginatesFromUpdatePolicy"] = r.OriginatesFromUpdatePolicy
 
 	return data
-}
-
-// FromMap converts an ingestion status record to a key value map
-func (r *StatusRecord) FromMap(data map[string]interface{}) {
-	r.Status = data["Status"].(StatusCode)
-	r.IngestionSourceID = data["IngestionSourceID"].(uuid.UUID)
-	r.IngestionSourcePath = data["IngestionSourcePath"].(string)
-	r.Database = data["Database"].(string)
-	r.Table = data["Table"].(string)
-	r.UpdatedOn = data["UpdatedOn"].(time.Time)
-	r.OperationID = data["OperationID"].(uuid.UUID)
-	r.ActivityID = data["ActivityID"].(uuid.UUID)
-	r.ErrorCode = data["ErrorCode"].(int)
-	r.FailureStatus = data["FailureStatus"].(FailureStatusCode)
-	r.Details = data["Details"].(string)
-	r.OriginatesFromUpdatePolicy = data["OriginatesFromUpdatePolicy"].(bool)
 }
 
 // ToString converts an ingestion status record a printable  string

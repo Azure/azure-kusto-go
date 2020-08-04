@@ -84,7 +84,7 @@ func initEnv() {
 	if testConfig.ClientID == "" {
 		azAuthorizer, err := auth.NewAuthorizerFromCLIWithResource(testConfig.Endpoint)
 		if err != nil {
-			fmt.Println("failed to acquire auth token from az-cli")
+			fmt.Println("failed to acquire auth token from az-cli" + err.Error())
 			return
 		}
 

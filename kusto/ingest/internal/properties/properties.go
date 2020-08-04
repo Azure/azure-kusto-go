@@ -136,12 +136,14 @@ const (
 type IngestionReportMthod int
 
 const (
-	// Queue tells the DM to report ingestion status to the a queue
-	Queue IngestionReportMthod = 0
-	// Table tells the DM to report ingestion status to the a table
-	Table IngestionReportMthod = 1
-	// QueueAndTable tells the DM to report ingestion status to both queues and tables
-	QueueAndTable IngestionReportMthod = 2
+	// ReportStatusToQueue tells the DM to report ingestion status to the a queue
+	ReportStatusToQueue IngestionReportMthod = 0
+	// ReportStatusToTable tells the DM to report ingestion status to the a table
+	ReportStatusToTable IngestionReportMthod = 1
+	// ReportStatusToQueueAndTable tells the DM to report ingestion status to both queues and tables
+	ReportStatusToQueueAndTable IngestionReportMthod = 2
+	// ReportStatusToAzureMonitoring tells the DM to report ingestion status to azure monitor
+	ReportStatusToAzureMonitoring IngestionReportMthod = 3
 )
 
 // String implements fmt.Stringer.
