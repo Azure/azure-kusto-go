@@ -7,12 +7,14 @@ import (
 	"github.com/Azure/azure-kusto-go/kusto/ingest/internal/properties"
 	"github.com/Azure/azure-kusto-go/kusto/ingest/internal/resources"
 	"github.com/Azure/azure-kusto-go/kusto/ingest/internal/status"
+	"github.com/google/uuid"
 )
 
 // Result provides a way for users track the state of ingestion jobs.
 type Result struct {
 	record        StatusRecord
 	uri           resources.URI
+	tableClient   *status.TableClient
 	reportToTable bool
 	reportToQueue bool
 }
@@ -47,6 +49,40 @@ func (r *Result) putProps(props properties.All) *Result {
 	return r
 }
 
+// putQueued sets the initial success status depending on status reporting state
+func (r *Result) putQueued() *Result {
+	// If not checking status, just return queued
+	if !r.reportToTable {
+		r.record.Status = Queued
+		return r
+	}
+
+	// create a table client
+	client, err := status.NewTableClient(r.uri)
+	if err != nil {
+		r.record.Status = StatusRetrievalFailed
+		r.record.FailureStatus = Transient
+		r.record.Details = "Failed Creating a Status Table client: " + err.Error()
+		return r
+	}
+
+	// Write initial record
+	r.record.Status = Pending
+	if r.record.IngestionSourceID == uuid.Nil {
+		r.record.IngestionSourceID = uuid.New()
+	}
+
+	recordMap := r.record.ToMap()
+	err = client.WriteIngestionStatus(r.record.IngestionSourceID, recordMap)
+	if err != nil {
+		r.putErr(err)
+	} else {
+		r.tableClient = client
+	}
+
+	return r
+}
+
 // Wait returns a channel that can be checked for ingestion results.
 // In order to check actual status please use the IngestionStatus option when ingesting data.
 func (r *Result) Wait(ctx context.Context) chan StatusRecord {
@@ -64,12 +100,7 @@ func (r *Result) Wait(ctx context.Context) chan StatusRecord {
 
 func (r *Result) poll(ctx context.Context, ch chan StatusRecord) {
 	// create a table client
-	client, err := status.NewTableClient(r.uri)
-	if err != nil {
-		r.record.Status = StatusRetrievalFailed
-		r.record.FailureStatus = Transient
-		r.record.Details = "Failed Creating a Status Table client: " + err.Error()
-	} else {
+	if r.tableClient != nil {
 		// Create a ticker to poll the table in 10 second intervals.
 		ticker := time.NewTicker(10 * time.Second)
 		run := true
@@ -86,7 +117,7 @@ func (r *Result) poll(ctx context.Context, ch chan StatusRecord) {
 			// Whenever the ticker fires.
 			case <-ticker.C:
 				// read the current state
-				smap, err := client.ReadIngestionStatus(r.record.IngestionSourceID)
+				smap, err := r.tableClient.ReadIngestionStatus(r.record.IngestionSourceID)
 				if err != nil {
 					// Read failure
 					r.record.Status = StatusRetrievalFailed

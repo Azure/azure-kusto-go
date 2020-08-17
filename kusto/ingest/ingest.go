@@ -387,7 +387,7 @@ func (i *Ingestion) FromFile(ctx context.Context, fPath string, options ...FileO
 	if err != nil {
 		result.putErr(err)
 	} else {
-		result.record.Status = Queued
+		result.putQueued()
 	}
 
 	return result
@@ -434,11 +434,12 @@ func (i *Ingestion) FromReader(ctx context.Context, reader io.Reader, options ..
 		}
 	}
 
-	err = i.fs.Reader(ctx, reader, props)
+	path, err := i.fs.Reader(ctx, reader, props)
+	result.record.IngestionSourcePath = path
 	if err != nil {
 		result.putErr(err)
 	} else {
-		result.record.Status = Queued
+		result.putQueued()
 	}
 
 	return result

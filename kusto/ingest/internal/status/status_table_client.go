@@ -11,7 +11,7 @@ const (
 	metadataLevel  = "fullmetadata"
 )
 
-// TableClient allows reading ana writing to azure tables
+// TableClient allows reading and writing to azure tables.
 type TableClient struct {
 	tableURI resources.URI
 	client   storage.Client
@@ -19,9 +19,8 @@ type TableClient struct {
 	table    *storage.Table
 }
 
-// NewTableClient Creates an azure table client
+// NewTableClient Creates an azure table client.
 func NewTableClient(uri resources.URI) (*TableClient, error) {
-	// Create a table client
 	c, err := storage.NewAccountSASClientFromEndpointToken(uri.URL().String(), uri.SAS().Get("SAS"))
 	if err != nil {
 		return nil, err
@@ -40,7 +39,7 @@ func NewTableClient(uri resources.URI) (*TableClient, error) {
 	return atc, nil
 }
 
-// ReadIngestionStatus reads a table record cotaining ingestion status
+// ReadIngestionStatus reads a table record cotaining ingestion status.
 func (c *TableClient) ReadIngestionStatus(ingestionSourceID uuid.UUID) (map[string]interface{}, error) {
 	entity := storage.Entity{
 		PartitionKey: ingestionSourceID.String(),
@@ -58,7 +57,7 @@ func (c *TableClient) ReadIngestionStatus(ingestionSourceID uuid.UUID) (map[stri
 	return entity.Properties, nil
 }
 
-// WriteIngestionStatus reads a table record cotaining ingestion status
+// WriteIngestionStatus reads a table record cotaining ingestion status.
 func (c *TableClient) WriteIngestionStatus(ingestionSourceID uuid.UUID, data map[string]interface{}) error {
 	entity := storage.Entity{
 		PartitionKey: ingestionSourceID.String(),
