@@ -21,7 +21,7 @@ type TableClient struct {
 
 // NewTableClient Creates an azure table client.
 func NewTableClient(uri resources.URI) (*TableClient, error) {
-	c, err := storage.NewAccountSASClientFromEndpointToken(uri.URL().String(), uri.SAS().Get("SAS"))
+	c, err := storage.NewAccountSASClientFromEndpointToken(uri.URL().String(), uri.SAS().Encode())
 	if err != nil {
 		return nil, err
 	}

@@ -13,7 +13,6 @@ import (
 // Result provides a way for users track the state of ingestion jobs.
 type Result struct {
 	record        StatusRecord
-	uri           resources.URI
 	tableClient   *status.TableClient
 	reportToTable bool
 	reportToQueue bool
@@ -50,15 +49,31 @@ func (r *Result) putProps(props properties.All) *Result {
 }
 
 // putQueued sets the initial success status depending on status reporting state
-func (r *Result) putQueued() *Result {
+func (r *Result) putQueued(mgr *resources.Manager) *Result {
 	// If not checking status, just return queued
 	if !r.reportToTable {
 		r.record.Status = Queued
 		return r
 	}
 
+	// Get table URI
+	resources, err := mgr.Resources()
+	if err != nil {
+		r.record.Status = StatusRetrievalFailed
+		r.record.FailureStatus = Transient
+		r.record.Details = "Failed getting status table URI: " + err.Error()
+		return r
+	}
+
+	if len(resources.Tables) == 0 {
+		r.record.Status = StatusRetrievalFailed
+		r.record.FailureStatus = Transient
+		r.record.Details = "Ingestion resources do not include a status table URI: " + err.Error()
+		return r
+	}
+
 	// create a table client
-	client, err := status.NewTableClient(r.uri)
+	client, err := status.NewTableClient(*resources.Tables[0])
 	if err != nil {
 		r.record.Status = StatusRetrievalFailed
 		r.record.FailureStatus = Transient

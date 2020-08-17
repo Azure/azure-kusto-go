@@ -261,7 +261,7 @@ func IfNotExists(ingestByTag string) FileOption {
 }
 
 // ReportResultToTable option requests that the ingestion status will be tracked in an Azure table
-func ReportResultToTable(tags []string) FileOption {
+func ReportResultToTable() FileOption {
 	return propertyOption(
 		func(p *properties.All) error {
 			p.Ingestion.ReportLevel = properties.FailureAndSuccess
@@ -387,7 +387,7 @@ func (i *Ingestion) FromFile(ctx context.Context, fPath string, options ...FileO
 	if err != nil {
 		result.putErr(err)
 	} else {
-		result.putQueued()
+		result.putQueued(manager)
 	}
 
 	return result
@@ -439,7 +439,7 @@ func (i *Ingestion) FromReader(ctx context.Context, reader io.Reader, options ..
 	if err != nil {
 		result.putErr(err)
 	} else {
-		result.putQueued()
+		result.putQueued(manager)
 	}
 
 	return result
