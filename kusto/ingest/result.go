@@ -9,32 +9,29 @@ import (
 	"github.com/Azure/azure-kusto-go/kusto/ingest/internal/status"
 )
 
-// IngestionResult provides a way for users track the state of ingestion jobs
-type IngestionResult struct {
+// Result provides a way for users track the state of ingestion jobs.
+type Result struct {
 	record        StatusRecord
 	uri           resources.URI
 	reportToTable bool
 	reportToQueue bool
 }
 
-// newIngestionResult creates an initial ingestion status record
-func newIngestionResult() *IngestionResult {
-	ret := &IngestionResult{}
+// newResult creates an initial ingestion status record.
+func newResult() *Result {
+	ret := &Result{}
 
 	ret.record = newStatusRecord()
-	ret.reportToTable = false
-	ret.reportToQueue = false
-
 	return ret
 }
 
-// updateFromError sets the record to a failure state and adds the error to the record details
-func (r *IngestionResult) updateFromError(err error) *IngestionResult {
-	return r.updateFromErrorString(err.Error())
+// putErr sets the record to a failure state and adds the error to the record details.
+func (r *Result) putErr(err error) *Result {
+	return r.putErrStr(err.Error())
 }
 
-// updateFromErrorString sets the record to a failure state and adds the error to the record details
-func (r *IngestionResult) updateFromErrorString(err string) *IngestionResult {
+// putErrStr sets the record to a failure state and adds the error to the record details.
+func (r *Result) putErrStr(err string) *Result {
 	r.record.Status = ClientError
 	r.record.FailureStatus = Permanent
 	r.record.Details = err
@@ -42,30 +39,30 @@ func (r *IngestionResult) updateFromErrorString(err string) *IngestionResult {
 	return r
 }
 
-// updateFromProps sets the record to a failure state and adds the error to the record details
-func (r *IngestionResult) updateFromProps(props properties.All) *IngestionResult {
+// putProps sets the record to a failure state and adds the error to the record details.
+func (r *Result) putProps(props properties.All) *Result {
 	r.reportToTable = props.Ingestion.ReportMethod == properties.ReportStatusToTable || props.Ingestion.ReportMethod == properties.ReportStatusToQueueAndTable
 	r.record.FromProps(props)
 
 	return r
 }
 
-// WaitForIngestionComplete returns a channel that can be checked for ingestion results
-// In order to check actual status please use the IngestionStatus option when ingesting data
-func (r *IngestionResult) WaitForIngestionComplete(ctx context.Context) chan StatusRecord {
+// Wait returns a channel that can be checked for ingestion results.
+// In order to check actual status please use the IngestionStatus option when ingesting data.
+func (r *Result) Wait(ctx context.Context) chan StatusRecord {
 	ch := make(chan StatusRecord, 1)
 
 	if r.record.Status.IsFinal() || r.reportToTable == false {
 		ch <- r.record
 		close(ch)
 	} else {
-		go r.pollIngestionStatusTable(ctx, ch)
+		go r.poll(ctx, ch)
 	}
 
 	return ch
 }
 
-func (r *IngestionResult) pollIngestionStatusTable(ctx context.Context, ch chan StatusRecord) {
+func (r *Result) poll(ctx context.Context, ch chan StatusRecord) {
 	// create a table client
 	client, err := status.NewTableClient(r.uri)
 	if err != nil {
@@ -73,20 +70,20 @@ func (r *IngestionResult) pollIngestionStatusTable(ctx context.Context, ch chan 
 		r.record.FailureStatus = Transient
 		r.record.Details = "Failed Creating a Status Table client: " + err.Error()
 	} else {
-		// Create a ticker to poll the table in 10 second intervals
+		// Create a ticker to poll the table in 10 second intervals.
 		ticker := time.NewTicker(10 * time.Second)
 		run := true
 
 		for run {
 			select {
-			// In case the user canceled the wait, return current known state
+			// In case the user canceled the wait, return current known state.
 			case <-ctx.Done():
-				// return a canceld state
+				// return a canceld state.
 				r.record.Status = StatusRetrievalCanceled
 				r.record.FailureStatus = Transient
 				run = false
 
-			// Whenever the ticker fires
+			// Whenever the ticker fires.
 			case <-ticker.C:
 				// read the current state
 				smap, err := client.ReadIngestionStatus(r.record.IngestionSourceID)
@@ -98,7 +95,7 @@ func (r *IngestionResult) pollIngestionStatusTable(ctx context.Context, ch chan 
 					run = false
 
 				} else {
-					// convert the data into a record and send it if the state is final
+					// convert the data into a record and send it if the state is final.
 					r.record.FromMap(smap)
 					if r.record.Status.IsFinal() {
 						run = false

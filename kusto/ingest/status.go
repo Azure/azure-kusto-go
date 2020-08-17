@@ -129,7 +129,7 @@ type StatusRecord struct {
 	// The URI of the blob, potentially including the secret needed to access
 	// the blob. This can be a filesystem URI (on-premises deployments only),
 	// or an Azure Blob Storage URI (including a SAS key or a semicolon followed
-	// by the account key)
+	// by the account key).
 	IngestionSourcePath string
 
 	// Database - The name of the database holding the target table.
@@ -161,7 +161,7 @@ type StatusRecord struct {
 	OriginatesFromUpdatePolicy bool
 }
 
-// newStatusRecord creates a new record initialized with defaults and user provided data
+// newStatusRecord creates a new record initialized with defaults and user provided data.
 func newStatusRecord() StatusRecord {
 	rec := StatusRecord{
 		Status:                     Failed,
@@ -181,7 +181,7 @@ func newStatusRecord() StatusRecord {
 	return rec
 }
 
-// FromProps takes in data from ingestion options
+// FromProps takes in data from ingestion options.
 func (r *StatusRecord) FromProps(props properties.All) {
 	r.IngestionSourceID = props.Source.ID
 	r.Database = props.Ingestion.DatabaseName
@@ -193,7 +193,7 @@ func (r *StatusRecord) FromProps(props properties.All) {
 	}
 }
 
-// FromMap converts an ingestion status record to a key value map
+// FromMap converts an ingestion status record to a key value map.
 func (r *StatusRecord) FromMap(data map[string]interface{}) {
 	r.Status = data["Status"].(StatusCode)
 	r.IngestionSourceID = data["IngestionSourceID"].(uuid.UUID)
@@ -209,7 +209,7 @@ func (r *StatusRecord) FromMap(data map[string]interface{}) {
 	r.OriginatesFromUpdatePolicy = data["OriginatesFromUpdatePolicy"].(bool)
 }
 
-// ToMap converts an ingestion status record to a key value map
+// ToMap converts an ingestion status record to a key value map.
 func (r *StatusRecord) ToMap() map[string]interface{} {
 	data := make(map[string]interface{})
 
@@ -229,8 +229,8 @@ func (r *StatusRecord) ToMap() map[string]interface{} {
 	return data
 }
 
-// ToString converts an ingestion status record a printable  string
-func (r *StatusRecord) ToString() string {
+// String converts an ingestion status record a printable  string.
+func (r *StatusRecord) String() string {
 
 	str := fmt.Sprintf("IngestionSourceID: '%s', IngestionSourcePath: '%s', Status: '%s',  FailureStatus: '%s', ErrorCode: '%d', Database: '%s', Table: '%s', UpdatedOn: '%s', OperationID: '%s', ActivityID: '%s', OriginatesFromUpdatePolicy: '%t', Details: '%s'",
 		r.IngestionSourceID,
@@ -249,7 +249,7 @@ func (r *StatusRecord) ToString() string {
 	return str
 }
 
-// ToError converts an ingestion status to an error if failed or partially succeeded, or nil if succeeded
+// ToError converts an ingestion status to an error if failed or partially succeeded, or nil if succeeded.
 func (r *StatusRecord) ToError() error {
 	switch r.Status {
 	case Succeeded:
@@ -257,8 +257,8 @@ func (r *StatusRecord) ToError() error {
 		return nil
 
 	case PartiallySucceeded:
-		return fmt.Errorf("Ingestion succeeded partially\n" + r.ToString())
+		return fmt.Errorf("Ingestion succeeded partially\n" + r.String())
 	}
 
-	return fmt.Errorf("Ingestion Failed\n" + r.ToString())
+	return fmt.Errorf("Ingestion Failed\n" + r.String())
 }

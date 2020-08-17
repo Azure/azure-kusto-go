@@ -469,7 +469,7 @@ func TestFileIngestion(t *testing.T) {
 
 			test.options = append(test.options, ingest.FlushImmediately())
 
-			res := <-ingestor.FromFile(ctx, test.src, test.options...).WaitForIngestionComplete(ctx)
+			res := <-ingestor.FromFile(ctx, test.src, test.options...).Wait(ctx)
 			err := res.ToError()
 			switch {
 			case err == nil && test.wantErr:
@@ -653,7 +653,7 @@ func TestReaderIngestion(t *testing.T) {
 				io.Copy(writer, f)
 			}()
 
-			res := <-ingestor.FromReader(ctx, reader, test.options...).WaitForIngestionComplete(ctx)
+			res := <-ingestor.FromReader(ctx, reader, test.options...).Wait(ctx)
 			err = res.ToError()
 			switch {
 			case err == nil && test.wantErr:
