@@ -123,7 +123,7 @@ func TestIgestionWithStatusReporting(t *testing.T) {
 	initOnce()
 
 	ctx, cancel := context.WithCancel(context.Background())
-	ctx, cancel = context.WithTimeout(ctx, 1*time.Minute)
+	ctx, cancel = context.WithTimeout(ctx, 5*time.Minute)
 	defer cancel()
 
 	client, err := kusto.New(testConfig.Endpoint, testConfig.Authorizer)
@@ -137,8 +137,8 @@ func TestIgestionWithStatusReporting(t *testing.T) {
 	}
 
 	res := <-ingestor.FromFile(ctx, csvFile, ingest.ReportResultToTable(), ingest.FlushImmediately()).Wait(ctx)
-	if res.Status != ingest.Queued {
-		t.Errorf("Exepcted status Queued however result is:\n%s", res.String())
+	if res.Status != ingest.Succeeded {
+		t.Errorf("Exepcted status Succeeded however result is:\n%s", res.String())
 	} else if verbose {
 		println(res.String())
 		println()

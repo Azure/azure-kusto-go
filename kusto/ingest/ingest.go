@@ -378,7 +378,7 @@ func (i *Ingestion) FromFile(ctx context.Context, fPath string, options ...FileO
 		}
 
 		props.Ingestion.TableEntryRef.PartitionKey = props.Source.ID.String()
-		props.Ingestion.TableEntryRef.RowKey = "0"
+		props.Ingestion.TableEntryRef.RowKey = uuid.Nil.String()
 	}
 
 	result.putProps(props)
@@ -448,7 +448,7 @@ func (i *Ingestion) FromReader(ctx context.Context, reader io.Reader, options ..
 		}
 
 		props.Ingestion.TableEntryRef.PartitionKey = props.Source.ID.String()
-		props.Ingestion.TableEntryRef.RowKey = "0"
+		props.Ingestion.TableEntryRef.RowKey = uuid.Nil.String()
 	}
 
 	result.putProps(props)

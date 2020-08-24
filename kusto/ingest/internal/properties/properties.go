@@ -264,7 +264,7 @@ type Ingestion struct {
 	// Additional (properties) is a set of extra properties added to the ingestion command
 	Additional Additional `json:"AdditionalProperties"`
 	// TableEntryRef points to the staus table entry used to report the status of this ingestion
-	TableEntryRef StatusTableDescription `json:"IngestionStatusInTableDescription,omitempty"`
+	TableEntryRef StatusTableDescription `json:"IngestionStatusInTable,omitempty"`
 }
 
 // Additional is additional properites.

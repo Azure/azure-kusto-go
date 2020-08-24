@@ -6,6 +6,7 @@ import (
 	"time"
 
 	"github.com/Azure/azure-kusto-go/kusto/ingest/internal/properties"
+	"github.com/google/uuid"
 )
 
 // StatusCode is the ingestion status
@@ -71,7 +72,7 @@ type StatusRecord struct {
 	Status StatusCode
 
 	// IngestionSourceID - A unique identifier representing the ingested source. It can be supplied during the ingestion execution.
-	IngestionSourceID string
+	IngestionSourceID uuid.UUID
 
 	// The URI of the blob, potentially including the secret needed to access
 	// the blob. This can be a filesystem URI (on-premises deployments only),
@@ -89,10 +90,10 @@ type StatusRecord struct {
 	UpdatedOn time.Time
 
 	// OperationID - The ingestion's operation ID.
-	OperationID string
+	OperationID uuid.UUID
 
 	// ActivityID - The ingestion's activity ID.
-	ActivityID string
+	ActivityID uuid.UUID
 
 	// ErrorCode In case of a failure, indicates the failure's error code.
 	// TODO [Yochai, July 2020] make this into a const list
@@ -112,13 +113,13 @@ type StatusRecord struct {
 func newStatusRecord() StatusRecord {
 	rec := StatusRecord{
 		Status:                     Failed,
-		IngestionSourceID:          "",
+		IngestionSourceID:          uuid.Nil,
 		IngestionSourcePath:        "Undefined",
 		Database:                   "Undefined",
 		Table:                      "Undefined",
 		UpdatedOn:                  time.Now(),
-		OperationID:                "",
-		ActivityID:                 "",
+		OperationID:                uuid.Nil,
+		ActivityID:                 uuid.Nil,
 		ErrorCode:                  "Unknown",
 		FailureStatus:              Unknown,
 		Details:                    "",
@@ -130,7 +131,7 @@ func newStatusRecord() StatusRecord {
 
 // FromProps takes in data from ingestion options.
 func (r *StatusRecord) FromProps(props properties.All) {
-	r.IngestionSourceID = props.Source.ID.String()
+	r.IngestionSourceID = props.Source.ID
 	r.Database = props.Ingestion.DatabaseName
 	r.Table = props.Ingestion.TableName
 	r.UpdatedOn = time.Now()
@@ -142,22 +143,55 @@ func (r *StatusRecord) FromProps(props properties.All) {
 
 // FromMap converts an ingestion status record to a key value map.
 func (r *StatusRecord) FromMap(data map[string]interface{}) {
-	r.Status = StatusCode(data["Status"].(string))
-	r.IngestionSourcePath = data["IngestionSourcePath"].(string)
-	r.Database = data["Database"].(string)
-	r.Table = data["Table"].(string)
-	r.OperationID = data["OperationID"].(string)
-	r.ActivityID = data["ActivityID"].(string)
-	r.ErrorCode = data["ErrorCode"].(string)
-	r.FailureStatus = FailureStatusCode(data["FailureStatus"].(string))
-	r.Details = data["Details"].(string)
-	r.OriginatesFromUpdatePolicy = strings.EqualFold(data["OriginatesFromUpdatePolicy"].(string), "true")
-	r.IngestionSourceID = data["IngestionSourceID"].(string)
+	if data["Status"] != nil {
+		r.Status = StatusCode(data["Status"].(string))
+	}
 
-	t, err := time.Parse(time.RFC3339, data["UpdatedOn"].(string))
+	if data["IngestionSourceId"] != nil {
+		r.IngestionSourceID = data["IngestionSourceId"].(uuid.UUID)
+	}
+
+	if data["IngestionSourcePath"] != nil {
+		r.IngestionSourcePath = data["IngestionSourcePath"].(string)
+	}
+
+	if data["Database"] != nil {
+		r.Database = data["Database"].(string)
+	}
+
+	if data["Table"] != nil {
+		r.Table = data["Table"].(string)
+	}
+
+	t, err := time.Parse(time.RFC3339Nano, data["UpdatedOn"].(string))
 	if err == nil {
 		r.UpdatedOn = t
 	}
+
+	if data["OperationId"] != nil {
+		r.OperationID = data["OperationId"].(uuid.UUID)
+	}
+
+	if data["ActivityId"] != nil {
+		r.ActivityID = data["ActivityId"].(uuid.UUID)
+	}
+
+	if data["ErrorCode"] != nil {
+		r.ErrorCode = data["ErrorCode"].(string)
+	}
+
+	if data["FailureStatus"] != nil {
+		r.FailureStatus = FailureStatusCode(data["FailureStatus"].(string))
+	}
+
+	if data["Details"] != nil {
+		r.Details = data["Details"].(string)
+	}
+
+	if data["OriginatesFromUpdatePolicy"] != nil {
+		r.OriginatesFromUpdatePolicy = strings.EqualFold(data["OriginatesFromUpdatePolicy"].(string), "true")
+	}
+
 }
 
 // ToMap converts an ingestion status record to a key value map.
@@ -168,22 +202,11 @@ func (r *StatusRecord) ToMap() map[string]interface{} {
 	//   OperationID, AcitivityID, ErrorCode, FailureStatus, Details, OriginatesFromUpdatePolicy
 	// Those will be read from the server if they have data in them
 	data["Status"] = r.Status
-	data["IngestionSourceID"] = r.IngestionSourceID
+	data["IngestionSourceId"] = r.IngestionSourceID
 	data["IngestionSourcePath"] = r.IngestionSourcePath
 	data["Database"] = r.Database
 	data["Table"] = r.Table
-	data["UpdatedOn"] = r.UpdatedOn.Format(time.RFC3339)
-	data["OperationID"] = r.OperationID
-	data["ActivityID"] = r.ActivityID
-	data["ErrorCode"] = r.ErrorCode
-	data["FailureStatus"] = r.FailureStatus
-	data["Details"] = r.Details
-
-	if r.OriginatesFromUpdatePolicy {
-		data["OriginatesFromUpdatePolicy"] = "true"
-	} else {
-		data["OriginatesFromUpdatePolicy"] = "false"
-	}
+	data["UpdatedOn"] = r.UpdatedOn.Format(time.RFC3339Nano)
 
 	return data
 }

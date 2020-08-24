@@ -83,7 +83,7 @@ func (r *Result) putQueued(mgr *resources.Manager) *Result {
 	// Write initial record
 	r.record.Status = Pending
 	recordMap := r.record.ToMap()
-	err = client.WriteIngestionStatus(r.record.IngestionSourceID, recordMap)
+	err = client.WriteIngestionStatus(r.record.IngestionSourceID.String(), recordMap)
 	if err != nil {
 		r.putErr(err)
 	} else {
@@ -129,7 +129,7 @@ func (r *Result) poll(ctx context.Context) {
 			// Whenever the ticker fires.
 			case <-ticker.C:
 				// read the current state
-				smap, err := r.tableClient.ReadIngestionStatus(r.record.IngestionSourceID)
+				smap, err := r.tableClient.ReadIngestionStatus(r.record.IngestionSourceID.String())
 				if err != nil {
 					// Read failure
 					r.record.Status = StatusRetrievalFailed
