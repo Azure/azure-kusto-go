@@ -2,6 +2,7 @@ package etoe
 
 import (
 	"context"
+	"fmt"
 	"testing"
 	"time"
 
@@ -18,15 +19,18 @@ const (
 )
 
 var (
-	initDone bool = false
-	testConf Config
+	initDone   bool = false
+	initFailed bool = true
+	testConf   Config
 )
 
-func initOnce() {
+func initOnce() error {
 	if !initDone {
+		initDone = true
+
 		testConf, err := NewConfig()
 		if err != nil {
-			panic("end to end tests disabled: missing config.json file in etoe directory or test environment not set")
+			return fmt.Errorf("end to end tests disabled: missing config.json file in etoe directory or test environment not set - %s", err)
 		}
 
 		ctx, cancel := context.WithCancel(context.Background())
@@ -35,29 +39,39 @@ func initOnce() {
 
 		client, err := kusto.New(testConfig.Endpoint, testConfig.Authorizer)
 		if err != nil {
-			panic(err)
+			return err
 		}
 
 		// Drop the old table if exists
 		dropStmt := kusto.NewStmt(".drop table ", kusto.UnsafeStmt(unsafe.Stmt{Add: true})).UnsafeAdd(tableName).Add(" ifexists")
 		_, err = client.Mgmt(ctx, testConf.Database, dropStmt)
 		if err != nil {
-			panic("failed to drop the old table:\n" + err.Error())
+			return fmt.Errorf("failed to drop the old table:\n" + err.Error())
 		}
 
 		// Create a database
 		createStmt := kusto.NewStmt(".create table ", kusto.UnsafeStmt(unsafe.Stmt{Add: true})).UnsafeAdd(tableName).UnsafeAdd(scheme)
 		_, err = client.Mgmt(ctx, testConf.Database, createStmt)
 		if err != nil {
-			panic("failed to create a table:\n" + err.Error())
+			return fmt.Errorf("failed to create a table:\n" + err.Error())
 		}
 
-		initDone = true
+		initFailed = false
+	}
+
+	if initFailed {
+		return fmt.Errorf("Init once failed in the past")
+	} else {
+		return nil
 	}
 }
 
 func TestIgestionWithoutStatusReporting(t *testing.T) {
-	initOnce()
+	err := initOnce()
+	if err != nil {
+		t.Skipf("Skipping tests: %s", err)
+		return
+	}
 
 	ctx, cancel := context.WithCancel(context.Background())
 	ctx, cancel = context.WithTimeout(ctx, 1*time.Minute)
@@ -83,8 +97,11 @@ func TestIgestionWithoutStatusReporting(t *testing.T) {
 }
 
 func TestIgestionWithWithClientFailure(t *testing.T) {
-
-	initOnce()
+	err := initOnce()
+	if err != nil {
+		t.Skipf("Skipping tests: %s", err)
+		return
+	}
 
 	ctx, cancel := context.WithCancel(context.Background())
 	ctx, cancel = context.WithTimeout(ctx, 1*time.Minute)
@@ -120,7 +137,11 @@ func TestIgestionWithWithClientFailure(t *testing.T) {
 }
 
 func TestIgestionWithStatusReporting(t *testing.T) {
-	initOnce()
+	err := initOnce()
+	if err != nil {
+		t.Skipf("Skipping tests: %s", err)
+		return
+	}
 
 	ctx, cancel := context.WithCancel(context.Background())
 	ctx, cancel = context.WithTimeout(ctx, 5*time.Minute)
