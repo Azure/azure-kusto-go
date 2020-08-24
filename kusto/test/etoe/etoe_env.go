@@ -68,11 +68,11 @@ func initEnv() error {
 		}
 
 		if testConfig.Endpoint == "" {
-			fmt.Errorf("missing ENGINE_CONNECTION_STRING environment variable")
+			return fmt.Errorf("Missing ENGINE_CONNECTION_STRING environment variable")
 		}
 
 	} else if err := json.Unmarshal(b, &testConfig); err != nil {
-		fmt.Errorf("Failed reading test settings from '%s'", p)
+		return fmt.Errorf("Failed reading test settings from '%s'", p)
 	}
 
 	if err := testConfig.validate(); err != nil {
@@ -82,7 +82,7 @@ func initEnv() error {
 	if testConfig.ClientID == "" {
 		azAuthorizer, err := auth.NewAuthorizerFromCLIWithResource(testConfig.Endpoint)
 		if err != nil {
-			fmt.Println("failed to acquire auth token from az-cli" + err.Error())
+			fmt.Println("Failed to acquire auth token from az-cli" + err.Error())
 			return err
 		}
 
