@@ -1,12 +1,8 @@
 package etoe
 
 import (
-	"encoding/json"
 	"fmt"
-	"io/ioutil"
 	"os"
-	"path/filepath"
-	"runtime"
 
 	"github.com/Azure/azure-kusto-go/kusto"
 	"github.com/Azure/go-autorest/autorest/azure/auth"
@@ -48,31 +44,17 @@ var (
 
 // initEnv will read in our config file and if it can't be read, will set skipETOE so the tests will be suppressed.
 func initEnv() error {
-	_, filename, _, ok := runtime.Caller(0)
-	if !ok {
-		return fmt.Errorf("Failed calling runtime.Claller()")
+	// if couldn't find a config file, we try to read them from env
+	testConfig = Config{
+		Endpoint:     os.Getenv("ENGINE_CONNECTION_STRING"),
+		Database:     os.Getenv("TEST_DATABASE"),
+		ClientID:     os.Getenv("APP_ID"),
+		ClientSecret: os.Getenv("APP_KEY"),
+		TenantID:     os.Getenv("AUTH_ID"),
 	}
 
-	p := filepath.Join(filepath.Dir(filename), "config.json")
-
-	b, err := ioutil.ReadFile(p)
-
-	if err != nil {
-		// if couldn't find a config file, we try to read them from env
-		testConfig = Config{
-			Endpoint:     os.Getenv("ENGINE_CONNECTION_STRING"),
-			Database:     os.Getenv("TEST_DATABASE"),
-			ClientID:     os.Getenv("APP_ID"),
-			ClientSecret: os.Getenv("APP_KEY"),
-			TenantID:     os.Getenv("AUTH_ID"),
-		}
-
-		if testConfig.Endpoint == "" {
-			fmt.Errorf("missing ENGINE_CONNECTION_STRING environment variable")
-		}
-
-	} else if err := json.Unmarshal(b, &testConfig); err != nil {
-		fmt.Errorf("Failed reading test settings from '%s'", p)
+	if testConfig.Endpoint == "" {
+		return fmt.Errorf("missing ENGINE_CONNECTION_STRING environment variable")
 	}
 
 	if err := testConfig.validate(); err != nil {
