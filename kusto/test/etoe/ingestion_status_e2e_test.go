@@ -26,7 +26,7 @@ func initOnce() {
 	if !initDone {
 		testConf, err := NewConfig()
 		if err != nil {
-			panic("end to end tests disabled: missing config.json file in etoe directory")
+			panic("end to end tests disabled: missing config.json file in etoe directory or test environment not set")
 		}
 
 		ctx, cancel := context.WithCancel(context.Background())

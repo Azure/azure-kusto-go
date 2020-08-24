@@ -41,18 +41,16 @@ var (
 	// has init occured
 	wasInit bool = false
 	// skipETOE will be set if the ./config.json file does not exist to let us suppress these tests.
-	skipETOE bool = false
+	skipETOE bool = true
 	// testConfig is the configuration file that we read in via init().
 	testConfig Config
 )
 
 // initEnv will read in our config file and if it can't be read, will set skipETOE so the tests will be suppressed.
-func initEnv() {
-	skipETOE = true
-
+func initEnv() error {
 	_, filename, _, ok := runtime.Caller(0)
 	if !ok {
-		return
+		return fmt.Errorf("Failed calling runtime.Claller()")
 	}
 
 	p := filepath.Join(filepath.Dir(filename), "config.json")
@@ -70,22 +68,22 @@ func initEnv() {
 		}
 
 		if testConfig.Endpoint == "" {
-			return
+			fmt.Errorf("missing ENGINE_CONNECTION_STRING environment variable")
 		}
 
 	} else if err := json.Unmarshal(b, &testConfig); err != nil {
-		return
+		fmt.Errorf("Failed reading test settings from '%s'", p)
 	}
 
 	if err := testConfig.validate(); err != nil {
-		return
+		return err
 	}
 
 	if testConfig.ClientID == "" {
 		azAuthorizer, err := auth.NewAuthorizerFromCLIWithResource(testConfig.Endpoint)
 		if err != nil {
 			fmt.Println("failed to acquire auth token from az-cli" + err.Error())
-			return
+			return err
 		}
 
 		testConfig.Authorizer = kusto.Authorization{Authorizer: azAuthorizer}
@@ -93,13 +91,20 @@ func initEnv() {
 		testConfig.Authorizer = kusto.Authorization{Config: auth.NewClientCredentialsConfig(testConfig.ClientID, testConfig.ClientSecret, testConfig.TenantID)}
 	}
 
-	skipETOE = false
+	return nil
 }
 
 // NewConfig returns e2e environent configuration data
 func NewConfig() (*Config, error) {
 	if !wasInit {
-		initEnv()
+		err := initEnv()
+		if err != nil {
+			fmt.Println("Failed initializing E2E environment")
+			fmt.Println(err)
+		} else {
+			skipETOE = false
+		}
+
 		wasInit = true
 	}
 
