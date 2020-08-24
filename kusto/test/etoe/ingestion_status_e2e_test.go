@@ -3,6 +3,7 @@ package etoe
 import (
 	"context"
 	"testing"
+	"time"
 
 	"github.com/Azure/azure-kusto-go/kusto"
 	"github.com/Azure/azure-kusto-go/kusto/ingest"
@@ -29,6 +30,7 @@ func initOnce() {
 		}
 
 		ctx, cancel := context.WithCancel(context.Background())
+		ctx, cancel = context.WithTimeout(ctx, 2*time.Minute)
 		defer cancel()
 
 		client, err := kusto.New(testConfig.Endpoint, testConfig.Authorizer)
@@ -58,6 +60,7 @@ func TestIgestionWithoutStatusReporting(t *testing.T) {
 	initOnce()
 
 	ctx, cancel := context.WithCancel(context.Background())
+	ctx, cancel = context.WithTimeout(ctx, 2*time.Minute)
 	defer cancel()
 
 	client, err := kusto.New(testConfig.Endpoint, testConfig.Authorizer)
@@ -84,6 +87,7 @@ func TestIgestionWithWithClientFailure(t *testing.T) {
 	initOnce()
 
 	ctx, cancel := context.WithCancel(context.Background())
+	ctx, cancel = context.WithTimeout(ctx, 2*time.Minute)
 	defer cancel()
 
 	client, err := kusto.New(testConfig.Endpoint, testConfig.Authorizer)
@@ -119,6 +123,7 @@ func TestIgestionWithStatusReporting(t *testing.T) {
 	initOnce()
 
 	ctx, cancel := context.WithCancel(context.Background())
+	ctx, cancel = context.WithTimeout(ctx, 2*time.Minute)
 	defer cancel()
 
 	client, err := kusto.New(testConfig.Endpoint, testConfig.Authorizer)

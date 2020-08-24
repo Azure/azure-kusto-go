@@ -17,6 +17,7 @@ import (
 	"github.com/Azure/azure-kusto-go/kusto/ingest/internal/filesystem"
 	"github.com/Azure/azure-kusto-go/kusto/ingest/internal/properties"
 	"github.com/Azure/azure-kusto-go/kusto/ingest/internal/resources"
+	"github.com/google/uuid"
 )
 
 var (
@@ -364,6 +365,10 @@ func (i *Ingestion) FromFile(ctx context.Context, fPath string, options ...FileO
 		}
 	}
 
+	if props.Source.ID == uuid.Nil {
+		props.Source.ID = uuid.New()
+	}
+
 	result.putProps(props)
 
 	if props.Ingestion.Additional.IngestionMappingRef != "" {
@@ -416,6 +421,10 @@ func (i *Ingestion) FromReader(ctx context.Context, reader io.Reader, options ..
 				return result.putErr(err)
 			}
 		}
+	}
+
+	if props.Source.ID == uuid.Nil {
+		props.Source.ID = uuid.New()
 	}
 
 	result.putProps(props)

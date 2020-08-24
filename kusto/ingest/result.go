@@ -7,7 +7,6 @@ import (
 	"github.com/Azure/azure-kusto-go/kusto/ingest/internal/properties"
 	"github.com/Azure/azure-kusto-go/kusto/ingest/internal/resources"
 	"github.com/Azure/azure-kusto-go/kusto/ingest/internal/status"
-	"github.com/google/uuid"
 )
 
 // Result provides a way for users track the state of ingestion jobs.
@@ -83,10 +82,6 @@ func (r *Result) putQueued(mgr *resources.Manager) *Result {
 
 	// Write initial record
 	r.record.Status = Pending
-	if r.record.IngestionSourceID == uuid.Nil {
-		r.record.IngestionSourceID = uuid.New()
-	}
-
 	recordMap := r.record.ToMap()
 	err = client.WriteIngestionStatus(r.record.IngestionSourceID, recordMap)
 	if err != nil {
@@ -141,13 +136,12 @@ func (r *Result) poll(ctx context.Context) {
 					r.record.FailureStatus = Transient
 					r.record.Details = "Failed reading from Status Table: " + err.Error()
 					return
+				}
 
-				} else {
-					// convert the data into a record and send it if the state is final.
-					r.record.FromMap(smap)
-					if r.record.Status.IsFinal() {
-						return
-					}
+				// convert the data into a record and send it if the state is final.
+				r.record.FromMap(smap)
+				if r.record.Status.IsFinal() {
+					return
 				}
 			}
 		}

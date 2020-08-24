@@ -195,18 +195,34 @@ func (r *StatusRecord) FromProps(props properties.All) {
 
 // FromMap converts an ingestion status record to a key value map.
 func (r *StatusRecord) FromMap(data map[string]interface{}) {
-	r.Status = data["Status"].(StatusCode)
-	r.IngestionSourceID = data["IngestionSourceID"].(uuid.UUID)
+	r.Status = StatusCode(int32(data["Status"].(float64)))
 	r.IngestionSourcePath = data["IngestionSourcePath"].(string)
 	r.Database = data["Database"].(string)
 	r.Table = data["Table"].(string)
-	r.UpdatedOn = data["UpdatedOn"].(time.Time)
-	r.OperationID = data["OperationID"].(uuid.UUID)
-	r.ActivityID = data["ActivityID"].(uuid.UUID)
-	r.ErrorCode = data["ErrorCode"].(int)
-	r.FailureStatus = data["FailureStatus"].(FailureStatusCode)
+	r.ErrorCode = int(data["ErrorCode"].(float64))
+	r.FailureStatus = FailureStatusCode(int(data["FailureStatus"].(float64)))
 	r.Details = data["Details"].(string)
 	r.OriginatesFromUpdatePolicy = data["OriginatesFromUpdatePolicy"].(bool)
+
+	uid, err := uuid.Parse(data["IngestionSourceID"].(string))
+	if err == nil {
+		r.IngestionSourceID = uid
+	}
+
+	uid, err = uuid.Parse(data["OperationID"].(string))
+	if err == nil {
+		r.OperationID = uid
+	}
+
+	uid, err = uuid.Parse(data["ActivityID"].(string))
+	if err == nil {
+		r.ActivityID = uid
+	}
+
+	t, err := time.Parse(time.RFC3339Nano, data["UpdatedOn"].(string))
+	if err == nil {
+		r.UpdatedOn = t
+	}
 }
 
 // ToMap converts an ingestion status record to a key value map.
@@ -214,13 +230,13 @@ func (r *StatusRecord) ToMap() map[string]interface{} {
 	data := make(map[string]interface{})
 
 	data["Status"] = r.Status
-	data["IngestionSourceID"] = r.IngestionSourceID
+	data["IngestionSourceID"] = r.IngestionSourceID.String()
 	data["IngestionSourcePath"] = r.IngestionSourcePath
 	data["Database"] = r.Database
 	data["Table"] = r.Table
-	data["UpdatedOn"] = r.UpdatedOn
-	data["OperationID"] = r.OperationID
-	data["ActivityID"] = r.ActivityID
+	data["UpdatedOn"] = r.UpdatedOn.Format(time.RFC3339Nano)
+	data["OperationID"] = r.OperationID.String()
+	data["ActivityID"] = r.ActivityID.String()
 	data["ErrorCode"] = r.ErrorCode
 	data["FailureStatus"] = r.FailureStatus
 	data["Details"] = r.Details

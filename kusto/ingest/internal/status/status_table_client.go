@@ -8,7 +8,7 @@ import (
 
 const (
 	defaultTimeout = 10000
-	metadataLevel  = "fullmetadata"
+	fullmetadata   = "application/json;odata=fullmetadata"
 )
 
 // TableClient allows reading and writing to azure tables.
@@ -41,15 +41,9 @@ func NewTableClient(uri resources.URI) (*TableClient, error) {
 
 // ReadIngestionStatus reads a table record cotaining ingestion status.
 func (c *TableClient) ReadIngestionStatus(ingestionSourceID uuid.UUID) (map[string]interface{}, error) {
-	entity := storage.Entity{
-		PartitionKey: ingestionSourceID.String(),
-		RowKey:       "0",
-		Table:        c.table,
-	}
+	entity := c.table.GetEntityReference(ingestionSourceID.String(), "0")
 
-	options := &storage.GetEntityOptions{}
-
-	err := entity.Get(defaultTimeout, metadataLevel, options)
+	err := entity.Get(defaultTimeout, fullmetadata, nil)
 	if err != nil {
 		return nil, err
 	}
@@ -59,17 +53,13 @@ func (c *TableClient) ReadIngestionStatus(ingestionSourceID uuid.UUID) (map[stri
 
 // WriteIngestionStatus reads a table record cotaining ingestion status.
 func (c *TableClient) WriteIngestionStatus(ingestionSourceID uuid.UUID, data map[string]interface{}) error {
-	entity := storage.Entity{
-		PartitionKey: ingestionSourceID.String(),
-		RowKey:       "0",
-		Table:        c.table,
-		Properties:   data,
-	}
+	entity := c.table.GetEntityReference(ingestionSourceID.String(), "0")
+	entity.Properties = data
 
 	options := &storage.EntityOptions{}
 	options.Timeout = defaultTimeout
 
-	err := entity.InsertOrReplace(options)
+	err := entity.Insert(fullmetadata, options)
 	if err != nil {
 		return err
 	}
