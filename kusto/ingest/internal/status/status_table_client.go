@@ -7,7 +7,7 @@ import (
 )
 
 const (
-	defaultTimeout = 1000
+	defaultTimeout = 10000
 	metadataLevel  = "fullmetadata"
 )
 

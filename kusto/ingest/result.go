@@ -103,31 +103,33 @@ func (r *Result) putQueued(mgr *resources.Manager) *Result {
 func (r *Result) Wait(ctx context.Context) chan StatusRecord {
 	ch := make(chan StatusRecord, 1)
 
-	if r.record.Status.IsFinal() || r.reportToTable == false {
+	go func() {
+		defer close(ch)
+
+		if !r.record.Status.IsFinal() && r.reportToTable == true {
+			r.poll(ctx)
+		}
+
 		ch <- r.record
-		close(ch)
-	} else {
-		go r.poll(ctx, ch)
-	}
+	}()
 
 	return ch
 }
 
-func (r *Result) poll(ctx context.Context, ch chan StatusRecord) {
+func (r *Result) poll(ctx context.Context) {
 	// create a table client
 	if r.tableClient != nil {
 		// Create a ticker to poll the table in 10 second intervals.
 		ticker := time.NewTicker(10 * time.Second)
-		run := true
 
-		for run {
+		for {
 			select {
 			// In case the user canceled the wait, return current known state.
 			case <-ctx.Done():
 				// return a canceld state.
 				r.record.Status = StatusRetrievalCanceled
 				r.record.FailureStatus = Transient
-				run = false
+				return
 
 			// Whenever the ticker fires.
 			case <-ticker.C:
@@ -138,19 +140,16 @@ func (r *Result) poll(ctx context.Context, ch chan StatusRecord) {
 					r.record.Status = StatusRetrievalFailed
 					r.record.FailureStatus = Transient
 					r.record.Details = "Failed reading from Status Table: " + err.Error()
-					run = false
+					return
 
 				} else {
 					// convert the data into a record and send it if the state is final.
 					r.record.FromMap(smap)
 					if r.record.Status.IsFinal() {
-						run = false
+						return
 					}
 				}
 			}
 		}
 	}
-
-	ch <- r.record
-	close(ch)
 }

@@ -79,7 +79,7 @@ func TestIgestionWithoutStatusReporting(t *testing.T) {
 	}
 }
 
-func TestIgestionWithWithLocalFailure(t *testing.T) {
+func TestIgestionWithWithClientFailure(t *testing.T) {
 
 	initOnce()
 
