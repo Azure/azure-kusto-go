@@ -365,8 +365,20 @@ func (i *Ingestion) FromFile(ctx context.Context, fPath string, options ...FileO
 		}
 	}
 
-	if props.Source.ID == uuid.Nil {
-		props.Source.ID = uuid.New()
+	if props.Ingestion.ReportMethod == properties.ReportStatusToTable || props.Ingestion.ReportMethod == properties.ReportStatusToQueueAndTable {
+		if props.Source.ID == uuid.Nil {
+			props.Source.ID = uuid.New()
+		}
+
+		resources, err := manager.Resources()
+		if err == nil {
+			if len(resources.Tables) > 0 {
+				props.Ingestion.TableEntryRef.TableConnectionString = resources.Tables[0].URL().String()
+			}
+		}
+
+		props.Ingestion.TableEntryRef.PartitionKey = props.Source.ID.String()
+		props.Ingestion.TableEntryRef.RowKey = "0"
 	}
 
 	result.putProps(props)
@@ -423,8 +435,20 @@ func (i *Ingestion) FromReader(ctx context.Context, reader io.Reader, options ..
 		}
 	}
 
-	if props.Source.ID == uuid.Nil {
-		props.Source.ID = uuid.New()
+	if props.Ingestion.ReportMethod == properties.ReportStatusToTable || props.Ingestion.ReportMethod == properties.ReportStatusToQueueAndTable {
+		if props.Source.ID == uuid.Nil {
+			props.Source.ID = uuid.New()
+		}
+
+		resources, err := manager.Resources()
+		if err == nil {
+			if len(resources.Tables) > 0 {
+				props.Ingestion.TableEntryRef.TableConnectionString = resources.Tables[0].URL().String()
+			}
+		}
+
+		props.Ingestion.TableEntryRef.PartitionKey = props.Source.ID.String()
+		props.Ingestion.TableEntryRef.RowKey = "0"
 	}
 
 	result.putProps(props)

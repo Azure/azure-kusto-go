@@ -2,43 +2,43 @@ package ingest
 
 import (
 	"fmt"
+	"strings"
 	"time"
 
 	"github.com/Azure/azure-kusto-go/kusto/ingest/internal/properties"
-	"github.com/google/uuid"
 )
 
 // StatusCode is the ingestion status
-type StatusCode int
+type StatusCode string
 
 const (
 	// Pending status represents a temporary status.
 	// Might change during the course of ingestion based on the
 	// outcome of the data ingestion operation into Kusto.
-	Pending StatusCode = 0
+	Pending StatusCode = "Pending"
 	// Succeeded status represents a permanent status.
 	// The data has been successfully ingested to Kusto.
-	Succeeded StatusCode = 1
+	Succeeded StatusCode = "Succeeded"
 	// Failed Status represents a permanent status.
 	// The data has not been ingested to Kusto.
-	Failed StatusCode = 2
+	Failed StatusCode = "Failed"
 	// Queued status represents a permanent status.
 	// The data has been queued for ingestion &  status tracking was not requested.
 	// (This does not indicate that the ingestion was successful.)
-	Queued StatusCode = 4
+	Queued StatusCode = "Queued"
 	// Skipped status represents a permanent status.
 	// No data was supplied for ingestion. The ingest operation was skipped.
-	Skipped StatusCode = 5
+	Skipped StatusCode = "Skipped"
 	// PartiallySucceeded status represents a permanent status.
 	// Part of the data was successfully ingested to Kusto, while other parts failed.
-	PartiallySucceeded StatusCode = 6
+	PartiallySucceeded StatusCode = "PartiallySucceeded"
 
 	// StatusRetrievalFailed means the client ran into truble reading the status from the service
-	StatusRetrievalFailed StatusCode = 100
+	StatusRetrievalFailed StatusCode = "StatusRetrievalFailed"
 	// StatusRetrievalCanceled means the user canceld the status check
-	StatusRetrievalCanceled StatusCode = 101
+	StatusRetrievalCanceled StatusCode = "StatusRetrievalCanceled"
 	// ClientError an error was detected on the client side
-	ClientError StatusCode = 102
+	ClientError StatusCode = "ClientError"
 )
 
 // IsFinal returns true if the ingestion status is a final status, or false if the status is temporary
@@ -46,72 +46,19 @@ func (i StatusCode) IsFinal() bool {
 	return i != Pending
 }
 
-// ToString returns a string represnetation of StatusCode
-func (i StatusCode) ToString() string {
-	switch i {
-	case Pending:
-		return "Pending"
-
-	case Succeeded:
-		return "Succeeded"
-
-	case Failed:
-		return "Failed"
-
-	case Queued:
-		return "Queued"
-
-	case Skipped:
-		return "Skipped"
-
-	case PartiallySucceeded:
-		return "PartiallySucceeded"
-
-	case StatusRetrievalCanceled:
-		return "StatusRetrievalCanceled"
-
-	case StatusRetrievalFailed:
-		return "StatusRetrievalFailed"
-
-	case ClientError:
-		return "ClientError"
-	}
-
-	return "Undefined Status Code Value: " + i.ToString()
-}
-
 // FailureStatusCode indicates the status of failuted ingestion attempts
-type FailureStatusCode int
+type FailureStatusCode string
 
 const (
 	// Unknown represents an undefined or unset failure state
-	Unknown FailureStatusCode = 0
+	Unknown FailureStatusCode = "Unknown"
 	// Permanent represnets failure state that will benefit from a retry attempt
-	Permanent FailureStatusCode = 1
+	Permanent FailureStatusCode = "Permanent"
 	// Transient represnet a retryable failure state
-	Transient FailureStatusCode = 2
+	Transient FailureStatusCode = "Transient"
 	// Exhausted represents a retryable failure that has exhusted all retry attempts
-	Exhausted FailureStatusCode = 3
+	Exhausted FailureStatusCode = "Exhausted"
 )
-
-// ToString returns a string represnetation of FailureStatusCode
-func (f FailureStatusCode) ToString() string {
-	switch f {
-	case Unknown:
-		return "Unknown"
-
-	case Permanent:
-		return "Permanent"
-
-	case Transient:
-		return "Transient"
-
-	case Exhausted:
-		return "Exhausted"
-	}
-
-	return "Undefined Failure Status Code Value: " + f.ToString()
-}
 
 // StatusRecord is a record containing information regarding the status of an ingation command
 type StatusRecord struct {
@@ -124,7 +71,7 @@ type StatusRecord struct {
 	Status StatusCode
 
 	// IngestionSourceID - A unique identifier representing the ingested source. It can be supplied during the ingestion execution.
-	IngestionSourceID uuid.UUID `json:"Id"`
+	IngestionSourceID string
 
 	// The URI of the blob, potentially including the secret needed to access
 	// the blob. This can be a filesystem URI (on-premises deployments only),
@@ -142,20 +89,20 @@ type StatusRecord struct {
 	UpdatedOn time.Time
 
 	// OperationID - The ingestion's operation ID.
-	OperationID uuid.UUID
+	OperationID string
 
 	// ActivityID - The ingestion's activity ID.
-	ActivityID uuid.UUID
+	ActivityID string
 
 	// ErrorCode In case of a failure, indicates the failure's error code.
 	// TODO [Yochai, July 2020] make this into a const list
-	ErrorCode int
+	ErrorCode string
 
 	// FailureStatus - In case of a failure, indicates the failure's status.
 	FailureStatus FailureStatusCode
 
 	// Details - In case of a failure, indicates the failure's details.
-	Details string `json:",omitempty"`
+	Details string
 
 	// OriginatesFromUpdatePolicy - In case of a failure, indicates whether or not the failure originated from an Update Policy.
 	OriginatesFromUpdatePolicy bool
@@ -165,14 +112,14 @@ type StatusRecord struct {
 func newStatusRecord() StatusRecord {
 	rec := StatusRecord{
 		Status:                     Failed,
-		IngestionSourceID:          uuid.Nil,
+		IngestionSourceID:          "",
 		IngestionSourcePath:        "Undefined",
 		Database:                   "Undefined",
 		Table:                      "Undefined",
 		UpdatedOn:                  time.Now(),
-		OperationID:                uuid.Nil,
-		ActivityID:                 uuid.Nil,
-		ErrorCode:                  0,
+		OperationID:                "",
+		ActivityID:                 "",
+		ErrorCode:                  "Unknown",
 		FailureStatus:              Unknown,
 		Details:                    "",
 		OriginatesFromUpdatePolicy: false,
@@ -183,7 +130,7 @@ func newStatusRecord() StatusRecord {
 
 // FromProps takes in data from ingestion options.
 func (r *StatusRecord) FromProps(props properties.All) {
-	r.IngestionSourceID = props.Source.ID
+	r.IngestionSourceID = props.Source.ID.String()
 	r.Database = props.Ingestion.DatabaseName
 	r.Table = props.Ingestion.TableName
 	r.UpdatedOn = time.Now()
@@ -195,31 +142,19 @@ func (r *StatusRecord) FromProps(props properties.All) {
 
 // FromMap converts an ingestion status record to a key value map.
 func (r *StatusRecord) FromMap(data map[string]interface{}) {
-	r.Status = StatusCode(int32(data["Status"].(float64)))
+	r.Status = StatusCode(data["Status"].(string))
 	r.IngestionSourcePath = data["IngestionSourcePath"].(string)
 	r.Database = data["Database"].(string)
 	r.Table = data["Table"].(string)
-	r.ErrorCode = int(data["ErrorCode"].(float64))
-	r.FailureStatus = FailureStatusCode(int(data["FailureStatus"].(float64)))
+	r.OperationID = data["OperationID"].(string)
+	r.ActivityID = data["ActivityID"].(string)
+	r.ErrorCode = data["ErrorCode"].(string)
+	r.FailureStatus = FailureStatusCode(data["FailureStatus"].(string))
 	r.Details = data["Details"].(string)
-	r.OriginatesFromUpdatePolicy = data["OriginatesFromUpdatePolicy"].(bool)
+	r.OriginatesFromUpdatePolicy = strings.EqualFold(data["OriginatesFromUpdatePolicy"].(string), "true")
+	r.IngestionSourceID = data["IngestionSourceID"].(string)
 
-	uid, err := uuid.Parse(data["IngestionSourceID"].(string))
-	if err == nil {
-		r.IngestionSourceID = uid
-	}
-
-	uid, err = uuid.Parse(data["OperationID"].(string))
-	if err == nil {
-		r.OperationID = uid
-	}
-
-	uid, err = uuid.Parse(data["ActivityID"].(string))
-	if err == nil {
-		r.ActivityID = uid
-	}
-
-	t, err := time.Parse(time.RFC3339Nano, data["UpdatedOn"].(string))
+	t, err := time.Parse(time.RFC3339, data["UpdatedOn"].(string))
 	if err == nil {
 		r.UpdatedOn = t
 	}
@@ -229,18 +164,26 @@ func (r *StatusRecord) FromMap(data map[string]interface{}) {
 func (r *StatusRecord) ToMap() map[string]interface{} {
 	data := make(map[string]interface{})
 
+	// Since we only create the initial record, It's not our responsibility to write the following fields:
+	//   OperationID, AcitivityID, ErrorCode, FailureStatus, Details, OriginatesFromUpdatePolicy
+	// Those will be read from the server if they have data in them
 	data["Status"] = r.Status
-	data["IngestionSourceID"] = r.IngestionSourceID.String()
+	data["IngestionSourceID"] = r.IngestionSourceID
 	data["IngestionSourcePath"] = r.IngestionSourcePath
 	data["Database"] = r.Database
 	data["Table"] = r.Table
-	data["UpdatedOn"] = r.UpdatedOn.Format(time.RFC3339Nano)
-	data["OperationID"] = r.OperationID.String()
-	data["ActivityID"] = r.ActivityID.String()
+	data["UpdatedOn"] = r.UpdatedOn.Format(time.RFC3339)
+	data["OperationID"] = r.OperationID
+	data["ActivityID"] = r.ActivityID
 	data["ErrorCode"] = r.ErrorCode
 	data["FailureStatus"] = r.FailureStatus
 	data["Details"] = r.Details
-	data["OriginatesFromUpdatePolicy"] = r.OriginatesFromUpdatePolicy
+
+	if r.OriginatesFromUpdatePolicy {
+		data["OriginatesFromUpdatePolicy"] = "true"
+	} else {
+		data["OriginatesFromUpdatePolicy"] = "false"
+	}
 
 	return data
 }
@@ -248,11 +191,11 @@ func (r *StatusRecord) ToMap() map[string]interface{} {
 // String converts an ingestion status record a printable  string.
 func (r *StatusRecord) String() string {
 
-	str := fmt.Sprintf("IngestionSourceID: '%s', IngestionSourcePath: '%s', Status: '%s',  FailureStatus: '%s', ErrorCode: '%d', Database: '%s', Table: '%s', UpdatedOn: '%s', OperationID: '%s', ActivityID: '%s', OriginatesFromUpdatePolicy: '%t', Details: '%s'",
+	str := fmt.Sprintf("IngestionSourceID: '%s', IngestionSourcePath: '%s', Status: '%s',  FailureStatus: '%s', ErrorCode: '%s', Database: '%s', Table: '%s', UpdatedOn: '%s', OperationID: '%s', ActivityID: '%s', OriginatesFromUpdatePolicy: '%t', Details: '%s'",
 		r.IngestionSourceID,
 		r.IngestionSourcePath,
-		r.Status.ToString(),
-		r.FailureStatus.ToString(),
+		r.Status,
+		r.FailureStatus,
 		r.ErrorCode,
 		r.Database,
 		r.Table,

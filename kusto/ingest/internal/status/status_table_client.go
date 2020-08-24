@@ -3,7 +3,6 @@ package status
 import (
 	"github.com/Azure/azure-kusto-go/kusto/ingest/internal/resources"
 	"github.com/Azure/azure-sdk-for-go/storage"
-	"github.com/google/uuid"
 )
 
 const (
@@ -40,8 +39,8 @@ func NewTableClient(uri resources.URI) (*TableClient, error) {
 }
 
 // ReadIngestionStatus reads a table record cotaining ingestion status.
-func (c *TableClient) ReadIngestionStatus(ingestionSourceID uuid.UUID) (map[string]interface{}, error) {
-	entity := c.table.GetEntityReference(ingestionSourceID.String(), "0")
+func (c *TableClient) ReadIngestionStatus(ingestionSourceID string) (map[string]interface{}, error) {
+	entity := c.table.GetEntityReference(ingestionSourceID, "0")
 
 	err := entity.Get(defaultTimeout, fullmetadata, nil)
 	if err != nil {
@@ -52,8 +51,8 @@ func (c *TableClient) ReadIngestionStatus(ingestionSourceID uuid.UUID) (map[stri
 }
 
 // WriteIngestionStatus reads a table record cotaining ingestion status.
-func (c *TableClient) WriteIngestionStatus(ingestionSourceID uuid.UUID, data map[string]interface{}) error {
-	entity := c.table.GetEntityReference(ingestionSourceID.String(), "0")
+func (c *TableClient) WriteIngestionStatus(ingestionSourceID string, data map[string]interface{}) error {
+	entity := c.table.GetEntityReference(ingestionSourceID, "0")
 	entity.Properties = data
 
 	options := &storage.EntityOptions{}

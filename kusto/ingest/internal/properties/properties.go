@@ -254,12 +254,17 @@ type Ingestion struct {
 	FlushImmediately bool
 	// Daniel:
 	// IgnoreSizeLimit
-	IgnoreSizeLimit bool                 `json:",omitempty"`
-	ReportLevel     IngestionReportLevel `json:",omitempty"`
-	ReportMethod    IngestionReportMthod `json:",omitempty"`
+	IgnoreSizeLimit bool `json:",omitempty"`
+	// ReportLevel defines which if any ingestion states are reported
+	ReportLevel IngestionReportLevel `json:",omitempty"`
+	// ReportMethod defines which mechanisms are used to report the ingestion status
+	ReportMethod IngestionReportMthod `json:",omitempty"`
 	// SourceMessageCreationTime is when we created the blob.
-	SourceMessageCreationTime time.Time  `json:",omitempty"`
-	Additional                Additional `json:"AdditionalProperties"`
+	SourceMessageCreationTime time.Time `json:",omitempty"`
+	// Additional (properties) is a set of extra properties added to the ingestion command
+	Additional Additional `json:"AdditionalProperties"`
+	// TableEntryRef points to the staus table entry used to report the status of this ingestion
+	TableEntryRef StatusTableDescription `json:"IngestionStatusInTableDescription,omitempty"`
 }
 
 // Additional is additional properites.
@@ -283,6 +288,16 @@ type Additional struct {
 	// IngestIfNotExists is a string value that, if specified, prevents ingestion from succeeding if the table already
 	// has data tagged with an ingest-by: tag with the same value. This ensures idempotent data ingestion.
 	IngestIfNotExists string `json:"ingestIfNotExists,omitempty"`
+}
+
+// StatusTableDescription is a reference to the table status entry used for this ingestion command
+type StatusTableDescription struct {
+	// TableConnectionString is a secret-free connection string to the status table
+	TableConnectionString string `json:",omitempty"`
+	// PartitionKey is the partition key of the table entry
+	PartitionKey string `json:",omitempty"`
+	// RowKey is the row key of the table entry
+	RowKey string `json:",omitempty"`
 }
 
 // MarshalJSON implements json.Marshaller. This is for use only by the SDK and may be removed at any time.

@@ -11,7 +11,7 @@ import (
 )
 
 const (
-	tableName string = "StatusReportingTest"
+	tableName string = "GolangStatusReportingTest"
 	scheme    string = " (rownumber:int, rowguid:string, xdouble:real, xfloat:real, xbool:bool, xint16:int, xint32:int, xint64:long, xuint8:long, xuint16:long, xuint32:long, xuint64:long, xdate:datetime, xsmalltext:string, xtext:string, xnumberAsText:string, xtime:timespan, xtextWithNulls:string, xdynamicWithNulls:dynamic)"
 	csvFile   string = "testdata/dataset.csv"
 	verbose   bool   = true
@@ -30,7 +30,7 @@ func initOnce() {
 		}
 
 		ctx, cancel := context.WithCancel(context.Background())
-		ctx, cancel = context.WithTimeout(ctx, 2*time.Minute)
+		ctx, cancel = context.WithTimeout(ctx, 1*time.Minute)
 		defer cancel()
 
 		client, err := kusto.New(testConfig.Endpoint, testConfig.Authorizer)
@@ -60,7 +60,7 @@ func TestIgestionWithoutStatusReporting(t *testing.T) {
 	initOnce()
 
 	ctx, cancel := context.WithCancel(context.Background())
-	ctx, cancel = context.WithTimeout(ctx, 2*time.Minute)
+	ctx, cancel = context.WithTimeout(ctx, 1*time.Minute)
 	defer cancel()
 
 	client, err := kusto.New(testConfig.Endpoint, testConfig.Authorizer)
@@ -87,7 +87,7 @@ func TestIgestionWithWithClientFailure(t *testing.T) {
 	initOnce()
 
 	ctx, cancel := context.WithCancel(context.Background())
-	ctx, cancel = context.WithTimeout(ctx, 2*time.Minute)
+	ctx, cancel = context.WithTimeout(ctx, 1*time.Minute)
 	defer cancel()
 
 	client, err := kusto.New(testConfig.Endpoint, testConfig.Authorizer)
@@ -123,7 +123,7 @@ func TestIgestionWithStatusReporting(t *testing.T) {
 	initOnce()
 
 	ctx, cancel := context.WithCancel(context.Background())
-	ctx, cancel = context.WithTimeout(ctx, 2*time.Minute)
+	ctx, cancel = context.WithTimeout(ctx, 1*time.Minute)
 	defer cancel()
 
 	client, err := kusto.New(testConfig.Endpoint, testConfig.Authorizer)
