@@ -2,11 +2,11 @@ package ingest
 
 import (
 	"fmt"
-	"strings"
 	"time"
 
 	"github.com/Azure/azure-kusto-go/kusto/ingest/internal/properties"
 	"github.com/google/uuid"
+	storageuid "github.com/satori/go.uuid"
 )
 
 // StatusCode is the ingestion status
@@ -148,7 +148,8 @@ func (r *StatusRecord) FromMap(data map[string]interface{}) {
 	}
 
 	if data["IngestionSourceId"] != nil {
-		r.IngestionSourceID = data["IngestionSourceId"].(uuid.UUID)
+		uid := data["IngestionSourceId"].(storageuid.UUID)
+		r.IngestionSourceID, _ = uuid.ParseBytes(uid.Bytes())
 	}
 
 	if data["IngestionSourcePath"] != nil {
@@ -163,17 +164,18 @@ func (r *StatusRecord) FromMap(data map[string]interface{}) {
 		r.Table = data["Table"].(string)
 	}
 
-	t, err := time.Parse(time.RFC3339Nano, data["UpdatedOn"].(string))
-	if err == nil {
-		r.UpdatedOn = t
+	if data["UpdatedOn"] != nil {
+		r.UpdatedOn = data["UpdatedOn"].(time.Time)
 	}
 
 	if data["OperationId"] != nil {
-		r.OperationID = data["OperationId"].(uuid.UUID)
+		uid := data["OperationId"].(storageuid.UUID)
+		r.OperationID, _ = uuid.ParseBytes(uid.Bytes())
 	}
 
 	if data["ActivityId"] != nil {
-		r.ActivityID = data["ActivityId"].(uuid.UUID)
+		uid := data["ActivityId"].(storageuid.UUID)
+		r.ActivityID, _ = uuid.ParseBytes(uid.Bytes())
 	}
 
 	if data["ErrorCode"] != nil {
@@ -189,7 +191,7 @@ func (r *StatusRecord) FromMap(data map[string]interface{}) {
 	}
 
 	if data["OriginatesFromUpdatePolicy"] != nil {
-		r.OriginatesFromUpdatePolicy = strings.EqualFold(data["OriginatesFromUpdatePolicy"].(string), "true")
+		r.OriginatesFromUpdatePolicy = data["OriginatesFromUpdatePolicy"].(bool)
 	}
 
 }
