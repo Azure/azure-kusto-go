@@ -96,14 +96,17 @@ func TestIgestionFromFileWithStatusReportingQueued(t *testing.T) {
 		panic(err)
 	}
 
-	chan1 := ingestor.FromFile(ctx, csvFile, ingest.ReportResultToTable()).Wait(ctx)
-	chan2 := ingestor.FromFile(ctx, csvFile, ingest.ReportResultToTable()).Wait(ctx)
-	chan3 := ingestor.FromFile(ctx, csvFile, ingest.ReportResultToTable()).Wait(ctx)
+	count := 5
+	var ch [5]chan ingest.StatusRecord
+	var results [5]ingest.StatusRecord
 
-	var results [3]ingest.StatusRecord
-	results[0] = <-chan1
-	results[1] = <-chan2
-	results[2] = <-chan3
+	for i := 0; i < count; i++ {
+		ch[i] = ingestor.FromFile(ctx, csvFile /*ingest.ReportResultToTable()*/).Wait(ctx)
+	}
+
+	for i := 0; i < count; i++ {
+		results[i] = <-ch[i]
+	}
 
 	for i, res := range results {
 		if res.Status != ingest.Succeeded {
