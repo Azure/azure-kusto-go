@@ -17,7 +17,7 @@ const (
 	tableName string = "GolangStatusReportingTest"
 	scheme    string = " (rownumber:int, rowguid:string, xdouble:real, xfloat:real, xbool:bool, xint16:int, xint32:int, xint64:long, xuint8:long, xuint16:long, xuint32:long, xuint64:long, xdate:datetime, xsmalltext:string, xtext:string, xnumberAsText:string, xtime:timespan, xtextWithNulls:string, xdynamicWithNulls:dynamic)"
 	csvFile   string = "testdata/dataset.csv"
-	verbose   bool   = true
+	verbose   bool   = false
 )
 
 var (
@@ -58,13 +58,60 @@ func initOnce() error {
 			return fmt.Errorf("failed to create a table:\n" + err.Error())
 		}
 
+		// Change the ingetion batching time
+		batchingStmt := kusto.NewStmt(".alter table ", kusto.UnsafeStmt(unsafe.Stmt{Add: true})).UnsafeAdd(tableName).Add(" policy ingestionbatching @'{ \"MaximumBatchingTimeSpan\": \"00:00:25\", \"MaximumNumberOfItems\": 500, \"MaximumRawDataSizeMB\": 1024 }' ")
+		_, err = client.Mgmt(ctx, testConf.Database, batchingStmt)
+		if err != nil {
+			return fmt.Errorf("failed to reduce the default batching time\n" + err.Error())
+		}
+
 		initFailed = false
 	}
 
 	if initFailed {
 		return fmt.Errorf("Init once failed in the past")
-	} else {
-		return nil
+	}
+
+	return nil
+}
+
+func TestIgestionFromFileWithStatusReportingQueued(t *testing.T) {
+	err := initOnce()
+	if err != nil {
+		t.Skipf("Skipping tests: %s", err)
+		return
+	}
+
+	ctx, cancel := context.WithCancel(context.Background())
+	ctx, cancel = context.WithTimeout(ctx, 3*time.Minute)
+	defer cancel()
+
+	client, err := kusto.New(testConfig.Endpoint, testConfig.Authorizer)
+	if err != nil {
+		panic(err)
+	}
+
+	ingestor, err := ingest.New(client, testConfig.Database, tableName)
+	if err != nil {
+		panic(err)
+	}
+
+	chan1 := ingestor.FromFile(ctx, csvFile, ingest.ReportResultToTable()).Wait(ctx)
+	chan2 := ingestor.FromFile(ctx, csvFile, ingest.ReportResultToTable()).Wait(ctx)
+	chan3 := ingestor.FromFile(ctx, csvFile, ingest.ReportResultToTable()).Wait(ctx)
+
+	var results [3]ingest.StatusRecord
+	results[0] = <-chan1
+	results[1] = <-chan2
+	results[2] = <-chan3
+
+	for i, res := range results {
+		if res.Status != ingest.Succeeded {
+			t.Errorf("Exepcted status Succeeded however result on channel %d is:\n%s", i+1, res.String())
+		} else if verbose {
+			println(res.String())
+			println()
+		}
 	}
 }
 
@@ -290,36 +337,6 @@ func TestIgestionFromReaderWithStatusReporting(t *testing.T) {
 	}()
 
 	res := <-ingestor.FromReader(ctx, reader, ingest.ReportResultToTable(), ingest.FlushImmediately(), ingest.FileFormat(ingest.CSV)).Wait(ctx)
-	if res.Status != ingest.Succeeded {
-		t.Errorf("Exepcted status Succeeded however result is:\n%s", res.String())
-	} else if verbose {
-		println(res.String())
-		println()
-	}
-}
-
-func TestIgestionFromFileWithStatusReportingQueued(t *testing.T) {
-	err := initOnce()
-	if err != nil {
-		t.Skipf("Skipping tests: %s", err)
-		return
-	}
-
-	ctx, cancel := context.WithCancel(context.Background())
-	ctx, cancel = context.WithTimeout(ctx, 6*time.Minute)
-	defer cancel()
-
-	client, err := kusto.New(testConfig.Endpoint, testConfig.Authorizer)
-	if err != nil {
-		panic(err)
-	}
-
-	ingestor, err := ingest.New(client, testConfig.Database, tableName)
-	if err != nil {
-		panic(err)
-	}
-
-	res := <-ingestor.FromFile(ctx, csvFile, ingest.ReportResultToTable()).Wait(ctx)
 	if res.Status != ingest.Succeeded {
 		t.Errorf("Exepcted status Succeeded however result is:\n%s", res.String())
 	} else if verbose {

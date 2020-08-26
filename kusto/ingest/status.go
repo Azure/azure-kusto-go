@@ -148,8 +148,10 @@ func (r *StatusRecord) FromMap(data map[string]interface{}) {
 	}
 
 	if data["IngestionSourceId"] != nil {
-		uid := data["IngestionSourceId"].(storageuid.UUID)
-		r.IngestionSourceID, _ = uuid.ParseBytes(uid.Bytes())
+		uid, err := getGoogleUUIDFromInterface(data["IngestionSourceId"])
+		if err == nil {
+			r.IngestionSourceID = uid
+		}
 	}
 
 	if data["IngestionSourcePath"] != nil {
@@ -165,17 +167,24 @@ func (r *StatusRecord) FromMap(data map[string]interface{}) {
 	}
 
 	if data["UpdatedOn"] != nil {
-		r.UpdatedOn = data["UpdatedOn"].(time.Time)
+		t, err := getTimeFromInterface(data["UpdatedOn"])
+		if err == nil {
+			r.UpdatedOn = t
+		}
 	}
 
 	if data["OperationId"] != nil {
-		uid := data["OperationId"].(storageuid.UUID)
-		r.OperationID, _ = uuid.ParseBytes(uid.Bytes())
+		uid, err := getGoogleUUIDFromInterface(data["OperationId"])
+		if err == nil {
+			r.OperationID = uid
+		}
 	}
 
 	if data["ActivityId"] != nil {
-		uid := data["ActivityId"].(storageuid.UUID)
-		r.ActivityID, _ = uuid.ParseBytes(uid.Bytes())
+		uid, err := getGoogleUUIDFromInterface(data["ActivityId"])
+		if err == nil {
+			r.ActivityID = uid
+		}
 	}
 
 	if data["ErrorCode"] != nil {
@@ -245,4 +254,38 @@ func (r *StatusRecord) ToError() error {
 	}
 
 	return fmt.Errorf("Ingestion Failed\n" + r.String())
+}
+
+func getTimeFromInterface(x interface{}) (time.Time, error) {
+	switch x.(type) {
+	case string:
+		return time.Parse(time.RFC3339Nano, x.(string))
+
+	case time.Time:
+		return x.(time.Time), nil
+
+	default:
+		return time.Now(), fmt.Errorf("getTimeFromInterface: Unexpected format %T", x)
+	}
+}
+
+func getGoogleUUIDFromInterface(x interface{}) (uuid.UUID, error) {
+	switch x.(type) {
+	case string:
+		return uuid.Parse(x.(string))
+
+	case uuid.UUID:
+		return x.(uuid.UUID), nil
+
+	case storageuid.UUID:
+		uid, err := uuid.ParseBytes(x.(storageuid.UUID).Bytes())
+		if err != nil {
+			return uuid.Nil, err
+		}
+
+		return uid, err
+
+	default:
+		return uuid.Nil, fmt.Errorf("getGoogleUUIDFromInterface: Unexpected format %T", x)
+	}
 }
