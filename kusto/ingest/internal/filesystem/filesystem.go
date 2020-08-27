@@ -124,7 +124,7 @@ func (i *Ingestion) Reader(ctx context.Context, reader io.Reader, props properti
 		return "", errors.ES(errors.OpFileIngest, errors.KBlobstore, "no Kusto queue resources are defined, there is no queue to upload to").SetNoRetry()
 	}
 
-	blobName := fmt.Sprintf("%s_%s_%s_%s.gz", filepath.Base(uuid.New().String()), nower(), i.db, i.table)
+	blobName := fmt.Sprintf("%s_%s_%s_%s.gz", i.db, i.table, nower(), filepath.Base(uuid.New().String()))
 
 	// Here's how to upload a blob.
 	blobURL := to.NewBlockBlobURL(blobName)
@@ -244,9 +244,9 @@ var nower = time.Now
 // error if there was one.
 func (i *Ingestion) localToBlob(ctx context.Context, from string, to azblob.ContainerURL, props *properties.All) (azblob.BlockBlobURL, int64, error) {
 	compression := CompressionDiscovery(from)
-	blobName := fmt.Sprintf("%s_%s_%s_%s", filepath.Base(from), nower(), i.db, i.table)
+	blobName := fmt.Sprintf("%s_%s_%s_%s", i.db, i.table, nower(), filepath.Base(from))
 	if compression == properties.CTNone {
-		blobName = from + ".gz"
+		blobName = blobName + ".gz"
 	}
 
 	// Here's how to upload a blob.

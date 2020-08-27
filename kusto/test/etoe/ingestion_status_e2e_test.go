@@ -101,7 +101,61 @@ func TestIgestionFromFileWithStatusReportingQueued(t *testing.T) {
 	var results [5]ingest.StatusRecord
 
 	for i := 0; i < count; i++ {
-		ch[i] = ingestor.FromFile(ctx, csvFile /*ingest.ReportResultToTable()*/).Wait(ctx)
+		ch[i] = ingestor.FromFile(ctx, csvFile, ingest.ReportResultToTable()).Wait(ctx)
+	}
+
+	for i := 0; i < count; i++ {
+		results[i] = <-ch[i]
+	}
+
+	for i, res := range results {
+		if res.Status != ingest.Succeeded {
+			t.Errorf("Exepcted status Succeeded however result on channel %d is:\n%s", i+1, res.String())
+		} else if verbose {
+			println(res.String())
+			println()
+		}
+	}
+}
+
+func TestIgestionFromReaderWithStatusReportingQueued(t *testing.T) {
+	err := initOnce()
+	if err != nil {
+		t.Skipf("Skipping tests: %s", err)
+		return
+	}
+
+	ctx, cancel := context.WithCancel(context.Background())
+	ctx, cancel = context.WithTimeout(ctx, 3*time.Minute)
+	defer cancel()
+
+	client, err := kusto.New(testConfig.Endpoint, testConfig.Authorizer)
+	if err != nil {
+		panic(err)
+	}
+
+	ingestor, err := ingest.New(client, testConfig.Database, tableName)
+	if err != nil {
+		panic(err)
+	}
+
+	count := 5
+	var ch [5]chan ingest.StatusRecord
+	var results [5]ingest.StatusRecord
+
+	for i := 0; i < count; i++ {
+		f, err := os.Open(csvFile)
+		if err != nil {
+			panic(err)
+		}
+
+		reader, writer := io.Pipe()
+		go func() {
+			defer writer.Close()
+			io.Copy(writer, f)
+		}()
+
+		ch[i] = ingestor.FromReader(ctx, reader, ingest.ReportResultToTable(), ingest.FileFormat(ingest.CSV)).Wait(ctx)
 	}
 
 	for i := 0; i < count; i++ {

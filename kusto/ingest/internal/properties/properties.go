@@ -133,17 +133,17 @@ const (
 )
 
 // IngestionReportMthod defines where the DM reports ingestion statuses to
-type IngestionReportMthod int
+type IngestionReportMethod int
 
 const (
 	// ReportStatusToQueue tells the DM to report ingestion status to the a queue
-	ReportStatusToQueue IngestionReportMthod = 0
+	ReportStatusToQueue IngestionReportMethod = 0
 	// ReportStatusToTable tells the DM to report ingestion status to the a table
-	ReportStatusToTable IngestionReportMthod = 1
+	ReportStatusToTable IngestionReportMethod = 1
 	// ReportStatusToQueueAndTable tells the DM to report ingestion status to both queues and tables
-	ReportStatusToQueueAndTable IngestionReportMthod = 2
+	ReportStatusToQueueAndTable IngestionReportMethod = 2
 	// ReportStatusToAzureMonitoring tells the DM to report ingestion status to azure monitor
-	ReportStatusToAzureMonitoring IngestionReportMthod = 3
+	ReportStatusToAzureMonitoring IngestionReportMethod = 3
 )
 
 // String implements fmt.Stringer.
@@ -258,7 +258,7 @@ type Ingestion struct {
 	// ReportLevel defines which if any ingestion states are reported
 	ReportLevel IngestionReportLevel `json:",omitempty"`
 	// ReportMethod defines which mechanisms are used to report the ingestion status
-	ReportMethod IngestionReportMthod `json:",omitempty"`
+	ReportMethod IngestionReportMethod `json:",omitempty"`
 	// SourceMessageCreationTime is when we created the blob.
 	SourceMessageCreationTime time.Time `json:",omitempty"`
 	// Additional (properties) is a set of extra properties added to the ingestion command
