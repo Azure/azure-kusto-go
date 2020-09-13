@@ -261,7 +261,9 @@ func IfNotExists(ingestByTag string) FileOption {
 	)
 }
 
-// ReportResultToTable option requests that the ingestion status will be tracked in an Azure table
+// ReportResultToTable option requests that the ingestion status will be tracked in an Azure table.
+// Note using Table status reporting is not recommandad for high capacity ingestions, as it could slow down the ingestion.
+// In such caces, it's recommandad to enable it temporarily for debugging failed ingestions.
 func ReportResultToTable() FileOption {
 	return propertyOption(
 		func(p *properties.All) error {
@@ -365,20 +367,22 @@ func (i *Ingestion) FromFile(ctx context.Context, fPath string, options ...FileO
 		}
 	}
 
-	if props.Ingestion.ReportMethod == properties.ReportStatusToTable || props.Ingestion.ReportMethod == properties.ReportStatusToQueueAndTable {
+	if props.Ingestion.ReportLevel != properties.None {
 		if props.Source.ID == uuid.Nil {
 			props.Source.ID = uuid.New()
 		}
 
-		resources, err := manager.Resources()
-		if err == nil {
-			if len(resources.Tables) > 0 {
-				props.Ingestion.TableEntryRef.TableConnectionString = resources.Tables[0].URL().String()
+		if props.Ingestion.ReportMethod == properties.ReportStatusToTable || props.Ingestion.ReportMethod == properties.ReportStatusToQueueAndTable {
+			resources, err := manager.Resources()
+			if err == nil {
+				if len(resources.Tables) > 0 {
+					props.Ingestion.TableEntryRef.TableConnectionString = resources.Tables[0].URL().String()
+				}
 			}
-		}
 
-		props.Ingestion.TableEntryRef.PartitionKey = props.Source.ID.String()
-		props.Ingestion.TableEntryRef.RowKey = uuid.Nil.String()
+			props.Ingestion.TableEntryRef.PartitionKey = props.Source.ID.String()
+			props.Ingestion.TableEntryRef.RowKey = uuid.Nil.String()
+		}
 	}
 
 	result.putProps(props)

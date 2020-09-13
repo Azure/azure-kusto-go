@@ -83,7 +83,7 @@ func (r *Result) putQueued(mgr *resources.Manager) *Result {
 	// Write initial record
 	r.record.Status = Pending
 	recordMap := r.record.ToMap()
-	err = client.WriteIngestionStatus(r.record.IngestionSourceID.String(), recordMap)
+	err = client.Write(r.record.IngestionSourceID.String(), recordMap)
 	if err != nil {
 		r.putErr(err)
 	} else {
@@ -112,10 +112,13 @@ func (r *Result) Wait(ctx context.Context) chan StatusRecord {
 }
 
 func (r *Result) poll(ctx context.Context) {
+	const pollInterval = 10 * time.Second
+
 	// create a table client
 	if r.tableClient != nil {
 		// Create a ticker to poll the table in 10 second intervals.
-		ticker := time.NewTicker(10 * time.Second)
+		timer := time.NewTimer(pollInterval)
+		defer timer.Stop()
 
 		for {
 			select {
@@ -127,9 +130,9 @@ func (r *Result) poll(ctx context.Context) {
 				return
 
 			// Whenever the ticker fires.
-			case <-ticker.C:
+			case <-timer.C:
 				// read the current state
-				smap, err := r.tableClient.ReadIngestionStatus(r.record.IngestionSourceID.String())
+				smap, err := r.tableClient.Read(r.record.IngestionSourceID.String())
 				if err != nil {
 					// Read failure
 					r.record.Status = StatusRetrievalFailed
@@ -143,6 +146,8 @@ func (r *Result) poll(ctx context.Context) {
 				if r.record.Status.IsFinal() {
 					return
 				}
+
+				timer.Reset(pollInterval)
 			}
 		}
 	}

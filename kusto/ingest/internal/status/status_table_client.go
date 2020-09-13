@@ -7,8 +7,8 @@ import (
 )
 
 const (
-	defaultTimeout = 10000
-	fullmetadata   = "application/json;odata=fullmetadata"
+	defaultTimeoutMsec = 10000
+	fullMetadata       = "application/json;odata=fullmetadata"
 )
 
 // TableClient allows reading and writing to azure tables.
@@ -27,24 +27,21 @@ func NewTableClient(uri resources.URI) (*TableClient, error) {
 	}
 
 	ts := c.GetTableService()
-	tc := ts.GetTableReference(uri.ObjectName())
 
-	atc := &TableClient{
+	return &TableClient{
 		tableURI: uri,
 		client:   c,
 		service:  ts,
-		table:    tc,
-	}
-
-	return atc, nil
+		table:    ts.GetTableReference(uri.ObjectName()),
+	}, nil
 }
 
-// ReadIngestionStatus reads a table record cotaining ingestion status.
-func (c *TableClient) ReadIngestionStatus(ingestionSourceID string) (map[string]interface{}, error) {
+// Read reads a table record cotaining ingestion status.
+func (c *TableClient) Read(ingestionSourceID string) (map[string]interface{}, error) {
 	var emptyID = uuid.Nil.String()
 	entity := c.table.GetEntityReference(ingestionSourceID, emptyID)
 
-	err := entity.Get(defaultTimeout, fullmetadata, nil)
+	err := entity.Get(defaultTimeoutMsec, fullMetadata, nil)
 	if err != nil {
 		return nil, err
 	}
@@ -52,16 +49,16 @@ func (c *TableClient) ReadIngestionStatus(ingestionSourceID string) (map[string]
 	return entity.Properties, nil
 }
 
-// WriteIngestionStatus reads a table record cotaining ingestion status.
-func (c *TableClient) WriteIngestionStatus(ingestionSourceID string, data map[string]interface{}) error {
+// Write reads a table record cotaining ingestion status.
+func (c *TableClient) Write(ingestionSourceID string, data map[string]interface{}) error {
 	var emptyID = uuid.Nil.String()
 	entity := c.table.GetEntityReference(ingestionSourceID, emptyID)
 	entity.Properties = data
 
 	options := &storage.EntityOptions{}
-	options.Timeout = defaultTimeout
+	options.Timeout = defaultTimeoutMsec
 
-	err := entity.Insert(fullmetadata, options)
+	err := entity.Insert(fullMetadata, options)
 	if err != nil {
 		return err
 	}

@@ -6,6 +6,7 @@ import (
 
 	"github.com/Azure/azure-kusto-go/kusto/ingest/internal/properties"
 	"github.com/google/uuid"
+	"github.com/kylelemons/godebug/pretty"
 	storageuid "github.com/satori/go.uuid"
 )
 
@@ -222,28 +223,13 @@ func (r *StatusRecord) ToMap() map[string]interface{} {
 	return data
 }
 
-// String converts an ingestion status record a printable  string.
+// String implements fmt.Stringer.
 func (r *StatusRecord) String() string {
-
-	str := fmt.Sprintf("IngestionSourceID: '%s', IngestionSourcePath: '%s', Status: '%s',  FailureStatus: '%s', ErrorCode: '%s', Database: '%s', Table: '%s', UpdatedOn: '%s', OperationID: '%s', ActivityID: '%s', OriginatesFromUpdatePolicy: '%t', Details: '%s'",
-		r.IngestionSourceID,
-		r.IngestionSourcePath,
-		r.Status,
-		r.FailureStatus,
-		r.ErrorCode,
-		r.Database,
-		r.Table,
-		r.UpdatedOn,
-		r.OperationID,
-		r.ActivityID,
-		r.OriginatesFromUpdatePolicy,
-		r.Details)
-
-	return str
+	return pretty.Sprint(r)
 }
 
 // ToError converts an ingestion status to an error if failed or partially succeeded, or nil if succeeded.
-func (r *StatusRecord) ToError() error {
+func (r *StatusRecord) Error() error {
 	switch r.Status {
 	case Succeeded:
 	case Queued:

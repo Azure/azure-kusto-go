@@ -107,6 +107,7 @@ func (i *Ingestion) Local(ctx context.Context, from string, props properties.All
 }
 
 // Reader uploads a file via an io.Reader.
+// If the function succeeds, it returns the path of the created blob.
 func (i *Ingestion) Reader(ctx context.Context, reader io.Reader, props properties.All) (string, error) {
 	to, err := i.upstreamContainer()
 	if err != nil {

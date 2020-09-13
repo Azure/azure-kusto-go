@@ -88,7 +88,7 @@ const (
 	TSVE DataFormat = 14
 	// TXT is a text file with lines deliminated by "\n".
 	TXT DataFormat = 15
-	// W3CLogFile indicates the source is encoded using W3C Extended Log File format
+	// W3CLogFile indicates the source is encoded using W3C Extended Log File format.
 	W3CLogFile DataFormat = 16
 )
 
@@ -120,29 +120,29 @@ var dfDescriptions = []dfDescriptor{
 	{"E3cLogFile", "e3clogfile", ".e3clogfile", false, false},
 }
 
-// IngestionReportLevel defines which ingestion statuses are reported by the DM
+// IngestionReportLevel defines which ingestion statuses are reported by the DM.
 type IngestionReportLevel int
 
 const (
-	// FailuresOnly tells to the DM to report the ingestion sytatus of failed ingestions only
+	// FailuresOnly tells to the DM to report the ingestion sytatus of failed ingestions only.
 	FailuresOnly IngestionReportLevel = 0
-	// None tells to the DM not to report ingestion status
+	// None tells to the DM not to report ingestion status.
 	None IngestionReportLevel = 1
-	// FailureAndSuccess tells to the DM to report ingestion status for failed and successfull ingestions
+	// FailureAndSuccess tells to the DM to report ingestion status for failed and successfull ingestions.
 	FailureAndSuccess IngestionReportLevel = 2
 )
 
-// IngestionReportMthod defines where the DM reports ingestion statuses to
+// IngestionReportMthod defines where the DM reports ingestion statuses to.
 type IngestionReportMethod int
 
 const (
-	// ReportStatusToQueue tells the DM to report ingestion status to the a queue
+	// ReportStatusToQueue tells the DM to report ingestion status to the a queue.
 	ReportStatusToQueue IngestionReportMethod = 0
-	// ReportStatusToTable tells the DM to report ingestion status to the a table
+	// ReportStatusToTable tells the DM to report ingestion status to the a table.
 	ReportStatusToTable IngestionReportMethod = 1
-	// ReportStatusToQueueAndTable tells the DM to report ingestion status to both queues and tables
+	// ReportStatusToQueueAndTable tells the DM to report ingestion status to both queues and tables.
 	ReportStatusToQueueAndTable IngestionReportMethod = 2
-	// ReportStatusToAzureMonitoring tells the DM to report ingestion status to azure monitor
+	// ReportStatusToAzureMonitoring tells the DM to report ingestion status to azure monitor.
 	ReportStatusToAzureMonitoring IngestionReportMethod = 3
 )
 
@@ -183,7 +183,7 @@ func (d DataFormat) RequiresMapping() bool {
 	return false
 }
 
-// IsValidMappingKind returns true if a dataformat can be used as a MappingKind
+// IsValidMappingKind returns true if a dataformat can be used as a MappingKind.
 func (d DataFormat) IsValidMappingKind() bool {
 	if d > 0 && int(d) < len(dfDescriptions) {
 		return dfDescriptions[d].validMappingKind
@@ -255,15 +255,15 @@ type Ingestion struct {
 	// Daniel:
 	// IgnoreSizeLimit
 	IgnoreSizeLimit bool `json:",omitempty"`
-	// ReportLevel defines which if any ingestion states are reported
+	// ReportLevel defines which if any ingestion states are reported.
 	ReportLevel IngestionReportLevel `json:",omitempty"`
-	// ReportMethod defines which mechanisms are used to report the ingestion status
+	// ReportMethod defines which mechanisms are used to report the ingestion status.
 	ReportMethod IngestionReportMethod `json:",omitempty"`
 	// SourceMessageCreationTime is when we created the blob.
 	SourceMessageCreationTime time.Time `json:",omitempty"`
-	// Additional (properties) is a set of extra properties added to the ingestion command
+	// Additional (properties) is a set of extra properties added to the ingestion command.
 	Additional Additional `json:"AdditionalProperties"`
-	// TableEntryRef points to the staus table entry used to report the status of this ingestion
+	// TableEntryRef points to the staus table entry used to report the status of this ingestion.
 	TableEntryRef StatusTableDescription `json:"IngestionStatusInTable,omitempty"`
 }
 
@@ -290,13 +290,13 @@ type Additional struct {
 	IngestIfNotExists string `json:"ingestIfNotExists,omitempty"`
 }
 
-// StatusTableDescription is a reference to the table status entry used for this ingestion command
+// StatusTableDescription is a reference to the table status entry used for this ingestion command.
 type StatusTableDescription struct {
-	// TableConnectionString is a secret-free connection string to the status table
+	// TableConnectionString is a secret-free connection string to the status table.
 	TableConnectionString string `json:",omitempty"`
-	// PartitionKey is the partition key of the table entry
+	// PartitionKey is the partition key of the table entry.
 	PartitionKey string `json:",omitempty"`
-	// RowKey is the row key of the table entry
+	// RowKey is the row key of the table entry.
 	RowKey string `json:",omitempty"`
 }
 
