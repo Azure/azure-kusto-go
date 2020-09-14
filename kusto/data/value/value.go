@@ -497,82 +497,44 @@ func (t Timespan) Marshal() string {
 		return "00:00:00"
 	}
 
+	// val is used to track the duration value as we move our parts of our time into our string format.
+	// For example, after we write to our string the number of days that value had, we remove those days
+	// from the duration. We continue doing this until val only holds values < 10 millionth of a second (tick)
+	// as that is the lowest precision in our string representation.
 	val := t.Value
 
 	sb := strings.Builder{}
+
+	// Add a - sign if we have a negative value. Convert our value to positive for easier processing.
 	if t.Value < 0 {
 		sb.WriteString("-")
 		val = val * -1
 	}
 
+	// Only include the day if the duration is 1+ days.
 	days := val / day
 	val = val - (days * day)
 	switch {
 	case days == 0:
-	case days < 10:
-		sb.WriteString(fmt.Sprintf("0%d.", int(days)))
 	default:
-		sb.WriteString(fmt.Sprintf("%d.", int(days)))
+		sb.WriteString(fmt.Sprintf("%02d.", int(days)))
 	}
 
+	// Add our hours:minutes:seconds section.
 	hours := val / time.Hour
 	val = val - (hours * time.Hour)
-	switch {
-	case hours < 10:
-		sb.WriteString(fmt.Sprintf("0%d:", int(hours)))
-	default:
-		sb.WriteString(fmt.Sprintf("%d:", int(hours)))
-	}
-
 	minutes := val / time.Minute
 	val = val - (minutes * time.Minute)
-	switch {
-	case minutes < 10:
-		sb.WriteString(fmt.Sprintf("0%d:", int(minutes)))
-	default:
-		sb.WriteString(fmt.Sprintf("%d:", int(minutes)))
-	}
-
 	seconds := val / time.Second
 	val = val - (seconds * time.Second)
-	switch {
-	case seconds < 10:
-		sb.WriteString(fmt.Sprintf("0%d", int(seconds)))
-	default:
-		sb.WriteString(fmt.Sprintf("%d", int(seconds)))
-	}
+	sb.WriteString(fmt.Sprintf("%02d:%02d:%02d", int(hours), int(minutes), int(seconds)))
 
-	// In this section we build a subSecond string representation.
-	// This is compbined later with the existing content if and only if
-	// we have a subSecond value (which is determined by set==true).
-	subSecond := strings.Builder{}
-	set := false
-
+	// Add our sub-second string representation that is proceeded with a ".".
 	milliseconds := val / time.Millisecond
 	val = val - (milliseconds * time.Millisecond)
-	switch {
-	case milliseconds == 0:
-		subSecond.WriteString("000")
-	case milliseconds < 10:
-		set = true
-		subSecond.WriteString(fmt.Sprintf("00%d", milliseconds))
-	case milliseconds < 100:
-		set = true
-		subSecond.WriteString(fmt.Sprintf("0%d", milliseconds))
-	default:
-		set = true
-		subSecond.WriteString(fmt.Sprintf("%d", milliseconds))
-	}
-
 	ticks := val / tick
-	if ticks > 0 {
-		set = true
-		subSecond.WriteString(fmt.Sprintf("%d", ticks))
-	}
-
-	// If we have a subSecond string, combine it with our existing string builder.
-	if set {
-		sb.WriteString("." + subSecond.String())
+	if milliseconds > 0 || ticks > 0 {
+		sb.WriteString(fmt.Sprintf(".%03d%d", milliseconds, ticks))
 	}
 
 	// Remove any trailing 0's.
