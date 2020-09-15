@@ -531,31 +531,20 @@ func TestTimespan(t *testing.T) {
 			if strGot != "00:00:00" {
 				t.Errorf("TestTimespan(%s): Marshal(): got %v, want %v", test.desc, strGot, "00:00:00")
 			}
-		} else if strings.Trim(strGot, "0:.") != strings.Trim(test.i.(string), "0:.") {
+		}else if removeLeadingZeros(strGot) != removeLeadingZeros(test.i.(string)) {
 			t.Errorf("TestTimespan(%s): Marshal(): got %v, want %v", test.desc, strGot, test.i)
 		}
 	}
 }
 
-// TestTimespanRegession35 tests that we will not have more than 7 digits of subsecond accuracy on Timespan on the
-// Marshal() call.  We had 9 digits which was giving us nanosecond accuracy. Timespan is based on .Net's Timespan type
-// which can only handle "tick" accuracy, where "tick" is 10 millionth of a second.
-// Bug: https://github.com/Azure/azure-kusto-go/issues/35 .
-func TestTimespanRegession35(t *testing.T) {
-	// There are 7 digits in Timespan accuracy.  The first 3 are milliseconds, the second 3 are microseconds,
-	// the last one is ticks. In a normal representation there are 9, based on that each category increment
-	// is 1000 * the last one.
-	ts := Timespan{
-		Value: 24*time.Hour + time.Hour + time.Minute + time.Second +
-			111*time.Millisecond + 222*time.Microsecond + 3*tick + 4*time.Nanosecond,
-		Valid: true,
+func removeLeadingZeros(s string) string {
+	if len(s) == 0 {
+		return s
 	}
-
-	want := "01.01:01:01.1112223"
-
-	if ts.Marshal() != want {
-		t.Errorf("TestTimespanRegession35: got %s, want %s", ts.Marshal(), want)
+	if string(s[0]) == "-" {
+		return string(s[0]) + strings.Trim(s[1:], "0:.")
 	}
+	return strings.Trim(s, "0:.")
 }
 
 func TestDecimal(t *testing.T) {
