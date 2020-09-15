@@ -487,7 +487,8 @@ func (t Timespan) String() string {
 	return t.Value.String()
 }
 
-// Marshal marshals the Timespan into a Kusto compatible string.
+// Marshal marshals the Timespan into a Kusto compatible string. The string is the contant invariant(c)
+// format. See https://docs.microsoft.com/en-us/dotnet/standard/base-types/standard-timespan-format-strings .
 func (t Timespan) Marshal() string {
 	const (
 		day = 24 * time.Hour
@@ -514,10 +515,8 @@ func (t Timespan) Marshal() string {
 	// Only include the day if the duration is 1+ days.
 	days := val / day
 	val = val - (days * day)
-	switch {
-	case days == 0:
-	default:
-		sb.WriteString(fmt.Sprintf("%02d.", int(days)))
+	if days > 0 {
+		sb.WriteString(fmt.Sprintf("%d.", int(days)))
 	}
 
 	// Add our hours:minutes:seconds section.
