@@ -531,10 +531,20 @@ func TestTimespan(t *testing.T) {
 			if strGot != "00:00:00" {
 				t.Errorf("TestTimespan(%s): Marshal(): got %v, want %v", test.desc, strGot, "00:00:00")
 			}
-		} else if strings.Trim(strGot, "0:.") != strings.Trim(test.i.(string), "0:.") {
+		}else if removeLeadingZeros(strGot) != removeLeadingZeros(test.i.(string)) {
 			t.Errorf("TestTimespan(%s): Marshal(): got %v, want %v", test.desc, strGot, test.i)
 		}
 	}
+}
+
+func removeLeadingZeros(s string) string {
+	if len(s) == 0 {
+		return s
+	}
+	if string(s[0]) == "-" {
+		return string(s[0]) + strings.Trim(s[1:], "0:.")
+	}
+	return strings.Trim(s, "0:.")
 }
 
 func TestDecimal(t *testing.T) {

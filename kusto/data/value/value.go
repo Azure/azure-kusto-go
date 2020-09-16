@@ -467,6 +467,8 @@ func (d *Decimal) Unmarshal(i interface{}) error {
 	return nil
 }
 
+const tick = 100 * time.Nanosecond
+
 // Timespan represents a Kusto timespan type.  Timespan implements Kusto.
 type Timespan struct {
 	// Value holds the value of the type.
@@ -485,7 +487,8 @@ func (t Timespan) String() string {
 	return t.Value.String()
 }
 
-// Marshal marshals the Timespan into a Kusto compatible string.
+// Marshal marshals the Timespan into a Kusto compatible string. The string is the contant invariant(c)
+// format. See https://docs.microsoft.com/en-us/dotnet/standard/base-types/standard-timespan-format-strings .
 func (t Timespan) Marshal() string {
 	const (
 		day = 24 * time.Hour
@@ -495,79 +498,45 @@ func (t Timespan) Marshal() string {
 		return "00:00:00"
 	}
 
+	// val is used to track the duration value as we move our parts of our time into our string format.
+	// For example, after we write to our string the number of days that value had, we remove those days
+	// from the duration. We continue doing this until val only holds values < 10 millionth of a second (tick)
+	// as that is the lowest precision in our string representation.
 	val := t.Value
 
 	sb := strings.Builder{}
+
+	// Add a - sign if we have a negative value. Convert our value to positive for easier processing.
 	if t.Value < 0 {
 		sb.WriteString("-")
 		val = val * -1
 	}
 
+	// Only include the day if the duration is 1+ days.
 	days := val / day
 	val = val - (days * day)
-	switch {
-	case days == 0:
-	case days < 10:
-		sb.WriteString(fmt.Sprintf("0%d.", int(days)))
-	default:
+	if days > 0 {
 		sb.WriteString(fmt.Sprintf("%d.", int(days)))
 	}
 
+	// Add our hours:minutes:seconds section.
 	hours := val / time.Hour
 	val = val - (hours * time.Hour)
-	switch {
-	case hours < 10:
-		sb.WriteString(fmt.Sprintf("0%d:", int(hours)))
-	default:
-		sb.WriteString(fmt.Sprintf("%d:", int(hours)))
-	}
-
 	minutes := val / time.Minute
 	val = val - (minutes * time.Minute)
-	switch {
-	case minutes < 10:
-		sb.WriteString(fmt.Sprintf("0%d:", int(minutes)))
-	default:
-		sb.WriteString(fmt.Sprintf("%d:", int(minutes)))
-	}
-
 	seconds := val / time.Second
 	val = val - (seconds * time.Second)
-	switch {
-	case minutes < 10:
-		sb.WriteString(fmt.Sprintf("0%d", int(seconds)))
-	default:
-		sb.WriteString(fmt.Sprintf("%d", int(seconds)))
-	}
+	sb.WriteString(fmt.Sprintf("%02d:%02d:%02d", int(hours), int(minutes), int(seconds)))
 
-	subSecond := strings.Builder{}
-	set := false
-
+	// Add our sub-second string representation that is proceeded with a ".".
 	milliseconds := val / time.Millisecond
 	val = val - (milliseconds * time.Millisecond)
-	switch {
-	case milliseconds == 0:
-		subSecond.WriteString("000")
-	case milliseconds < 10:
-		set = true
-		subSecond.WriteString(fmt.Sprintf("00%d", milliseconds))
-	case milliseconds < 100:
-		set = true
-		subSecond.WriteString(fmt.Sprintf("0%d", milliseconds))
-	default:
-		set = true
-		subSecond.WriteString(fmt.Sprintf("%d", milliseconds))
+	ticks := val / tick
+	if milliseconds > 0 || ticks > 0 {
+		sb.WriteString(fmt.Sprintf(".%03d%d", milliseconds, ticks))
 	}
 
-	nanoseconds := val / time.Nanosecond
-	if nanoseconds > 0 {
-		set = true
-		subSecond.WriteString(fmt.Sprintf("%d", nanoseconds))
-	}
-	if set {
-		sb.WriteString("." + subSecond.String())
-	}
-
+	// Remove any trailing 0's.
 	str := strings.TrimRight(sb.String(), "0")
 	if strings.HasSuffix(str, ":") {
 		str = str + "00"
@@ -675,8 +644,6 @@ func (t *Timespan) unmarshalMinutes(s string) (time.Duration, error) {
 	}
 	return time.Duration(minutes) * time.Minute, nil
 }
-
-const tick = 100 * time.Nanosecond
 
 // unmarshalSeconds deals with this crazy output format. Instead of having some multiplier, the number
 // of precision characters behind the decimal indicates your multiplier. This can be between 0 and 7, but
