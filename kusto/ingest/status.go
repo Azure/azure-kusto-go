@@ -144,66 +144,53 @@ func (r *StatusRecord) FromProps(props properties.All) {
 
 // FromMap converts an ingestion status record to a key value map.
 func (r *StatusRecord) FromMap(data map[string]interface{}) {
-	if data["Status"] != nil {
-		r.Status = StatusCode(data["Status"].(string))
+
+	var strStatus string
+	safeSetString(data, "Status", &strStatus)
+	if len(strStatus) > 0 {
+		r.Status = StatusCode(strStatus)
 	}
 
+	safeSetString(data, "FailureStatus", &strStatus)
+	if len(strStatus) > 0 {
+		r.FailureStatus = FailureStatusCode(strStatus)
+	}
+
+	safeSetString(data, "IngestionSourcePath", &r.IngestionSourcePath)
+	safeSetString(data, "Database", &r.Database)
+	safeSetString(data, "Table", &r.Table)
+	safeSetString(data, "ErrorCode", &r.ErrorCode)
+	safeSetString(data, "Details", &r.Details)
+
 	if data["IngestionSourceId"] != nil {
-		uid, err := getGoogleUUIDFromInterface(data["IngestionSourceId"])
-		if err == nil {
+		if uid, err := getGoogleUUIDFromInterface(data["IngestionSourceId"]); err == nil {
 			r.IngestionSourceID = uid
 		}
 	}
 
-	if data["IngestionSourcePath"] != nil {
-		r.IngestionSourcePath = data["IngestionSourcePath"].(string)
-	}
-
-	if data["Database"] != nil {
-		r.Database = data["Database"].(string)
-	}
-
-	if data["Table"] != nil {
-		r.Table = data["Table"].(string)
-	}
-
-	if data["UpdatedOn"] != nil {
-		t, err := getTimeFromInterface(data["UpdatedOn"])
-		if err == nil {
-			r.UpdatedOn = t
-		}
-	}
-
 	if data["OperationId"] != nil {
-		uid, err := getGoogleUUIDFromInterface(data["OperationId"])
-		if err == nil {
+		if uid, err := getGoogleUUIDFromInterface(data["OperationId"]); err == nil {
 			r.OperationID = uid
 		}
 	}
 
 	if data["ActivityId"] != nil {
-		uid, err := getGoogleUUIDFromInterface(data["ActivityId"])
-		if err == nil {
+		if uid, err := getGoogleUUIDFromInterface(data["ActivityId"]); err == nil {
 			r.ActivityID = uid
 		}
 	}
 
-	if data["ErrorCode"] != nil {
-		r.ErrorCode = data["ErrorCode"].(string)
-	}
-
-	if data["FailureStatus"] != nil {
-		r.FailureStatus = FailureStatusCode(data["FailureStatus"].(string))
-	}
-
-	if data["Details"] != nil {
-		r.Details = data["Details"].(string)
+	if data["UpdatedOn"] != nil {
+		if t, err := getTimeFromInterface(data["UpdatedOn"]); err == nil {
+			r.UpdatedOn = t
+		}
 	}
 
 	if data["OriginatesFromUpdatePolicy"] != nil {
-		r.OriginatesFromUpdatePolicy = data["OriginatesFromUpdatePolicy"].(bool)
+		if b, ok := data["OriginatesFromUpdatePolicy"].(bool); ok {
+			r.OriginatesFromUpdatePolicy = b
+		}
 	}
-
 }
 
 // ToMap converts an ingestion status record to a key value map.
@@ -273,5 +260,13 @@ func getGoogleUUIDFromInterface(x interface{}) (uuid.UUID, error) {
 
 	default:
 		return uuid.Nil, fmt.Errorf("getGoogleUUIDFromInterface: Unexpected format %T", x)
+	}
+}
+
+func safeSetString(data map[string]interface{}, key string, target *string) {
+	if v := data[key]; v != nil {
+		if s, ok := v.(string); ok {
+			*target = s
+		}
 	}
 }
