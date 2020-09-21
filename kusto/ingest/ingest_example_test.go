@@ -54,7 +54,7 @@ func ExampleIngestion_FromFile() {
 		failureStat, _ := ingest.GetIngestionFailureStatus(err)
 		retry, _ := ingest.IsRetryable(err)
 
-		fmt.Println("Ingestion failed with Status %s; Failure is %s; details:\n%s", code, failureStat, err)
+		fmt.Printf("Ingestion failed with Status %s; Failure is %s; details:\n%s\n", code, failureStat, err)
 		if retry {
 			// retry ingestion ?
 		}
