@@ -2,6 +2,7 @@ package ingest_test
 
 import (
 	"context"
+	"fmt"
 	"time"
 
 	"github.com/Azure/azure-kusto-go/kusto"
@@ -41,7 +42,21 @@ func ExampleIngestion_FromFile() {
 	defer cancel()
 
 	// Upload our file. When completed, delete the file on local storage we are uploading.
-	if err := ingestor.FromFile(ctx, "/path/to/file", ingest.DeleteSource()); err != nil {
-		// Do something
+	res, err := ingestor.FromFile(ctx, "/path/to/file", ingest.DeleteSource(), ingest.ReportResultToTable())
+	if err != nil {
+		// The ingestion command failed to be sent, Do something
+	}
+
+	err = <-res.Wait(ctx)
+	if err != nil {
+		// the ingestion failed for some reason
+		code, _ := ingest.GetIngestionStatus(err)
+		failureStat, _ := ingest.GetIngestionFailureStatus(err)
+		retry, _ := ingest.IsRetryable(err)
+
+		fmt.Println("Ingestion failed with Status %s; Failure is %s; details:\n%s", code, failureStat, err)
+		if retry {
+			// retry ingestion ?
+		}
 	}
 }
