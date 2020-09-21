@@ -2,6 +2,7 @@ package ingest
 
 import (
 	"context"
+	"fmt"
 	"time"
 
 	"github.com/Azure/azure-kusto-go/kusto/ingest/internal/properties"
@@ -11,7 +12,7 @@ import (
 
 // Result provides a way for users track the state of ingestion jobs.
 type Result struct {
-	record        StatusRecord
+	record        statusRecord
 	tableClient   *status.TableClient
 	reportToTable bool
 	reportToQueue bool
@@ -83,8 +84,8 @@ func (r *Result) putQueued(mgr *resources.Manager) *Result {
 
 // Wait returns a channel that can be checked for ingestion results.
 // In order to check actual status please use the IngestionStatus option when ingesting data.
-func (r *Result) Wait(ctx context.Context) chan StatusRecord {
-	ch := make(chan StatusRecord, 1)
+func (r *Result) Wait(ctx context.Context) chan error {
+	ch := make(chan error, 1)
 
 	go func() {
 		defer close(ch)
@@ -93,7 +94,9 @@ func (r *Result) Wait(ctx context.Context) chan StatusRecord {
 			r.poll(ctx)
 		}
 
-		ch <- r.record
+		if !r.record.Status.IsSuccess() {
+			ch <- r.record
+		}
 	}()
 
 	return ch
@@ -139,4 +142,31 @@ func (r *Result) poll(ctx context.Context) {
 			}
 		}
 	}
+}
+
+// GetIngestionStatus extracts the ingestion status code from an ingestion error
+func GetIngestionStatus(err error) (StatusCode, error) {
+	if s, ok := err.(statusRecord); ok {
+		return s.Status, nil
+	}
+
+	return Failed, fmt.Errorf("Error is not an Ingestion Result")
+}
+
+// GetIngestionFailureStatus extracts the ingestion failure code from an ingestion error
+func GetIngestionFailureStatus(err error) (FailureStatusCode, error) {
+	if s, ok := err.(statusRecord); ok {
+		return s.FailureStatus, nil
+	}
+
+	return Unknown, fmt.Errorf("Error is not an Ingestion Result")
+}
+
+// IsRetryable indicates whether there's any merit in retying ingestion
+func IsRetryable(err error) (bool, error) {
+	if s, ok := err.(statusRecord); ok {
+		return s.FailureStatus.IsRetryable(), nil
+	}
+
+	return false, fmt.Errorf("Error is not an Ingestion Result")
 }

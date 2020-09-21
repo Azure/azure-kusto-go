@@ -46,6 +46,20 @@ func (i StatusCode) IsFinal() bool {
 	return i != Pending
 }
 
+// IsSuccess returns true if the status code is a final successfull status code
+func (i StatusCode) IsSuccess() bool {
+	switch i {
+	case Succeeded:
+		return true
+
+	case Queued:
+		return true
+
+	default:
+		return false
+	}
+}
+
 // FailureStatusCode indicates the status of failuted ingestion attempts
 type FailureStatusCode string
 
@@ -60,8 +74,22 @@ const (
 	Exhausted FailureStatusCode = "Exhausted"
 )
 
-// StatusRecord is a record containing information regarding the status of an ingation command
-type StatusRecord struct {
+// IsRetryable indicates whether there's any merit in retying ingestion
+func (i FailureStatusCode) IsRetryable() bool {
+	switch i {
+	case Transient:
+		return true
+
+	case Exhausted:
+		return true
+
+	default:
+		return false
+	}
+}
+
+// statusRecord is a record containing information regarding the status of an ingation command
+type statusRecord struct {
 	// Status - The ingestion status returned from the service. Status remains 'Pending' during the ingestion process and
 	// is updated by the service once the ingestion completes. When <see cref="IngestionReportMethod"/> is set to 'Queue', the ingestion status
 	// will always be 'Queued' and the caller needs to query the reports queues for ingestion status, as configured. To query statuses that were
@@ -109,8 +137,8 @@ type StatusRecord struct {
 }
 
 // newStatusRecord creates a new record initialized with defaults and user provided data.
-func newStatusRecord() StatusRecord {
-	rec := StatusRecord{
+func newStatusRecord() statusRecord {
+	rec := statusRecord{
 		Status:                     Failed,
 		IngestionSourceID:          uuid.Nil,
 		IngestionSourcePath:        "Undefined",
@@ -129,7 +157,7 @@ func newStatusRecord() StatusRecord {
 }
 
 // FromProps takes in data from ingestion options.
-func (r *StatusRecord) FromProps(props properties.All) {
+func (r *statusRecord) FromProps(props properties.All) {
 	r.IngestionSourceID = props.Source.ID
 	r.Database = props.Ingestion.DatabaseName
 	r.Table = props.Ingestion.TableName
@@ -141,7 +169,7 @@ func (r *StatusRecord) FromProps(props properties.All) {
 }
 
 // FromMap converts an ingestion status record to a key value map.
-func (r *StatusRecord) FromMap(data map[string]interface{}) {
+func (r *statusRecord) FromMap(data map[string]interface{}) {
 
 	var strStatus string
 	safeSetString(data, "Status", &strStatus)
@@ -192,7 +220,7 @@ func (r *StatusRecord) FromMap(data map[string]interface{}) {
 }
 
 // ToMap converts an ingestion status record to a key value map.
-func (r *StatusRecord) ToMap() map[string]interface{} {
+func (r *statusRecord) ToMap() map[string]interface{} {
 	data := make(map[string]interface{})
 
 	// Since we only create the initial record, It's not our responsibility to write the following fields:
@@ -209,22 +237,25 @@ func (r *StatusRecord) ToMap() map[string]interface{} {
 }
 
 // String implements fmt.Stringer.
-func (r *StatusRecord) String() string {
+func (r *statusRecord) String() string {
 	return pretty.Sprint(r)
 }
 
 // ToError converts an ingestion status to an error if failed or partially succeeded, or nil if succeeded.
-func (r *StatusRecord) Error() error {
+func (r statusRecord) Error() string {
 	switch r.Status {
 	case Succeeded:
+		return fmt.Sprintf("Ingestion succeeded\n" + r.String())
+
 	case Queued:
-		return nil
+		return fmt.Sprintf("Ingestion Queued\n" + r.String())
 
 	case PartiallySucceeded:
-		return fmt.Errorf("Ingestion succeeded partially\n" + r.String())
-	}
+		return fmt.Sprintf("Ingestion succeeded partially\n" + r.String())
 
-	return fmt.Errorf("Ingestion Failed\n" + r.String())
+	default:
+		return fmt.Sprintf("Ingestion Failed\n" + r.String())
+	}
 }
 
 func getTimeFromInterface(x interface{}) (time.Time, error) {

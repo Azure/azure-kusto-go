@@ -471,8 +471,7 @@ func TestFileIngestion(t *testing.T) {
 
 			res, err := ingestor.FromFile(ctx, test.src, test.options...)
 			if err == nil {
-				stat := <-res.Wait(ctx)
-				err = stat.Error()
+				err = <-res.Wait(ctx)
 			}
 
 			switch {
@@ -659,8 +658,7 @@ func TestReaderIngestion(t *testing.T) {
 
 			res, err := ingestor.FromReader(ctx, reader, test.options...)
 			if err == nil {
-				stat := <-res.Wait(ctx)
-				err = stat.Error()
+				err = <-res.Wait(ctx)
 			}
 
 			switch {
