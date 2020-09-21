@@ -5,6 +5,7 @@ import (
 	"compress/gzip"
 	"context"
 	"encoding/json"
+	"fmt"
 	"io"
 	"sync"
 	"sync/atomic"
@@ -342,27 +343,19 @@ type mapEntry struct {
 	Kind string
 }
 
-// FromFile allows uploading a data file for Kusto from either a local path or a blobstore URI path.
-// This method is thread-safe.
-func (i *Ingestion) FromFile(ctx context.Context, fPath string, options ...FileOption) *Result {
+func (i *Ingestion) prepForIngestion(ctx context.Context, options []FileOption) (*Result, *properties.All, error) {
 	result := newResult()
-	result.record.IngestionSourcePath = fPath
 
-	manager, err := getManager(i.client)
+	auth, err := i.mgr.AuthContext(ctx)
 	if err != nil {
-		return result.putErr(err)
-	}
-
-	auth, err := manager.AuthContext(ctx)
-	if err != nil {
-		return result.putErr(err)
+		return result.putErr(err), nil, err
 	}
 
 	props := i.newProp(auth)
 	for _, o := range options {
 		if propOpt, ok := o.(propertyOption); ok {
 			if err := propOpt(&props); err != nil {
-				return result.putErr(err)
+				return result.putErr(err), nil, err
 			}
 		}
 	}
@@ -373,19 +366,35 @@ func (i *Ingestion) FromFile(ctx context.Context, fPath string, options ...FileO
 		}
 
 		if props.Ingestion.ReportMethod == properties.ReportStatusToTable || props.Ingestion.ReportMethod == properties.ReportStatusToQueueAndTable {
-			resources, err := manager.Resources()
-			if err == nil {
-				if len(resources.Tables) > 0 {
-					props.Ingestion.TableEntryRef.TableConnectionString = resources.Tables[0].URL().String()
-				}
+			resources, err := i.mgr.Resources()
+			if err != nil {
+				return result.putErr(err), nil, err
 			}
 
+			if len(resources.Tables) == 0 {
+				err = fmt.Errorf("User requested reorting status to table, yet staus table resource URI is not found")
+				return result.putErr(err), nil, err
+			}
+
+			props.Ingestion.TableEntryRef.TableConnectionString = resources.Tables[0].URL().String()
 			props.Ingestion.TableEntryRef.PartitionKey = props.Source.ID.String()
 			props.Ingestion.TableEntryRef.RowKey = uuid.Nil.String()
 		}
 	}
 
 	result.putProps(props)
+	return result, &props, nil
+}
+
+// FromFile allows uploading a data file for Kusto from either a local path or a blobstore URI path.
+// This method is thread-safe.
+func (i *Ingestion) FromFile(ctx context.Context, fPath string, options ...FileOption) *Result {
+	result, props, err := i.prepForIngestion(ctx, options)
+	if err != nil {
+		return result
+	}
+
+	result.record.IngestionSourcePath = fPath
 
 	if props.Ingestion.Additional.IngestionMappingRef != "" {
 		if err := i.haveMappingRef(ctx, props.Ingestion.Additional.IngestionMappingRef); err != nil {
@@ -399,16 +408,16 @@ func (i *Ingestion) FromFile(ctx context.Context, fPath string, options ...FileO
 	}
 
 	if local {
-		err = i.fs.Local(ctx, fPath, props)
+		err = i.fs.Local(ctx, fPath, *props)
 	} else {
 
-		err = i.fs.Blob(ctx, fPath, 0, props)
+		err = i.fs.Blob(ctx, fPath, 0, *props)
 	}
 
 	if err != nil {
 		result.putErr(err)
 	} else {
-		result.putQueued(manager)
+		result.putQueued(i.mgr)
 	}
 
 	return result
@@ -418,44 +427,10 @@ func (i *Ingestion) FromFile(ctx context.Context, fPath string, options ...FileO
 // ingested after all data in the reader is processed. Content should not use compression as the content will be
 // compressed with gzip. This method is thread-safe.
 func (i *Ingestion) FromReader(ctx context.Context, reader io.Reader, options ...FileOption) *Result {
-	result := newResult()
-	manager, err := getManager(i.client)
-
+	result, props, err := i.prepForIngestion(ctx, options)
 	if err != nil {
-		return result.putErr(err)
+		return result
 	}
-
-	auth, err := manager.AuthContext(ctx)
-	if err != nil {
-		return result.putErr(err)
-	}
-
-	props := i.newProp(auth)
-	for _, o := range options {
-		if propOpt, ok := o.(propertyOption); ok {
-			if err := propOpt(&props); err != nil {
-				return result.putErr(err)
-			}
-		}
-	}
-
-	if props.Ingestion.ReportMethod == properties.ReportStatusToTable || props.Ingestion.ReportMethod == properties.ReportStatusToQueueAndTable {
-		if props.Source.ID == uuid.Nil {
-			props.Source.ID = uuid.New()
-		}
-
-		resources, err := manager.Resources()
-		if err == nil {
-			if len(resources.Tables) > 0 {
-				props.Ingestion.TableEntryRef.TableConnectionString = resources.Tables[0].URL().String()
-			}
-		}
-
-		props.Ingestion.TableEntryRef.PartitionKey = props.Source.ID.String()
-		props.Ingestion.TableEntryRef.RowKey = uuid.Nil.String()
-	}
-
-	result.putProps(props)
 
 	if props.Ingestion.Additional.Format == DFUnknown {
 		return result.putErrStr("must provide option FileFormat() when using FromReader()")
@@ -471,12 +446,12 @@ func (i *Ingestion) FromReader(ctx context.Context, reader io.Reader, options ..
 		}
 	}
 
-	path, err := i.fs.Reader(ctx, reader, props)
+	path, err := i.fs.Reader(ctx, reader, *props)
 	result.record.IngestionSourcePath = path
 	if err != nil {
 		result.putErr(err)
 	} else {
-		result.putQueued(manager)
+		result.putQueued(i.mgr)
 	}
 
 	return result
