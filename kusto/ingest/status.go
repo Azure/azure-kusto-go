@@ -39,8 +39,6 @@ const (
 	StatusRetrievalFailed StatusCode = "StatusRetrievalFailed"
 	// StatusRetrievalCanceled means the user canceld the status check
 	StatusRetrievalCanceled StatusCode = "StatusRetrievalCanceled"
-	// ClientError an error was detected on the client side
-	ClientError StatusCode = "ClientError"
 )
 
 // IsFinal returns true if the ingestion status is a final status, or false if the status is temporary

@@ -101,7 +101,12 @@ func TestIgestionFromFileWithStatusReportingQueued(t *testing.T) {
 	var results [5]ingest.StatusRecord
 
 	for i := 0; i < count; i++ {
-		ch[i] = ingestor.FromFile(ctx, csvFile, ingest.ReportResultToTable()).Wait(ctx)
+		res, err := ingestor.FromFile(ctx, csvFile, ingest.ReportResultToTable())
+		if err != nil {
+			panic(err)
+		}
+
+		ch[i] = res.Wait(ctx)
 	}
 
 	for i := 0; i < count; i++ {
@@ -155,7 +160,8 @@ func TestIgestionFromReaderWithStatusReportingQueued(t *testing.T) {
 			io.Copy(writer, f)
 		}()
 
-		ch[i] = ingestor.FromReader(ctx, reader, ingest.ReportResultToTable(), ingest.FileFormat(ingest.CSV)).Wait(ctx)
+		res, err := ingestor.FromReader(ctx, reader, ingest.ReportResultToTable(), ingest.FileFormat(ingest.CSV))
+		ch[i] = res.Wait(ctx)
 	}
 
 	for i := 0; i < count; i++ {
@@ -193,11 +199,16 @@ func TestIgestionFromFileWithoutStatusReporting(t *testing.T) {
 		panic(err)
 	}
 
-	res := <-ingestor.FromFile(ctx, csvFile).Wait(ctx)
-	if res.Status != ingest.Queued {
-		t.Errorf("Exepcted status Queued however result is:\n%s", res.String())
+	res, err := ingestor.FromFile(ctx, csvFile)
+	if err != nil {
+		panic(err)
+	}
+
+	stat := <-res.Wait(ctx)
+	if stat.Status != ingest.Queued {
+		t.Errorf("Exepcted status Queued however result is:\n%s", stat.String())
 	} else if verbose {
-		println(res.String())
+		println(stat.String())
 		println()
 	}
 }
@@ -234,11 +245,16 @@ func TestIgestionFromReaderWithoutStatusReporting(t *testing.T) {
 		io.Copy(writer, f)
 	}()
 
-	res := <-ingestor.FromReader(ctx, reader, ingest.FileFormat(ingest.CSV)).Wait(ctx)
-	if res.Status != ingest.Queued {
-		t.Errorf("Exepcted status Queued however result is:\n%s", res.String())
+	res, err := ingestor.FromReader(ctx, reader, ingest.FileFormat(ingest.CSV))
+	if err != nil {
+		panic(err)
+	}
+
+	stat := <-res.Wait(ctx)
+	if stat.Status != ingest.Queued {
+		t.Errorf("Exepcted status Queued however result is:\n%s", stat.String())
 	} else if verbose {
-		println(res.String())
+		println(stat.String())
 		println()
 	}
 }
@@ -265,23 +281,29 @@ func TestIgestionFromFileWithClientFailure(t *testing.T) {
 	}
 
 	// Once without status reporting
-	res := <-ingestor.FromFile(ctx, "thisfiledoesnotexist.csv").Wait(ctx)
-	if res.Status != ingest.ClientError {
-		t.Errorf("Test without status reporting:\nExepcted status ClientError however result is:\n%s", res.String())
-	} else if verbose {
-		println("Test without status reporting:")
-		println(res.String())
-		println()
+	res, err := ingestor.FromFile(ctx, "thisfiledoesnotexist.csv")
+	if err == nil {
+		t.Errorf("Test without status reporting:\nExepcted status ClientError however result is:\n%s", err)
+
+		if verbose {
+			stat := <-res.Wait(ctx)
+			println("Test without status reporting:")
+			println(stat.String())
+			println()
+		}
 	}
 
 	// Once with table status reporting
-	res = <-ingestor.FromFile(ctx, "thisfiledoesnotexist.csv", ingest.ReportResultToTable()).Wait(ctx)
-	if res.Status != ingest.ClientError {
-		t.Errorf("Test with status reporting:\nExepcted status ClientError however result is:\n%s", res.String())
-	} else if verbose {
-		println("Test with status reporting:")
-		println(res.String())
-		println()
+	res, err = ingestor.FromFile(ctx, "thisfiledoesnotexist.csv", ingest.ReportResultToTable())
+	if err == nil {
+		t.Errorf("Test with status reporting:\nExepcted status ClientError however result is:\n%s", err)
+
+		if verbose {
+			stat := <-res.Wait(ctx)
+			println("Test with status reporting:")
+			println(stat.String())
+			println()
+		}
 	}
 }
 
@@ -311,23 +333,29 @@ func TestIgestionFromReaderWithClientFailure(t *testing.T) {
 	writer.Close()
 
 	// Once without status reporting
-	res := <-ingestor.FromReader(ctx, reader).Wait(ctx)
-	if res.Status != ingest.ClientError {
-		t.Errorf("Test without status reporting:\nExepcted status ClientError however result is:\n%s", res.String())
-	} else if verbose {
-		println("Test without status reporting:")
-		println(res.String())
-		println()
+	res, err := ingestor.FromReader(ctx, reader)
+	if err == nil {
+		t.Errorf("Test without status reporting:\nExepcted ingestion to fail however result is:\n%s", err)
+
+		if verbose {
+			stat := <-res.Wait(ctx)
+			println("Test without status reporting:")
+			println(stat.String())
+			println()
+		}
 	}
 
 	// Once with table status reporting
-	res = <-ingestor.FromReader(ctx, reader, ingest.ReportResultToTable()).Wait(ctx)
-	if res.Status != ingest.ClientError {
-		t.Errorf("Test with status reporting:\nExepcted status ClientError however result is:\n%s", res.String())
-	} else if verbose {
-		println("Test with status reporting:")
-		println(res.String())
-		println()
+	res, err = ingestor.FromReader(ctx, reader, ingest.ReportResultToTable())
+	if err == nil {
+		t.Errorf("Test with status reporting:\nExepcted ingestion to fail however result is:\n%s", err)
+
+		if verbose {
+			stat := <-res.Wait(ctx)
+			println("Test with status reporting:")
+			println(stat.String())
+			println()
+		}
 	}
 }
 
@@ -352,11 +380,16 @@ func TestIgestionFromFileWithStatusReporting(t *testing.T) {
 		panic(err)
 	}
 
-	res := <-ingestor.FromFile(ctx, csvFile, ingest.ReportResultToTable(), ingest.FlushImmediately()).Wait(ctx)
-	if res.Status != ingest.Succeeded {
-		t.Errorf("Exepcted status Succeeded however result is:\n%s", res.String())
+	res, err := ingestor.FromFile(ctx, csvFile, ingest.ReportResultToTable(), ingest.FlushImmediately())
+	if err != nil {
+		panic(err)
+	}
+
+	stat := <-res.Wait(ctx)
+	if stat.Status != ingest.Succeeded {
+		t.Errorf("Exepcted status Succeeded however result is:\n%s", err)
 	} else if verbose {
-		println(res.String())
+		println(stat.String())
 		println()
 	}
 }
@@ -393,11 +426,16 @@ func TestIgestionFromReaderWithStatusReporting(t *testing.T) {
 		io.Copy(writer, f)
 	}()
 
-	res := <-ingestor.FromReader(ctx, reader, ingest.ReportResultToTable(), ingest.FlushImmediately(), ingest.FileFormat(ingest.CSV)).Wait(ctx)
-	if res.Status != ingest.Succeeded {
-		t.Errorf("Exepcted status Succeeded however result is:\n%s", res.String())
+	res, err := ingestor.FromReader(ctx, reader, ingest.ReportResultToTable(), ingest.FlushImmediately(), ingest.FileFormat(ingest.CSV))
+	if err != nil {
+		panic(err)
+	}
+
+	stat := <-res.Wait(ctx)
+	if stat.Status != ingest.Succeeded {
+		t.Errorf("Exepcted status Succeeded however result is:\n%s", stat.String())
 	} else if verbose {
-		println(res.String())
+		println(stat.String())
 		println()
 	}
 }

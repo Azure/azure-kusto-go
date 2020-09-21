@@ -25,20 +25,6 @@ func newResult() *Result {
 	return ret
 }
 
-// putErr sets the record to a failure state and adds the error to the record details.
-func (r *Result) putErr(err error) *Result {
-	return r.putErrStr(err.Error())
-}
-
-// putErrStr sets the record to a failure state and adds the error to the record details.
-func (r *Result) putErrStr(err string) *Result {
-	r.record.Status = ClientError
-	r.record.FailureStatus = Permanent
-	r.record.Details = err
-
-	return r
-}
-
 // putProps sets the record to a failure state and adds the error to the record details.
 func (r *Result) putProps(props properties.All) *Result {
 	r.reportToTable = props.Ingestion.ReportMethod == properties.ReportStatusToTable || props.Ingestion.ReportMethod == properties.ReportStatusToQueueAndTable
@@ -59,14 +45,14 @@ func (r *Result) putQueued(mgr *resources.Manager) *Result {
 	resources, err := mgr.Resources()
 	if err != nil {
 		r.record.Status = StatusRetrievalFailed
-		r.record.FailureStatus = Transient
+		r.record.FailureStatus = Permanent
 		r.record.Details = "Failed getting status table URI: " + err.Error()
 		return r
 	}
 
 	if len(resources.Tables) == 0 {
 		r.record.Status = StatusRetrievalFailed
-		r.record.FailureStatus = Transient
+		r.record.FailureStatus = Permanent
 		r.record.Details = "Ingestion resources do not include a status table URI: " + err.Error()
 		return r
 	}
@@ -75,7 +61,7 @@ func (r *Result) putQueued(mgr *resources.Manager) *Result {
 	client, err := status.NewTableClient(*resources.Tables[0])
 	if err != nil {
 		r.record.Status = StatusRetrievalFailed
-		r.record.FailureStatus = Transient
+		r.record.FailureStatus = Permanent
 		r.record.Details = "Failed Creating a Status Table client: " + err.Error()
 		return r
 	}
@@ -85,11 +71,13 @@ func (r *Result) putQueued(mgr *resources.Manager) *Result {
 	recordMap := r.record.ToMap()
 	err = client.Write(r.record.IngestionSourceID.String(), recordMap)
 	if err != nil {
-		r.putErr(err)
-	} else {
-		r.tableClient = client
+		r.record.Status = StatusRetrievalFailed
+		r.record.FailureStatus = Permanent
+		r.record.Details = "Failed writing initial status record: " + err.Error()
+		return r
 	}
 
+	r.tableClient = client
 	return r
 }
 

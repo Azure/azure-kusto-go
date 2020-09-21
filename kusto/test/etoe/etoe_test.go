@@ -469,8 +469,12 @@ func TestFileIngestion(t *testing.T) {
 
 			test.options = append(test.options, ingest.FlushImmediately())
 
-			res := <-ingestor.FromFile(ctx, test.src, test.options...).Wait(ctx)
-			err := res.Error()
+			res, err := ingestor.FromFile(ctx, test.src, test.options...)
+			if err == nil {
+				stat := <-res.Wait(ctx)
+				err = stat.Error()
+			}
+
 			switch {
 			case err == nil && test.wantErr:
 				t.Errorf("TestFileIngestion(%s): ingestor.FromFile(): got err == nil, want err != nil", test.desc)
@@ -653,8 +657,12 @@ func TestReaderIngestion(t *testing.T) {
 				io.Copy(writer, f)
 			}()
 
-			res := <-ingestor.FromReader(ctx, reader, test.options...).Wait(ctx)
-			err = res.Error()
+			res, err := ingestor.FromReader(ctx, reader, test.options...)
+			if err == nil {
+				stat := <-res.Wait(ctx)
+				err = stat.Error()
+			}
+
 			switch {
 			case err == nil && test.wantErr:
 				t.Errorf("TestReaderIngestion(%s): ingestor.FromFile(): got err == nil, want err != nil", test.desc)

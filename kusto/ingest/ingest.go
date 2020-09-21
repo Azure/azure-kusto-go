@@ -348,14 +348,14 @@ func (i *Ingestion) prepForIngestion(ctx context.Context, options []FileOption) 
 
 	auth, err := i.mgr.AuthContext(ctx)
 	if err != nil {
-		return result.putErr(err), nil, err
+		return nil, nil, err
 	}
 
 	props := i.newProp(auth)
 	for _, o := range options {
 		if propOpt, ok := o.(propertyOption); ok {
 			if err := propOpt(&props); err != nil {
-				return result.putErr(err), nil, err
+				return nil, nil, err
 			}
 		}
 	}
@@ -368,12 +368,12 @@ func (i *Ingestion) prepForIngestion(ctx context.Context, options []FileOption) 
 		if props.Ingestion.ReportMethod == properties.ReportStatusToTable || props.Ingestion.ReportMethod == properties.ReportStatusToQueueAndTable {
 			resources, err := i.mgr.Resources()
 			if err != nil {
-				return result.putErr(err), nil, err
+				return nil, nil, err
 			}
 
 			if len(resources.Tables) == 0 {
 				err = fmt.Errorf("User requested reorting status to table, yet staus table resource URI is not found")
-				return result.putErr(err), nil, err
+				return nil, nil, err
 			}
 
 			props.Ingestion.TableEntryRef.TableConnectionString = resources.Tables[0].URL().String()
@@ -388,23 +388,23 @@ func (i *Ingestion) prepForIngestion(ctx context.Context, options []FileOption) 
 
 // FromFile allows uploading a data file for Kusto from either a local path or a blobstore URI path.
 // This method is thread-safe.
-func (i *Ingestion) FromFile(ctx context.Context, fPath string, options ...FileOption) *Result {
+func (i *Ingestion) FromFile(ctx context.Context, fPath string, options ...FileOption) (*Result, error) {
 	result, props, err := i.prepForIngestion(ctx, options)
 	if err != nil {
-		return result
+		return nil, err
 	}
 
 	result.record.IngestionSourcePath = fPath
 
 	if props.Ingestion.Additional.IngestionMappingRef != "" {
 		if err := i.haveMappingRef(ctx, props.Ingestion.Additional.IngestionMappingRef); err != nil {
-			return result.putErr(err)
+			return nil, err
 		}
 	}
 
 	local, err := filesystem.IsLocalPath(fPath)
 	if err != nil {
-		return result.putErr(err)
+		return nil, err
 	}
 
 	if local {
@@ -415,46 +415,44 @@ func (i *Ingestion) FromFile(ctx context.Context, fPath string, options ...FileO
 	}
 
 	if err != nil {
-		result.putErr(err)
+		return nil, err
 	} else {
 		result.putQueued(i.mgr)
+		return result, nil
 	}
-
-	return result
 }
 
 // FromReader allows uploading a data file for Kusto from an io.Reader. The content is uploaded to Blobstore and
 // ingested after all data in the reader is processed. Content should not use compression as the content will be
 // compressed with gzip. This method is thread-safe.
-func (i *Ingestion) FromReader(ctx context.Context, reader io.Reader, options ...FileOption) *Result {
+func (i *Ingestion) FromReader(ctx context.Context, reader io.Reader, options ...FileOption) (*Result, error) {
 	result, props, err := i.prepForIngestion(ctx, options)
 	if err != nil {
-		return result
+		return nil, err
 	}
 
 	if props.Ingestion.Additional.Format == DFUnknown {
-		return result.putErrStr("must provide option FileFormat() when using FromReader()")
+		return nil, fmt.Errorf("must provide option FileFormat() when using FromReader()")
 	}
 
 	if props.Source.DeleteLocalSource {
-		return result.putErrStr("cannot use DeleteLocalSource() with FromReader()")
+		return nil, fmt.Errorf("cannot use DeleteLocalSource() with FromReader()")
 	}
 
 	if props.Ingestion.Additional.IngestionMappingRef != "" {
 		if err := i.haveMappingRef(ctx, props.Ingestion.Additional.IngestionMappingRef); err != nil {
-			return result.putErr(err)
+			return nil, err
 		}
 	}
 
 	path, err := i.fs.Reader(ctx, reader, *props)
-	result.record.IngestionSourcePath = path
 	if err != nil {
-		result.putErr(err)
+		return nil, err
 	} else {
+		result.record.IngestionSourcePath = path
 		result.putQueued(i.mgr)
+		return result, nil
 	}
-
-	return result
 }
 
 var (
