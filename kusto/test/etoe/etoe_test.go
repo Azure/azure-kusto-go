@@ -467,7 +467,7 @@ func TestFileIngestion(t *testing.T) {
 				}()
 			}
 
-			test.options = append(test.options, ingest.FlushImmediately())
+			test.options = append(test.options, ingest.FlushImmediately(), ingest.ReportResultToTable())
 
 			res, err := ingestor.FromFile(ctx, test.src, test.options...)
 			if err == nil {
