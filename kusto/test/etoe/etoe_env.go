@@ -48,7 +48,8 @@ var (
 func init() {
 	_, filename, _, ok := runtime.Caller(0)
 	if !ok {
-		panic("Failed calling runtime.Caller()")
+		fmt.Println("Failed calling runtime.Caller()")
+		return
 	}
 
 	p := filepath.Join(filepath.Dir(filename), "config.json")
@@ -56,7 +57,8 @@ func init() {
 
 	if err == nil {
 		if err := json.Unmarshal(b, &testConfig); err != nil {
-			panic(fmt.Sprintf("Failed reading test settings from '%s'", p))
+			fmt.Printf("Failed reading test settings from '%s\n'", p)
+			return
 		}
 	} else {
 		// if couldn't find a config file, we try to read them from env
@@ -75,14 +77,15 @@ func init() {
 	}
 
 	if err := testConfig.validate(); err != nil {
-		panic(err)
+		fmt.Println(err)
+		return
 	}
 
 	if testConfig.ClientID == "" {
 		azAuthorizer, err := auth.NewAuthorizerFromCLIWithResource(testConfig.Endpoint)
 		if err != nil {
 			fmt.Println("Failed to acquire auth token from az-cli" + err.Error())
-			panic(err)
+			return
 		}
 
 		testConfig.Authorizer = kusto.Authorization{Authorizer: azAuthorizer}

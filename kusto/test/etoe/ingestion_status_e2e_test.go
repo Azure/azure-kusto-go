@@ -2,6 +2,7 @@ package etoe
 
 import (
 	"context"
+	"fmt"
 	"io"
 	"os"
 	"testing"
@@ -21,7 +22,7 @@ const (
 
 func init() {
 	if skipETOE {
-		panic("end to end tests disabled: missing config.json file in etoe directory and test environment not set")
+		fmt.Println("end to end tests disabled: missing config.json file in etoe directory and test environment not set")
 	}
 
 	ctx, cancel := context.WithTimeout(context.Background(), 1*time.Minute)
