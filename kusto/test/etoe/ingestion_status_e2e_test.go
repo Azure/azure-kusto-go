@@ -2,7 +2,6 @@ package etoe
 
 import (
 	"context"
-	"fmt"
 	"io"
 	"os"
 	"testing"
@@ -20,70 +19,43 @@ const (
 	verbose   bool   = false
 )
 
-var (
-	initDone   bool = false
-	initFailed bool = true
-	testConf   Config
-)
-
-func initOnce() error {
-	if !initDone {
-		initDone = true
-
-		testConf, err := NewConfig()
-		if err != nil {
-			return fmt.Errorf("end to end tests disabled: missing config.json file in etoe directory or test environment not set - %s", err)
-		}
-
-		ctx, cancel := context.WithCancel(context.Background())
-		ctx, cancel = context.WithTimeout(ctx, 1*time.Minute)
-		defer cancel()
-
-		client, err := kusto.New(testConfig.Endpoint, testConfig.Authorizer)
-		if err != nil {
-			return err
-		}
-
-		// Drop the old table if exists
-		dropStmt := kusto.NewStmt(".drop table ", kusto.UnsafeStmt(unsafe.Stmt{Add: true})).UnsafeAdd(tableName).Add(" ifexists")
-		_, err = client.Mgmt(ctx, testConf.Database, dropStmt)
-		if err != nil {
-			return fmt.Errorf("failed to drop the old table:\n" + err.Error())
-		}
-
-		// Create a database
-		createStmt := kusto.NewStmt(".create table ", kusto.UnsafeStmt(unsafe.Stmt{Add: true})).UnsafeAdd(tableName).UnsafeAdd(scheme)
-		_, err = client.Mgmt(ctx, testConf.Database, createStmt)
-		if err != nil {
-			return fmt.Errorf("failed to create a table:\n" + err.Error())
-		}
-
-		// Change the ingetion batching time
-		batchingStmt := kusto.NewStmt(".alter table ", kusto.UnsafeStmt(unsafe.Stmt{Add: true})).UnsafeAdd(tableName).Add(" policy ingestionbatching @'{ \"MaximumBatchingTimeSpan\": \"00:00:25\", \"MaximumNumberOfItems\": 500, \"MaximumRawDataSizeMB\": 1024 }' ")
-		_, err = client.Mgmt(ctx, testConf.Database, batchingStmt)
-		if err != nil {
-			return fmt.Errorf("failed to reduce the default batching time\n" + err.Error())
-		}
-
-		initFailed = false
+func init() {
+	if skipETOE {
+		panic("end to end tests disabled: missing config.json file in etoe directory and test environment not set")
 	}
 
-	if initFailed {
-		return fmt.Errorf("Init once failed in the past")
+	ctx, cancel := context.WithTimeout(context.Background(), 1*time.Minute)
+	defer cancel()
+
+	client, err := kusto.New(testConfig.Endpoint, testConfig.Authorizer)
+	if err != nil {
+		panic(err)
 	}
 
-	return nil
+	// Drop the old table if exists
+	dropStmt := kusto.NewStmt(".drop table ", kusto.UnsafeStmt(unsafe.Stmt{Add: true})).UnsafeAdd(tableName).Add(" ifexists")
+	_, err = client.Mgmt(ctx, testConfig.Database, dropStmt)
+	if err != nil {
+		panic("failed to drop the old table:\n" + err.Error())
+	}
+
+	// Create a database
+	createStmt := kusto.NewStmt(".create table ", kusto.UnsafeStmt(unsafe.Stmt{Add: true})).UnsafeAdd(tableName).UnsafeAdd(scheme)
+	_, err = client.Mgmt(ctx, testConfig.Database, createStmt)
+	if err != nil {
+		panic("failed to create a table:\n" + err.Error())
+	}
+
+	// Change the ingestion batching time
+	batchingStmt := kusto.NewStmt(".alter table ", kusto.UnsafeStmt(unsafe.Stmt{Add: true})).UnsafeAdd(tableName).Add(" policy ingestionbatching @'{ \"MaximumBatchingTimeSpan\": \"00:00:25\", \"MaximumNumberOfItems\": 500, \"MaximumRawDataSizeMB\": 1024 }' ")
+	_, err = client.Mgmt(ctx, testConfig.Database, batchingStmt)
+	if err != nil {
+		panic("failed to reduce the default batching time\n" + err.Error())
+	}
 }
 
 func TestIgestionFromFileWithStatusReportingQueued(t *testing.T) {
-	err := initOnce()
-	if err != nil {
-		t.Skipf("Skipping tests: %s", err)
-		return
-	}
-
-	ctx, cancel := context.WithCancel(context.Background())
-	ctx, cancel = context.WithTimeout(ctx, 3*time.Minute)
+	ctx, cancel := context.WithTimeout(context.Background(), 3*time.Minute)
 	defer cancel()
 
 	client, err := kusto.New(testConfig.Endpoint, testConfig.Authorizer)
@@ -121,14 +93,7 @@ func TestIgestionFromFileWithStatusReportingQueued(t *testing.T) {
 }
 
 func TestIgestionFromReaderWithStatusReportingQueued(t *testing.T) {
-	err := initOnce()
-	if err != nil {
-		t.Skipf("Skipping tests: %s", err)
-		return
-	}
-
-	ctx, cancel := context.WithCancel(context.Background())
-	ctx, cancel = context.WithTimeout(ctx, 3*time.Minute)
+	ctx, cancel := context.WithTimeout(context.Background(), 3*time.Minute)
 	defer cancel()
 
 	client, err := kusto.New(testConfig.Endpoint, testConfig.Authorizer)
@@ -173,14 +138,7 @@ func TestIgestionFromReaderWithStatusReportingQueued(t *testing.T) {
 }
 
 func TestIgestionFromFileWithoutStatusReporting(t *testing.T) {
-	err := initOnce()
-	if err != nil {
-		t.Skipf("Skipping tests: %s", err)
-		return
-	}
-
-	ctx, cancel := context.WithCancel(context.Background())
-	ctx, cancel = context.WithTimeout(ctx, 1*time.Minute)
+	ctx, cancel := context.WithTimeout(context.Background(), 1*time.Minute)
 	defer cancel()
 
 	client, err := kusto.New(testConfig.Endpoint, testConfig.Authorizer)
@@ -205,14 +163,7 @@ func TestIgestionFromFileWithoutStatusReporting(t *testing.T) {
 }
 
 func TestIgestionFromReaderWithoutStatusReporting(t *testing.T) {
-	err := initOnce()
-	if err != nil {
-		t.Skipf("Skipping tests: %s", err)
-		return
-	}
-
-	ctx, cancel := context.WithCancel(context.Background())
-	ctx, cancel = context.WithTimeout(ctx, 1*time.Minute)
+	ctx, cancel := context.WithTimeout(context.Background(), 1*time.Minute)
 	defer cancel()
 
 	client, err := kusto.New(testConfig.Endpoint, testConfig.Authorizer)
@@ -248,14 +199,7 @@ func TestIgestionFromReaderWithoutStatusReporting(t *testing.T) {
 }
 
 func TestIgestionFromFileWithClientFailure(t *testing.T) {
-	err := initOnce()
-	if err != nil {
-		t.Skipf("Skipping tests: %s", err)
-		return
-	}
-
-	ctx, cancel := context.WithCancel(context.Background())
-	ctx, cancel = context.WithTimeout(ctx, 1*time.Minute)
+	ctx, cancel := context.WithTimeout(context.Background(), 1*time.Minute)
 	defer cancel()
 
 	client, err := kusto.New(testConfig.Endpoint, testConfig.Authorizer)
@@ -282,14 +226,7 @@ func TestIgestionFromFileWithClientFailure(t *testing.T) {
 }
 
 func TestIgestionFromReaderWithClientFailure(t *testing.T) {
-	err := initOnce()
-	if err != nil {
-		t.Skipf("Skipping tests: %s", err)
-		return
-	}
-
-	ctx, cancel := context.WithCancel(context.Background())
-	ctx, cancel = context.WithTimeout(ctx, 1*time.Minute)
+	ctx, cancel := context.WithTimeout(context.Background(), 1*time.Minute)
 	defer cancel()
 
 	client, err := kusto.New(testConfig.Endpoint, testConfig.Authorizer)
@@ -320,14 +257,7 @@ func TestIgestionFromReaderWithClientFailure(t *testing.T) {
 }
 
 func TestIgestionFromFileWithStatusReporting(t *testing.T) {
-	err := initOnce()
-	if err != nil {
-		t.Skipf("Skipping tests: %s", err)
-		return
-	}
-
-	ctx, cancel := context.WithCancel(context.Background())
-	ctx, cancel = context.WithTimeout(ctx, 300*time.Second)
+	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Minute)
 	defer cancel()
 
 	client, err := kusto.New(testConfig.Endpoint, testConfig.Authorizer)
@@ -352,14 +282,7 @@ func TestIgestionFromFileWithStatusReporting(t *testing.T) {
 }
 
 func TestIgestionFromReaderWithStatusReporting(t *testing.T) {
-	err := initOnce()
-	if err != nil {
-		t.Skipf("Skipping tests: %s", err)
-		return
-	}
-
-	ctx, cancel := context.WithCancel(context.Background())
-	ctx, cancel = context.WithTimeout(ctx, 30*time.Second)
+	ctx, cancel := context.WithTimeout(context.Background(), 1*time.Minute)
 	defer cancel()
 
 	client, err := kusto.New(testConfig.Endpoint, testConfig.Authorizer)

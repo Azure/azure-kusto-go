@@ -254,8 +254,8 @@ func IfNotExists(ingestByTag string) FileOption {
 }
 
 // ReportResultToTable option requests that the ingestion status will be tracked in an Azure table.
-// Note using Table status reporting is not recommandad for high capacity ingestions, as it could slow down the ingestion.
-// In such caces, it's recommandad to enable it temporarily for debugging failed ingestions.
+// Note using Table status reporting is not recommended for high capacity ingestions, as it could slow down the ingestion.
+// In such cases, it's recommended to enable it temporarily for debugging failed ingestions.
 func ReportResultToTable() FileOption {
 	return propertyOption(
 		func(p *properties.All) error {
@@ -334,19 +334,19 @@ type mapEntry struct {
 	Kind string
 }
 
-func (i *Ingestion) prepForIngestion(ctx context.Context, options []FileOption) (*Result, *properties.All, error) {
+func (i *Ingestion) prepForIngestion(ctx context.Context, options []FileOption) (*Result, properties.All, error) {
 	result := newResult()
 
 	auth, err := i.mgr.AuthContext(ctx)
 	if err != nil {
-		return nil, nil, err
+		return nil, properties.All{}, err
 	}
 
 	props := i.newProp(auth)
 	for _, o := range options {
 		if propOpt, ok := o.(propertyOption); ok {
 			if err := propOpt(&props); err != nil {
-				return nil, nil, err
+				return nil, properties.All{}, err
 			}
 		}
 	}
@@ -356,25 +356,26 @@ func (i *Ingestion) prepForIngestion(ctx context.Context, options []FileOption) 
 			props.Source.ID = uuid.New()
 		}
 
-		if props.Ingestion.ReportMethod == properties.ReportStatusToTable || props.Ingestion.ReportMethod == properties.ReportStatusToQueueAndTable {
+		switch props.Ingestion.ReportMethod {
+		case properties.ReportStatusToTable, properties.ReportStatusToQueueAndTable:
 			resources, err := i.mgr.Resources()
 			if err != nil {
-				return nil, nil, err
+				return nil, properties.All{}, err
 			}
 
 			if len(resources.Tables) == 0 {
-				err = fmt.Errorf("User requested reorting status to table, yet staus table resource URI is not found")
-				return nil, nil, err
+				return nil, properties.All{}, fmt.Errorf("User requested reporting status to table, yet status table resource URI is not found")
 			}
 
 			props.Ingestion.TableEntryRef.TableConnectionString = resources.Tables[0].URL().String()
 			props.Ingestion.TableEntryRef.PartitionKey = props.Source.ID.String()
 			props.Ingestion.TableEntryRef.RowKey = uuid.Nil.String()
+			break
 		}
 	}
 
 	result.putProps(props)
-	return result, &props, nil
+	return result, props, nil
 }
 
 // FromFile allows uploading a data file for Kusto from either a local path or a blobstore URI path.
@@ -393,18 +394,18 @@ func (i *Ingestion) FromFile(ctx context.Context, fPath string, options ...FileO
 	}
 
 	if local {
-		err = i.fs.Local(ctx, fPath, *props)
+		err = i.fs.Local(ctx, fPath, props)
 	} else {
 
-		err = i.fs.Blob(ctx, fPath, 0, *props)
+		err = i.fs.Blob(ctx, fPath, 0, props)
 	}
 
 	if err != nil {
 		return nil, err
-	} else {
-		result.putQueued(i.mgr)
-		return result, nil
 	}
+
+	result.putQueued(i.mgr)
+	return result, nil
 }
 
 // FromReader allows uploading a data file for Kusto from an io.Reader. The content is uploaded to Blobstore and
@@ -424,14 +425,14 @@ func (i *Ingestion) FromReader(ctx context.Context, reader io.Reader, options ..
 		return nil, fmt.Errorf("cannot use DeleteLocalSource() with FromReader()")
 	}
 
-	path, err := i.fs.Reader(ctx, reader, *props)
+	path, err := i.fs.Reader(ctx, reader, props)
 	if err != nil {
 		return nil, err
-	} else {
-		result.record.IngestionSourcePath = path
-		result.putQueued(i.mgr)
-		return result, nil
 	}
+
+	result.record.IngestionSourcePath = path
+	result.putQueued(i.mgr)
+	return result, nil
 }
 
 var (

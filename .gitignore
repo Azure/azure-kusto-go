@@ -329,3 +329,7 @@ ASALocalRun/
 .mfractor/
 
 sample.go
+
+# VS Code
+.vscode/*.*
+*.bak

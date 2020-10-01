@@ -3,6 +3,7 @@ package ingest
 import (
 	"context"
 	"fmt"
+	"math/rand"
 	"time"
 
 	"github.com/Azure/azure-kusto-go/kusto/ingest/internal/properties"
@@ -27,19 +28,17 @@ func newResult() *Result {
 }
 
 // putProps sets the record to a failure state and adds the error to the record details.
-func (r *Result) putProps(props properties.All) *Result {
+func (r *Result) putProps(props properties.All) {
 	r.reportToTable = props.Ingestion.ReportMethod == properties.ReportStatusToTable || props.Ingestion.ReportMethod == properties.ReportStatusToQueueAndTable
 	r.record.FromProps(props)
-
-	return r
 }
 
 // putQueued sets the initial success status depending on status reporting state
-func (r *Result) putQueued(mgr *resources.Manager) *Result {
+func (r *Result) putQueued(mgr *resources.Manager) {
 	// If not checking status, just return queued
 	if !r.reportToTable {
 		r.record.Status = Queued
-		return r
+		return
 	}
 
 	// Get table URI
@@ -48,14 +47,14 @@ func (r *Result) putQueued(mgr *resources.Manager) *Result {
 		r.record.Status = StatusRetrievalFailed
 		r.record.FailureStatus = Permanent
 		r.record.Details = "Failed getting status table URI: " + err.Error()
-		return r
+		return
 	}
 
 	if len(resources.Tables) == 0 {
 		r.record.Status = StatusRetrievalFailed
 		r.record.FailureStatus = Permanent
 		r.record.Details = "Ingestion resources do not include a status table URI: " + err.Error()
-		return r
+		return
 	}
 
 	// create a table client
@@ -64,22 +63,20 @@ func (r *Result) putQueued(mgr *resources.Manager) *Result {
 		r.record.Status = StatusRetrievalFailed
 		r.record.FailureStatus = Permanent
 		r.record.Details = "Failed Creating a Status Table client: " + err.Error()
-		return r
+		return
 	}
 
 	// Write initial record
 	r.record.Status = Pending
-	recordMap := r.record.ToMap()
-	err = client.Write(r.record.IngestionSourceID.String(), recordMap)
+	err = client.Write(r.record.IngestionSourceID.String(), r.record.ToMap())
 	if err != nil {
 		r.record.Status = StatusRetrievalFailed
 		r.record.FailureStatus = Permanent
 		r.record.Details = "Failed writing initial status record: " + err.Error()
-		return r
+		return
 	}
 
 	r.tableClient = client
-	return r
 }
 
 // Wait returns a channel that can be checked for ingestion results.
@@ -87,13 +84,15 @@ func (r *Result) putQueued(mgr *resources.Manager) *Result {
 func (r *Result) Wait(ctx context.Context) chan error {
 	ch := make(chan error, 1)
 
+	if r.record.Status.IsFinal() || !r.reportToTable {
+		close(ch)
+		return ch
+	}
+
 	go func() {
 		defer close(ch)
 
-		if !r.record.Status.IsFinal() && r.reportToTable == true {
-			r.poll(ctx)
-		}
-
+		r.poll(ctx)
 		if !r.record.Status.IsSuccess() {
 			ch <- r.record
 		}
@@ -104,6 +103,8 @@ func (r *Result) Wait(ctx context.Context) chan error {
 
 func (r *Result) poll(ctx context.Context) {
 	const pollInterval = 10 * time.Second
+	attempts := 3
+	delay := [3]int{120, 60, 10} // attempts are counted backwards
 
 	// create a table client
 	if r.tableClient != nil {
@@ -113,29 +114,28 @@ func (r *Result) poll(ctx context.Context) {
 
 		for {
 			select {
-			// In case the user canceled the wait, return current known state.
 			case <-ctx.Done():
-				// return a canceld state.
 				r.record.Status = StatusRetrievalCanceled
 				r.record.FailureStatus = Transient
 				return
 
-			// Whenever the ticker fires.
 			case <-timer.C:
-				// read the current state
 				smap, err := r.tableClient.Read(r.record.IngestionSourceID.String())
 				if err != nil {
-					// Read failure
-					r.record.Status = StatusRetrievalFailed
-					r.record.FailureStatus = Transient
-					r.record.Details = "Failed reading from Status Table: " + err.Error()
-					return
-				}
+					if attempts == 0 {
+						r.record.Status = StatusRetrievalFailed
+						r.record.FailureStatus = Transient
+						r.record.Details = "Failed reading from Status Table: " + err.Error()
+						return
+					}
 
-				// convert the data into a record and send it if the state is final.
-				r.record.FromMap(smap)
-				if r.record.Status.IsFinal() {
-					return
+					attempts = attempts - 1
+					time.Sleep(time.Duration(delay[attempts]+rand.Intn(5)) * time.Second)
+				} else {
+					r.record.FromMap(smap)
+					if r.record.Status.IsFinal() {
+						return
+					}
 				}
 
 				timer.Reset(pollInterval)
@@ -163,10 +163,10 @@ func GetIngestionFailureStatus(err error) (FailureStatusCode, error) {
 }
 
 // IsRetryable indicates whether there's any merit in retying ingestion
-func IsRetryable(err error) (bool, error) {
+func IsRetryable(err error) bool {
 	if s, ok := err.(statusRecord); ok {
-		return s.FailureStatus.IsRetryable(), nil
+		return s.FailureStatus.IsRetryable()
 	}
 
-	return false, fmt.Errorf("Error is not an Ingestion Result")
+	return false
 }

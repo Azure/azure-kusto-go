@@ -49,10 +49,7 @@ func (i StatusCode) IsFinal() bool {
 // IsSuccess returns true if the status code is a final successfull status code
 func (i StatusCode) IsSuccess() bool {
 	switch i {
-	case Succeeded:
-		return true
-
-	case Queued:
+	case Succeeded, Queued:
 		return true
 
 	default:
@@ -77,10 +74,7 @@ const (
 // IsRetryable indicates whether there's any merit in retying ingestion
 func (i FailureStatusCode) IsRetryable() bool {
 	switch i {
-	case Transient:
-		return true
-
-	case Exhausted:
+	case Transient, Exhausted:
 		return true
 
 	default:
@@ -90,7 +84,7 @@ func (i FailureStatusCode) IsRetryable() bool {
 
 // statusRecord is a record containing information regarding the status of an ingation command
 type statusRecord struct {
-	// Status - The ingestion status returned from the service. Status remains 'Pending' during the ingestion process and
+	// Status is The ingestion status returned from the service. Status remains 'Pending' during the ingestion process and
 	// is updated by the service once the ingestion completes. When <see cref="IngestionReportMethod"/> is set to 'Queue', the ingestion status
 	// will always be 'Queued' and the caller needs to query the reports queues for ingestion status, as configured. To query statuses that were
 	// reported to queue, see: <see href="https://docs.microsoft.com/en-us/azure/kusto/api/netfx/kusto-ingest-client-status#ingestion-status-in-azure-queue"/>.
@@ -98,56 +92,59 @@ type statusRecord struct {
 	// <see cref="IKustoIngestionResult.GetIngestionStatusCollection"/> to retrieve the most recent ingestion status.
 	Status StatusCode
 
-	// IngestionSourceID - A unique identifier representing the ingested source. It can be supplied during the ingestion execution.
+	// IngestionSourceID is a unique identifier representing the ingested source. It can be supplied during the ingestion execution.
 	IngestionSourceID uuid.UUID
 
-	// The URI of the blob, potentially including the secret needed to access
+	// IngestionSourcePath is the URI of the blob, potentially including the secret needed to access
 	// the blob. This can be a filesystem URI (on-premises deployments only),
-	// or an Azure Blob Storage URI (including a SAS key or a semicolon followed
-	// by the account key).
+	// or an Azure Blob Storage URI (including a SAS key or a semicolon followed by the account key).
 	IngestionSourcePath string
 
-	// Database - The name of the database holding the target table.
+	// Database is the name of the database holding the target table.
 	Database string
 
-	// Table - The name of the target table into which the data will be ingested.
+	// Table is the name of the target table into which the data will be ingested.
 	Table string
 
-	// UpdatedOn - The last updated time of the ingestion status.
+	// UpdatedOn is the last updated time of the ingestion status.
 	UpdatedOn time.Time
 
-	// OperationID - The ingestion's operation ID.
+	// OperationID is the ingestion's operation ID.
 	OperationID uuid.UUID
 
-	// ActivityID - The ingestion's activity ID.
+	// ActivityID is the ingestion's activity ID.
 	ActivityID uuid.UUID
 
 	// ErrorCode In case of a failure, indicates the failure's error code.
-	// TODO [Yochai, July 2020] make this into a const list
 	ErrorCode string
 
 	// FailureStatus - In case of a failure, indicates the failure's status.
 	FailureStatus FailureStatusCode
 
-	// Details - In case of a failure, indicates the failure's details.
+	// Details is a human readable description of the error added in case of a failure.
 	Details string
 
-	// OriginatesFromUpdatePolicy - In case of a failure, indicates whether or not the failure originated from an Update Policy.
+	// OriginatesFromUpdatePolicy indicates whether or not the failure originated from an Update Policy, in case of a failure.
 	OriginatesFromUpdatePolicy bool
 }
 
-// newStatusRecord creates a new record initialized with defaults and user provided data.
+const (
+	undefinedString = "Undefined"
+	unknownString   = "Unknown"
+)
+
+// newStatusRecord creates a new record initialized with defaults.
 func newStatusRecord() statusRecord {
 	rec := statusRecord{
 		Status:                     Failed,
 		IngestionSourceID:          uuid.Nil,
-		IngestionSourcePath:        "Undefined",
-		Database:                   "Undefined",
-		Table:                      "Undefined",
+		IngestionSourcePath:        undefinedString,
+		Database:                   undefinedString,
+		Table:                      undefinedString,
 		UpdatedOn:                  time.Now(),
 		OperationID:                uuid.Nil,
 		ActivityID:                 uuid.Nil,
-		ErrorCode:                  "Unknown",
+		ErrorCode:                  unknownString,
 		FailureStatus:              Unknown,
 		Details:                    "",
 		OriginatesFromUpdatePolicy: false,
@@ -163,7 +160,7 @@ func (r *statusRecord) FromProps(props properties.All) {
 	r.Table = props.Ingestion.TableName
 	r.UpdatedOn = time.Now()
 
-	if props.Ingestion.BlobPath != "" && r.IngestionSourcePath == "Undefined" {
+	if props.Ingestion.BlobPath != "" && r.IngestionSourcePath == undefinedString {
 		r.IngestionSourcePath = props.Ingestion.BlobPath
 	}
 }

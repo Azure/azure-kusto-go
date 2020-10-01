@@ -81,8 +81,7 @@ type queryFunc func(ctx context.Context, db string, query kusto.Stmt, options ..
 type mgmtFunc func(ctx context.Context, db string, query kusto.Stmt, options ...kusto.MgmtOption) (*kusto.RowIterator, error)
 
 func TestQueries(t *testing.T) {
-	testConfig, err := NewConfig()
-	if err != nil || testing.Short() {
+	if skipETOE || testing.Short() {
 		t.Skipf("end to end tests disabled: missing config.json file in etoe directory")
 	}
 
@@ -302,8 +301,7 @@ func TestQueries(t *testing.T) {
 func TestFileIngestion(t *testing.T) {
 	t.Parallel()
 
-	testConfig, err := NewConfig()
-	if err != nil || testing.Short() {
+	if skipETOE || testing.Short() {
 		t.Skipf("end to end tests disabled: missing config.json file in etoe directory")
 	}
 
@@ -493,8 +491,7 @@ func TestFileIngestion(t *testing.T) {
 }
 
 func TestReaderIngestion(t *testing.T) {
-	testConfig, err := NewConfig()
-	if err != nil || testing.Short() {
+	if skipETOE || testing.Short() {
 		t.SkipNow()
 	}
 
@@ -682,8 +679,7 @@ func TestReaderIngestion(t *testing.T) {
 func TestStreamingIngestion(t *testing.T) {
 	t.Parallel()
 
-	testConfig, err := NewConfig()
-	if err != nil || testing.Short() {
+	if skipETOE || testing.Short() {
 		t.SkipNow()
 	}
 	ctx, cancel := context.WithCancel(context.Background())

@@ -38,8 +38,6 @@ func (c *Config) validate() error {
 }
 
 var (
-	// has init occured
-	wasInit bool = false
 	// skipETOE will be set if the ./config.json file does not exist to let us suppress these tests.
 	skipETOE bool = true
 	// testConfig is the configuration file that we read in via init().
@@ -47,17 +45,20 @@ var (
 )
 
 // initEnv will read in our config file and if it can't be read, will set skipETOE so the tests will be suppressed.
-func initEnv() error {
+func init() {
 	_, filename, _, ok := runtime.Caller(0)
 	if !ok {
-		return fmt.Errorf("Failed calling runtime.Claller()")
+		panic("Failed calling runtime.Caller()")
 	}
 
 	p := filepath.Join(filepath.Dir(filename), "config.json")
-
 	b, err := ioutil.ReadFile(p)
 
-	if err != nil {
+	if err == nil {
+		if err := json.Unmarshal(b, &testConfig); err != nil {
+			panic(fmt.Sprintf("Failed reading test settings from '%s'", p))
+		}
+	} else {
 		// if couldn't find a config file, we try to read them from env
 		testConfig = Config{
 			Endpoint:     os.Getenv("ENGINE_CONNECTION_STRING"),
@@ -68,22 +69,20 @@ func initEnv() error {
 		}
 
 		if testConfig.Endpoint == "" {
-			return fmt.Errorf("Missing ENGINE_CONNECTION_STRING environment variable")
+			fmt.Println("Skipping E2E Tests - No json config and no test environment")
+			return
 		}
-
-	} else if err := json.Unmarshal(b, &testConfig); err != nil {
-		return fmt.Errorf("Failed reading test settings from '%s'", p)
 	}
 
 	if err := testConfig.validate(); err != nil {
-		return err
+		panic(err)
 	}
 
 	if testConfig.ClientID == "" {
 		azAuthorizer, err := auth.NewAuthorizerFromCLIWithResource(testConfig.Endpoint)
 		if err != nil {
 			fmt.Println("Failed to acquire auth token from az-cli" + err.Error())
-			return err
+			panic(err)
 		}
 
 		testConfig.Authorizer = kusto.Authorization{Authorizer: azAuthorizer}
@@ -91,26 +90,5 @@ func initEnv() error {
 		testConfig.Authorizer = kusto.Authorization{Config: auth.NewClientCredentialsConfig(testConfig.ClientID, testConfig.ClientSecret, testConfig.TenantID)}
 	}
 
-	return nil
-}
-
-// NewConfig returns e2e environent configuration data
-func NewConfig() (*Config, error) {
-	if !wasInit {
-		err := initEnv()
-		if err != nil {
-			fmt.Println("Failed initializing E2E environment")
-			fmt.Println(err)
-		} else {
-			skipETOE = false
-		}
-
-		wasInit = true
-	}
-
-	if skipETOE {
-		return nil, fmt.Errorf("E2E environment is not set")
-	}
-
-	return &testConfig, nil
+	skipETOE = false
 }
