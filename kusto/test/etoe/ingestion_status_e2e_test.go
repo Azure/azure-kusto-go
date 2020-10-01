@@ -23,6 +23,7 @@ const (
 func init() {
 	if skipETOE {
 		fmt.Println("end to end tests disabled: missing config.json file in etoe directory and test environment not set")
+		return
 	}
 
 	ctx, cancel := context.WithTimeout(context.Background(), 1*time.Minute)
@@ -56,6 +57,9 @@ func init() {
 }
 
 func TestIgestionFromFileWithStatusReportingQueued(t *testing.T) {
+	if skipETOE {
+		t.Skipf("end to end tests disabled: missing config.json file in etoe directory")
+	}
 	ctx, cancel := context.WithTimeout(context.Background(), 3*time.Minute)
 	defer cancel()
 
@@ -94,6 +98,10 @@ func TestIgestionFromFileWithStatusReportingQueued(t *testing.T) {
 }
 
 func TestIgestionFromReaderWithStatusReportingQueued(t *testing.T) {
+	if skipETOE {
+		t.Skipf("end to end tests disabled: missing config.json file in etoe directory")
+	}
+
 	ctx, cancel := context.WithTimeout(context.Background(), 3*time.Minute)
 	defer cancel()
 
@@ -139,6 +147,10 @@ func TestIgestionFromReaderWithStatusReportingQueued(t *testing.T) {
 }
 
 func TestIgestionFromFileWithoutStatusReporting(t *testing.T) {
+	if skipETOE {
+		t.Skipf("end to end tests disabled: missing config.json file in etoe directory")
+	}
+
 	ctx, cancel := context.WithTimeout(context.Background(), 1*time.Minute)
 	defer cancel()
 
@@ -164,6 +176,10 @@ func TestIgestionFromFileWithoutStatusReporting(t *testing.T) {
 }
 
 func TestIgestionFromReaderWithoutStatusReporting(t *testing.T) {
+	if skipETOE {
+		t.Skipf("end to end tests disabled: missing config.json file in etoe directory")
+	}
+
 	ctx, cancel := context.WithTimeout(context.Background(), 1*time.Minute)
 	defer cancel()
 
@@ -200,6 +216,10 @@ func TestIgestionFromReaderWithoutStatusReporting(t *testing.T) {
 }
 
 func TestIgestionFromFileWithClientFailure(t *testing.T) {
+	if skipETOE {
+		t.Skipf("end to end tests disabled: missing config.json file in etoe directory")
+	}
+
 	ctx, cancel := context.WithTimeout(context.Background(), 1*time.Minute)
 	defer cancel()
 
@@ -227,6 +247,10 @@ func TestIgestionFromFileWithClientFailure(t *testing.T) {
 }
 
 func TestIgestionFromReaderWithClientFailure(t *testing.T) {
+	if skipETOE {
+		t.Skipf("end to end tests disabled: missing config.json file in etoe directory")
+	}
+
 	ctx, cancel := context.WithTimeout(context.Background(), 1*time.Minute)
 	defer cancel()
 
@@ -258,6 +282,10 @@ func TestIgestionFromReaderWithClientFailure(t *testing.T) {
 }
 
 func TestIgestionFromFileWithStatusReporting(t *testing.T) {
+	if skipETOE {
+		t.Skipf("end to end tests disabled: missing config.json file in etoe directory")
+	}
+
 	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Minute)
 	defer cancel()
 
@@ -283,6 +311,10 @@ func TestIgestionFromFileWithStatusReporting(t *testing.T) {
 }
 
 func TestIgestionFromReaderWithStatusReporting(t *testing.T) {
+	if skipETOE {
+		t.Skipf("end to end tests disabled: missing config.json file in etoe directory")
+	}
+
 	ctx, cancel := context.WithTimeout(context.Background(), 1*time.Minute)
 	defer cancel()
 
