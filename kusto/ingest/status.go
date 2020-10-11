@@ -167,41 +167,25 @@ func (r *statusRecord) FromProps(props properties.All) {
 
 // FromMap converts an ingestion status record to a key value map.
 func (r *statusRecord) FromMap(data map[string]interface{}) {
-
-	var strStatus string
-	safeSetString(data, "Status", &strStatus)
+	strStatus := safeGetString(data, "Status")
 	if len(strStatus) > 0 {
 		r.Status = StatusCode(strStatus)
 	}
 
-	safeSetString(data, "FailureStatus", &strStatus)
+	strStatus = safeGetString(data, "FailureStatus")
 	if len(strStatus) > 0 {
 		r.FailureStatus = FailureStatusCode(strStatus)
 	}
 
-	safeSetString(data, "IngestionSourcePath", &r.IngestionSourcePath)
-	safeSetString(data, "Database", &r.Database)
-	safeSetString(data, "Table", &r.Table)
-	safeSetString(data, "ErrorCode", &r.ErrorCode)
-	safeSetString(data, "Details", &r.Details)
+	r.IngestionSourcePath = safeGetString(data, "IngestionSourcePath")
+	r.Database = safeGetString(data, "Database")
+	r.Table = safeGetString(data, "Table")
+	r.ErrorCode = safeGetString(data, "ErrorCode")
+	r.Details = safeGetString(data, "Details")
 
-	if data["IngestionSourceId"] != nil {
-		if uid, err := getGoogleUUIDFromInterface(data["IngestionSourceId"]); err == nil {
-			r.IngestionSourceID = uid
-		}
-	}
-
-	if data["OperationId"] != nil {
-		if uid, err := getGoogleUUIDFromInterface(data["OperationId"]); err == nil {
-			r.OperationID = uid
-		}
-	}
-
-	if data["ActivityId"] != nil {
-		if uid, err := getGoogleUUIDFromInterface(data["ActivityId"]); err == nil {
-			r.ActivityID = uid
-		}
-	}
+	r.IngestionSourceID = getGoogleUUIDFromInterface(data, "IngestionSourceId")
+	r.OperationID = getGoogleUUIDFromInterface(data, "OperationId")
+	r.ActivityID = getGoogleUUIDFromInterface(data, "ActivityId")
 
 	if data["UpdatedOn"] != nil {
 		if t, err := getTimeFromInterface(data["UpdatedOn"]); err == nil {
@@ -268,31 +252,44 @@ func getTimeFromInterface(x interface{}) (time.Time, error) {
 	}
 }
 
-func getGoogleUUIDFromInterface(x interface{}) (uuid.UUID, error) {
-	switch x.(type) {
-	case string:
-		return uuid.Parse(x.(string))
+func getGoogleUUIDFromInterface(data map[string]interface{}, key string) uuid.UUID {
+	x := data[key]
 
+	if x == nil {
+		return uuid.Nil
+	}
+
+	switch x.(type) {
 	case uuid.UUID:
-		return x.(uuid.UUID), nil
+		return x.(uuid.UUID)
+
+	case string:
+		uid, err := uuid.Parse(x.(string))
+		if err != nil {
+			return uuid.Nil
+		}
+
+		return uid
 
 	case storageuid.UUID:
 		uid, err := uuid.ParseBytes(x.(storageuid.UUID).Bytes())
 		if err != nil {
-			return uuid.Nil, err
+			return uuid.Nil
 		}
 
-		return uid, err
+		return uid
 
 	default:
-		return uuid.Nil, fmt.Errorf("getGoogleUUIDFromInterface: Unexpected format %T", x)
+		return uuid.Nil
 	}
 }
 
-func safeSetString(data map[string]interface{}, key string, target *string) {
+func safeGetString(data map[string]interface{}, key string) string {
 	if v := data[key]; v != nil {
 		if s, ok := v.(string); ok {
-			*target = s
+			return s
 		}
 	}
+
+	return ""
 }

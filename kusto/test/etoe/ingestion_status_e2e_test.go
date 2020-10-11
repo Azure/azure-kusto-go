@@ -60,6 +60,7 @@ func TestIgestionFromFileWithStatusReportingQueued(t *testing.T) {
 	if skipETOE {
 		t.Skipf("end to end tests disabled: missing config.json file in etoe directory")
 	}
+
 	ctx, cancel := context.WithTimeout(context.Background(), 3*time.Minute)
 	defer cancel()
 
