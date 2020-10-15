@@ -16,6 +16,7 @@ import (
 	"github.com/Azure/azure-kusto-go/kusto/ingest/internal/filesystem"
 	"github.com/Azure/azure-kusto-go/kusto/ingest/internal/properties"
 	"github.com/Azure/azure-kusto-go/kusto/ingest/internal/resources"
+	"github.com/google/uuid"
 )
 
 var (
@@ -252,6 +253,19 @@ func IfNotExists(ingestByTag string) FileOption {
 	)
 }
 
+// ReportResultToTable option requests that the ingestion status will be tracked in an Azure table.
+// Note using Table status reporting is not recommended for high capacity ingestions, as it could slow down the ingestion.
+// In such cases, it's recommended to enable it temporarily for debugging failed ingestions.
+func ReportResultToTable() FileOption {
+	return propertyOption(
+		func(p *properties.All) error {
+			p.Ingestion.ReportLevel = properties.FailureAndSuccess
+			p.Ingestion.ReportMethod = properties.ReportStatusToTable
+			return nil
+		},
+	)
+}
+
 // ValidationOption is an an option for validating the ingestion input data.
 // These are defined as constants within this package.
 type ValidationOption int8
@@ -320,72 +334,105 @@ type mapEntry struct {
 	Kind string
 }
 
-// FromFile allows uploading a data file for Kusto from either a local path or a blobstore URI path.
-// This method is thread-safe.
-func (i *Ingestion) FromFile(ctx context.Context, fPath string, options ...FileOption) error {
-	manager, err := getManager(i.client)
-	if err != nil {
-		return err
-	}
+func (i *Ingestion) prepForIngestion(ctx context.Context, options []FileOption) (*Result, properties.All, error) {
+	result := newResult()
 
-	auth, err := manager.AuthContext(ctx)
+	auth, err := i.mgr.AuthContext(ctx)
 	if err != nil {
-		return err
+		return nil, properties.All{}, err
 	}
 
 	props := i.newProp(auth)
 	for _, o := range options {
 		if propOpt, ok := o.(propertyOption); ok {
 			if err := propOpt(&props); err != nil {
-				return err
+				return nil, properties.All{}, err
 			}
 		}
 	}
 
+	if props.Ingestion.ReportLevel != properties.None {
+		if props.Source.ID == uuid.Nil {
+			props.Source.ID = uuid.New()
+		}
+
+		switch props.Ingestion.ReportMethod {
+		case properties.ReportStatusToTable, properties.ReportStatusToQueueAndTable:
+			resources, err := i.mgr.Resources()
+			if err != nil {
+				return nil, properties.All{}, err
+			}
+
+			if len(resources.Tables) == 0 {
+				return nil, properties.All{}, fmt.Errorf("User requested reporting status to table, yet status table resource URI is not found")
+			}
+
+			props.Ingestion.TableEntryRef.TableConnectionString = resources.Tables[0].URL().String()
+			props.Ingestion.TableEntryRef.PartitionKey = props.Source.ID.String()
+			props.Ingestion.TableEntryRef.RowKey = uuid.Nil.String()
+			break
+		}
+	}
+
+	result.putProps(props)
+	return result, props, nil
+}
+
+// FromFile allows uploading a data file for Kusto from either a local path or a blobstore URI path.
+// This method is thread-safe.
+func (i *Ingestion) FromFile(ctx context.Context, fPath string, options ...FileOption) (*Result, error) {
+	result, props, err := i.prepForIngestion(ctx, options)
+	if err != nil {
+		return nil, err
+	}
+
+	result.record.IngestionSourcePath = fPath
+
 	local, err := filesystem.IsLocalPath(fPath)
 	if err != nil {
-		return err
+		return nil, err
 	}
 
 	if local {
-		return i.fs.Local(ctx, fPath, props)
+		err = i.fs.Local(ctx, fPath, props)
+	} else {
+
+		err = i.fs.Blob(ctx, fPath, 0, props)
 	}
 
-	return i.fs.Blob(ctx, fPath, 0, props)
+	if err != nil {
+		return nil, err
+	}
+
+	result.putQueued(i.mgr)
+	return result, nil
 }
 
 // FromReader allows uploading a data file for Kusto from an io.Reader. The content is uploaded to Blobstore and
 // ingested after all data in the reader is processed. Content should not use compression as the content will be
 // compressed with gzip. This method is thread-safe.
-func (i *Ingestion) FromReader(ctx context.Context, reader io.Reader, options ...FileOption) error {
-	manager, err := getManager(i.client)
+func (i *Ingestion) FromReader(ctx context.Context, reader io.Reader, options ...FileOption) (*Result, error) {
+	result, props, err := i.prepForIngestion(ctx, options)
 	if err != nil {
-		return err
-	}
-
-	auth, err := manager.AuthContext(ctx)
-	if err != nil {
-		return err
-	}
-
-	props := i.newProp(auth)
-	for _, o := range options {
-		if propOpt, ok := o.(propertyOption); ok {
-			if err := propOpt(&props); err != nil {
-				return err
-			}
-		}
+		return nil, err
 	}
 
 	if props.Ingestion.Additional.Format == DFUnknown {
-		return fmt.Errorf("must provide option FileFormat() when using FromReader()")
+		return nil, fmt.Errorf("must provide option FileFormat() when using FromReader()")
 	}
 
 	if props.Source.DeleteLocalSource {
-		return fmt.Errorf("cannot use DeleteLocalSource() with FromReader()")
+		return nil, fmt.Errorf("cannot use DeleteLocalSource() with FromReader()")
 	}
 
-	return i.fs.Reader(ctx, reader, props)
+	path, err := i.fs.Reader(ctx, reader, props)
+	if err != nil {
+		return nil, err
+	}
+
+	result.record.IngestionSourcePath = path
+	result.putQueued(i.mgr)
+	return result, nil
 }
 
 var (

@@ -41,7 +41,8 @@ func ExampleIngestion_FromFile() {
 	defer cancel()
 
 	// Upload our file. When completed, delete the file on local storage we are uploading.
-	if err := ingestor.FromFile(ctx, "/path/to/file", ingest.DeleteSource()); err != nil {
-		// Do something
+	_, err = ingestor.FromFile(ctx, "/path/to/file", ingest.DeleteSource())
+	if err != nil {
+		// The ingestion command failed to be sent, Do something
 	}
 }

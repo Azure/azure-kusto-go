@@ -201,6 +201,8 @@ type Ingestion struct {
 	Queues []*URI
 	// Containers has URIs for blob resources.
 	Containers []*URI
+	// Tables contains URIs for table resources.
+	Tables []*URI
 }
 
 var errDoNotCare = errors.New("don't care about this")
@@ -216,6 +218,8 @@ func (i *Ingestion) importRec(rec ingestResc) error {
 		i.Containers = append(i.Containers, u)
 	case "SecuredReadyForAggregationQueue":
 		i.Queues = append(i.Queues, u)
+	case "IngestionsStatusTable":
+		i.Tables = append(i.Tables, u)
 	default:
 		return errDoNotCare
 	}

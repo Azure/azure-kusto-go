@@ -107,24 +107,25 @@ func (i *Ingestion) Local(ctx context.Context, from string, props properties.All
 }
 
 // Reader uploads a file via an io.Reader.
-func (i *Ingestion) Reader(ctx context.Context, reader io.Reader, props properties.All) error {
+// If the function succeeds, it returns the path of the created blob.
+func (i *Ingestion) Reader(ctx context.Context, reader io.Reader, props properties.All) (string, error) {
 	to, err := i.upstreamContainer()
 	if err != nil {
-		return err
+		return "", err
 	}
 
 	resources, err := i.mgr.Resources()
 	if err != nil {
-		return err
+		return "", err
 	}
 
 	// We want to check the queue size here so so we don't upload a file and then find we don't have a Kusto queue to stick
 	// it in. If we don't have a container, that is handled by containerQueue().
 	if len(resources.Queues) == 0 {
-		return errors.ES(errors.OpFileIngest, errors.KBlobstore, "no Kusto queue resources are defined, there is no queue to upload to").SetNoRetry()
+		return "", errors.ES(errors.OpFileIngest, errors.KBlobstore, "no Kusto queue resources are defined, there is no queue to upload to").SetNoRetry()
 	}
 
-	blobName := fmt.Sprintf("%s_%s_%s_%s.gz", filepath.Base(uuid.New().String()), nower(), i.db, i.table)
+	blobName := fmt.Sprintf("%s_%s_%s_%s.gz", i.db, i.table, nower(), filepath.Base(uuid.New().String()))
 
 	// Here's how to upload a blob.
 	blobURL := to.NewBlockBlobURL(blobName)
@@ -140,17 +141,17 @@ func (i *Ingestion) Reader(ctx context.Context, reader io.Reader, props properti
 	)
 
 	if err != nil {
-		return errors.ES(errors.OpFileIngest, errors.KBlobstore, "problem uploading to Blob Storage: %s", err)
+		return blobName, errors.ES(errors.OpFileIngest, errors.KBlobstore, "problem uploading to Blob Storage: %s", err)
 	}
 
 	// We always want to delete the blob we create when we ingest from a local file.
 	props.Ingestion.RetainBlobOnSuccess = false
 
 	if err := i.Blob(ctx, blobURL.String(), gstream.Size(), props); err != nil {
-		return err
+		return blobName, err
 	}
 
-	return nil
+	return blobName, nil
 }
 
 // Blob ingests a file from Azure Blob Storage into Kusto.
@@ -244,9 +245,9 @@ var nower = time.Now
 // error if there was one.
 func (i *Ingestion) localToBlob(ctx context.Context, from string, to azblob.ContainerURL, props *properties.All) (azblob.BlockBlobURL, int64, error) {
 	compression := CompressionDiscovery(from)
-	blobName := fmt.Sprintf("%s_%s_%s_%s", filepath.Base(from), nower(), i.db, i.table)
+	blobName := fmt.Sprintf("%s_%s_%s_%s", i.db, i.table, nower(), filepath.Base(from))
 	if compression == properties.CTNone {
-		blobName = from + ".gz"
+		blobName = blobName + ".gz"
 	}
 
 	// Here's how to upload a blob.
