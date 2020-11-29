@@ -6,7 +6,6 @@ import (
 
 	"github.com/Azure/azure-kusto-go/kusto"
 	"github.com/Azure/azure-kusto-go/kusto/ingest"
-
 	"github.com/Azure/go-autorest/autorest/azure/auth"
 )
 
@@ -40,9 +39,29 @@ func ExampleIngestion_FromFile() {
 	ctx, cancel := context.WithTimeout(context.Background(), 10*time.Minute)
 	defer cancel()
 
-	// Upload our file. When completed, delete the file on local storage we are uploading.
+	// Upload our file WITHOUT status reporting.
+	// When completed, delete the file on local storage we are uploading.
 	_, err = ingestor.FromFile(ctx, "/path/to/file", ingest.DeleteSource())
 	if err != nil {
 		// The ingestion command failed to be sent, Do something
+	}
+
+	// Upload our file WITH status reporting.
+	// When completed, delete the file on local storage we are uploading.
+	status, err := ingestor.FromFile(ctx, "/path/to/file", ingest.DeleteSource(), ingest.ReportResultToTable())
+	if err != nil {
+		// The ingestion command failed to be sent, Do something
+	}
+
+	err = <-status.Wait(ctx)
+	if err != nil {
+		// the operation complete with an error
+		if ingest.IsRetryable(err) {
+			// Handle reties
+		} else {
+			// inspect the failure
+			// statusCode, _ := ingest.GetIngestionStatus(err)
+			// failureStatus, _ := ingest.GetIngestionFailureStatus(err)
+		}
 	}
 }
