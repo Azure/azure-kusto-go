@@ -107,7 +107,7 @@ if err != nil {
 
 ### Ingestion
 
-The **ingest/** package provides acces to Kusto's ingestion service for importing data into Kusto. This requires
+The **ingest/** package provides access to Kusto's ingestion service for importing data into Kusto. This requires
 some prerequisite knowledge of acceptable data formats, mapping references, ...
 
 That documentation can be found [here](https://docs.microsoft.com/en-us/azure/kusto/management/data-ingestion/)
@@ -135,7 +135,7 @@ if err != nil {
 Ingesting a local file requires simply passing the path to the file to be ingested:
 
 ```go
-if err := in.FromFile(ctx, "/path/to/a/local/file"); err != nil {
+if _, err := in.FromFile(ctx, "/path/to/a/local/file"); err != nil {
 	panic("add error handling")
 }
 ```
@@ -148,7 +148,7 @@ The file will not be deleted after upload (there is an option that will allow th
 This package will also accept ingestion from an Azure Blob Storage file:
 
 ```go
-if err := in.FromFile(ctx, "https://myaccount.blob.core.windows.net/$root/myblob"); err != nil {
+if _, err := in.FromFile(ctx, "https://myaccount.blob.core.windows.net/$root/myblob"); err != nil {
 	panic("add error handling")
 }
 ```
@@ -173,7 +173,7 @@ go func() {
 	}
 }()
 
-if err := in.FromReader(ctx, r); err != nil {
+if _, err := in.FromReader(ctx, r); err != nil {
 	panic("add error handling")
 }
 ```
@@ -183,7 +183,7 @@ return io.EOF until the io.Writer is closed (such as io.Pipe).
 
 #### From a Stream
 
-Instestion from a stream commits blocks of fully formed data encodes (JSON, AVRO, ...) into Kusto:
+Ingestion from a stream commits blocks of fully formed data encodes (JSON, AVRO, ...) into Kusto:
 
 ```go
 if err := in.Stream(ctx, jsonEncodedData, ingest.JSON, "mappingName"); err != nil {
