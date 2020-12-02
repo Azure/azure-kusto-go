@@ -18,7 +18,7 @@ Ingestion from a local file
 
 Ingesting a local file requires simply passing the path to the file to be ingested:
 
-	if err := in.FromFile(ctx, "/path/to/a/local/file"); err != nil {
+	if _, err := in.FromFile(ctx, "/path/to/a/local/file"); err != nil {
 		panic("add error handling")
 	}
 
@@ -30,7 +30,7 @@ Ingestion from an Azure Blob Storage file
 
 This package will also accept ingestion from an Azure Blob Storage file:
 
-	if err := in.FromFile(ctx, "https://myaccount.blob.core.windows.net/$root/myblob"); err != nil {
+	if _, err := in.FromFile(ctx, "https://myaccount.blob.core.windows.net/$root/myblob"); err != nil {
 		panic("add error handling")
 	}
 
@@ -53,7 +53,7 @@ data via an io.Reader.
 		}
 	}()
 
-	if err := in.FromReader(ctx, r); err != nil {
+	if _, err := in.FromReader(ctx, r); err != nil {
 		panic("add error handling")
 	}
 
@@ -66,6 +66,33 @@ Instestion from a stream commits blocks of fully formed data encodes (JSON, AVRO
 
 	if err := in.Stream(ctx , jsonEncodedData, ingest.JSON, "mappingName"); err != nil {
 		panic("add error handling")
+	}
+
+Ingestion with Status Reporting 
+
+You can use Kusto Go SDK to get table-based status reporting of ingestion operations.
+Ingestion commands run using FromFile() and FromReader() return an error and a channel that can be waited upon for a final status.
+If the error is not nil, the operation has failed locally.
+If the error is nil and Table Status Reporting option was used, the SDK user can wait on the channel for a success (nil) or failure (Error) status.
+
+Note!
+This feature is not suitable for users running ingestion at high rates, and may slow down the ingestion operation.
+
+	status, err := ingestor.FromFile(ctx, "/path/to/file", ingest.ReportResultToTable())
+	if err != nil {
+		// The ingestion command failed to be sent, Do something
+	}
+
+	err = <-status.Wait(ctx)
+	if err != nil {
+		// the operation complete with an error
+		if ingest.IsRetryable(err) {
+			// Handle retries
+		} else {
+			// inspect the failure
+			// statusCode, _ := ingest.GetIngestionStatus(err)
+			// failureStatus, _ := ingest.GetIngestionFailureStatus(err)
+		}
 	}
 */
 package ingest
