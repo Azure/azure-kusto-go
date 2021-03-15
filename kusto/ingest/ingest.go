@@ -6,10 +6,6 @@ import (
 	"context"
 	"encoding/json"
 	"fmt"
-	"io"
-	"sync"
-	"sync/atomic"
-
 	"github.com/Azure/azure-kusto-go/kusto"
 	"github.com/Azure/azure-kusto-go/kusto/data/errors"
 	"github.com/Azure/azure-kusto-go/kusto/ingest/internal/conn"
@@ -17,6 +13,12 @@ import (
 	"github.com/Azure/azure-kusto-go/kusto/ingest/internal/properties"
 	"github.com/Azure/azure-kusto-go/kusto/ingest/internal/resources"
 	"github.com/google/uuid"
+	"io"
+	"io/ioutil"
+	"os"
+	"sync"
+	"sync/atomic"
+	"time"
 )
 
 var (
@@ -396,7 +398,6 @@ func (i *Ingestion) FromFile(ctx context.Context, fPath string, options ...FileO
 	if local {
 		err = i.fs.Local(ctx, fPath, props)
 	} else {
-
 		err = i.fs.Blob(ctx, fPath, 0, props)
 	}
 
@@ -440,7 +441,87 @@ var (
 	ErrTooLarge = errors.ES(errors.OpIngestStream, errors.KClientArgs, "cannot add data larger than 4MiB")
 )
 
-const mib = 1024 * 1024
+const (
+	MaxRetryCount    = 3
+	mib              = 1024 * 1024
+	MaxStreamingSize = 4 * mib
+)
+
+// FromFile allows uploading a data file for Kusto from either a local path or a blobstore URI path.
+// This method is thread-safe.
+func (i *Ingestion) FromFileManaged(ctx context.Context, fPath string,
+	options ...FileOption) (*Result, error) {
+	result, props, err := i.prepForIngestion(ctx, options)
+	if err != nil {
+		return nil, err
+	}
+
+	result.record.IngestionSourcePath = fPath
+
+	local, err := filesystem.IsLocalPath(fPath)
+	if err != nil {
+		return nil, err
+	}
+
+	skipStreaming := false
+
+	if local {
+		stat, err := os.Stat(fPath)
+		if err != nil {
+			return nil, err
+		}
+		skipStreaming = stat.Size() > MaxStreamingSize
+	}
+
+	if skipStreaming { // In case of blob it's inefficient to use streaming ingest,
+		// so we're defaulting to queued
+		if local {
+			err = i.fs.Local(ctx, fPath, props)
+		} else {
+			err = i.fs.Blob(ctx, fPath, 0, props)
+		}
+		if err != nil {
+			return nil, err
+		}
+		result.putQueued(i.mgr)
+		return result, nil
+	}
+
+	file, err := os.Open(fPath)
+	if err != nil {
+		return nil, err
+	}
+
+	return i.FromReaderManaged(ctx, file, options...)
+}
+
+func (i *Ingestion) FromReaderManaged(ctx context.Context, reader io.Reader,
+	options ...FileOption) (*Result, error) {
+	result, props, err := i.prepForIngestion(ctx, options)
+	if err != nil {
+		return nil, err
+	}
+
+	bytesRead, err := ioutil.ReadAll(reader)
+	if err != nil {
+		return nil, err
+	}
+
+	for j := 0; j < MaxRetryCount; j++ {
+		err = i.Stream(ctx, bytesRead, props.Ingestion.Additional.Format, props.Ingestion.Additional.IngestionMappingRef)
+		if err == nil {
+			result.record.Status = Succeeded
+			return result, nil
+		}
+		if errors.Retry(err) {
+			time.Sleep(time.Duration(j) * time.Second)
+		} else {
+			break
+		}
+	}
+
+	return i.FromReader(ctx, bytes.NewReader(bytesRead), options...)
+}
 
 // Stream takes a payload that is encoded in format with a server stored mappingName, compresses it and uploads it to Kusto.
 // payload must be a fully formed entry of format and < 4MiB or this will fail. We currently support
@@ -466,7 +547,7 @@ func (i *Ingestion) Stream(ctx context.Context, payload []byte, format DataForma
 	if err := zw.Close(); err != nil {
 		return errors.E(errors.OpIngestStream, errors.KClientArgs, err).SetNoRetry()
 	}
-	if buf.Len() > 4*mib {
+	if buf.Len() > MaxStreamingSize {
 		return ErrTooLarge
 	}
 
