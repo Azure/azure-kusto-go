@@ -1,6 +1,7 @@
 package ingest
 
 import (
+	"bufio"
 	"bytes"
 	"compress/gzip"
 	"context"
@@ -14,7 +15,6 @@ import (
 	"github.com/Azure/azure-kusto-go/kusto/ingest/internal/resources"
 	"github.com/google/uuid"
 	"io"
-	"io/ioutil"
 	"os"
 	"sync"
 	"sync/atomic"
@@ -43,10 +43,6 @@ func getManager(client *kusto.Client) (*resources.Manager, error) {
 		return mgr, nil
 	}
 	return i.(*resources.Manager), nil
-}
-
-type streamer interface {
-	stream(ctx context.Context, format DataFormat, mappingName string) (io.WriteCloser, error)
 }
 
 // Ingestion provides data ingestion from external sources into Kusto.
@@ -331,11 +327,6 @@ func FileFormat(et DataFormat) FileOption {
 	)
 }
 
-type mapEntry struct {
-	Name string
-	Kind string
-}
-
 func (i *Ingestion) prepForIngestion(ctx context.Context, options []FileOption) (*Result, properties.All, error) {
 	result := newResult()
 
@@ -442,7 +433,7 @@ var (
 )
 
 const (
-	MaxRetryCount    = 3
+	maxRetryCount    = 3
 	mib              = 1024 * 1024
 	MaxStreamingSize = 4 * mib
 )
@@ -451,7 +442,7 @@ const (
 // This method is thread-safe.
 func (i *Ingestion) FromFileManaged(ctx context.Context, fPath string,
 	options ...FileOption) (*Result, error) {
-	result, props, err := i.prepForIngestion(ctx, options)
+	result, _, err := i.prepForIngestion(ctx, options)
 	if err != nil {
 		return nil, err
 	}
@@ -463,7 +454,7 @@ func (i *Ingestion) FromFileManaged(ctx context.Context, fPath string,
 		return nil, err
 	}
 
-	skipStreaming := false
+	skipStreaming := true
 
 	if local {
 		stat, err := os.Stat(fPath)
@@ -475,16 +466,7 @@ func (i *Ingestion) FromFileManaged(ctx context.Context, fPath string,
 
 	if skipStreaming { // In case of blob it's inefficient to use streaming ingest,
 		// so we're defaulting to queued
-		if local {
-			err = i.fs.Local(ctx, fPath, props)
-		} else {
-			err = i.fs.Blob(ctx, fPath, 0, props)
-		}
-		if err != nil {
-			return nil, err
-		}
-		result.putQueued(i.mgr)
-		return result, nil
+		return i.FromFile(ctx, fPath, options...)
 	}
 
 	file, err := os.Open(fPath)
@@ -502,25 +484,40 @@ func (i *Ingestion) FromReaderManaged(ctx context.Context, reader io.Reader,
 		return nil, err
 	}
 
-	bytesRead, err := ioutil.ReadAll(reader)
-	if err != nil {
+	skipStreaming := false
+
+	if props.Ingestion.RawDataSize > MaxStreamingSize {
+		skipStreaming = true
+	}
+
+	bufferedReader := bufio.NewReaderSize(reader, MaxStreamingSize+1)
+	bytesRead, err := bufferedReader.Peek(MaxStreamingSize + 1)
+
+	if err != nil && err != io.EOF { // We expect EOF for readers that are smaller
 		return nil, err
 	}
 
-	for j := 0; j < MaxRetryCount; j++ {
-		err = i.Stream(ctx, bytesRead, props.Ingestion.Additional.Format, props.Ingestion.Additional.IngestionMappingRef)
-		if err == nil {
-			result.record.Status = Succeeded
-			return result, nil
-		}
-		if errors.Retry(err) {
-			time.Sleep(time.Duration(j) * time.Second)
-		} else {
-			break
+	if len(bytesRead) > MaxStreamingSize {
+		skipStreaming = false
+	}
+
+	if !skipStreaming {
+		for j := 0; j < maxRetryCount; j++ {
+			err = i.Stream(ctx, bytesRead, props.Ingestion.Additional.Format, props.Ingestion.Additional.IngestionMappingRef)
+			if err == nil {
+				result.record.Status = Succeeded
+				result.record.WasStreamed = true
+				return result, nil
+			}
+			if errors.ShouldRetry(err) {
+				time.Sleep(time.Duration(j) * time.Second)
+			} else {
+				break
+			}
 		}
 	}
 
-	return i.FromReader(ctx, bytes.NewReader(bytesRead), options...)
+	return i.FromReader(ctx, bufferedReader, options...)
 }
 
 // Stream takes a payload that is encoded in format with a server stored mappingName, compresses it and uploads it to Kusto.

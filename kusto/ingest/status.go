@@ -126,6 +126,9 @@ type statusRecord struct {
 
 	// OriginatesFromUpdatePolicy indicates whether or not the failure originated from an Update Policy, in case of a failure.
 	OriginatesFromUpdatePolicy bool
+
+	// WasStreamed indicates whether the data was ingested using streaming ingestion or queued
+	WasStreamed bool
 }
 
 const (
@@ -148,6 +151,7 @@ func newStatusRecord() statusRecord {
 		FailureStatus:              Unknown,
 		Details:                    "",
 		OriginatesFromUpdatePolicy: false,
+		WasStreamed:                false,
 	}
 
 	return rec
