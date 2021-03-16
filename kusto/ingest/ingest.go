@@ -454,27 +454,24 @@ func (i *Ingestion) FromFileManaged(ctx context.Context, fPath string,
 		return nil, err
 	}
 
-	skipStreaming := true
-
-	if local {
+	if local { // In case of blob it's inefficient to use streaming ingest,
+		// so we're defaulting to queued
 		stat, err := os.Stat(fPath)
 		if err != nil {
 			return nil, err
 		}
-		skipStreaming = stat.Size() > MaxStreamingSize
+
+		if stat.Size() <= MaxStreamingSize {
+			file, err := os.Open(fPath)
+			if err != nil {
+				return nil, err
+			}
+
+			return i.FromReaderManaged(ctx, file, options...)
+		}
 	}
 
-	if skipStreaming { // In case of blob it's inefficient to use streaming ingest,
-		// so we're defaulting to queued
-		return i.FromFile(ctx, fPath, options...)
-	}
-
-	file, err := os.Open(fPath)
-	if err != nil {
-		return nil, err
-	}
-
-	return i.FromReaderManaged(ctx, file, options...)
+	return i.FromFile(ctx, fPath, options...)
 }
 
 func (i *Ingestion) FromReaderManaged(ctx context.Context, reader io.Reader,
@@ -484,10 +481,8 @@ func (i *Ingestion) FromReaderManaged(ctx context.Context, reader io.Reader,
 		return nil, err
 	}
 
-	skipStreaming := false
-
 	if props.Ingestion.RawDataSize > MaxStreamingSize {
-		skipStreaming = true
+		return i.FromReader(ctx, reader, options...)
 	}
 
 	bufferedReader := bufio.NewReaderSize(reader, MaxStreamingSize+1)
@@ -497,11 +492,7 @@ func (i *Ingestion) FromReaderManaged(ctx context.Context, reader io.Reader,
 		return nil, err
 	}
 
-	if len(bytesRead) > MaxStreamingSize {
-		skipStreaming = false
-	}
-
-	if !skipStreaming {
+	if len(bytesRead) <= MaxStreamingSize {
 		for j := 0; j < maxRetryCount; j++ {
 			err = i.Stream(ctx, bytesRead, props.Ingestion.Additional.Format, props.Ingestion.Additional.IngestionMappingRef)
 			if err == nil {
