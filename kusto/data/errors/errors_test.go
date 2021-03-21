@@ -120,7 +120,7 @@ func TestRetry(t *testing.T) {
 	}
 
 	for _, test := range tests {
-		got := ShouldRetry(test.err)
+		got := Retry(test.err)
 
 		if got != test.want {
 			t.Errorf("Test(%s): got %v, want %v", test.desc, got, test.want)

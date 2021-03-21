@@ -7,18 +7,20 @@ import (
 	"context"
 	"encoding/json"
 	"fmt"
+	"io"
+	"os"
+	"sync"
+	"sync/atomic"
+	"time"
+
 	"github.com/Azure/azure-kusto-go/kusto"
 	"github.com/Azure/azure-kusto-go/kusto/data/errors"
 	"github.com/Azure/azure-kusto-go/kusto/ingest/internal/conn"
 	"github.com/Azure/azure-kusto-go/kusto/ingest/internal/filesystem"
 	"github.com/Azure/azure-kusto-go/kusto/ingest/internal/properties"
 	"github.com/Azure/azure-kusto-go/kusto/ingest/internal/resources"
+
 	"github.com/google/uuid"
-	"io"
-	"os"
-	"sync"
-	"sync/atomic"
-	"time"
 )
 
 var (
@@ -500,7 +502,7 @@ func (i *Ingestion) FromReaderManaged(ctx context.Context, reader io.Reader,
 				result.record.WasStreamed = true
 				return result, nil
 			}
-			if errors.ShouldRetry(err) {
+			if errors.Retry(err) {
 				time.Sleep(time.Duration(j) * time.Second)
 			} else {
 				break

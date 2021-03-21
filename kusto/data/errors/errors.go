@@ -103,7 +103,7 @@ func (e *Error) UnmarshalREST() map[string]interface{} {
 	return m
 }
 
-// SetNoRetry sets this error so that ShouldRetry() will always return false.
+// SetNoRetry sets this error so that Retry() will always return false.
 func (e *Error) SetNoRetry() *Error {
 	e.permanent = true
 	return e
@@ -165,9 +165,9 @@ func (e *Error) Error() string {
 	return b.String()
 }
 
-// ShouldRetry determines if the error is transient and the action can be retried or not.
+// Retry determines if the error is transient and the action can be retried or not.
 // Some errors that can be retried, such as a timeout, may never succeed, so avoid infinite retries.
-func ShouldRetry(err error) bool {
+func Retry(err error) bool {
 	var e *Error
 	if errors.As(err, &e) {
 		// e.permanent can be set multiple ways. If it is true, you can never retry.
@@ -189,16 +189,11 @@ func ShouldRetry(err error) bool {
 		}
 
 		if e.inner != nil {
-			return ShouldRetry(e.inner)
+			return Retry(e.inner)
 		}
 		return true
 	}
 	return false
-}
-
-// Deprecated: replaced by ShouldRetry, which is a clearer name
-func Retry(err error) bool {
-	return ShouldRetry(err)
 }
 
 // E constructs an Error. You may pass in an Op, Kind and error.  This will strip a *errors.Error(the error in this package) if you
