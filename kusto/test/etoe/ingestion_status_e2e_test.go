@@ -66,11 +66,13 @@ func TestIgestionFromFileWithStatusReportingQueued(t *testing.T) {
 
 	client, err := kusto.New(testConfig.Endpoint, testConfig.Authorizer)
 	if err != nil {
+		fmt.Printf("error 1\n")
 		panic(err)
 	}
 
 	ingestor, err := ingest.New(client, testConfig.Database, tableName)
 	if err != nil {
+		fmt.Printf("error 2\n")
 		panic(err)
 	}
 
@@ -81,7 +83,10 @@ func TestIgestionFromFileWithStatusReportingQueued(t *testing.T) {
 	for i := 0; i < count; i++ {
 		res, err := ingestor.FromFile(ctx, csvFile, ingest.ReportResultToTable())
 		if err != nil {
+			getwd, err2 := os.Getwd()
+			fmt.Printf("error 3, %s\n", getwd)
 			panic(err)
+			panic(err2)
 		}
 
 		ch[i] = res.Wait(ctx)
