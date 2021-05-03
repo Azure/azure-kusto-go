@@ -126,11 +126,11 @@ type token struct {
 
 // Manager manages Kusto resources.
 type Manager struct {
-	client               mgmter
-	done                 chan struct{}
-	resources            atomic.Value // Stores Ingestion
-	kustoToken           token
-	kustoTokenExpiration time.Time
+	client                    mgmter
+	done                      chan struct{}
+	resources                 atomic.Value // Stores Ingestion
+	kustoToken                token
+	kustoTokenCacheExpiration time.Time
 }
 
 // New is the constructor for Manager.
@@ -140,7 +140,7 @@ func New(client *kusto.Client) (*Manager, error) {
 		return nil, err
 	}
 
-	m.kustoTokenExpiration = time.Now().UTC()
+	m.kustoTokenCacheExpiration = time.Now().UTC()
 	go m.renewResources()
 
 	return m, nil
@@ -167,7 +167,7 @@ func (m *Manager) renewResources() {
 // AuthContext returns a string representing the authorization context. This auth token is a temporary token
 // that can be used to write a message via ingestion.  This is different than the ADAL token.
 func (m *Manager) AuthContext(ctx context.Context) (string, error) {
-	if m.kustoTokenExpiration.After(time.Now().UTC()) {
+	if m.kustoTokenCacheExpiration.After(time.Now().UTC()) {
 		return m.kustoToken.AuthContext, nil
 	}
 
@@ -192,7 +192,7 @@ func (m *Manager) AuthContext(ctx context.Context) (string, error) {
 	}
 
 	m.kustoToken = token
-	m.kustoTokenExpiration = time.Now().UTC().Add(time.Hour)
+	m.kustoTokenCacheExpiration = time.Now().UTC().Add(time.Hour)
 	return token.AuthContext, nil
 }
 
