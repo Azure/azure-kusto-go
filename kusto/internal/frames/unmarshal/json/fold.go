@@ -141,4 +141,3 @@ func simpleLetterEqualFold(s, t []byte) bool {
 	}
 	return true
 }
-

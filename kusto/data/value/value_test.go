@@ -531,7 +531,7 @@ func TestTimespan(t *testing.T) {
 			if strGot != "00:00:00" {
 				t.Errorf("TestTimespan(%s): Marshal(): got %v, want %v", test.desc, strGot, "00:00:00")
 			}
-		}else if removeLeadingZeros(strGot) != removeLeadingZeros(test.i.(string)) {
+		} else if removeLeadingZeros(strGot) != removeLeadingZeros(test.i.(string)) {
 			t.Errorf("TestTimespan(%s): Marshal(): got %v, want %v", test.desc, strGot, test.i)
 		}
 	}

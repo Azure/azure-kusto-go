@@ -141,4 +141,3 @@ func Indent(dst *bytes.Buffer, src []byte, prefix, indent string) error {
 	}
 	return nil
 }
-

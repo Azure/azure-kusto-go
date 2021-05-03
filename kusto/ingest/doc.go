@@ -68,7 +68,7 @@ Instestion from a stream commits blocks of fully formed data encodes (JSON, AVRO
 		panic("add error handling")
 	}
 
-Ingestion with Status Reporting 
+Ingestion with Status Reporting
 
 You can use Kusto Go SDK to get table-based status reporting of ingestion operations.
 Ingestion commands run using FromFile() and FromReader() return an error and a channel that can be waited upon for a final status.
