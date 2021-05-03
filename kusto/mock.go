@@ -5,9 +5,9 @@ import (
 	"io"
 	"reflect"
 
+	"github.com/Azure/azure-kusto-go/kusto/data/errors"
 	"github.com/Azure/azure-kusto-go/kusto/data/table"
 	"github.com/Azure/azure-kusto-go/kusto/data/value"
-	"github.com/Azure/azure-kusto-go/kusto/data/errors"
 )
 
 type columnData struct {

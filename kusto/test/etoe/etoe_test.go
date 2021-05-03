@@ -29,7 +29,7 @@ var (
 		),
 	)
 
-	ingestInlineStmt = kusto.NewStmt(".ingest inline into table AllDataTypes <|1,2.00000000000001,'2020-03-04T14:05:01.3109965Z',1:23:45.6789,{\"moshe\": \"value\"}, 1 ,0.01,asdf,9223372036854775807,74be27de-1e4e-49d9-b579-fe0b331d3642")
+	ingestInlineStmt = kusto.NewStmt(".ingest inline into table AllDataTypes <|1,2.00000000000001,'2020-03-04T14:05:01.3109965Z',1:23:45.6789,{\"moshe\": \"value\"},1,0.01,asdf,9223372036854775807,74be27de-1e4e-49d9-b579-fe0b331d3642")
 	createStmt       = kusto.NewStmt(".create table AllDataTypes (vnum: int, vdec: decimal, vdate: datetime, vspan: timespan, vobj: dynamic, vb: bool, vreal: real, vstr: string, vlong: long, vguid: guid)")
 	dropStmt         = kusto.NewStmt(".drop table AllDataTypes ifexists")
 )

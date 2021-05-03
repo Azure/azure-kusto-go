@@ -1386,4 +1386,3 @@ func cachedTypeFields(t reflect.Type) structFields {
 	f, _ := fieldCache.LoadOrStore(t, typeFields(t))
 	return f.(structFields)
 }
-

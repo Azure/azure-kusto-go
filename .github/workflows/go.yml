@@ -34,4 +34,10 @@ jobs:
     - name: Test
       run: |
         cd kusto
-        go test ./...
+        go test -v ./...
+      env:
+        ENGINE_CONNECTION_STRING: ${{ secrets.ENGINE_CONNECTION_STRING }}
+        APP_ID: ${{ secrets.APP_ID }}
+        APP_KEY: ${{ secrets.APP_KEY }}
+        AUTH_ID: ${{ secrets.AUTH_ID }}
+        TEST_DATABASE: ${{ secrets.TEST_DATABASE }}

@@ -512,4 +512,3 @@ func (dec *Decoder) peek() (byte, error) {
 func (dec *Decoder) InputOffset() int64 {
 	return dec.scanned + int64(dec.scanp)
 }
-
