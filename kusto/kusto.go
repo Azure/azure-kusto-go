@@ -130,9 +130,15 @@ func New(endpoint string, auth Authorization, options ...Option) (*Client, error
 		o(client)
 	}
 
-	if err := auth.Validate(endpoint); err != nil {
+	validationEndpoint := endpoint
+	if strings.Contains(strings.ToLower(endpoint), ".azuresynapse") {
+		validationEndpoint = "https://kusto.kusto.windows.net"
+	}
+
+	if err := auth.Validate(validationEndpoint); err != nil {
 		return nil, err
 	}
+
 	conn, err := newConn(endpoint, auth)
 	if err != nil {
 		return nil, err
