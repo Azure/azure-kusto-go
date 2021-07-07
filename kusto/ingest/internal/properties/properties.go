@@ -288,6 +288,8 @@ type Additional struct {
 	// IngestIfNotExists is a string value that, if specified, prevents ingestion from succeeding if the table already
 	// has data tagged with an ingest-by: tag with the same value. This ensures idempotent data ingestion.
 	IngestIfNotExists string `json:"ingestIfNotExists,omitempty"`
+	// CreationTime is used to override the time considered for retantion policies, which by default is the time of ingestion.
+	CreationTime time.Time `json:"creationTime,omitempty"`
 }
 
 // StatusTableDescription is a reference to the table status entry used for this ingestion command.
