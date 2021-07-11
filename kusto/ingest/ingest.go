@@ -269,10 +269,10 @@ func ReportResultToTable() FileOption {
 
 // SetCreationTime option allows the user to override the data creation time the retention policies are considered against
 // If not set the data creation time is considered to be the time of ingestion
-func SetCreationTime(creationTime time.Time) FileOption {
+func SetCreationTime(t time.Time) FileOption {
 	return propertyOption(
 		func(p *properties.All) error {
-			p.Ingestion.Additional.CreationTime = creationTime
+			p.Ingestion.Additional.CreationTime = t
 			return nil
 		},
 	)
