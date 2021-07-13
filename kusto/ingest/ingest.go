@@ -9,6 +9,7 @@ import (
 	"io"
 	"sync"
 	"sync/atomic"
+	"time"
 
 	"github.com/Azure/azure-kusto-go/kusto"
 	"github.com/Azure/azure-kusto-go/kusto/data/errors"
@@ -261,6 +262,17 @@ func ReportResultToTable() FileOption {
 		func(p *properties.All) error {
 			p.Ingestion.ReportLevel = properties.FailureAndSuccess
 			p.Ingestion.ReportMethod = properties.ReportStatusToTable
+			return nil
+		},
+	)
+}
+
+// SetCreationTime option allows the user to override the data creation time the retention policies are considered against
+// If not set the data creation time is considered to be the time of ingestion
+func SetCreationTime(t time.Time) FileOption {
+	return propertyOption(
+		func(p *properties.All) error {
+			p.Ingestion.Additional.CreationTime = t
 			return nil
 		},
 	)
