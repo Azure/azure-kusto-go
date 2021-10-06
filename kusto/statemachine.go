@@ -7,9 +7,8 @@ import (
 	"context"
 	"sync"
 
-	"github.com/Azure/azure-kusto-go/kusto/data/table"
-
 	"github.com/Azure/azure-kusto-go/kusto/data/errors"
+	"github.com/Azure/azure-kusto-go/kusto/data/table"
 	"github.com/Azure/azure-kusto-go/kusto/internal/frames"
 	v1 "github.com/Azure/azure-kusto-go/kusto/internal/frames/v1"
 	v2 "github.com/Azure/azure-kusto-go/kusto/internal/frames/v2"
@@ -316,11 +315,20 @@ type v1SM struct {
 	columnSetOnce sync.Once
 	ctx           context.Context
 
-	currentFrame frames.Frame
+	currentTable v1.DataTable
+	tables       []v1.DataTable
 
 	receivedDT bool
 
 	wg *sync.WaitGroup
+}
+
+type TableOfContents struct {
+	Ordinal    int64
+	Kind       string
+	Name       string
+	Id         string
+	PrettyName string
 }
 
 func (p *v1SM) start() (stateFn, error) {
@@ -337,26 +345,21 @@ func (p *v1SM) nextFrame() (stateFn, error) {
 		return nil, p.ctx.Err()
 	case fr, ok := <-p.in:
 		if !ok {
-			if !p.receivedDT {
-				return nil, errors.ES(p.op, errors.KInternal, "received a table stream that did not finish before our input channel, this is usally a return size or time limit")
+			if len(p.tables) == 0 {
+				return p.done, nil
 			}
-			p.wg.Wait()
-			return nil, nil
+			if len(p.tables) <= 2 {
+				p.currentTable = p.tables[0]
+			} else {
+				p.currentTable = p.tables[len(p.tables)-1]
+				return p.tableOfContents, nil
+			}
+			return p.dataTable, nil
 		}
-		p.currentFrame = fr
 		switch tbl := fr.(type) {
 		case v1.DataTable:
-			var err error
-			p.columnSetOnce.Do(func() {
-				var cols table.Columns
-				cols, err = tbl.DataTypes.ToColumns()
-				if err != nil {
-					return
-				}
-				p.wg.Add(1)
-				p.iter.inColumns <- send{inColumns: cols, wg: p.wg}
-			})
-			return p.dataTable, err
+			p.tables = append(p.tables, tbl)
+			return p.nextFrame, nil
 		case frames.Error:
 			return nil, tbl
 		default:
@@ -364,17 +367,62 @@ func (p *v1SM) nextFrame() (stateFn, error) {
 		}
 	}
 }
+func (p *v1SM) done() (stateFn, error) {
+	if !p.receivedDT {
+		return nil, errors.ES(p.op, errors.KInternal, "received a table stream that did not finish before our input channel, this is usally a return size or time limit")
+	}
+	p.wg.Wait()
+
+	return nil, nil
+}
+
+func (p *v1SM) tableOfContents() (stateFn, error) {
+	tableOfContents := p.currentTable
+	columns, err := tableOfContents.DataTypes.ToColumns()
+	if err != nil {
+		return nil, err
+	}
+
+	current := TableOfContents{}
+	for _, kustoRow := range tableOfContents.KustoRows {
+		row := table.Row{ColumnTypes: columns, Values: kustoRow, Op: p.op}
+		err := row.ToStruct(&current)
+		if err != nil {
+			return nil, err
+		}
+
+		kind := frames.TableKind(current.Kind)
+		if kind == frames.QueryResult {
+			p.currentTable = p.tables[current.Ordinal]
+			if _, err := p.dataTable(); err != nil {
+				return nil, err
+			}
+		}
+	}
+	return p.done, nil
+}
 
 func (p *v1SM) dataTable() (stateFn, error) {
-	table := p.currentFrame.(v1.DataTable)
+	var err error
+	currentTable := p.currentTable
+
+	p.columnSetOnce.Do(func() {
+		var cols table.Columns
+		cols, err = currentTable.DataTypes.ToColumns()
+		if err != nil {
+			return
+		}
+		p.wg.Add(1)
+		p.iter.inColumns <- send{inColumns: cols, wg: p.wg}
+	})
 
 	p.wg.Add(1)
 	select {
 	case <-p.ctx.Done():
 		return nil, p.ctx.Err()
-	case p.iter.inRows <- send{inRows: table.KustoRows, wg: p.wg}:
+	case p.iter.inRows <- send{inRows: currentTable.KustoRows, wg: p.wg}:
 		p.receivedDT = true
 	}
 
-	return p.nextFrame, nil
+	return p.done, nil
 }
