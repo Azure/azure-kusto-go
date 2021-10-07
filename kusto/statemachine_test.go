@@ -776,6 +776,13 @@ func TestV1SM(t *testing.T) {
 					},
 					KustoRows: []value.Values{
 						{
+							value.Long{Value: 0, Valid: true},
+							value.String{Value: "QueryResult", Valid: true},
+							value.String{Value: "PrimaryResult", Valid: true},
+							value.String{Value: "07dd9603-3e06-4c62-986b-dfc3d586b05a", Valid: true},
+							value.String{Value: "", Valid: true},
+						},
+						{
 							value.Long{Value: 1, Valid: true},
 							value.String{Value: "QueryProperties", Valid: true},
 							value.String{Value: "@ExtendedProperties", Valid: true},
@@ -784,13 +791,6 @@ func TestV1SM(t *testing.T) {
 						},
 						{
 							value.Long{Value: 2, Valid: true},
-							value.String{Value: "QueryResult", Valid: true},
-							value.String{Value: "PrimaryResult", Valid: true},
-							value.String{Value: "07dd9603-3e06-4c62-986b-dfc3d586b05a", Valid: true},
-							value.String{Value: "", Valid: true},
-						},
-						{
-							value.Long{Value: 0, Valid: true},
 							value.String{Value: "QueryResult", Valid: true},
 							value.String{Value: "PrimaryResult", Valid: true},
 							value.String{Value: "07dd9603-3e06-4c62-986b-dfc3d586b05a", Valid: true},
@@ -808,8 +808,8 @@ func TestV1SM(t *testing.T) {
 					},
 					Values: value.Values{
 						value.DateTime{Value: nowish, Valid: true},
-						value.String{Value: "DD", Valid: true},
-						value.Long{Value: 101, Valid: true},
+						value.String{Value: "Doak", Valid: true},
+						value.Long{Value: 10, Valid: true},
 					},
 					Op: errors.OpQuery,
 				},
@@ -821,8 +821,8 @@ func TestV1SM(t *testing.T) {
 					},
 					Values: value.Values{
 						value.DateTime{Value: nowish, Valid: true},
-						value.String{Value: "Doak", Valid: true},
-						value.Long{Value: 10, Valid: true},
+						value.String{Value: "DD", Valid: true},
+						value.Long{Value: 101, Valid: true},
 					},
 					Op: errors.OpQuery,
 				},
