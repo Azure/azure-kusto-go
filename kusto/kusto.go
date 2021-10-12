@@ -40,6 +40,10 @@ type Authorization struct {
 func (a *Authorization) Validate(endpoint string) error {
 	const rescField = "Resource"
 
+	if strings.Contains(strings.ToLower(endpoint), ".azuresynapse") {
+		endpoint = "https://kusto.kusto.windows.net"
+	}
+
 	if a.Authorizer != nil && a.Config != nil {
 		return errors.ES(errors.OpServConn, errors.KClientArgs, "cannot set Authoriztion.Authorizer and Authorizer.Config")
 	}
@@ -130,12 +134,7 @@ func New(endpoint string, auth Authorization, options ...Option) (*Client, error
 		o(client)
 	}
 
-	validationEndpoint := endpoint
-	if strings.Contains(strings.ToLower(endpoint), ".azuresynapse") {
-		validationEndpoint = "https://kusto.kusto.windows.net"
-	}
-
-	if err := auth.Validate(validationEndpoint); err != nil {
+	if err := auth.Validate(endpoint); err != nil {
 		return nil, err
 	}
 
