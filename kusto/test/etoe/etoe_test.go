@@ -38,6 +38,10 @@ type CountResult struct {
 	Count int64
 }
 
+type MgmtProjectionResult struct {
+	A string
+}
+
 type AllDataType struct {
 	Vnum  int32                  `kusto:"vnum"`
 	Vdec  value.Decimal          `kusto:"vdec"`
@@ -159,6 +163,44 @@ func TestQueries(t *testing.T) {
 			gotInit: func() interface{} {
 				return nil
 			},
+		},
+		{
+			desc:  "Mgmt(https://github.com/Azure/azure-kusto-go/issues/55): transformations on mgmt queries",
+			stmt:  kusto.NewStmt(`.show databases | project A="1" | take 1`),
+			mcall: client.Mgmt,
+			doer: func(row *table.Row, update interface{}) error {
+				rec := MgmtProjectionResult{}
+				if err := row.ToStruct(&rec); err != nil {
+					return err
+				}
+				recs := update.(*[]MgmtProjectionResult)
+				*recs = append(*recs, rec)
+				return nil
+			},
+			gotInit: func() interface{} {
+				v := []MgmtProjectionResult{}
+				return &v
+			},
+			want: []MgmtProjectionResult{{A: "1"}},
+		},
+		{
+			desc:  "Mgmt(https://github.com/Azure/azure-kusto-go/issues/55): transformations on mgmt queries - multiple tables",
+			stmt:  kusto.NewStmt(`.show databases | project A="1" | take 1; AllDataTypes | project A="2" | take 1`),
+			mcall: client.Mgmt,
+			doer: func(row *table.Row, update interface{}) error {
+				rec := MgmtProjectionResult{}
+				if err := row.ToStruct(&rec); err != nil {
+					return err
+				}
+				recs := update.(*[]MgmtProjectionResult)
+				*recs = append(*recs, rec)
+				return nil
+			},
+			gotInit: func() interface{} {
+				v := []MgmtProjectionResult{}
+				return &v
+			},
+			want: []MgmtProjectionResult{{A: "1"}, {A: "2"}},
 		},
 		{
 			desc:  "Query: Progressive query: make sure we can convert all data types from a row",

@@ -575,7 +575,42 @@ func TestV1SM(t *testing.T) {
 			err:    true,
 		},
 		{
-			desc: "Expected Result",
+			desc: "Single Table",
+			ctx:  context.Background(),
+			stream: []frames.Frame{
+				v1.DataTable{
+					DataTypes: v1.DataTypes{
+						{ColumnName: "Timestamp", ColumnType: "datetime"},
+						{ColumnName: "Name", ColumnType: "string"},
+						{ColumnName: "ID", ColumnType: "long"},
+					},
+					KustoRows: []value.Values{
+						{
+							value.DateTime{Value: nowish, Valid: true},
+							value.String{Value: "Doak", Valid: true},
+							value.Long{Value: 10, Valid: true},
+						},
+					},
+				},
+			},
+			want: table.Rows{
+				&table.Row{
+					ColumnTypes: table.Columns{
+						{Name: "Timestamp", Type: "datetime"},
+						{Name: "Name", Type: "string"},
+						{Name: "ID", Type: "long"},
+					},
+					Values: value.Values{
+						value.DateTime{Value: nowish, Valid: true},
+						value.String{Value: "Doak", Valid: true},
+						value.Long{Value: 10, Valid: true},
+					},
+					Op: errors.OpQuery,
+				},
+			},
+		},
+		{
+			desc: "Primary And QueryProperties",
 			ctx:  context.Background(),
 			stream: []frames.Frame{
 				v1.DataTable{
@@ -594,6 +629,37 @@ func TestV1SM(t *testing.T) {
 				},
 				v1.DataTable{
 					DataTypes: v1.DataTypes{
+						{ColumnName: "Value", ColumnType: "string"},
+					},
+					KustoRows: []value.Values{
+						{
+							value.String{Value: "{\"Visualization\":null,\"Title\":null,\"XColumn\":null,\"Series\":null,\"YColumns\":null,\"AnomalyColumns\":null,\"XTitle\":null,\"YTitle\":null,\"XAxis\":null,\"YAxis\":null,\"Legend\":null,\"YSplit\":null,\"Accumulate\":false,\"IsQuerySorted\":false,\"Kind\":null,\"Ymin\":\"NaN\",\"Ymax\":\"NaN\"}", Valid: true},
+						},
+					},
+				},
+			},
+			want: table.Rows{
+				&table.Row{
+					ColumnTypes: table.Columns{
+						{Name: "Timestamp", Type: "datetime"},
+						{Name: "Name", Type: "string"},
+						{Name: "ID", Type: "long"},
+					},
+					Values: value.Values{
+						value.DateTime{Value: nowish, Valid: true},
+						value.String{Value: "Doak", Valid: true},
+						value.Long{Value: 10, Valid: true},
+					},
+					Op: errors.OpQuery,
+				},
+			},
+		},
+		{
+			desc: "Primary With TableOfContents",
+			ctx:  context.Background(),
+			stream: []frames.Frame{
+				v1.DataTable{
+					DataTypes: v1.DataTypes{
 						{ColumnName: "Timestamp", ColumnType: "datetime"},
 						{ColumnName: "Name", ColumnType: "string"},
 						{ColumnName: "ID", ColumnType: "long"},
@@ -601,8 +667,134 @@ func TestV1SM(t *testing.T) {
 					KustoRows: []value.Values{
 						{
 							value.DateTime{Value: nowish, Valid: true},
-							value.String{Value: "Dubovski", Valid: true},
-							value.Long{Value: 0, Valid: false},
+							value.String{Value: "Doak", Valid: true},
+							value.Long{Value: 10, Valid: true},
+						},
+					},
+				},
+				v1.DataTable{
+					DataTypes: v1.DataTypes{
+						{ColumnName: "Value", ColumnType: "string"},
+					},
+					KustoRows: []value.Values{
+						{
+							value.String{Value: "{\"Visualization\":null,\"Title\":null,\"XColumn\":null,\"Series\":null,\"YColumns\":null,\"AnomalyColumns\":null,\"XTitle\":null,\"YTitle\":null,\"XAxis\":null,\"YAxis\":null,\"Legend\":null,\"YSplit\":null,\"Accumulate\":false,\"IsQuerySorted\":false,\"Kind\":null,\"Ymin\":\"NaN\",\"Ymax\":\"NaN\"}", Valid: true},
+						},
+					},
+				},
+				v1.DataTable{
+					DataTypes: v1.DataTypes{
+						{ColumnName: "Ordinal", ColumnType: "long"},
+						{ColumnName: "Kind", ColumnType: "string"},
+						{ColumnName: "Name", ColumnType: "string"},
+						{ColumnName: "Id", ColumnType: "string"},
+						{ColumnName: "PrettyName", ColumnType: "string"},
+					},
+					KustoRows: []value.Values{
+						{
+							value.Long{Value: 0, Valid: true},
+							value.String{Value: "QueryResult", Valid: true},
+							value.String{Value: "PrimaryResult", Valid: true},
+							value.String{Value: "07dd9603-3e06-4c62-986b-dfc3d586b05a", Valid: true},
+							value.String{Value: "", Valid: true},
+						},
+						{
+							value.Long{Value: 1, Valid: true},
+							value.String{Value: "QueryProperties", Valid: true},
+							value.String{Value: "@ExtendedProperties", Valid: true},
+							value.String{Value: "309c015e-5693-4b66-92e7-4a4f98c3155b", Valid: true},
+							value.String{Value: "", Valid: true},
+						},
+					},
+				},
+			},
+			want: table.Rows{
+				&table.Row{
+					ColumnTypes: table.Columns{
+						{Name: "Timestamp", Type: "datetime"},
+						{Name: "Name", Type: "string"},
+						{Name: "ID", Type: "long"},
+					},
+					Values: value.Values{
+						value.DateTime{Value: nowish, Valid: true},
+						value.String{Value: "Doak", Valid: true},
+						value.Long{Value: 10, Valid: true},
+					},
+					Op: errors.OpQuery,
+				},
+			},
+		},
+		{
+			desc: "Multiple Primaries",
+			ctx:  context.Background(),
+			stream: []frames.Frame{
+				v1.DataTable{
+					DataTypes: v1.DataTypes{
+						{ColumnName: "Timestamp", ColumnType: "datetime"},
+						{ColumnName: "Name", ColumnType: "string"},
+						{ColumnName: "ID", ColumnType: "long"},
+					},
+					KustoRows: []value.Values{
+						{
+							value.DateTime{Value: nowish, Valid: true},
+							value.String{Value: "Doak", Valid: true},
+							value.Long{Value: 10, Valid: true},
+						},
+					},
+				},
+				v1.DataTable{
+					DataTypes: v1.DataTypes{
+						{ColumnName: "Value", ColumnType: "string"},
+					},
+					KustoRows: []value.Values{
+						{
+							value.String{Value: "{\"Visualization\":null,\"Title\":null,\"XColumn\":null,\"Series\":null,\"YColumns\":null,\"AnomalyColumns\":null,\"XTitle\":null,\"YTitle\":null,\"XAxis\":null,\"YAxis\":null,\"Legend\":null,\"YSplit\":null,\"Accumulate\":false,\"IsQuerySorted\":false,\"Kind\":null,\"Ymin\":\"NaN\",\"Ymax\":\"NaN\"}", Valid: true},
+						},
+					},
+				},
+				v1.DataTable{
+					DataTypes: v1.DataTypes{
+						{ColumnName: "Timestamp", ColumnType: "datetime"},
+						{ColumnName: "Name", ColumnType: "string"},
+						{ColumnName: "ID", ColumnType: "long"},
+					},
+					KustoRows: []value.Values{
+						{
+							value.DateTime{Value: nowish, Valid: true},
+							value.String{Value: "DD", Valid: true},
+							value.Long{Value: 101, Valid: true},
+						},
+					},
+				},
+				v1.DataTable{
+					DataTypes: v1.DataTypes{
+						{ColumnName: "Ordinal", ColumnType: "long"},
+						{ColumnName: "Kind", ColumnType: "string"},
+						{ColumnName: "Name", ColumnType: "string"},
+						{ColumnName: "Id", ColumnType: "string"},
+						{ColumnName: "PrettyName", ColumnType: "string"},
+					},
+					KustoRows: []value.Values{
+						{
+							value.Long{Value: 0, Valid: true},
+							value.String{Value: "QueryResult", Valid: true},
+							value.String{Value: "PrimaryResult", Valid: true},
+							value.String{Value: "07dd9603-3e06-4c62-986b-dfc3d586b05a", Valid: true},
+							value.String{Value: "", Valid: true},
+						},
+						{
+							value.Long{Value: 1, Valid: true},
+							value.String{Value: "QueryProperties", Valid: true},
+							value.String{Value: "@ExtendedProperties", Valid: true},
+							value.String{Value: "309c015e-5693-4b66-92e7-4a4f98c3155b", Valid: true},
+							value.String{Value: "", Valid: true},
+						},
+						{
+							value.Long{Value: 2, Valid: true},
+							value.String{Value: "QueryResult", Valid: true},
+							value.String{Value: "PrimaryResult", Valid: true},
+							value.String{Value: "07dd9603-3e06-4c62-986b-dfc3d586b05a", Valid: true},
+							value.String{Value: "", Valid: true},
 						},
 					},
 				},
@@ -629,8 +821,8 @@ func TestV1SM(t *testing.T) {
 					},
 					Values: value.Values{
 						value.DateTime{Value: nowish, Valid: true},
-						value.String{Value: "Dubovski", Valid: true},
-						value.Long{Value: 0, Valid: false},
+						value.String{Value: "DD", Valid: true},
+						value.Long{Value: 101, Valid: true},
 					},
 					Op: errors.OpQuery,
 				},

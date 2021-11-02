@@ -56,6 +56,7 @@ const (
 	QueryCompletionInformation TableKind = "QueryCompletionInformation"
 	QueryTraceLog              TableKind = "QueryTraceLog"
 	QueryPerfLog               TableKind = "QueryPerfLog"
+	QueryResult                TableKind = "QueryResult"
 	TableOfContents            TableKind = "TableOfContents"
 	QueryPlan                  TableKind = "QueryPlan"
 	ExtendedProperties         TableKind = "@ExtendedProperties"
