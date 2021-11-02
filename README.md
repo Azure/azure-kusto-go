@@ -191,7 +191,10 @@ if err := in.Stream(ctx, jsonEncodedData, ingest.JSON, "mappingName"); err != ni
 }
 ```
 
-### Contributing
+## Best Practices
+See the SDK [best practices guide](https://docs.microsoft.com/azure/data-explorer/kusto/api/netfx/kusto-ingest-best-practices), which though written for the .NET SDK, applies similarly here.
+
+## Contributing
 
 This project welcomes contributions and suggestions.  Most contributions require you to agree to a
 Contributor License Agreement (CLA) declaring that you have the right to, and actually do, grant us
@@ -205,7 +208,7 @@ This project has adopted the [Microsoft Open Source Code of Conduct](https://ope
 For more information see the [Code of Conduct FAQ](https://opensource.microsoft.com/codeofconduct/faq/) or
 contact [opencode@microsoft.com](mailto:opencode@microsoft.com) with any additional questions or comments.
 
-### Looking for SDKs for other languages/platforms?
+## Looking for SDKs for other languages/platforms?
 
 - [Node](https://github.com/azure/azure-kusto-node)
 - [Java](https://github.com/azure/azure-kusto-java)
