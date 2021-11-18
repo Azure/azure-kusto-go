@@ -64,9 +64,10 @@ const (
 	ApacheAVRO DataFormat = 2
 	// CSV indicates the source is encoded in comma seperated values.
 	CSV DataFormat = 3
-	// JSON indicates the source is encoded as one or more lines, each containing a record in Javscript Object Notation.
+	// JSON indicates the source is encoded as one or more lines, each containing a record in Javascript Object Notation.
 	JSON DataFormat = 4
-	// MultiJSON indicates the source is encoded in JSON-Array of individual records in Javscript Object Notation.
+	// MultiJSON indicates the source is encoded in JSON-Array of individual records in Javascript Object Notation. Optionally,
+	//multiple documents can be concatenated.
 	MultiJSON DataFormat = 5
 	// ORC indicates the source is encoded in Apache Optimized Row Columnar format.
 	ORC DataFormat = 6
@@ -78,7 +79,7 @@ const (
 	Raw DataFormat = 9
 	// SCSV is a file containing semicolon ";" separated values.
 	SCSV DataFormat = 10
-	// SOHSV is a file containing SOH-separated values(ASCII codepont 1).
+	// SOHSV is a file containing SOH-separated values(ASCII codepoint 1).
 	SOHSV DataFormat = 11
 	// SStream indicats the source is encoded as a Microsoft Cosmos Structured Streams format
 	SStream DataFormat = 12
@@ -86,10 +87,12 @@ const (
 	TSV DataFormat = 13
 	// TSVE is a file containing escaped-tab seperated values ("\t").
 	TSVE DataFormat = 14
-	// TXT is a text file with lines deliminated by "\n".
+	// TXT is a text file with lines delimited by "\n".
 	TXT DataFormat = 15
 	// W3CLogFile indicates the source is encoded using W3C Extended Log File format.
 	W3CLogFile DataFormat = 16
+	// SingleJSON indicates the source is a single JSON value -- newlines are regular whitespace.
+	SingleJSON DataFormat = 17
 )
 
 type dfDescriptor struct {
@@ -106,18 +109,19 @@ var dfDescriptions = []dfDescriptor{
 	{"ApacheAvro", "avro", "", true, false},
 	{"Csv", "csv", ".csv", false, true},
 	{"Json", "json", ".json", true, true},
-	{"MultiJson", "json", "", true, false},
+	{"MultiJson", "multijson", "", true, false},
 	{"Orc", "orc", ".orc", false, true},
 	{"Parquet", "parquet", ".parquet", false, true},
 	{"Psv", "psv", ".psv", false, false},
 	{"Raw", "raw", ".raw", false, false},
 	{"Scsv", "scsv", ".scsv", false, false},
 	{"Sohsv", "sohsv", ".sohsv", false, false},
-	{"SStream", "sstream", ".sstream", false, false},
+	{"SStream", "sstream", ".ss", false, false},
 	{"Tsv", "tsv", ".tsv", false, false},
 	{"Tsve", "tsve", ".tsve", false, false},
 	{"Txt", "txt", ".txt", false, false},
-	{"E3cLogFile", "e3clogfile", ".e3clogfile", false, false},
+	{"W3cLogFile", "w3clogfile", ".w3clogfile", false, false},
+	{"SingleJson", "singlejson", "", true, false},
 }
 
 // IngestionReportLevel defines which ingestion statuses are reported by the DM.

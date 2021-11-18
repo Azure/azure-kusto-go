@@ -37,7 +37,7 @@ func TestFormatDiscovery(t *testing.T) {
 		{".tsv", properties.TSV},
 		{".txt", properties.TXT},
 		{".whatever", properties.DFUnknown},
-		{".e3clogfile", properties.W3CLogFile},
+		{".w3clogfile", properties.W3CLogFile},
 	}
 
 	for _, test := range tests {
