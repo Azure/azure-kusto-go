@@ -123,9 +123,10 @@ const (
 	ApacheAVRO DataFormat = properties.ApacheAVRO
 	// CSV indicates the source is encoded in comma seperated values.
 	CSV DataFormat = properties.CSV
-	// JSON indicates the source is encoded as one or more lines, each containing a record in Javscript Object Notation.
+	// JSON indicates the source is encoded as one or more lines, each containing a record in Javascript Object Notation.
 	JSON DataFormat = properties.JSON
-	// MultiJSON indicates the source is encoded in JSON-Array of individual records in Javscript Object Notation.
+	// MultiJSON indicates the source is encoded in JSON-Array of individual records in Javascript Object Notation. Optionally,
+	//multiple documents can be concatenated.
 	MultiJSON DataFormat = properties.MultiJSON
 	// ORC indicates the source is encoded in Apache Optimized Row Columnar format.
 	ORC DataFormat = properties.ORC
@@ -137,18 +138,20 @@ const (
 	Raw DataFormat = properties.Raw
 	// SCSV is a file containing semicolon ";" separated values.
 	SCSV DataFormat = properties.SCSV
-	// SOHSV is a file containing SOH-separated values(ASCII codepont 1).
+	// SOHSV is a file containing SOH-separated values(ASCII codepoint 1).
 	SOHSV DataFormat = properties.SOHSV
-	// SStream indicats the source is encoded as a Microsoft Cosmos Structured Streams format
+	// SStream indicates the source is encoded as a Microsoft Cosmos Structured Streams format
 	SStream DataFormat = properties.SStream
 	// TSV is a file containing tab seperated values ("\t").
 	TSV DataFormat = properties.TSV
 	// TSVE is a file containing escaped-tab seperated values ("\t").
 	TSVE DataFormat = properties.TSVE
-	// TXT is a text file with lines deliminated by "\n".
+	// TXT is a text file with lines ending with "\n".
 	TXT DataFormat = properties.TXT
-	// WCLogFile indicates the source is encoded using W3C Extended Log File format
+	// W3CLogFile indicates the source is encoded using W3C Extended Log File format
 	W3CLogFile DataFormat = properties.W3CLogFile
+	// SingleJSON indicates the source is a single JSON value -- newlines are regular whitespace.
+	SingleJSON DataFormat = properties.SingleJSON
 )
 
 // IngestionMapping provides runtime mapping of the data being imported to the fields in the table.
