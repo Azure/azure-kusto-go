@@ -146,7 +146,7 @@ const (
 	TSV DataFormat = properties.TSV
 	// TSVE is a file containing escaped-tab seperated values ("\t").
 	TSVE DataFormat = properties.TSVE
-	// TXT is a text file with lines eliminated by "\n".
+	// TXT is a text file with lines delimited by "\n".
 	TXT DataFormat = properties.TXT
 	// W3CLogFile indicates the source is encoded using W3C Extended Log File format
 	W3CLogFile DataFormat = properties.W3CLogFile
