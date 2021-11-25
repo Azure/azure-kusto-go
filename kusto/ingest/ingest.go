@@ -64,12 +64,17 @@ type Ingestion struct {
 
 // New is the constructor for Ingestion.
 func New(client *kusto.Client, db, table string) (*Ingestion, error) {
+	return NewWithBlobProperties(client, db, table, filesystem.BlockSize, filesystem.Concurrency)
+}
+
+// NewWithBlobProperties is an advanced constructor for Ingestion, to use in special cases where you need more control over memory consumption.
+func NewWithBlobProperties(client *kusto.Client, db, table string, blockSize int, concurrency int) (*Ingestion, error) {
 	mgr, err := getManager(client)
 	if err != nil {
 		return nil, err
 	}
 
-	fs, err := filesystem.New(db, table, mgr)
+	fs, err := filesystem.NewWithBlobProperties(db, table, mgr, blockSize, concurrency)
 	if err != nil {
 		return nil, err
 	}

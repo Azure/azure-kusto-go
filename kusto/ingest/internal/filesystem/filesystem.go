@@ -34,8 +34,8 @@ const (
 	// made a 5x improvement in speed. We don't have any numbers from the service side to give us numbers we should use, so this
 	// is our best guess from observation. DO NOT CHANGE UNLESS YOU KNOW BETTER.
 
-	blockSize   = 8 * _1MiB
-	concurrency = 50
+	BlockSize   = 8 * _1MiB
+	Concurrency = 50
 )
 
 // uploadBlobStream provides a type that mimics azblob.UploadStreamToBlockBlob to allow fakes for testing.
@@ -58,6 +58,11 @@ type Ingestion struct {
 
 // New is the constructor for Ingestion.
 func New(db, table string, mgr *resources.Manager) (*Ingestion, error) {
+	return NewWithBlobProperties(db, table, mgr, BlockSize, Concurrency)
+}
+
+// NewWithBlobProperties is an advanced constructor for Ingestion, to use in special cases where you need more control over memory consumption.
+func NewWithBlobProperties(db, table string, mgr *resources.Manager, blockSize int, concurrency int) (*Ingestion, error) {
 	transferManager, err := azblob.NewSyncPool(blockSize, concurrency)
 	if err != nil {
 		return nil, err
@@ -302,8 +307,8 @@ func (i *Ingestion) localToBlob(ctx context.Context, from string, to azblob.Cont
 		file,
 		blobURL,
 		azblob.UploadToBlockBlobOptions{
-			BlockSize:   blockSize,
-			Parallelism: concurrency,
+			BlockSize:   BlockSize,
+			Parallelism: Concurrency,
 		},
 	)
 
