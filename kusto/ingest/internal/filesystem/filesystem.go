@@ -53,16 +53,23 @@ type Ingestion struct {
 
 	uploadBlobStream uploadBlobStream
 	uploadBlobFile   uploadBlobFile
+	transferManager  azblob.TransferManager
 }
 
 // New is the constructor for Ingestion.
 func New(db, table string, mgr *resources.Manager) (*Ingestion, error) {
+	transferManager, err := azblob.NewSyncPool(blockSize, concurrency)
+	if err != nil {
+		return nil, err
+	}
+
 	i := &Ingestion{
 		db:               db,
 		table:            table,
 		mgr:              mgr,
 		uploadBlobStream: azblob.UploadStreamToBlockBlob,
 		uploadBlobFile:   azblob.UploadFileToBlockBlob,
+		transferManager:  transferManager,
 	}
 	return i, nil
 }
@@ -137,7 +144,7 @@ func (i *Ingestion) Reader(ctx context.Context, reader io.Reader, props properti
 		ctx,
 		gstream,
 		blobURL,
-		azblob.UploadStreamToBlockBlobOptions{BufferSize: blockSize, MaxBuffers: concurrency},
+		azblob.UploadStreamToBlockBlobOptions{TransferManager: i.transferManager},
 	)
 
 	if err != nil {
@@ -279,7 +286,7 @@ func (i *Ingestion) localToBlob(ctx context.Context, from string, to azblob.Cont
 			ctx,
 			gstream,
 			blobURL,
-			azblob.UploadStreamToBlockBlobOptions{BufferSize: blockSize, MaxBuffers: concurrency},
+			azblob.UploadStreamToBlockBlobOptions{TransferManager: i.transferManager},
 		)
 
 		if err != nil {
