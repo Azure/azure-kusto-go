@@ -60,21 +60,31 @@ type Ingestion struct {
 
 	connMu     sync.Mutex
 	streamConn *conn.Conn
+
+	blockSize   int
+	concurrency int
 }
 
-// New is the constructor for Ingestion.
-func New(client *kusto.Client, db, table string) (*Ingestion, error) {
-	return NewWithBlobProperties(client, db, table, filesystem.BlockSize, filesystem.Concurrency)
-}
+// Option is an optional argument to New().
+type Option func(s *Ingestion)
 
-// NewWithBlobProperties is an advanced constructor for Ingestion, to use in special cases where you need more control over memory consumption.
-func NewWithBlobProperties(client *kusto.Client, db, table string, blockSize int, concurrency int) (*Ingestion, error) {
-	mgr, err := getManager(client)
-	if err != nil {
-		return nil, err
+// WithBlockSize sets the block size for uploading streams to kusto. Defaults to 8MB.
+func WithBlockSize(size int) Option {
+	return func(s *Ingestion) {
+		s.blockSize = size
 	}
+}
 
-	fs, err := filesystem.NewWithBlobProperties(db, table, mgr, blockSize, concurrency)
+// WithConcurrency sets the concurrency for uploading streams to kusto. Defaults to 50.
+func WithConcurrency(concurrency int) Option {
+	return func(s *Ingestion) {
+		s.concurrency = concurrency
+	}
+}
+
+// New is a constructor for Ingestion.
+func New(client *kusto.Client, db, table string, options ...Option) (*Ingestion, error) {
+	mgr, err := getManager(client)
 	if err != nil {
 		return nil, err
 	}
@@ -84,8 +94,18 @@ func NewWithBlobProperties(client *kusto.Client, db, table string, blockSize int
 		mgr:    mgr,
 		db:     db,
 		table:  table,
-		fs:     fs,
 	}
+
+	for _, option := range options {
+		option(i)
+	}
+
+	fs, err := filesystem.New(db, table, mgr, filesystem.WithBlockSize(i.blockSize), filesystem.WithConcurrency(i.concurrency))
+	if err != nil {
+		return nil, err
+	}
+
+	i.fs = fs
 
 	return i, nil
 }
