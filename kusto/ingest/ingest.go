@@ -17,7 +17,20 @@ import (
 	"github.com/Azure/azure-kusto-go/kusto/ingest/internal/filesystem"
 	"github.com/Azure/azure-kusto-go/kusto/ingest/internal/properties"
 	"github.com/Azure/azure-kusto-go/kusto/ingest/internal/resources"
+	"github.com/Azure/azure-storage-blob-go/azblob"
 	"github.com/google/uuid"
+)
+
+const (
+	_1MiB = 1024 * 1024
+
+	// The numbers below are magic numbers. They were derived from doing Azure to Azure tests of azcopy for various file sizes
+	// to prove that changes weren't going to make azcopy slower. It was found that multipying azcopy's concurrency by 10x (to 50)
+	// made a 5x improvement in speed. We don't have any numbers from the service side to give us numbers we should use, so this
+	// is our best guess from observation. DO NOT CHANGE UNLESS YOU KNOW BETTER.
+
+	blockSize   = 8 * _1MiB
+	concurrency = 50
 )
 
 var (
@@ -61,24 +74,19 @@ type Ingestion struct {
 	connMu     sync.Mutex
 	streamConn *conn.Conn
 
-	blockSize   int
-	concurrency int
+	tm *azblob.TransferManager
 }
 
 // Option is an optional argument to New().
 type Option func(s *Ingestion)
 
-// WithBlockSize sets the block size for uploading streams to kusto. Defaults to 8MB.
-func WithBlockSize(size int) Option {
+// WithTransferManager provides a custom azblob TransferManager for copying our ingest data to
+// 	Azure Blob Storage for ingestion into Kusto during non-streamed ingestion.
+//	By default, we use an azblob.SyncPool that uses 8MiB blocks and 50 concurrent connections.
+//	You can create a one with your own settings using azblob.NewSyncPool() or the static allocation with azblob.NewStaticBuffer().
+func WithTransferManager(t *azblob.TransferManager) Option {
 	return func(s *Ingestion) {
-		s.blockSize = size
-	}
-}
-
-// WithConcurrency sets the concurrency for uploading streams to kusto. Defaults to 50.
-func WithConcurrency(concurrency int) Option {
-	return func(s *Ingestion) {
-		s.concurrency = concurrency
+		s.tm = t
 	}
 }
 
@@ -100,7 +108,15 @@ func New(client *kusto.Client, db, table string, options ...Option) (*Ingestion,
 		option(i)
 	}
 
-	fs, err := filesystem.New(db, table, mgr, filesystem.WithBlockSize(i.blockSize), filesystem.WithConcurrency(i.concurrency))
+	if i.tm == nil {
+		tm, err := azblob.NewSyncPool(blockSize, concurrency)
+		if err != nil {
+			return nil, err
+		}
+		i.tm = &tm
+	}
+
+	fs, err := filesystem.New(db, table, mgr, i.tm)
 	if err != nil {
 		return nil, err
 	}

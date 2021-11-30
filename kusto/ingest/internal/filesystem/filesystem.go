@@ -33,6 +33,7 @@ const (
 	// to prove that changes weren't going to make azcopy slower. It was found that multipying azcopy's concurrency by 10x (to 50)
 	// made a 5x improvement in speed. We don't have any numbers from the service side to give us numbers we should use, so this
 	// is our best guess from observation. DO NOT CHANGE UNLESS YOU KNOW BETTER.
+	// Duplicated from ingest.go - since azblob.UploadToBlockBlobOptions doesn't support transfer manager.
 
 	blockSize   = 8 * _1MiB
 	concurrency = 50
@@ -53,56 +54,19 @@ type Ingestion struct {
 
 	uploadBlobStream uploadBlobStream
 	uploadBlobFile   uploadBlobFile
-	transferManager  azblob.TransferManager
-
-	bufferSize  int
-	concurrency int
-}
-
-// Option is an optional argument to New().
-type Option func(s *Ingestion)
-
-// WithBlockSize sets the block size for uploading streams to kusto. Defaults to 8MB.
-func WithBlockSize(size int) Option {
-	return func(s *Ingestion) {
-		s.bufferSize = size
-	}
-}
-
-// WithConcurrency sets the concurrency for uploading streams to kusto. Defaults to 50.
-func WithConcurrency(concurrency int) Option {
-	return func(s *Ingestion) {
-		s.concurrency = concurrency
-	}
+	transferManager  *azblob.TransferManager
 }
 
 // New is the constructor for Ingestion.
-func New(db, table string, mgr *resources.Manager, options ...Option) (*Ingestion, error) {
+func New(db, table string, mgr *resources.Manager, transferManager *azblob.TransferManager) (*Ingestion, error) {
 	i := &Ingestion{
 		db:               db,
 		table:            table,
 		mgr:              mgr,
 		uploadBlobStream: azblob.UploadStreamToBlockBlob,
 		uploadBlobFile:   azblob.UploadFileToBlockBlob,
+		transferManager:  transferManager,
 	}
-
-	for _, opt := range options {
-		opt(i)
-	}
-
-	if i.bufferSize == 0 {
-		i.bufferSize = blockSize
-	}
-
-	if i.concurrency == 0 {
-		i.concurrency = concurrency
-	}
-
-	transferManager, err := azblob.NewSyncPool(i.bufferSize, i.concurrency)
-	if err != nil {
-		return nil, err
-	}
-	i.transferManager = transferManager
 
 	return i, nil
 }
@@ -177,7 +141,7 @@ func (i *Ingestion) Reader(ctx context.Context, reader io.Reader, props properti
 		ctx,
 		gstream,
 		blobURL,
-		azblob.UploadStreamToBlockBlobOptions{TransferManager: i.transferManager},
+		azblob.UploadStreamToBlockBlobOptions{TransferManager: *i.transferManager},
 	)
 
 	if err != nil {
@@ -319,7 +283,7 @@ func (i *Ingestion) localToBlob(ctx context.Context, from string, to azblob.Cont
 			ctx,
 			gstream,
 			blobURL,
-			azblob.UploadStreamToBlockBlobOptions{TransferManager: i.transferManager},
+			azblob.UploadStreamToBlockBlobOptions{TransferManager: *i.transferManager},
 		)
 
 		if err != nil {
