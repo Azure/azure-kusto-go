@@ -61,24 +61,24 @@ type Ingestion struct {
 	connMu     sync.Mutex
 	streamConn *conn.Conn
 
-	blockSize   int
-	concurrency int
+	uploadBlockSize   int
+	uploadConcurrency uint16
 }
 
 // Option is an optional argument to New().
 type Option func(s *Ingestion)
 
-// WithBlockSize sets the block size for uploading streams to kusto. Defaults to 8MB.
-func WithBlockSize(size int) Option {
+// WithUploadBlockSize sets the block size for uploading blobs to kusto. Defaults to 8MB.
+func WithUploadBlockSize(size int) Option {
 	return func(s *Ingestion) {
-		s.blockSize = size
+		s.uploadBlockSize = size
 	}
 }
 
-// WithConcurrency sets the concurrency for uploading streams to kusto. Defaults to 50.
-func WithConcurrency(concurrency int) Option {
+// WithUploadConcurrency sets the concurrency for uploading blobs to kusto. Defaults to 50.
+func WithUploadConcurrency(concurrency uint16) Option {
 	return func(s *Ingestion) {
-		s.concurrency = concurrency
+		s.uploadConcurrency = concurrency
 	}
 }
 
@@ -90,17 +90,19 @@ func New(client *kusto.Client, db, table string, options ...Option) (*Ingestion,
 	}
 
 	i := &Ingestion{
-		client: client,
-		mgr:    mgr,
-		db:     db,
-		table:  table,
+		client:            client,
+		mgr:               mgr,
+		db:                db,
+		table:             table,
+		uploadBlockSize:   filesystem.BlockSize,
+		uploadConcurrency: filesystem.Concurrency,
 	}
 
 	for _, option := range options {
 		option(i)
 	}
 
-	fs, err := filesystem.New(db, table, mgr, filesystem.WithBlockSize(i.blockSize), filesystem.WithConcurrency(i.concurrency))
+	fs, err := filesystem.New(db, table, mgr, filesystem.WithUploadBlockSize(i.uploadBlockSize), filesystem.WithUploadConcurrency(i.uploadConcurrency))
 	if err != nil {
 		return nil, err
 	}

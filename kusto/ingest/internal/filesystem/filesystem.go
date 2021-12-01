@@ -34,8 +34,8 @@ const (
 	// made a 5x improvement in speed. We don't have any numbers from the service side to give us numbers we should use, so this
 	// is our best guess from observation. DO NOT CHANGE UNLESS YOU KNOW BETTER.
 
-	blockSize   = 8 * _1MiB
-	concurrency = 50
+	BlockSize   = 8 * _1MiB
+	Concurrency = 50
 )
 
 // uploadBlobStream provides a type that mimics azblob.UploadStreamToBlockBlob to allow fakes for testing.
@@ -55,50 +55,44 @@ type Ingestion struct {
 	uploadBlobFile   uploadBlobFile
 	transferManager  azblob.TransferManager
 
-	bufferSize  int
-	concurrency int
+	uploadBlockSize   int
+	uploadConcurrency uint16
 }
 
 // Option is an optional argument to New().
 type Option func(s *Ingestion)
 
-// WithBlockSize sets the block size for uploading streams to kusto. Defaults to 8MB.
-func WithBlockSize(size int) Option {
+// WithUploadBlockSize sets the block size for uploading blobs to kusto. Defaults to 8MB.
+func WithUploadBlockSize(size int) Option {
 	return func(s *Ingestion) {
-		s.bufferSize = size
+		s.uploadBlockSize = size
 	}
 }
 
-// WithConcurrency sets the concurrency for uploading streams to kusto. Defaults to 50.
-func WithConcurrency(concurrency int) Option {
+// WithUploadConcurrency sets the concurrency for uploading blobs to kusto. Defaults to 50.
+func WithUploadConcurrency(concurrency uint16) Option {
 	return func(s *Ingestion) {
-		s.concurrency = concurrency
+		s.uploadConcurrency = concurrency
 	}
 }
 
 // New is the constructor for Ingestion.
 func New(db, table string, mgr *resources.Manager, options ...Option) (*Ingestion, error) {
 	i := &Ingestion{
-		db:               db,
-		table:            table,
-		mgr:              mgr,
-		uploadBlobStream: azblob.UploadStreamToBlockBlob,
-		uploadBlobFile:   azblob.UploadFileToBlockBlob,
+		db:                db,
+		table:             table,
+		mgr:               mgr,
+		uploadBlobStream:  azblob.UploadStreamToBlockBlob,
+		uploadBlobFile:    azblob.UploadFileToBlockBlob,
+		uploadBlockSize:   BlockSize,
+		uploadConcurrency: Concurrency,
 	}
 
 	for _, opt := range options {
 		opt(i)
 	}
 
-	if i.bufferSize == 0 {
-		i.bufferSize = blockSize
-	}
-
-	if i.concurrency == 0 {
-		i.concurrency = concurrency
-	}
-
-	transferManager, err := azblob.NewSyncPool(i.bufferSize, i.concurrency)
+	transferManager, err := azblob.NewSyncPool(i.uploadBlockSize, int(i.uploadConcurrency))
 	if err != nil {
 		return nil, err
 	}
@@ -335,8 +329,8 @@ func (i *Ingestion) localToBlob(ctx context.Context, from string, to azblob.Cont
 		file,
 		blobURL,
 		azblob.UploadToBlockBlobOptions{
-			BlockSize:   blockSize,
-			Parallelism: concurrency,
+			BlockSize:   int64(i.uploadBlockSize),
+			Parallelism: i.uploadConcurrency,
 		},
 	)
 
