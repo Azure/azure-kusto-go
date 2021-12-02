@@ -55,44 +55,38 @@ type Ingestion struct {
 	uploadBlobFile   uploadBlobFile
 	transferManager  azblob.TransferManager
 
-	uploadBlockSize   int
-	uploadConcurrency uint16
+	blockSize   int
+	concurrency uint16
 }
 
 // Option is an optional argument to New().
 type Option func(s *Ingestion)
 
-// WithUploadBlockSize sets the block size for uploading blobs to kusto. Defaults to 8MB.
-func WithUploadBlockSize(size int) Option {
+// WithUploadSettings sets the block size and concurrency for uploading blobs to kusto. Defaults to 8MB block size and concurrency of 50.
+func WithUploadSettings(size int, concurrency uint16) Option {
 	return func(s *Ingestion) {
-		s.uploadBlockSize = size
-	}
-}
-
-// WithUploadConcurrency sets the concurrency for uploading blobs to kusto. Defaults to 50.
-func WithUploadConcurrency(concurrency uint16) Option {
-	return func(s *Ingestion) {
-		s.uploadConcurrency = concurrency
+		s.blockSize = size
+		s.concurrency = concurrency
 	}
 }
 
 // New is the constructor for Ingestion.
 func New(db, table string, mgr *resources.Manager, options ...Option) (*Ingestion, error) {
 	i := &Ingestion{
-		db:                db,
-		table:             table,
-		mgr:               mgr,
-		uploadBlobStream:  azblob.UploadStreamToBlockBlob,
-		uploadBlobFile:    azblob.UploadFileToBlockBlob,
-		uploadBlockSize:   BlockSize,
-		uploadConcurrency: Concurrency,
+		db:               db,
+		table:            table,
+		mgr:              mgr,
+		uploadBlobStream: azblob.UploadStreamToBlockBlob,
+		uploadBlobFile:   azblob.UploadFileToBlockBlob,
+		blockSize:        BlockSize,
+		concurrency:      Concurrency,
 	}
 
 	for _, opt := range options {
 		opt(i)
 	}
 
-	transferManager, err := azblob.NewSyncPool(i.uploadBlockSize, int(i.uploadConcurrency))
+	transferManager, err := azblob.NewSyncPool(i.blockSize, int(i.concurrency))
 	if err != nil {
 		return nil, err
 	}
@@ -329,8 +323,8 @@ func (i *Ingestion) localToBlob(ctx context.Context, from string, to azblob.Cont
 		file,
 		blobURL,
 		azblob.UploadToBlockBlobOptions{
-			BlockSize:   int64(i.uploadBlockSize),
-			Parallelism: i.uploadConcurrency,
+			BlockSize:   int64(i.blockSize),
+			Parallelism: i.concurrency,
 		},
 	)
 
