@@ -11,12 +11,48 @@ import (
 	"github.com/Azure/azure-kusto-go/kusto/ingest/internal/status"
 )
 
+type IngestionResult interface {
+	StatusCode() StatusCode
+	Database() string
+	Table() string
+}
+
+type StreamingResult struct {
+	statusCode StatusCode
+	database   string
+	table      string
+}
+
+func (r *StreamingResult) StatusCode() StatusCode {
+	return r.statusCode
+}
+
+func (r *StreamingResult) Database() string {
+	return r.database
+}
+
+func (r *StreamingResult) Table() string {
+	return r.table
+}
+
 // Result provides a way for users track the state of ingestion jobs.
 type Result struct {
 	record        statusRecord
 	tableClient   *status.TableClient
 	reportToTable bool
 	reportToQueue bool
+}
+
+func (r *Result) StatusCode() StatusCode {
+	return r.record.Status
+}
+
+func (r *Result) Database() string {
+	return r.record.Database
+}
+
+func (r *Result) Table() string {
+	return r.record.Table
 }
 
 // newResult creates an initial ingestion status record.

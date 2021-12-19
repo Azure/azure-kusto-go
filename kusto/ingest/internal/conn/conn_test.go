@@ -16,7 +16,6 @@ import (
 
 	"github.com/Azure/azure-kusto-go/kusto"
 	"github.com/Azure/azure-kusto-go/kusto/ingest/internal/properties"
-
 	"github.com/google/uuid"
 	"github.com/kylelemons/godebug/pretty"
 )

@@ -444,11 +444,6 @@ func (i *Ingestion) FromReader(ctx context.Context, reader io.Reader, options ..
 	return result, nil
 }
 
-var (
-	// ErrTooLarge indicates that the data being passed to a StreamBlock is larger than the maximum StreamBlock size of 4MiB.
-	ErrTooLarge = errors.ES(errors.OpIngestStream, errors.KClientArgs, "cannot add data larger than 4MiB")
-)
-
 const mib = 1024 * 1024
 
 // Stream takes a payload that is encoded in format with a server stored mappingName, compresses it and uploads it to Kusto.
@@ -464,22 +459,14 @@ func (i *Ingestion) Stream(ctx context.Context, payload []byte, format DataForma
 		return err
 	}
 
-	buf := conn.BuffPool.Get().(*bytes.Buffer)
-
-	zw := gzip.NewWriter(buf)
-	_, err = zw.Write(payload)
-	if err != nil {
-		return errors.E(errors.OpIngestStream, errors.KClientArgs, err)
+	props := StreamingIngestProps{
+		format:           format,
+		mappingReference: mappingName,
 	}
 
-	if err := zw.Close(); err != nil {
-		return errors.E(errors.OpIngestStream, errors.KClientArgs, err).SetNoRetry()
-	}
-	if buf.Len() > 4*mib {
-		return ErrTooLarge
-	}
+	_, err = streamImpl(i.db, i.table, c, ctx, bytes.NewReader(payload), props)
 
-	return c.Write(ctx, i.db, i.table, buf, format, mappingName)
+	return err
 }
 
 func (i *Ingestion) getStreamConn() (*conn.Conn, error) {
