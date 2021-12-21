@@ -13,6 +13,7 @@ import (
 // StatusCode is the ingestion status
 type StatusCode string
 
+//goland:noinspection GoUnusedConst - Part of the API
 const (
 	// Pending status represents a temporary status.
 	// Might change during the course of ingestion based on the
@@ -222,7 +223,7 @@ func (r *statusRecord) String() string {
 	return pretty.Sprint(r)
 }
 
-// ToError converts an ingestion status to an error if failed or partially succeeded, or nil if succeeded.
+// Error converts an ingestion status to a string. Since we only provide the record in case of an error, the success branches will never be called.
 func (r statusRecord) Error() string {
 	switch r.Status {
 	case Succeeded:
