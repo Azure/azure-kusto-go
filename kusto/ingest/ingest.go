@@ -2,7 +2,6 @@ package ingest
 
 import (
 	"bytes"
-	"compress/gzip"
 	"context"
 	"fmt"
 	"io"
