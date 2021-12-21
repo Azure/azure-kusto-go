@@ -97,7 +97,7 @@ var writeOp = errors.OpIngestStream
 
 // Write writes into database "db", table "table" what is stored in "payload" which should be encoded in "format" and
 // have a server side data mapping reference named "mappingName".  "mappingName" can be nil if the format doesn't require it.
-func (c *Conn) Write(ctx context.Context, db, table string, payload io.Reader, format properties.DataFormat, mappingName string, leaveOpen bool, clientRequestId string) error {
+func (c *Conn) Write(ctx context.Context, db, table string, payload io.Reader, format properties.DataFormat, mappingName string, clientRequestId string) error {
 	defer func() {
 		if buf, ok := payload.(*bytes.Buffer); ok {
 			buf.Reset()
@@ -145,7 +145,7 @@ func (c *Conn) Write(ctx context.Context, db, table string, payload io.Reader, f
 
 	var closeablePayload io.ReadCloser
 	var ok bool
-	if closeablePayload, ok = payload.(io.ReadCloser); !ok || leaveOpen {
+	if closeablePayload, ok = payload.(io.ReadCloser); !ok {
 		closeablePayload = ioutil.NopCloser(payload)
 	}
 

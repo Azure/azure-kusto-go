@@ -24,7 +24,7 @@ type StreamingIngestion struct {
 	streamConn *conn.Conn
 }
 
-// New is the constructor for Ingestion.
+// NewStreaming is the constructor for StreamingIngestion.
 func NewStreaming(client *kusto.Client, db, table string) (*StreamingIngestion, error) {
 	streamConn, err := conn.New(client.Endpoint(), client.Auth())
 	if err != nil {
@@ -41,52 +41,9 @@ func NewStreaming(client *kusto.Client, db, table string) (*StreamingIngestion, 
 	return i, nil
 }
 
-// StreamingIngestProps is an optional argument to FromFile().
-type StreamingIngestProps struct {
-	isCompressed     bool
-	format           DataFormat
-	mappingReference string
-	leaveOpen        bool
-	clientRequestId  string
-}
-
-type StreamingIngestProp func(props *StreamingIngestProps)
-
-func Format(format DataFormat) StreamingIngestProp {
-	return func(props *StreamingIngestProps) {
-		props.format = format
-	}
-}
-
-func MappingReference(mappingReference string) StreamingIngestProp {
-	return func(props *StreamingIngestProps) {
-		props.mappingReference = mappingReference
-	}
-}
-
-func LeaveOpen(leaveOpen bool) StreamingIngestProp {
-	return func(props *StreamingIngestProps) {
-		props.leaveOpen = leaveOpen
-	}
-}
-
-func ClientRequestId(clientRequestId string) StreamingIngestProp {
-	return func(props *StreamingIngestProps) {
-		props.clientRequestId = clientRequestId
-	}
-}
-
-func Compressed(isCompressed bool) StreamingIngestProp {
-	return func(props *StreamingIngestProps) {
-		props.isCompressed = isCompressed
-	}
-}
-
 // FromFile allows uploading a data file for Kusto from either a local path or a blobstore URI path.
 // This method is thread-safe.
-func (i *StreamingIngestion) FromFile(ctx context.Context, fPath string, props ...StreamingIngestProp) (*StreamingResult, error) {
-	streamingProps := StreamingIngestProps{}
-
+func (i *StreamingIngestion) FromFile(ctx context.Context, fPath string, options ...FileOption) (*Result, error) {
 	local, err := filesystem.IsLocalPath(fPath)
 	if err != nil {
 		return nil, err
@@ -95,47 +52,48 @@ func (i *StreamingIngestion) FromFile(ctx context.Context, fPath string, props .
 	if !local {
 		return nil, errors.ES(errors.OpFileIngest, errors.KClientArgs, "blobstore paths are not supported for streaming")
 	}
+	props := i.newProp()
+
+	for _, option := range options {
+		err := option.Run(&props, true, false, false, false, true)
+		if err != nil {
+			return nil, err
+		}
+	}
 
 	discovery := filesystem.CompressionDiscovery(fPath)
-
 	if discovery != properties.CTUnknown && discovery != properties.CTNone {
-		streamingProps.isCompressed = true
+		props.Streaming.ShouldCompress = true
 	}
-
-	for _, prop := range props {
-		prop(&streamingProps)
-	}
-
-	streamingProps.leaveOpen = false // Since we open the file, we have to close it
 
 	file, err := os.Open(fPath)
 	if err != nil {
 		return nil, err
 	}
 
-	return streamImpl(i.db, i.table, i.streamConn, ctx, file, streamingProps)
+	return streamImpl(i.db, i.table, i.streamConn, ctx, file, props)
 }
 
 // FromReader allows uploading a data file for Kusto from an io.Reader. The content is uploaded to Blobstore and
 // ingested after all data in the reader is processed. Content should not use compression as the content will be
 // compressed with gzip. This method is thread-safe.
-func (i *StreamingIngestion) FromReader(ctx context.Context, reader io.Reader, props ...StreamingIngestProp) (*StreamingResult, error) {
-	streamingProps := StreamingIngestProps{}
+func (i *StreamingIngestion) FromReader(ctx context.Context, reader io.Reader, options ...FileOption) (*Result, error) {
+	props := i.newProp()
 
-	for _, prop := range props {
-		prop(&streamingProps)
+	for _, prop := range options {
+		err := prop.Run(&props, false, false, true, false, true)
+		if err != nil {
+			return nil, err
+		}
 	}
 
-	return streamImpl(i.db, i.table, i.streamConn, ctx, reader, streamingProps)
+	props.Streaming.ShouldCompress = true
+
+	return streamImpl(i.db, i.table, i.streamConn, ctx, reader, props)
 }
 
-var (
-	// ErrTooLarge indicates that the data being passed to a StreamBlock is larger than the maximum StreamBlock size of 4MiB.
-	ErrTooLarge = errors.ES(errors.OpIngestStream, errors.KClientArgs, "cannot add data larger than 4MiB")
-)
-
-func streamImpl(db, table string, c *conn.Conn, ctx context.Context, payload io.Reader, props StreamingIngestProps) (*StreamingResult, error) {
-	if !props.isCompressed {
+func streamImpl(db, table string, c *conn.Conn, ctx context.Context, payload io.Reader, props properties.All) (*Result, error) {
+	if props.Streaming.ShouldCompress {
 		var closer io.ReadCloser
 		var ok bool
 		if closer, ok = payload.(io.ReadCloser); !ok {
@@ -147,30 +105,24 @@ func streamImpl(db, table string, c *conn.Conn, ctx context.Context, payload io.
 		payload = zw
 	}
 
-	//TODO - should we keep this check? Or maybe just for buffers?
-	if seeker, ok := payload.(io.Seeker); ok {
-		seek, err := seeker.Seek(0, io.SeekEnd)
-		if err != nil {
-			return nil, errors.E(errors.OpIngestStream, errors.KClientArgs, err)
-		}
-		if seek > 4*mib {
-			return nil, ErrTooLarge
-		}
-		_, err = seeker.Seek(0, io.SeekStart)
-		if err != nil {
-			return nil, err
-		}
-	}
-
-	err := c.Write(ctx, db, table, payload, props.format, props.mappingReference, props.leaveOpen, props.clientRequestId)
+	err := c.Write(ctx, db, table, payload, props.Ingestion.Additional.Format, props.Ingestion.Additional.IngestionMappingRef, props.Streaming.ClientRequestId)
 
 	if err != nil {
 		return nil, errors.E(errors.OpIngestStream, errors.KClientArgs, err)
 	}
 
-	return &StreamingResult{
-		statusCode: Succeeded,
-		database:   db,
-		table:      table,
-	}, nil
+	result := newResult()
+	result.putProps(props)
+	result.record.Status = "Success"
+
+	return result, nil
+}
+
+func (i *StreamingIngestion) newProp() properties.All {
+	return properties.All{
+		Ingestion: properties.Ingestion{
+			DatabaseName: i.db,
+			TableName:    i.table,
+		},
+	}
 }
