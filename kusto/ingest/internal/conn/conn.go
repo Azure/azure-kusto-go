@@ -22,7 +22,7 @@ import (
 	"github.com/google/uuid"
 )
 
-var validURL = regexp.MustCompile(`https://([a-zA-Z0-9_-]{1,}\.){1,2}.*\??`)
+var validURL = regexp.MustCompile(`https://([a-zA-Z0-9_-]+\.){1,2}.*\??`)
 
 // BuffPool provides a pool of *bytes.Buffer objects.
 var BuffPool = sync.Pool{
