@@ -27,7 +27,7 @@ import (
 	"github.com/google/uuid"
 )
 
-var validURL = regexp.MustCompile(`https://([a-zA-Z0-9_-]{1,}\.){1,2}.*`)
+var validURL = regexp.MustCompile(`https://([a-zA-Z0-9_-]+\.){1,2}.*`)
 
 var bufferPool = sync.Pool{
 	New: func() interface{} {
@@ -85,7 +85,7 @@ func (c *conn) query(ctx context.Context, db string, query Stmt, options *queryO
 		return execResp{}, errors.ES(errors.OpQuery, errors.KClientArgs, "a Stmt to Query() cannot begin with a period(.), only Mgmt() calls can do that").SetNoRetry()
 	}
 
-	return c.execute(ctx, execQuery, db, query, "", *options.requestProperties)
+	return c.execute(ctx, execQuery, db, query, *options.requestProperties)
 }
 
 // mgmt is used to do management queries to Kusto.
@@ -102,7 +102,7 @@ func (c *conn) mgmt(ctx context.Context, db string, query Stmt, options *mgmtOpt
 		}
 	}
 
-	return c.execute(ctx, execMgmt, db, query, "", *options.requestProperties)
+	return c.execute(ctx, execMgmt, db, query, *options.requestProperties)
 }
 
 const (
@@ -117,7 +117,7 @@ type execResp struct {
 	frameCh    chan frames.Frame
 }
 
-func (c *conn) execute(ctx context.Context, execType int, db string, query Stmt, payload string, properties requestProperties) (execResp, error) {
+func (c *conn) execute(ctx context.Context, execType int, db string, query Stmt, properties requestProperties) (execResp, error) {
 	var op errors.Op
 	if execType == execQuery {
 		op = errors.OpQuery
