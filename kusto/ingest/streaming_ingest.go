@@ -91,7 +91,8 @@ func (i *StreamingIngestion) FromReader(ctx context.Context, reader io.Reader, o
 }
 
 func streamImpl(db, table string, c *conn.Conn, ctx context.Context, payload io.Reader, props properties.All) (*Result, error) {
-	if props.Streaming.DontCompress {
+	compress := !props.Streaming.DontCompress
+	if compress {
 		var closer io.ReadCloser
 		var ok bool
 		if closer, ok = payload.(io.ReadCloser); !ok {
