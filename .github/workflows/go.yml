@@ -18,7 +18,11 @@ jobs:
         with:
           go-version: 1.13
         id: go
-
+      - name: setup env
+        run: |
+          echo "::set-env name=GOPATH::$(dirname $GITHUB_WORKSPACE)"
+          echo "::add-path::$(dirname $GITHUB_WORKSPACE)/bin"
+        shell: bash
       - name: Setup JUnit Report
         run: go get -u github.com/jstemmer/go-junit-report
 
