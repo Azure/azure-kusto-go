@@ -103,6 +103,11 @@ func TestStream(t *testing.T) {
 			payload:     fakeContent{Name: "Doak", ID: 25},
 			mappingName: "jsonMap",
 		},
+		{
+			desc:        "failure",
+			payload:     fakeContent{Name: "aaaa", ID: 25},
+			mappingName: "fail",
+		},
 	}
 
 	server := newFakeStreamService()
