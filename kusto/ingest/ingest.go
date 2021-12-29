@@ -199,6 +199,9 @@ func (i *Ingestion) Stream(ctx context.Context, payload []byte, format DataForma
 				IngestionMappingRef: mappingName,
 			},
 		},
+		Streaming: properties.Streaming{
+			ShouldCompress: true,
+		},
 	}
 
 	_, err = streamImpl(i.db, i.table, c, ctx, bytes.NewReader(payload), props)
