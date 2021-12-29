@@ -13,31 +13,45 @@ jobs:
     runs-on: ubuntu-latest
     steps:
 
-    - name: Set up Go 1.13
-      uses: actions/setup-go@v1
-      with:
-        go-version: 1.13
-      id: go
+      - name: Set up Go 1.13
+        uses: actions/setup-go@v2
+        with:
+          go-version: 1.13
+        id: go
+      - name: setup env
+        run: |
+          echo "GOPATH=$(dirname $GITHUB_WORKSPACE)" >> $GITHUB_ENV
+          echo "$(dirname $GITHUB_WORKSPACE)/bin" >> $GITHUB_PATH
+        shell: bash
+      - name: Setup JUnit Report
+        run: go get -u github.com/jstemmer/go-junit-report
 
-    - name: Check out code into the Go module directory
-      uses: actions/checkout@v2
+      - name: Check out code into the Go module directory
+        uses: actions/checkout@v2
 
-    - name: Get dependencies
-      run: |
-        cd kusto
-        go get -v -t -d ./...
+      - name: Get dependencies
+        run: |
+          cd kusto
+          go get -v -t -d ./...
 
-    - name: Build
-      run: |
-        cd kusto
-        go build -v ./...
-    - name: Test
-      run: |
-        cd kusto
-        go test -v ./...
-      env:
-        ENGINE_CONNECTION_STRING: ${{ secrets.ENGINE_CONNECTION_STRING }}
-        APP_ID: ${{ secrets.APP_ID }}
-        APP_KEY: ${{ secrets.APP_KEY }}
-        AUTH_ID: ${{ secrets.AUTH_ID }}
-        TEST_DATABASE: ${{ secrets.TEST_DATABASE }}
+      - name: Build
+        run: |
+          cd kusto
+          go build -v ./...
+
+      - name: Test
+        run: |
+          cd kusto
+          go test -v ./... 2>&1 | tee >(go-junit-report > report.xml)
+        env:
+          ENGINE_CONNECTION_STRING: ${{ secrets.ENGINE_CONNECTION_STRING }}
+          APP_ID: ${{ secrets.APP_ID }}
+          APP_KEY: ${{ secrets.APP_KEY }}
+          AUTH_ID: ${{ secrets.AUTH_ID }}
+          TEST_DATABASE: ${{ secrets.TEST_DATABASE }}
+      - name: Publish Unit Test Results
+        uses: EnricoMi/publish-unit-test-result-action@v1
+        if: always()
+        with:
+          files: |
+            kusto/report.xml
