@@ -37,6 +37,7 @@ jobs:
       - name: Test
         run: |
           cd kusto
+          set -o pipefail
           go test -v ./... 2>&1 | tee >(go-junit-report > report.xml)
         env:
           ENGINE_CONNECTION_STRING: ${{ secrets.ENGINE_CONNECTION_STRING }}
