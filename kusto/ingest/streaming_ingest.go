@@ -61,9 +61,9 @@ func (i *StreamingIngestion) FromFile(ctx context.Context, fPath string, options
 		}
 	}
 
-	discovery := filesystem.CompressionDiscovery(fPath)
-	if discovery != properties.CTUnknown && discovery != properties.CTNone {
-		props.Streaming.ShouldCompress = true
+	compression := filesystem.CompressionDiscovery(fPath)
+	if compression != properties.CTNone {
+		props.Streaming.DontCompress = true
 	}
 
 	file, err := os.Open(fPath)
@@ -87,13 +87,11 @@ func (i *StreamingIngestion) FromReader(ctx context.Context, reader io.Reader, o
 		}
 	}
 
-	props.Streaming.ShouldCompress = true
-
 	return streamImpl(i.db, i.table, i.streamConn, ctx, reader, props)
 }
 
 func streamImpl(db, table string, c *conn.Conn, ctx context.Context, payload io.Reader, props properties.All) (*Result, error) {
-	if props.Streaming.ShouldCompress {
+	if props.Streaming.DontCompress {
 		var closer io.ReadCloser
 		var ok bool
 		if closer, ok = payload.(io.ReadCloser); !ok {

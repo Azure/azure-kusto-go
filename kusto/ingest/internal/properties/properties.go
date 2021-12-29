@@ -236,7 +236,7 @@ type All struct {
 // Streaming provides options that are used when doing an ingestion from a stream.
 type Streaming struct {
 	ClientRequestId string
-	ShouldCompress  bool
+	DontCompress    bool
 }
 
 // SourceOptions are options that the user provides about the source file that is going to be uploaded.
