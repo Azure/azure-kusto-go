@@ -75,7 +75,7 @@ func TestNonProgressive(t *testing.T) {
 					TableKind: frames.QueryProperties,
 					TableName: frames.ExtendedProperties,
 					Columns: table.Columns{
-						{Name: "TableId", Type: "ints"},
+						{Name: "TableId", Type: "int"},
 						{Name: "Key", Type: "string"},
 						{Name: "Value", Type: "dynamic"},
 					},
