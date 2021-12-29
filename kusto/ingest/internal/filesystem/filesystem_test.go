@@ -59,7 +59,7 @@ func TestCompressionDiscovery(t *testing.T) {
 		{"https://somehost.somedomain.com:8080/v1/somestuff/file.zip", properties.ZIP},
 		{"/path/to/a/file.gz", properties.GZIP},
 		{"/path/to/a/file.zip", properties.ZIP},
-		{"/path/to/a/file", properties.CTNone},
+		{"/path/to/a/file", properties.GZIP},
 	}
 
 	for _, test := range tests {

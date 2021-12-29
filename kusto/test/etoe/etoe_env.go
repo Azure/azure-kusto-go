@@ -93,5 +93,5 @@ func init() {
 		testConfig.Authorizer = kusto.Authorization{Config: auth.NewClientCredentialsConfig(testConfig.ClientID, testConfig.ClientSecret, testConfig.TenantID)}
 	}
 
-	skipETOE = false
+	skipETOE = true
 }
