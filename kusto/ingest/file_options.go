@@ -2,67 +2,64 @@ package ingest
 
 import (
 	"encoding/json"
+	"fmt"
 	"time"
 
 	"github.com/Azure/azure-kusto-go/kusto/data/errors"
 	"github.com/Azure/azure-kusto-go/kusto/ingest/internal/properties"
 )
 
+type OptionScope uint
+
+const (
+	IngestFromFile OptionScope = 1 << iota
+	IngestFromReader
+	IngestFromBlob
+	QueuedIngest
+	StreamingIngest
+)
+
+var scopesMap = map[OptionScope]string{
+	IngestFromFile:   "IngestFromFile",
+	IngestFromReader: "IngestFromReader",
+	IngestFromBlob:   "IngestFromBlob",
+	QueuedIngest:     "QueuedIngest",
+	StreamingIngest:  "StreamingIngest",
+}
+
 // FileOption is an optional argument to FromFile().
 type FileOption interface {
-	isFileOption() bool
-	isBlobOption() bool
-	isReaderOption() bool
-	isQueuedOption() bool
-	isStreamingOption() bool
+	fmt.Stringer
 
-	Run(p *properties.All, isFile, isblob, isReader, isQueued, isStreaming bool) error
+	OptionScopes() OptionScope
+
+	Run(p *properties.All, scopes OptionScope) error
 }
 
 type option struct {
-	run         func(p *properties.All) error
-	isFile      bool
-	isBlob      bool
-	isReader    bool
-	isQueued    bool
-	isStreaming bool
+	run    func(p *properties.All) error
+	scopes OptionScope
+	name   string
 }
 
-func (o option) isFileOption() bool {
-	return o.isFile
+func (o option) String() string {
+	return o.name
 }
 
-func (o option) isReaderOption() bool {
-	return o.isReader
+func (o option) OptionScopes() OptionScope {
+	return o.scopes
 }
 
-func (o option) isQueuedOption() bool {
-	return o.isQueued
-}
+func (o option) Run(p *properties.All, scopes OptionScope) error {
 
-func (o option) isStreamingOption() bool {
-	return o.isStreaming
-}
-
-func (o option) isBlobOption() bool {
-	return o.isBlob
-}
-
-func (o option) Run(p *properties.All, isFile, isReader, isBlob, isQueued, isStreaming bool) error {
-	if isFile && !o.isFile {
-		return errors.ES(errors.OpFileIngest, errors.KClientArgs, "option cannot be used with File ingestion")
-	}
-	if isReader && !o.isReader {
-		return errors.ES(errors.OpFileIngest, errors.KClientArgs, "option cannot be used with Reader ingestion")
-	}
-	if isBlob && !o.isBlob {
-		return errors.ES(errors.OpFileIngest, errors.KClientArgs, "option cannot be used with Blob ingestion")
-	}
-	if isQueued && !o.isQueued {
-		return errors.ES(errors.OpFileIngest, errors.KClientArgs, "option cannot be used with Queued ingestion")
-	}
-	if isStreaming && !o.isStreaming {
-		return errors.ES(errors.OpFileIngest, errors.KClientArgs, "option cannot be used with Streaming ingestion")
+	for scope, scopeName := range scopesMap {
+		if ((scopes & scope) != 0) && ((o.scopes & scope) == 0) {
+			errType := errors.OpFileIngest
+			if (scopes & StreamingIngest) == 1 {
+				errType = errors.OpIngestStream
+			}
+			return errors.ES(errType, errors.KClientArgs, "Option %v is not allowed in scope %s", o, scopeName)
+		}
 	}
 
 	return o.run(p)
@@ -75,11 +72,8 @@ func FlushImmediately() FileOption {
 			p.Ingestion.FlushImmediately = true
 			return nil
 		},
-		isFile:      true,
-		isReader:    true,
-		isBlob:      true,
-		isQueued:    true,
-		isStreaming: false,
+		scopes: IngestFromFile | IngestFromReader | IngestFromBlob | QueuedIngest,
+		name:   "FlushImmediately",
 	}
 }
 
@@ -169,11 +163,8 @@ func IngestionMapping(mapping interface{}, mappingKind DataFormat) FileOption {
 
 			return nil
 		},
-		isFile:      true,
-		isBlob:      true,
-		isReader:    true,
-		isQueued:    true,
-		isStreaming: false,
+		scopes: IngestFromFile | IngestFromReader | IngestFromBlob | QueuedIngest,
+		name:   "IngestionMapping",
 	}
 }
 
@@ -190,11 +181,8 @@ func IngestionMappingRef(refName string, mappingKind DataFormat) FileOption {
 			p.Ingestion.Additional.IngestionMappingType = mappingKind
 			return nil
 		},
-		isFile:      true,
-		isBlob:      true,
-		isReader:    true,
-		isQueued:    true,
-		isStreaming: true,
+		scopes: IngestFromFile | IngestFromReader | IngestFromBlob | QueuedIngest | StreamingIngest,
+		name:   "IngestionMappingRef",
 	}
 }
 
@@ -205,11 +193,8 @@ func DeleteSource() FileOption {
 			p.Source.DeleteLocalSource = true
 			return nil
 		},
-		isFile:      true,
-		isBlob:      false,
-		isReader:    false,
-		isQueued:    true,
-		isStreaming: true,
+		scopes: IngestFromFile | QueuedIngest | StreamingIngest,
+		name:   "DeleteSource",
 	}
 }
 
@@ -220,11 +205,8 @@ func IgnoreSizeLimit() FileOption {
 			p.Ingestion.IgnoreSizeLimit = true
 			return nil
 		},
-		isFile:      true,
-		isBlob:      false,
-		isReader:    true,
-		isQueued:    true,
-		isStreaming: false,
+		scopes: IngestFromFile | IngestFromReader | QueuedIngest,
+		name:   "IgnoreSizeLimit",
 	}
 }
 
@@ -235,11 +217,8 @@ func Tags(tags []string) FileOption {
 			p.Ingestion.Additional.Tags = tags
 			return nil
 		},
-		isFile:      true,
-		isBlob:      false,
-		isReader:    true,
-		isQueued:    true,
-		isStreaming: false,
+		scopes: IngestFromFile | IngestFromReader | QueuedIngest,
+		name:   "Tags",
 	}
 }
 
@@ -252,11 +231,8 @@ func IfNotExists(ingestByTag string) FileOption {
 			p.Ingestion.Additional.IngestIfNotExists = ingestByTag
 			return nil
 		},
-		isFile:      true,
-		isBlob:      false,
-		isReader:    true,
-		isQueued:    true,
-		isStreaming: false,
+		scopes: IngestFromFile | IngestFromReader | QueuedIngest,
+		name:   "IfNotExists",
 	}
 }
 
@@ -270,11 +246,8 @@ func ReportResultToTable() FileOption {
 			p.Ingestion.ReportMethod = properties.ReportStatusToTable
 			return nil
 		},
-		isFile:      true,
-		isBlob:      true,
-		isReader:    true,
-		isQueued:    true,
-		isStreaming: false,
+		scopes: IngestFromFile | IngestFromReader | IngestFromBlob | QueuedIngest | StreamingIngest,
+		name:   "ReportResultToTable",
 	}
 }
 
@@ -286,11 +259,8 @@ func SetCreationTime(t time.Time) FileOption {
 			p.Ingestion.Additional.CreationTime = t
 			return nil
 		},
-		isFile:      true,
-		isBlob:      true,
-		isReader:    true,
-		isQueued:    true,
-		isStreaming: false,
+		scopes: IngestFromFile | IngestFromReader | IngestFromBlob | QueuedIngest,
+		name:   "SetCreationTime",
 	}
 }
 
@@ -344,11 +314,8 @@ func ValidationPolicy(policy ValPolicy) FileOption {
 			p.Ingestion.Additional.ValidationPolicy = string(b)
 			return nil
 		},
-		isFile:      true,
-		isBlob:      true,
-		isReader:    true,
-		isQueued:    true,
-		isStreaming: false,
+		scopes: IngestFromFile | IngestFromReader | IngestFromBlob | QueuedIngest,
+		name:   "ValidationPolicy",
 	}
 }
 
@@ -361,11 +328,8 @@ func FileFormat(et DataFormat) FileOption {
 			p.Ingestion.Additional.Format = et
 			return nil
 		},
-		isFile:      true,
-		isBlob:      true,
-		isReader:    true,
-		isQueued:    true,
-		isStreaming: true,
+		scopes: IngestFromFile | IngestFromReader | IngestFromBlob | QueuedIngest | StreamingIngest,
+		name:   "FileFormat",
 	}
 }
 
@@ -376,10 +340,7 @@ func ClientRequestId(clientRequestId string) FileOption {
 			p.Streaming.ClientRequestId = clientRequestId
 			return nil
 		},
-		isFile:      true,
-		isBlob:      true,
-		isReader:    true,
-		isQueued:    false,
-		isStreaming: true,
+		scopes: IngestFromFile | IngestFromReader | IngestFromBlob | StreamingIngest,
+		name:   "ClientRequestId",
 	}
 }

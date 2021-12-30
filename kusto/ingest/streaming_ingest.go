@@ -55,7 +55,7 @@ func (i *StreamingIngestion) FromFile(ctx context.Context, fPath string, options
 	props := i.newProp()
 
 	for _, option := range options {
-		err := option.Run(&props, true, false, false, false, true)
+		err := option.Run(&props, StreamingIngest|IngestFromFile)
 		if err != nil {
 			return nil, err
 		}
@@ -81,7 +81,7 @@ func (i *StreamingIngestion) FromReader(ctx context.Context, reader io.Reader, o
 	props := i.newProp()
 
 	for _, prop := range options {
-		err := prop.Run(&props, false, false, true, false, true)
+		err := prop.Run(&props, StreamingIngest|IngestFromReader)
 		if err != nil {
 			return nil, err
 		}
@@ -107,6 +107,9 @@ func streamImpl(db, table string, c *conn.Conn, ctx context.Context, payload io.
 	err := c.Write(ctx, db, table, payload, props.Ingestion.Additional.Format, props.Ingestion.Additional.IngestionMappingRef, props.Streaming.ClientRequestId)
 
 	if err != nil {
+		if e, ok := err.(*errors.Error); ok {
+			return nil, e
+		}
 		return nil, errors.E(errors.OpIngestStream, errors.KClientArgs, err)
 	}
 

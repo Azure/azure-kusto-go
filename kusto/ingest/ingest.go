@@ -82,7 +82,7 @@ func New(client *kusto.Client, db, table string) (*Ingestion, error) {
 	return i, nil
 }
 
-func (i *Ingestion) prepForIngestion(ctx context.Context, options []FileOption, isFile, isBlob, isReader bool) (*Result, properties.All, error) {
+func (i *Ingestion) prepForIngestion(ctx context.Context, options []FileOption, scope OptionScope) (*Result, properties.All, error) {
 	result := newResult()
 
 	auth, err := i.mgr.AuthContext(ctx)
@@ -92,7 +92,7 @@ func (i *Ingestion) prepForIngestion(ctx context.Context, options []FileOption, 
 
 	props := i.newProp(auth)
 	for _, o := range options {
-		if err := o.Run(&props, isFile, isBlob, isReader, true, false); err != nil {
+		if err := o.Run(&props, QueuedIngest|scope); err != nil {
 			return nil, properties.All{}, err
 		}
 	}
@@ -132,7 +132,14 @@ func (i *Ingestion) FromFile(ctx context.Context, fPath string, options ...FileO
 		return nil, err
 	}
 
-	result, props, err := i.prepForIngestion(ctx, options, local, !local, false)
+	var scope OptionScope
+	if local {
+		scope = IngestFromFile
+	} else {
+		scope = IngestFromBlob
+	}
+
+	result, props, err := i.prepForIngestion(ctx, options, scope)
 	if err != nil {
 		return nil, err
 	}
@@ -158,7 +165,7 @@ func (i *Ingestion) FromFile(ctx context.Context, fPath string, options ...FileO
 // ingested after all data in the reader is processed. Content should not use compression as the content will be
 // compressed with gzip. This method is thread-safe.
 func (i *Ingestion) FromReader(ctx context.Context, reader io.Reader, options ...FileOption) (*Result, error) {
-	result, props, err := i.prepForIngestion(ctx, options, false, false, true)
+	result, props, err := i.prepForIngestion(ctx, options, IngestFromReader)
 	if err != nil {
 		return nil, err
 	}
@@ -179,7 +186,7 @@ func (i *Ingestion) FromReader(ctx context.Context, reader io.Reader, options ..
 
 // Stream takes a payload that is encoded in format with a server stored mappingName, compresses it and uploads it to Kusto.
 // payload must be a fully formed entry of format and < 4MiB or this will fail. We currently support
-// CSV, TSV, SCSV, SOHSV, PSV, JSON and AVRO. If using JSON or AVRO, you must provide a mappingName that references
+// CSV, TSV, SCSV, SOHSV, PSV, JSON and AVRO. If using JSON or AVRO, you must provide a .mappingName that references
 // the name of the pre-created ingestion mapping defined on the table. Otherwise mappingName can be an empty string.
 // More information can be found here:
 // https://docs.microsoft.com/en-us/azure/kusto/management/create-ingestion-mapping-command
