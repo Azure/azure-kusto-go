@@ -10,6 +10,7 @@ import (
 	"time"
 
 	"github.com/Azure/azure-kusto-go/kusto"
+	"github.com/Azure/azure-kusto-go/kusto/data/errors"
 	"github.com/Azure/azure-kusto-go/kusto/data/table"
 	"github.com/Azure/azure-kusto-go/kusto/data/types"
 	"github.com/Azure/azure-kusto-go/kusto/data/value"
@@ -29,9 +30,8 @@ var (
 		),
 	)
 
-	ingestInlineStmt = kusto.NewStmt(".ingest inline into table AllDataTypes <|1,2.00000000000001,'2020-03-04T14:05:01.3109965Z',1:23:45.6789,{\"moshe\": \"value\"},1,0.01,asdf,9223372036854775807,74be27de-1e4e-49d9-b579-fe0b331d3642")
-	createStmt       = kusto.NewStmt(".create table AllDataTypes (vnum: int, vdec: decimal, vdate: datetime, vspan: timespan, vobj: dynamic, vb: bool, vreal: real, vstr: string, vlong: long, vguid: guid)")
-	dropStmt         = kusto.NewStmt(".drop table AllDataTypes ifexists")
+	// This is needed because of a bug in the backend that sometimes causes the tables not to drop and get stuck.
+	clearStreamingCacheStatement = kusto.NewStmt(".clear database cache streamingingestion schema")
 )
 
 type CountResult struct {
@@ -107,6 +107,8 @@ func TestQueries(t *testing.T) {
 		),
 	)
 
+	allDataTypesTable := fmt.Sprintf("goe2e_all_data_types_%d", time.Now().Unix())
+
 	tests := []struct {
 		// desc is a description of a test.
 		desc string
@@ -132,10 +134,10 @@ func TestQueries(t *testing.T) {
 		{
 			desc: "Query: Retrieve count of the number of rows that match",
 			stmt: pCountStmt.MustParameters(
-				kusto.NewParameters().Must(kusto.QueryValues{"tableName": "AllDataTypes"}),
+				kusto.NewParameters().Must(kusto.QueryValues{"tableName": allDataTypesTable}),
 			),
 			setup: func() error {
-				return createAllDataTypesTable(client)
+				return createAllDataTypesUnsafeTable(t, client, allDataTypesTable)
 			},
 			qcall: client.Query,
 			doer: func(row *table.Row, update interface{}) error {
@@ -184,8 +186,9 @@ func TestQueries(t *testing.T) {
 			want: []MgmtProjectionResult{{A: "1"}},
 		},
 		{
-			desc:  "Mgmt(https://github.com/Azure/azure-kusto-go/issues/55): transformations on mgmt queries - multiple tables",
-			stmt:  kusto.NewStmt(`.show databases | project A="1" | take 1; AllDataTypes | project A="2" | take 1`),
+			desc: "Mgmt(https://github.com/Azure/azure-kusto-go/issues/55): transformations on mgmt queries - multiple tables",
+			stmt: kusto.NewStmt(`.show databases | project A="1" | take 1;`, kusto.UnsafeStmt(unsafe.Stmt{Add: true})).UnsafeAdd(allDataTypesTable).Add(
+				" | project A=\"2\" | take 1"),
 			mcall: client.Mgmt,
 			doer: func(row *table.Row, update interface{}) error {
 				rec := MgmtProjectionResult{}
@@ -204,7 +207,7 @@ func TestQueries(t *testing.T) {
 		},
 		{
 			desc:  "Query: Progressive query: make sure we can convert all data types from a row",
-			stmt:  kusto.NewStmt("AllDataTypes"),
+			stmt:  kusto.NewStmt("", kusto.UnsafeStmt(unsafe.Stmt{Add: true})).UnsafeAdd(allDataTypesTable),
 			qcall: client.Query,
 			doer: func(row *table.Row, update interface{}) error {
 				rec := AllDataType{}
@@ -223,7 +226,7 @@ func TestQueries(t *testing.T) {
 		},
 		{
 			desc:    "Query: Non-Progressive query: make sure we can convert all data types from a row",
-			stmt:    kusto.NewStmt("AllDataTypes"),
+			stmt:    kusto.NewStmt("", kusto.UnsafeStmt(unsafe.Stmt{Add: true})).UnsafeAdd(allDataTypesTable),
 			qcall:   client.Query,
 			options: []kusto.QueryOption{kusto.ResultsProgressiveDisable()},
 			doer: func(row *table.Row, update interface{}) error {
@@ -355,7 +358,15 @@ func TestFileIngestion(t *testing.T) {
 		panic(err)
 	}
 
-	ingestor, err := ingest.New(client, testConfig.Database, "Logs")
+	queuedTable := fmt.Sprintf("goe2e_queued_file_logs_%d", time.Now().Unix())
+	streamingTable := fmt.Sprintf("goe2e_streaming_file_logs_%d", time.Now().Unix())
+
+	queuedIngestor, err := ingest.New(client, testConfig.Database, queuedTable)
+	if err != nil {
+		panic(err)
+	}
+
+	streamingIngestor, err := ingest.NewStreaming(client, testConfig.Database, streamingTable)
 	if err != nil {
 		panic(err)
 	}
@@ -365,6 +376,8 @@ func TestFileIngestion(t *testing.T) {
 	tests := []struct {
 		// desc describes the test.
 		desc string
+		// the type of queuedIngestor for the test
+		ingestor ingest.Ingestor
 		// src represents where we are getting our data.
 		src string
 		// options are options used on ingesting.
@@ -381,28 +394,41 @@ func TestFileIngestion(t *testing.T) {
 		gotInit func() interface{}
 		// want is the data we want to receive from the query.
 		want interface{}
-		// wantErr indicates that we want the ingestion to fail before the query.
-		wantErr bool
+		// wantErr indicates what type of error we expect. nil if we don't expect
+		wantErr error
 		// compare allows the test to have a custom compare operation. If nil, the data from doer's update argument is
 		// compared against want using pretty.Compare().
 		compare func(got, want interface{}) error
 	}{
 		{
-			desc:    "Ingest from blob with bad existing mapping",
-			src:     "https://adxingestiondemo.blob.core.windows.net/data/demo.json",
-			options: []ingest.FileOption{ingest.IngestionMappingRef("Logs_bad_mapping", ingest.JSON)},
-			wantErr: true,
+			desc:     "Ingest from blob with bad existing mapping",
+			ingestor: queuedIngestor,
+			src:      "https://adxingestiondemo.blob.core.windows.net/data/demo.json",
+			options:  []ingest.FileOption{ingest.IngestionMappingRef("Logs_bad_mapping", ingest.JSON)},
+			wantErr: ingest.StatusFromMap(map[string]interface{}{
+				"Status":        "Failed",
+				"FailureStatus": "Permanent",
+				"ErrorCode":     "BadRequest_MappingReferenceWasNotFound",
+			}),
 		},
 		{
-			desc:    "Ingest from blob with existing mapping",
-			src:     "https://adxingestiondemo.blob.core.windows.net/data/demo.json",
-			options: []ingest.FileOption{ingest.IngestionMappingRef("Logs_mapping", ingest.JSON)},
+			desc:     "Ingest from blob with streaming ingestion should fail",
+			ingestor: streamingIngestor,
+			src:      "https://adxingestiondemo.blob.core.windows.net/data/demo.json",
+			options:  []ingest.FileOption{ingest.IngestionMappingRef("Logs_mapping", ingest.JSON)},
+			wantErr:  errors.ES(errors.OpFileIngest, errors.KClientArgs, "blobstore paths are not supported for streaming"),
+		},
+		{
+			desc:     "Ingest from blob with existing mapping",
+			ingestor: queuedIngestor,
+			src:      "https://adxingestiondemo.blob.core.windows.net/data/demo.json",
+			options:  []ingest.FileOption{ingest.IngestionMappingRef("Logs_mapping", ingest.JSON)},
 			stmt: pCountStmt.MustParameters(
 				kusto.NewParameters().Must(
-					kusto.QueryValues{"tableName": "Logs"},
+					kusto.QueryValues{"tableName": queuedTable},
 				),
 			),
-			setup: func() error { return createIngestionTable(client) },
+			setup: func() error { return createIngestionTable(t, client, queuedTable) },
 			doer: func(row *table.Row, update interface{}) error {
 				rec := CountResult{}
 				if err := row.ToStruct(&rec); err != nil {
@@ -419,8 +445,9 @@ func TestFileIngestion(t *testing.T) {
 			want: []CountResult{{Count: 500}},
 		},
 		{
-			desc: "Ingest from blob with inline mapping",
-			src:  "https://adxingestiondemo.blob.core.windows.net/data/demo.json",
+			desc:     "Ingest from blob with inline mapping",
+			ingestor: queuedIngestor,
+			src:      "https://adxingestiondemo.blob.core.windows.net/data/demo.json",
 			options: []ingest.FileOption{
 				ingest.IngestionMapping(
 					"[{\"column\":\"header_time\",\"datatype\":\"datetime\",\"Properties\":{\"path\":\"$.header.time\"}},{\"column\":\"header_id\",\"datatype\":\"guid\",\"Properties\":{\"path\":\"$.header.id\"}},{\"column\":\"header_api_version\",\"Properties\":{\"path\":\"$.header.api_version\"},\"datatype\":\"string\"},{\"column\":\"payload_data\",\"datatype\":\"string\",\"Properties\":{\"path\":\"$.payload.data\"}},{\"column\":\"payload_user\",\"datatype\":\"string\",\"Properties\":{\"path\":\"$.payload.user\"}}]",
@@ -429,7 +456,7 @@ func TestFileIngestion(t *testing.T) {
 			},
 			stmt: pCountStmt.MustParameters(
 				kusto.NewParameters().Must(
-					kusto.QueryValues{"tableName": "Logs"},
+					kusto.QueryValues{"tableName": queuedTable},
 				),
 			),
 			doer: func(row *table.Row, update interface{}) error {
@@ -448,11 +475,12 @@ func TestFileIngestion(t *testing.T) {
 			want: []CountResult{{Count: 1000}}, // The count is the last ingestion + this one (500).
 		},
 		{
-			desc: "Ingestion from local file",
-			src:  csvFileFromString(),
+			desc:     "Ingestion from local file queued",
+			ingestor: queuedIngestor,
+			src:      csvFileFromString(),
 			stmt: pCountStmt.MustParameters(
 				kusto.NewParameters().Must(
-					kusto.QueryValues{"tableName": "Logs"},
+					kusto.QueryValues{"tableName": queuedTable},
 				),
 			),
 			doer: func(row *table.Row, update interface{}) error {
@@ -471,10 +499,56 @@ func TestFileIngestion(t *testing.T) {
 			want: []CountResult{{Count: 1003}}, // The count is the sum of all previous ingestions + 3.
 		},
 		{
-			desc:  "Ingestion from local file test 2",
-			src:   createCsvFileFromData(mockRows),
-			stmt:  kusto.NewStmt("Logs | order by header_api_version asc"),
-			setup: func() error { return createIngestionTable(client) },
+			desc:     "Ingestion from local file test 2 queued",
+			ingestor: queuedIngestor,
+			src:      createCsvFileFromData(mockRows),
+			stmt:     kusto.NewStmt("", kusto.UnsafeStmt(unsafe.Stmt{Add: true})).UnsafeAdd(queuedTable).Add(" | order by header_api_version asc"),
+			setup:    func() error { return createIngestionTable(t, client, queuedTable) },
+			doer: func(row *table.Row, update interface{}) error {
+				rec := LogRow{}
+				if err := row.ToStruct(&rec); err != nil {
+					return err
+				}
+				recs := update.(*[]LogRow)
+				*recs = append(*recs, rec)
+				return nil
+			},
+			gotInit: func() interface{} {
+				v := []LogRow{}
+				return &v
+			},
+			want: mockRows,
+		},
+		{
+			desc:     "Ingestion from local file streaming",
+			ingestor: streamingIngestor,
+			src:      csvFileFromString(),
+			stmt: pCountStmt.MustParameters(
+				kusto.NewParameters().Must(
+					kusto.QueryValues{"tableName": streamingTable},
+				),
+			),
+			setup: func() error { return createIngestionTable(t, client, streamingTable) },
+			doer: func(row *table.Row, update interface{}) error {
+				rec := CountResult{}
+				if err := row.ToStruct(&rec); err != nil {
+					return err
+				}
+				recs := update.(*[]CountResult)
+				*recs = append(*recs, rec)
+				return nil
+			},
+			gotInit: func() interface{} {
+				v := []CountResult{}
+				return &v
+			},
+			want: []CountResult{{Count: 3}},
+		},
+		{
+			desc:     "Ingestion from local file test 2 streaming",
+			ingestor: streamingIngestor,
+			src:      createCsvFileFromData(mockRows),
+			stmt:     kusto.NewStmt("", kusto.UnsafeStmt(unsafe.Stmt{Add: true})).UnsafeAdd(streamingTable).Add(" | order by header_api_version asc"),
 			doer: func(row *table.Row, update interface{}) error {
 				rec := LogRow{}
 				if err := row.ToStruct(&rec); err != nil {
@@ -507,21 +581,21 @@ func TestFileIngestion(t *testing.T) {
 				}()
 			}
 
-			test.options = append(test.options, ingest.FlushImmediately(), ingest.ReportResultToTable())
+			if _, ok := test.ingestor.(*ingest.Ingestion); ok {
+				test.options = append(test.options, ingest.FlushImmediately(), ingest.ReportResultToTable())
+			}
 
-			res, err := ingestor.FromFile(ctx, test.src, test.options...)
+			res, err := test.ingestor.FromFile(ctx, test.src, test.options...)
 			if err == nil {
 				err = <-res.Wait(ctx)
 			}
 
-			switch {
-			case err == nil && test.wantErr:
-				t.Errorf("TestFileIngestion(%s): ingestor.FromFile(): got err == nil, want err != nil", test.desc)
+			if !assertErrorsMatch(err, test.wantErr) {
+				t.Errorf("TestFileIngestion(%s): ingestor.FromFile(): got err == %v, want err == %v", test.desc, err, test.wantErr)
 				return
-			case err != nil && !test.wantErr:
-				t.Errorf("TestFileIngestion(%s): ingestor.FromFile(): got err == %s, want err == nil", test.desc, err)
-				return
-			case err != nil:
+			}
+
+			if err != nil {
 				return
 			}
 
@@ -532,6 +606,36 @@ func TestFileIngestion(t *testing.T) {
 	}
 }
 
+func assertErrorsMatch(got, want error) bool {
+	if ingest.IsStatusRecord(got) {
+		if want == nil || !ingest.IsStatusRecord(want) {
+			return false
+		}
+
+		codeGot, _ := ingest.GetErrorCode(got)
+		codeWant, _ := ingest.GetErrorCode(want)
+
+		statusGot, _ := ingest.GetIngestionStatus(got)
+		statusWant, _ := ingest.GetIngestionStatus(want)
+
+		failureStatusGot, _ := ingest.GetIngestionFailureStatus(got)
+		failureStatusWant, _ := ingest.GetIngestionFailureStatus(want)
+
+		return (codeGot == codeWant) && (statusGot == statusWant) && (failureStatusGot == failureStatusWant)
+
+	} else if e, ok := got.(*errors.Error); ok {
+		if want == nil {
+			return false
+		}
+		if wantE, ok := want.(*errors.Error); ok {
+			return e.Op == wantE.Op && e.Kind == wantE.Kind
+		}
+		return false
+	}
+
+	return got == want
+}
+
 func TestReaderIngestion(t *testing.T) {
 	if skipETOE || testing.Short() {
 		t.SkipNow()
@@ -540,12 +644,15 @@ func TestReaderIngestion(t *testing.T) {
 	ctx, cancel := context.WithCancel(context.Background())
 	defer cancel()
 
+	queuedTable := fmt.Sprintf("goe2e_queued_reader_logs_%d", time.Now().Unix())
+	//streamingTable := fmt.Sprintf("goe2e_streaming_reader_logs_%d", time.Now().Unix())
+
 	client, err := kusto.New(testConfig.Endpoint, testConfig.Authorizer)
 	if err != nil {
 		panic(err)
 	}
 
-	ingestor, err := ingest.New(client, testConfig.Database, "Logs")
+	ingestor, err := ingest.New(client, testConfig.Database, queuedTable)
 	if err != nil {
 		panic(err)
 	}
@@ -592,10 +699,10 @@ func TestReaderIngestion(t *testing.T) {
 			},
 			stmt: pCountStmt.MustParameters(
 				kusto.NewParameters().Must(
-					kusto.QueryValues{"tableName": "Logs"},
+					kusto.QueryValues{"tableName": queuedTable},
 				),
 			),
-			setup: func() error { return createIngestionTable(client) },
+			setup: func() error { return createIngestionTable(t, client, queuedTable) },
 			doer: func(row *table.Row, update interface{}) error {
 				rec := CountResult{}
 				if err := row.ToStruct(&rec); err != nil {
@@ -623,7 +730,7 @@ func TestReaderIngestion(t *testing.T) {
 			},
 			stmt: pCountStmt.MustParameters(
 				kusto.NewParameters().Must(
-					kusto.QueryValues{"tableName": "Logs"},
+					kusto.QueryValues{"tableName": queuedTable},
 				),
 			),
 			doer: func(row *table.Row, update interface{}) error {
@@ -647,8 +754,8 @@ func TestReaderIngestion(t *testing.T) {
 			options: []ingest.FileOption{
 				ingest.FileFormat(ingest.CSV),
 			},
-			stmt:  kusto.NewStmt("Logs | order by header_api_version asc"),
-			setup: func() error { return createIngestionTable(client) },
+			stmt:  kusto.NewStmt("", kusto.UnsafeStmt(unsafe.Stmt{Add: true})).UnsafeAdd(queuedTable).Add(" | order by header_api_version asc"),
+			setup: func() error { return createIngestionTable(t, client, queuedTable) },
 			doer: func(row *table.Row, update interface{}) error {
 				rec := LogRow{}
 				if err := row.ToStruct(&rec); err != nil {
@@ -733,17 +840,7 @@ func TestStreamingIngestion(t *testing.T) {
 	}
 
 	setupFunc := func(tableName string) error {
-		if err := createAllDataTypesUnsafeTable(client, tableName); err != nil {
-			return err
-		}
-
-		// This is needed because of a bug in the backend that sometimes causes the tables not to drop and get stuck.
-		_, err := client.Mgmt(
-			context.Background(),
-			testConfig.Database,
-			kusto.NewStmt(".clear database cache streamingingestion schema"),
-		)
-		return err
+		return createAllDataTypesUnsafeTable(t, client, tableName)
 	}
 
 	tests := []struct {
@@ -796,7 +893,7 @@ func TestStreamingIngestion(t *testing.T) {
 	}
 
 	for _, test := range tests {
-		tableName := fmt.Sprintf("Logs_%d", time.Now().Unix())
+		tableName := fmt.Sprintf("goe2e_streaming_datatypes_%d", time.Now().Unix())
 		if err := setupFunc(tableName); err != nil {
 			panic(err)
 		}
@@ -877,16 +974,16 @@ func getExpectedResult() AllDataType {
 	}
 }
 
-func createAllDataTypesUnsafeTable(client *kusto.Client, tableName string) error {
+func createAllDataTypesUnsafeTable(t *testing.T, client *kusto.Client, tableName string) error {
 	dropUnsafe := kusto.NewStmt(".drop table ", kusto.UnsafeStmt(unsafe.Stmt{Add: true})).UnsafeAdd(tableName).Add(" ifexists")
-	createUnsafe := kusto.NewStmt(".create table ", kusto.UnsafeStmt(unsafe.Stmt{Add: true})).UnsafeAdd(tableName).Add(" (header_time: datetime, header_id: guid, header_api_version: string, payload_data: string, payload_user: string) ")
+	createUnsafe := kusto.NewStmt(".set ", kusto.UnsafeStmt(unsafe.Stmt{Add: true})).UnsafeAdd(tableName).Add(" <| AllDataTypes")
 	addMappingUnsafe := kusto.NewStmt(".create table ", kusto.UnsafeStmt(unsafe.Stmt{Add: true})).UnsafeAdd(tableName).Add(" ingestion json mapping 'Logs_mapping' '[{\"column\":\"header_time\",\"path\":\"$.header.time\",\"datatype\":\"datetime\"},{\"column\":\"header_id\",\"path\":\"$.header.id\",\"datatype\":\"guid\"},{\"column\":\"header_api_version\",\"path\":\"$.header.api_version\",\"datatype\":\"string\"},{\"column\":\"payload_data\",\"path\":\"$.payload.data\",\"datatype\":\"string\"},{\"column\":\"payload_user\",\"path\":\"$.payload.user\",\"datatype\":\"string\"}]'")
 
-	return executeCommands(client, dropUnsafe, createUnsafe, addMappingUnsafe)
-}
+	t.Cleanup(func() {
+		_ = executeCommands(client, dropUnsafe)
+	})
 
-func createAllDataTypesTable(client *kusto.Client) error {
-	return executeCommands(client, dropStmt, createStmt, ingestInlineStmt)
+	return executeCommands(client, dropUnsafe, createUnsafe, addMappingUnsafe, clearStreamingCacheStatement)
 }
 
 func createMockLogRows() []LogRow {
@@ -962,20 +1059,16 @@ func csvFileFromString() string {
 	return fname
 }
 
-func createIngestionTable(client *kusto.Client) error {
-	var dropStmt = kusto.NewStmt(".drop table Logs ifexists")
-	var createStmt = kusto.NewStmt(".create table Logs (header_time: datetime, header_id: guid, header_api_version: string, payload_data: string, payload_user: string) ")
-	var addMappingStmt = kusto.NewStmt(".create table Logs ingestion json mapping 'Logs_mapping' '[{\"column\":\"header_time\",\"path\":\"$.header.time\",\"datatype\":\"datetime\"},{\"column\":\"header_id\",\"path\":\"$.header.id\",\"datatype\":\"guid\"},{\"column\":\"header_api_version\",\"path\":\"$.header.api_version\",\"datatype\":\"string\"},{\"column\":\"payload_data\",\"path\":\"$.payload.data\",\"datatype\":\"string\"},{\"column\":\"payload_user\",\"path\":\"$.payload.user\",\"datatype\":\"string\"}]'")
+func createIngestionTable(t *testing.T, client *kusto.Client, tableName string) error {
+	var dropStmt = kusto.NewStmt(".drop table ", kusto.UnsafeStmt(unsafe.Stmt{Add: true})).UnsafeAdd(tableName).Add(" ifexists")
+	var createStmt = kusto.NewStmt(".create table ", kusto.UnsafeStmt(unsafe.Stmt{Add: true})).UnsafeAdd(tableName).Add("(header_time: datetime, header_id: guid, header_api_version: string, payload_data: string, payload_user: string) ")
+	var addMappingStmt = kusto.NewStmt(".create table ", kusto.UnsafeStmt(unsafe.Stmt{Add: true})).UnsafeAdd(tableName).Add(" ingestion json mapping 'Logs_mapping' '[{\"column\":\"header_time\",\"path\":\"$.header.time\",\"datatype\":\"datetime\"},{\"column\":\"header_id\",\"path\":\"$.header.id\",\"datatype\":\"guid\"},{\"column\":\"header_api_version\",\"path\":\"$.header.api_version\",\"datatype\":\"string\"},{\"column\":\"payload_data\",\"path\":\"$.payload.data\",\"datatype\":\"string\"},{\"column\":\"payload_user\",\"path\":\"$.payload.user\",\"datatype\":\"string\"}]'")
 
-	commandsToRun := []kusto.Stmt{dropStmt, createStmt, addMappingStmt}
+	t.Cleanup(func() {
+		_ = executeCommands(client, dropStmt)
+	})
 
-	for _, cmd := range commandsToRun {
-		if _, err := client.Mgmt(context.Background(), testConfig.Database, cmd); err != nil {
-			return err
-		}
-	}
-
-	return nil
+	return executeCommands(client, dropStmt, createStmt, addMappingStmt, clearStreamingCacheStatement)
 }
 
 func createStringyLogsData() string {
@@ -987,7 +1080,7 @@ func createStringyLogsData() string {
 
 func executeCommands(client *kusto.Client, commandsToRun ...kusto.Stmt) error {
 	for _, cmd := range commandsToRun {
-		if _, err := client.Mgmt(context.Background(), testConfig.Database, cmd); err != nil {
+		if _, err := client.Mgmt(context.Background(), testConfig.Database, cmd, kusto.AllowWrite()); err != nil {
 			return err
 		}
 	}
