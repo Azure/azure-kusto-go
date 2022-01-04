@@ -2,6 +2,7 @@ package ingest
 
 import (
 	"context"
+	"fmt"
 	"io"
 	"io/ioutil"
 	"os"
@@ -66,6 +67,11 @@ func (i *StreamingIngestion) FromFile(ctx context.Context, fPath string, options
 		props.Streaming.DontCompress = true
 	}
 
+	err = filesystem.CompleteFormatFromFileName(&props, fPath)
+	if err != nil {
+		return nil, err
+	}
+
 	file, err := os.Open(fPath)
 	if err != nil {
 		return nil, err
@@ -85,6 +91,11 @@ func (i *StreamingIngestion) FromReader(ctx context.Context, reader io.Reader, o
 		if err != nil {
 			return nil, err
 		}
+	}
+
+	if props.Ingestion.Additional.Format == DFUnknown {
+		// TODO - other SDKs default to CSV. Should we do this here for parity?
+		return nil, fmt.Errorf("must provide option FileFormat() when using FromReader()")
 	}
 
 	return streamImpl(i.db, i.table, i.streamConn, ctx, reader, props)
