@@ -239,7 +239,7 @@ func TestQueries(t *testing.T) {
 				ad := []AllDataType{}
 				return &ad
 			},
-			want: []AllDataType{getExpectedResult()},
+			want: &[]AllDataType{getExpectedResult()},
 		},
 		{
 			desc:    "Query: make sure Dynamic data type variations can be parsed",
@@ -654,14 +654,25 @@ func TestReaderIngestion(t *testing.T) {
 	defer cancel()
 
 	queuedTable := fmt.Sprintf("goe2e_queued_reader_logs_%d", time.Now().Unix())
-	//streamingTable := fmt.Sprintf("goe2e_streaming_reader_logs_%d", time.Now().Unix())
+	streamingTable := fmt.Sprintf("goe2e_streaming_reader_logs_%d", time.Now().Unix())
+	streamingTable2 := fmt.Sprintf("goe2e_streaming_reader_logs_2_%d", time.Now().Unix())
 
 	client, err := kusto.New(testConfig.Endpoint, testConfig.Authorizer)
 	if err != nil {
 		panic(err)
 	}
 
-	ingestor, err := ingest.New(client, testConfig.Database, queuedTable)
+	queuedIngestor, err := ingest.New(client, testConfig.Database, queuedTable)
+	if err != nil {
+		panic(err)
+	}
+
+	streamingIngestor, err := ingest.New(client, testConfig.Database, streamingTable)
+	if err != nil {
+		panic(err)
+	}
+
+	streamingIngestor2, err := ingest.NewStreaming(client, testConfig.Database, streamingTable2)
 	if err != nil {
 		panic(err)
 	}
@@ -690,17 +701,23 @@ func TestReaderIngestion(t *testing.T) {
 		// want is the data we want to receive from the query.
 		want interface{}
 		// wantErr indicates what type of error we expect. nil if we don't expect
-		wantErr bool
+		wantErr error
 	}{
 		{
-			desc:    "Ingest from blob with bad existing mapping",
-			src:     "testdata/demo.json",
-			options: []ingest.FileOption{ingest.IngestionMappingRef("Logs_bad_mapping", ingest.JSON)},
-			wantErr: true,
+			desc:     "Ingest from blob with bad existing mapping",
+			ingestor: queuedIngestor,
+			src:      "testdata/demo.json",
+			options:  []ingest.FileOption{ingest.FileFormat(ingest.JSON), ingest.IngestionMappingRef("Logs_bad_mapping", ingest.JSON)},
+			wantErr: ingest.StatusFromMap(map[string]interface{}{
+				"Status":        "Failed",
+				"FailureStatus": "Permanent",
+				"ErrorCode":     "BadRequest_MappingReferenceWasNotFound",
+			}),
 		},
 		{
-			desc: "Ingest with existing mapping",
-			src:  "testdata/demo.json",
+			desc:     "Ingest with existing mapping",
+			ingestor: queuedIngestor,
+			src:      "testdata/demo.json",
 			options: []ingest.FileOption{
 				ingest.FileFormat(ingest.JSON),
 				ingest.IngestionMappingRef("Logs_mapping", ingest.JSON),
@@ -727,8 +744,9 @@ func TestReaderIngestion(t *testing.T) {
 			want: &[]CountResult{{Count: 500}},
 		},
 		{
-			desc: "Ingest with inline mapping",
-			src:  "testdata/demo.json",
+			desc:     "Ingest with inline mapping",
+			ingestor: queuedIngestor,
+			src:      "testdata/demo.json",
 			options: []ingest.FileOption{
 				ingest.FileFormat(ingest.JSON),
 				ingest.IngestionMapping(
@@ -757,13 +775,94 @@ func TestReaderIngestion(t *testing.T) {
 			want: &[]CountResult{{Count: 1000}}, // The count is the last ingestion + this one (500).
 		},
 		{
-			desc: "Ingestion from mock data",
-			src:  createCsvFileFromData(mockRows),
+			desc:     "Ingestion from mock data",
+			ingestor: queuedIngestor,
+			src:      createCsvFileFromData(mockRows),
 			options: []ingest.FileOption{
 				ingest.FileFormat(ingest.CSV),
 			},
 			stmt:  kusto.NewStmt("", kusto.UnsafeStmt(unsafe.Stmt{Add: true})).UnsafeAdd(queuedTable).Add(" | order by header_api_version asc"),
 			setup: func() error { return createIngestionTable(t, client, queuedTable) },
+			doer: func(row *table.Row, update interface{}) error {
+				rec := LogRow{}
+				if err := row.ToStruct(&rec); err != nil {
+					return err
+				}
+				recs := update.(*[]LogRow)
+				*recs = append(*recs, rec)
+				return nil
+			},
+			gotInit: func() interface{} {
+				v := []LogRow{}
+				return &v
+			},
+			want: &mockRows,
+		},
+		{
+			desc:     "Ingest from local with existing mapping streaming",
+			ingestor: streamingIngestor,
+			src:      "testdata/demo.json",
+			options: []ingest.FileOption{
+				ingest.IngestionMappingRef("Logs_mapping", ingest.JSON),
+				ingest.FileFormat(ingest.JSON),
+			},
+			stmt: pCountStmt.MustParameters(
+				kusto.NewParameters().Must(
+					kusto.QueryValues{"tableName": streamingTable},
+				),
+			),
+			setup: func() error { return createIngestionTable(t, client, streamingTable) },
+			doer: func(row *table.Row, update interface{}) error {
+				rec := CountResult{}
+				if err := row.ToStruct(&rec); err != nil {
+					return err
+				}
+				recs := update.(*[]CountResult)
+				*recs = append(*recs, rec)
+				return nil
+			},
+			gotInit: func() interface{} {
+				v := []CountResult{}
+				return &v
+			},
+			want: &[]CountResult{{Count: 500}},
+		},
+		{
+			desc:     "Ingestion from local file streaming",
+			ingestor: streamingIngestor,
+			src:      csvFileFromString(),
+			options: []ingest.FileOption{
+				ingest.FileFormat(ingest.CSV),
+			},
+			stmt: pCountStmt.MustParameters(
+				kusto.NewParameters().Must(
+					kusto.QueryValues{"tableName": streamingTable},
+				),
+			),
+			doer: func(row *table.Row, update interface{}) error {
+				rec := CountResult{}
+				if err := row.ToStruct(&rec); err != nil {
+					return err
+				}
+				recs := update.(*[]CountResult)
+				*recs = append(*recs, rec)
+				return nil
+			},
+			gotInit: func() interface{} {
+				v := []CountResult{}
+				return &v
+			},
+			want: &[]CountResult{{Count: 503}},
+		},
+		{
+			desc:     "Ingestion from local file test 2 streaming",
+			ingestor: streamingIngestor2,
+			options: []ingest.FileOption{
+				ingest.FileFormat(ingest.CSV),
+			},
+			src:   createCsvFileFromData(mockRows),
+			stmt:  kusto.NewStmt("", kusto.UnsafeStmt(unsafe.Stmt{Add: true})).UnsafeAdd(streamingTable2).Add(" | order by header_api_version asc"),
+			setup: func() error { return createIngestionTable(t, client, streamingTable2) },
 			doer: func(row *table.Row, update interface{}) error {
 				rec := LogRow{}
 				if err := row.ToStruct(&rec); err != nil {
@@ -796,7 +895,9 @@ func TestReaderIngestion(t *testing.T) {
 				}()
 			}
 
-			test.options = append(test.options, ingest.FlushImmediately())
+			if _, ok := test.ingestor.(*ingest.Ingestion); ok {
+				test.options = append(test.options, ingest.FlushImmediately(), ingest.ReportResultToTable())
+			}
 
 			f, err := os.Open(test.src)
 			if err != nil {
@@ -806,21 +907,25 @@ func TestReaderIngestion(t *testing.T) {
 			// We could do this other ways that are simplier for testing, but this mimics what the user will likely do.
 			reader, writer := io.Pipe()
 			go func() {
-				defer writer.Close()
-				io.Copy(writer, f)
+				defer func(writer *io.PipeWriter) {
+					err := writer.Close()
+					if err != nil {
+						t.Errorf("Failed to close writer %v", err)
+					}
+				}(writer)
+				_, err := io.Copy(writer, f)
+				if err != nil {
+					t.Errorf("Failed to copy io: %v", err)
+				}
 			}()
 
-			res, err := ingestor.FromReader(ctx, reader, test.options...)
+			res, err := test.ingestor.FromReader(ctx, reader, test.options...)
 			if err == nil {
 				err = <-res.Wait(ctx)
 			}
 
-			switch {
-			case err == nil && test.wantErr:
-				t.Errorf("TestReaderIngestion(%s): ingestor.FromFile(): got err == nil, want err != nil", test.desc)
-				return
-			case err != nil && !test.wantErr:
-				t.Errorf("TestReaderIngestion(%s): ingestor.FromFile(): got err == %s, want err == nil", test.desc, err)
+			if !assertErrorsMatch(t, err, test.wantErr) {
+				t.Errorf("TestFileIngestion(%s): ingestor.FromFile(): got err == %v, want err == %v", test.desc, err, test.wantErr)
 				return
 			}
 
@@ -828,9 +933,7 @@ func TestReaderIngestion(t *testing.T) {
 				return
 			}
 
-			if err := waitForIngest(t, ctx, client, test.stmt, test.doer, test.want, test.gotInit); err != nil {
-				t.Errorf("TestReaderIngestion(%s): %s", test.desc, err)
-			}
+			require.NoError(t, waitForIngest(t, ctx, client, test.stmt, test.doer, test.want, test.gotInit))
 		})
 	}
 }
@@ -905,13 +1008,6 @@ func TestStreamingIngestion(t *testing.T) {
 			if err := setupFunc(tableName); err != nil {
 				panic(err)
 			}
-			defer func() {
-				client.Mgmt(
-					context.Background(),
-					testConfig.Database,
-					kusto.NewStmt(".drop table ", kusto.UnsafeStmt(unsafe.Stmt{Add: true})).UnsafeAdd(tableName).Add(" ifexists"),
-				)
-			}()
 
 			ingestor, err := ingest.New(client, testConfig.Database, tableName)
 			if err != nil {
@@ -1038,7 +1134,12 @@ func createCsvFileFromData(data []LogRow) string {
 	if err != nil {
 		panic(err)
 	}
-	defer file.Close()
+	defer func(file *os.File) {
+		err := file.Close()
+		if err != nil {
+			panic(err)
+		}
+	}(file)
 
 	writer := csv.NewWriter(file)
 	defer writer.Flush()
@@ -1064,7 +1165,12 @@ func csvFileFromString() string {
 		panic(err)
 	}
 
-	defer file.Close()
+	defer func(file *os.File) {
+		err := file.Close()
+		if err != nil {
+			panic(err)
+		}
+	}(file)
 
 	writer := io.StringWriter(file)
 	if _, err := writer.WriteString(raw); err != nil {

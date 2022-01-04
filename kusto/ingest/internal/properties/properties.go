@@ -235,8 +235,8 @@ type All struct {
 
 // Streaming provides options that are used when doing an ingestion from a stream.
 type Streaming struct {
+	// ClientRequestID is the client request ID to use for the ingestion.
 	ClientRequestId string
-	DontCompress    bool
 }
 
 // SourceOptions are options that the user provides about the source file that is going to be uploaded.
@@ -247,6 +247,9 @@ type SourceOptions struct {
 
 	// DeleteLocalSource indicates to delete the local file after it has been consumed.
 	DeleteLocalSource bool
+
+	// DontCompress indicates to not compress the file.
+	DontCompress bool
 }
 
 // Ingestion is a JSON serializable set of options that must be provided to the service.
