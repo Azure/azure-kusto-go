@@ -890,8 +890,8 @@ func createAllDataTypesTable(client *kusto.Client) error {
 }
 
 func createMockLogRows() []LogRow {
-	fake_uid, _ := uuid.Parse("11196991-b193-4610-ae12-bcc03d092927")
-	fake_time, _ := time.Parse(time.RFC3339Nano, "2020-03-10T20:59:30.694177Z")
+	fakeUid, _ := uuid.Parse("11196991-b193-4610-ae12-bcc03d092927")
+	fakeTime, _ := time.Parse(time.RFC3339Nano, "2020-03-10T20:59:30.694177Z")
 	return []LogRow{
 		// One empty line
 		{
@@ -903,17 +903,17 @@ func createMockLogRows() []LogRow {
 		},
 		// One full line
 		{
-			HeaderTime:       value.DateTime{fake_time, true},
-			HeaderId:         value.GUID{fake_uid, true},
-			HeaderApiVersion: value.String{"v0.0.1", true},
-			PayloadData:      value.String{"Hello world!", true},
-			PayloadUser:      value.String{"Daniel Dubovski", true},
+			HeaderTime:       value.DateTime{Value: fakeTime, Valid: true},
+			HeaderId:         value.GUID{Value: fakeUid, Valid: true},
+			HeaderApiVersion: value.String{Value: "v0.0.1", Valid: true},
+			PayloadData:      value.String{Value: "Hello world!", Valid: true},
+			PayloadUser:      value.String{Value: "Daniel Dubovski", Valid: true},
 		},
 		// Partial Data
 		{
-			HeaderTime:       value.DateTime{fake_time, true},
+			HeaderTime:       value.DateTime{Value: fakeTime, Valid: true},
 			HeaderId:         value.GUID{},
-			HeaderApiVersion: value.String{"v0.0.2", true},
+			HeaderApiVersion: value.String{Value: "v0.0.2", Valid: true},
 			PayloadData:      value.String{Value: "", Valid: true},
 			PayloadUser:      value.String{Value: "", Valid: true},
 		},

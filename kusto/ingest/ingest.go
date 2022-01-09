@@ -44,10 +44,6 @@ func getManager(client *kusto.Client) (*resources.Manager, error) {
 	return i.(*resources.Manager), nil
 }
 
-type streamer interface {
-	stream(ctx context.Context, format DataFormat, mappingName string) (io.WriteCloser, error)
-}
-
 // Ingestion provides data ingestion from external sources into Kusto.
 type Ingestion struct {
 	db    string
@@ -135,6 +131,7 @@ type DataFormat = properties.DataFormat
 // note: any change here needs to be kept up to date with the properties version.
 // I'm not a fan of having two copies, but I don't think it is worth moving to its own package
 // to allow properties and ingest to both import without a cycle.
+//goland:noinspection GoUnusedConst - Part of the API
 const (
 	// DFUnknown indicates the EncodingType is not set.
 	DFUnknown DataFormat = properties.DFUnknown
@@ -306,6 +303,7 @@ func SetCreationTime(t time.Time) FileOption {
 // These are defined as constants within this package.
 type ValidationOption int8
 
+//goland:noinspection GoUnusedConst - Part of the API
 const (
 	// VOUnknown indicates that a ValidationOption was not set.
 	VOUnknown ValidationOption = 0
@@ -319,6 +317,7 @@ const (
 // These are defined as constants within this package.
 type ValidationImplication int8
 
+//goland:noinspection GoUnusedConst - Part of the API
 const (
 	// FailIngestion indicates that any violation of the ValidationPolicy will cause the entire ingestion to fail.
 	FailIngestion ValidationImplication = 0
@@ -365,11 +364,6 @@ func FileFormat(et DataFormat) FileOption {
 	)
 }
 
-type mapEntry struct {
-	Name string
-	Kind string
-}
-
 func (i *Ingestion) prepForIngestion(ctx context.Context, options []FileOption) (*Result, properties.All, error) {
 	result := newResult()
 
@@ -394,16 +388,16 @@ func (i *Ingestion) prepForIngestion(ctx context.Context, options []FileOption) 
 
 		switch props.Ingestion.ReportMethod {
 		case properties.ReportStatusToTable, properties.ReportStatusToQueueAndTable:
-			resources, err := i.mgr.Resources()
+			managerResources, err := i.mgr.Resources()
 			if err != nil {
 				return nil, properties.All{}, err
 			}
 
-			if len(resources.Tables) == 0 {
+			if len(managerResources.Tables) == 0 {
 				return nil, properties.All{}, fmt.Errorf("User requested reporting status to table, yet status table resource URI is not found")
 			}
 
-			props.Ingestion.TableEntryRef.TableConnectionString = resources.Tables[0].URL().String()
+			props.Ingestion.TableEntryRef.TableConnectionString = managerResources.Tables[0].URL().String()
 			props.Ingestion.TableEntryRef.PartitionKey = props.Source.ID.String()
 			props.Ingestion.TableEntryRef.RowKey = uuid.Nil.String()
 			break

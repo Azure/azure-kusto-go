@@ -36,6 +36,7 @@ func (c CompressionType) MarshalJSON() ([]byte, error) {
 	return []byte(fmt.Sprintf("%q", c.String())), nil
 }
 
+//goland:noinspection GoUnusedConst - Part of the API
 const (
 	// CTUnknown indicates that that the compression type was unset.
 	CTUnknown CompressionType = 0
@@ -127,6 +128,7 @@ var dfDescriptions = []dfDescriptor{
 // IngestionReportLevel defines which ingestion statuses are reported by the DM.
 type IngestionReportLevel int
 
+//goland:noinspection GoUnusedConst - Part of the API
 const (
 	// FailuresOnly tells to the DM to report the ingestion sytatus of failed ingestions only.
 	FailuresOnly IngestionReportLevel = 0
@@ -136,9 +138,10 @@ const (
 	FailureAndSuccess IngestionReportLevel = 2
 )
 
-// IngestionReportMthod defines where the DM reports ingestion statuses to.
+// IngestionReportMethod defines where the DM reports ingestion statuses to.
 type IngestionReportMethod int
 
+//goland:noinspection GoUnusedConst - Part of the API
 const (
 	// ReportStatusToQueue tells the DM to report ingestion status to the a queue.
 	ReportStatusToQueue IngestionReportMethod = 0

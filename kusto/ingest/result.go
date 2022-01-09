@@ -42,7 +42,7 @@ func (r *Result) putQueued(mgr *resources.Manager) {
 	}
 
 	// Get table URI
-	resources, err := mgr.Resources()
+	managerResources, err := mgr.Resources()
 	if err != nil {
 		r.record.Status = StatusRetrievalFailed
 		r.record.FailureStatus = Permanent
@@ -50,7 +50,7 @@ func (r *Result) putQueued(mgr *resources.Manager) {
 		return
 	}
 
-	if len(resources.Tables) == 0 {
+	if len(managerResources.Tables) == 0 {
 		r.record.Status = StatusRetrievalFailed
 		r.record.FailureStatus = Permanent
 		r.record.Details = "Ingestion resources do not include a status table URI: " + err.Error()
@@ -58,7 +58,7 @@ func (r *Result) putQueued(mgr *resources.Manager) {
 	}
 
 	// create a table client
-	client, err := status.NewTableClient(*resources.Tables[0])
+	client, err := status.NewTableClient(*managerResources.Tables[0])
 	if err != nil {
 		r.record.Status = StatusRetrievalFailed
 		r.record.FailureStatus = Permanent
