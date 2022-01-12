@@ -29,6 +29,13 @@ var (
 			},
 		),
 	)
+	pTableStmt = kusto.NewStmt("table(tableName)").MustDefinitions(
+		kusto.NewDefinitions().Must(
+			kusto.ParamTypes{
+				"tableName": kusto.ParamType{Type: types.String},
+			},
+		),
+	)
 
 	// This is needed because of a bug in the backend that sometimes causes the tables not to drop and get stuck.
 	clearStreamingCacheStatement = kusto.NewStmt(".clear database cache streamingingestion schema")
@@ -134,7 +141,7 @@ func TestQueries(t *testing.T) {
 				kusto.NewParameters().Must(kusto.QueryValues{"tableName": allDataTypesTable}),
 			),
 			setup: func() error {
-				return createAllDataTypesUnsafeTable(t, client, allDataTypesTable, true)
+				return createIngestionTable(t, client, allDataTypesTable, true)
 			},
 			qcall: client.Query,
 			doer: func(row *table.Row, update interface{}) error {
@@ -204,7 +211,7 @@ func TestQueries(t *testing.T) {
 		},
 		{
 			desc:  "Query: Progressive query: make sure we can convert all data types from a row",
-			stmt:  kusto.NewStmt("", kusto.UnsafeStmt(unsafe.Stmt{Add: true})).UnsafeAdd(allDataTypesTable),
+			stmt:  pTableStmt.MustParameters(kusto.NewParameters().Must(kusto.QueryValues{"tableName": allDataTypesTable})),
 			qcall: client.Query,
 			doer: func(row *table.Row, update interface{}) error {
 				rec := AllDataType{}
@@ -223,7 +230,7 @@ func TestQueries(t *testing.T) {
 		},
 		{
 			desc:    "Query: Non-Progressive query: make sure we can convert all data types from a row",
-			stmt:    kusto.NewStmt("", kusto.UnsafeStmt(unsafe.Stmt{Add: true})).UnsafeAdd(allDataTypesTable),
+			stmt:    pTableStmt.MustParameters(kusto.NewParameters().Must(kusto.QueryValues{"tableName": allDataTypesTable})),
 			qcall:   client.Query,
 			options: []kusto.QueryOption{kusto.ResultsProgressiveDisable()},
 			doer: func(row *table.Row, update interface{}) error {
@@ -411,7 +418,7 @@ func TestFileIngestion(t *testing.T) {
 					kusto.QueryValues{"tableName": queuedTable},
 				),
 			),
-			setup: func() error { return createIngestionTable(t, client, queuedTable) },
+			setup: func() error { return createIngestionTable(t, client, queuedTable, false) },
 			doer: func(row *table.Row, update interface{}) error {
 				rec := CountResult{}
 				if err := row.ToStruct(&rec); err != nil {
@@ -485,8 +492,12 @@ func TestFileIngestion(t *testing.T) {
 			desc:     "Ingestion from local file test 2 queued",
 			ingestor: queuedIngestor,
 			src:      createCsvFileFromData(mockRows),
-			stmt:     kusto.NewStmt("", kusto.UnsafeStmt(unsafe.Stmt{Add: true})).UnsafeAdd(queuedTable).Add(" | order by header_api_version asc"),
-			setup:    func() error { return createIngestionTable(t, client, queuedTable) },
+			stmt: pTableStmt.Add(" | order by header_api_version asc").MustParameters(
+				kusto.NewParameters().Must(
+					kusto.QueryValues{"tableName": queuedTable},
+				),
+			),
+			setup: func() error { return createIngestionTable(t, client, queuedTable, false) },
 			doer: func(row *table.Row, update interface{}) error {
 				rec := LogRow{}
 				if err := row.ToStruct(&rec); err != nil {
@@ -512,7 +523,7 @@ func TestFileIngestion(t *testing.T) {
 					kusto.QueryValues{"tableName": streamingTable},
 				),
 			),
-			setup: func() error { return createIngestionTable(t, client, streamingTable) },
+			setup: func() error { return createIngestionTable(t, client, streamingTable, false) },
 			doer: func(row *table.Row, update interface{}) error {
 				rec := CountResult{}
 				if err := row.ToStruct(&rec); err != nil {
@@ -556,8 +567,8 @@ func TestFileIngestion(t *testing.T) {
 			desc:     "Ingestion from local file test 2 streaming",
 			ingestor: streamingIngestor2,
 			src:      createCsvFileFromData(mockRows),
-			stmt:     kusto.NewStmt("", kusto.UnsafeStmt(unsafe.Stmt{Add: true})).UnsafeAdd(streamingTable2).Add(" | order by header_api_version asc"),
-			setup:    func() error { return createIngestionTable(t, client, streamingTable2) },
+			stmt:     pTableStmt.Add(" | order by header_api_version asc").MustParameters(kusto.NewParameters().Must(kusto.QueryValues{"tableName": streamingTable2})),
+			setup:    func() error { return createIngestionTable(t, client, streamingTable2, false) },
 			doer: func(row *table.Row, update interface{}) error {
 				rec := LogRow{}
 				if err := row.ToStruct(&rec); err != nil {
@@ -727,7 +738,7 @@ func TestReaderIngestion(t *testing.T) {
 					kusto.QueryValues{"tableName": queuedTable},
 				),
 			),
-			setup: func() error { return createIngestionTable(t, client, queuedTable) },
+			setup: func() error { return createIngestionTable(t, client, queuedTable, false) },
 			doer: func(row *table.Row, update interface{}) error {
 				rec := CountResult{}
 				if err := row.ToStruct(&rec); err != nil {
@@ -781,8 +792,8 @@ func TestReaderIngestion(t *testing.T) {
 			options: []ingest.FileOption{
 				ingest.FileFormat(ingest.CSV),
 			},
-			stmt:  kusto.NewStmt("", kusto.UnsafeStmt(unsafe.Stmt{Add: true})).UnsafeAdd(queuedTable).Add(" | order by header_api_version asc"),
-			setup: func() error { return createIngestionTable(t, client, queuedTable) },
+			stmt:  pTableStmt.Add(" | order by header_api_version asc").MustParameters(kusto.NewParameters().Must(kusto.QueryValues{"tableName": queuedTable})),
+			setup: func() error { return createIngestionTable(t, client, queuedTable, false) },
 			doer: func(row *table.Row, update interface{}) error {
 				rec := LogRow{}
 				if err := row.ToStruct(&rec); err != nil {
@@ -811,7 +822,7 @@ func TestReaderIngestion(t *testing.T) {
 					kusto.QueryValues{"tableName": streamingTable},
 				),
 			),
-			setup: func() error { return createIngestionTable(t, client, streamingTable) },
+			setup: func() error { return createIngestionTable(t, client, streamingTable, false) },
 			doer: func(row *table.Row, update interface{}) error {
 				rec := CountResult{}
 				if err := row.ToStruct(&rec); err != nil {
@@ -861,8 +872,8 @@ func TestReaderIngestion(t *testing.T) {
 				ingest.FileFormat(ingest.CSV),
 			},
 			src:   createCsvFileFromData(mockRows),
-			stmt:  kusto.NewStmt("", kusto.UnsafeStmt(unsafe.Stmt{Add: true})).UnsafeAdd(streamingTable2).Add(" | order by header_api_version asc"),
-			setup: func() error { return createIngestionTable(t, client, streamingTable2) },
+			stmt:  pTableStmt.Add(" | order by header_api_version asc").MustParameters(kusto.NewParameters().Must(kusto.QueryValues{"tableName": streamingTable2})),
+			setup: func() error { return createIngestionTable(t, client, streamingTable2, false) },
 			doer: func(row *table.Row, update interface{}) error {
 				rec := LogRow{}
 				if err := row.ToStruct(&rec); err != nil {
@@ -953,7 +964,7 @@ func TestStreamingIngestion(t *testing.T) {
 	}
 
 	setupFunc := func(tableName string) error {
-		return createAllDataTypesUnsafeTable(t, client, tableName, false)
+		return createIngestionTable(t, client, tableName, false)
 	}
 
 	tests := []struct {
@@ -1079,7 +1090,7 @@ func getExpectedResult() AllDataType {
 	}
 }
 
-func createAllDataTypesUnsafeTable(t *testing.T, client *kusto.Client, tableName string, withInitialRow bool) error {
+func createIngestionTable(t *testing.T, client *kusto.Client, tableName string, withInitialRow bool) error {
 	dropUnsafe := kusto.NewStmt(".drop table ", kusto.UnsafeStmt(unsafe.Stmt{Add: true})).UnsafeAdd(tableName).Add(" ifexists")
 	var createUnsafe kusto.Stmt
 	if withInitialRow {
@@ -1178,18 +1189,6 @@ func csvFileFromString() string {
 	}
 
 	return fname
-}
-
-func createIngestionTable(t *testing.T, client *kusto.Client, tableName string) error {
-	var dropStmt = kusto.NewStmt(".drop table ", kusto.UnsafeStmt(unsafe.Stmt{Add: true})).UnsafeAdd(tableName).Add(" ifexists")
-	var createStmt = kusto.NewStmt(".create table ", kusto.UnsafeStmt(unsafe.Stmt{Add: true})).UnsafeAdd(tableName).Add("(header_time: datetime, header_id: guid, header_api_version: string, payload_data: string, payload_user: string) ")
-	var addMappingStmt = kusto.NewStmt(".create table ", kusto.UnsafeStmt(unsafe.Stmt{Add: true})).UnsafeAdd(tableName).Add(" ingestion json mapping 'Logs_mapping' '[{\"column\":\"header_time\",\"path\":\"$.header.time\",\"datatype\":\"datetime\"},{\"column\":\"header_id\",\"path\":\"$.header.id\",\"datatype\":\"guid\"},{\"column\":\"header_api_version\",\"path\":\"$.header.api_version\",\"datatype\":\"string\"},{\"column\":\"payload_data\",\"path\":\"$.payload.data\",\"datatype\":\"string\"},{\"column\":\"payload_user\",\"path\":\"$.payload.user\",\"datatype\":\"string\"}]'")
-
-	t.Cleanup(func() {
-		_ = executeCommands(client, dropStmt)
-	})
-
-	return executeCommands(client, dropStmt, createStmt, addMappingStmt, clearStreamingCacheStatement)
 }
 
 func createStringyLogsData() string {
