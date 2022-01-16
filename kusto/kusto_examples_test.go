@@ -149,7 +149,7 @@ func ExampleAuthorization_msi() {
 	}
 
 	// Normally here you take a client.
-	_, err = New("endpoint", authorizer)
+	_, err := New("endpoint", authorizer)
 	if err != nil {
 		panic("add error handling")
 	}
