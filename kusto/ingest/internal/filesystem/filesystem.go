@@ -55,18 +55,18 @@ type Ingestion struct {
 	uploadBlobFile   uploadBlobFile
 	transferManager  azblob.TransferManager
 
-	blockSize   int
-	concurrency uint16
+	bufferSize int
+	maxBuffers int
 }
 
 // Option is an optional argument to New().
 type Option func(s *Ingestion)
 
-// WithUploadSettings sets the block size and concurrency for uploading blobs to kusto. Defaults to 8MB block size and concurrency of 50.
-func WithUploadSettings(size int, concurrency uint16) Option {
+// WithStaticBuffer sets a static buffer with a buffer size and max amount of buffers for uploading blobs to kusto.
+func WithStaticBuffer(bufferSize int, maxBuffers int) Option {
 	return func(s *Ingestion) {
-		s.blockSize = size
-		s.concurrency = concurrency
+		s.bufferSize = bufferSize
+		s.maxBuffers = maxBuffers
 	}
 }
 
@@ -78,15 +78,19 @@ func New(db, table string, mgr *resources.Manager, options ...Option) (*Ingestio
 		mgr:              mgr,
 		uploadBlobStream: azblob.UploadStreamToBlockBlob,
 		uploadBlobFile:   azblob.UploadFileToBlockBlob,
-		blockSize:        BlockSize,
-		concurrency:      Concurrency,
 	}
 
 	for _, opt := range options {
 		opt(i)
 	}
 
-	transferManager, err := azblob.NewSyncPool(i.blockSize, int(i.concurrency))
+	var transferManager azblob.TransferManager
+	var err error
+	if i.bufferSize == 0 {
+		transferManager, err = azblob.NewSyncPool(BlockSize, Concurrency)
+	} else {
+		transferManager, err = azblob.NewStaticBuffer(i.bufferSize, i.maxBuffers)
+	}
 	if err != nil {
 		return nil, err
 	}
@@ -323,8 +327,8 @@ func (i *Ingestion) localToBlob(ctx context.Context, from string, to azblob.Cont
 		file,
 		blobURL,
 		azblob.UploadToBlockBlobOptions{
-			BlockSize:   int64(i.blockSize),
-			Parallelism: i.concurrency,
+			BlockSize:   BlockSize,
+			Parallelism: Concurrency,
 		},
 	)
 

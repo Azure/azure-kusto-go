@@ -57,18 +57,18 @@ type Ingestion struct {
 	connMu     sync.Mutex
 	streamConn *conn.Conn
 
-	blockSize   int
-	concurrency uint16
+	bufferSize int
+	maxBuffers int
 }
 
 // Option is an optional argument to New().
 type Option func(s *Ingestion)
 
-// WithUploadSettings sets the block size and concurrency for uploading blobs to kusto. Defaults to 8MB block size and concurrency of 50.
-func WithUploadSettings(size int, concurrency uint16) Option {
+// WithStaticBuffer sets a static buffer with a buffer size and max amount of buffers for uploading blobs to kusto.
+func WithStaticBuffer(bufferSize int, maxBuffers int) Option {
 	return func(s *Ingestion) {
-		s.blockSize = size
-		s.concurrency = concurrency
+		s.bufferSize = bufferSize
+		s.maxBuffers = maxBuffers
 	}
 }
 
@@ -80,19 +80,17 @@ func New(client *kusto.Client, db, table string, options ...Option) (*Ingestion,
 	}
 
 	i := &Ingestion{
-		client:      client,
-		mgr:         mgr,
-		db:          db,
-		table:       table,
-		blockSize:   filesystem.BlockSize,
-		concurrency: filesystem.Concurrency,
+		client: client,
+		mgr:    mgr,
+		db:     db,
+		table:  table,
 	}
 
 	for _, option := range options {
 		option(i)
 	}
 
-	fs, err := filesystem.New(db, table, mgr, filesystem.WithUploadSettings(i.blockSize, i.concurrency))
+	fs, err := filesystem.New(db, table, mgr, filesystem.WithStaticBuffer(i.bufferSize, i.maxBuffers))
 	if err != nil {
 		return nil, err
 	}
