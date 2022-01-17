@@ -12,7 +12,7 @@ This is a data plane SDK (it is for interacting with Azure Data Explorer service
 
 ## Minimum Requirements
 
-* go version 1.13
+* go version 1.16
 
 ## Examples
 
