@@ -142,17 +142,14 @@ func ExampleAuthorization_config() {
 
 func ExampleAuthorization_msi() {
 	// Create an authorizer with an Azure MSI (managed identities).
-	msi, err := auth.NewMSIConfig().Authorizer()
-	if err != nil {
-		panic("add error handling")
-	}
+	msi := auth.NewMSIConfig()
 
 	authorizer := Authorization{
-		Authorizer: msi,
+		Config: msi,
 	}
 
 	// Normally here you take a client.
-	_, err = New("endpoint", authorizer)
+	_, err := New("endpoint", authorizer)
 	if err != nil {
 		panic("add error handling")
 	}
