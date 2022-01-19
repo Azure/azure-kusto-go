@@ -64,7 +64,7 @@ type Ingestion struct {
 // Option is an optional argument to New().
 type Option func(s *Ingestion)
 
-// WithStaticBuffer sets a static buffer with a buffer size and max amount of buffers for uploading blobs to kusto.
+// WithStaticBuffer configures the ingest client to upload data to Kusto using a set of one or more static memory buffers with a fixed size.
 func WithStaticBuffer(bufferSize int, maxBuffers int) Option {
 	return func(s *Ingestion) {
 		s.bufferSize = bufferSize
