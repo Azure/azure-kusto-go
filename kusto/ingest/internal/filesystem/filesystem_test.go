@@ -180,10 +180,10 @@ func TestLocalToBlob(t *testing.T) {
 		fbs := &fakeBlobstore{shouldErr: test.uploadErr, out: &bytes.Buffer{}}
 
 		in := &Ingestion{
-			db:               "database",
-			table:            "table",
-			uploadBlobStream: fbs.uploadBlobStream,
-			uploadBlobFile:   fbs.uploadBlobFile,
+			db:     "database",
+			table:  "table",
+			stream: fbs.uploadBlobStream,
+			upload: fbs.uploadBlobFile,
 		}
 
 		_, _, err := in.localToBlob(context.Background(), test.from, to, &properties.All{})

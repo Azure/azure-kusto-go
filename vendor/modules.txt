@@ -1,10 +1,10 @@
-# github.com/Azure/azure-pipeline-go v0.2.1
+# github.com/Azure/azure-pipeline-go v0.2.3
 github.com/Azure/azure-pipeline-go/pipeline
 # github.com/Azure/azure-sdk-for-go v44.1.0+incompatible
 ## explicit
 github.com/Azure/azure-sdk-for-go/storage
 github.com/Azure/azure-sdk-for-go/version
-# github.com/Azure/azure-storage-blob-go v0.8.0
+# github.com/Azure/azure-storage-blob-go v0.14.0
 ## explicit
 github.com/Azure/azure-storage-blob-go/azblob
 # github.com/Azure/azure-storage-queue-go v0.0.0-20191125232315-636801874cdd
@@ -37,19 +37,17 @@ github.com/dimchansky/utfbom
 ## explicit
 # github.com/golang-jwt/jwt/v4 v4.2.0
 github.com/golang-jwt/jwt/v4
-# github.com/google/uuid v1.1.1
+# github.com/google/uuid v1.2.0
 ## explicit
 github.com/google/uuid
 # github.com/kylelemons/godebug v1.1.0
 ## explicit
 github.com/kylelemons/godebug/diff
 github.com/kylelemons/godebug/pretty
-# github.com/mattn/go-ieproxy v0.0.0-20190610004146-91bb50d98149
+# github.com/mattn/go-ieproxy v0.0.1
 github.com/mattn/go-ieproxy
 # github.com/mitchellh/go-homedir v1.1.0
 github.com/mitchellh/go-homedir
-# github.com/pkg/errors v0.9.1
-## explicit
 # github.com/satori/go.uuid v1.2.0
 ## explicit
 github.com/satori/go.uuid
