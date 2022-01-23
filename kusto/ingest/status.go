@@ -5,9 +5,9 @@ import (
 	"time"
 
 	"github.com/Azure/azure-kusto-go/kusto/ingest/internal/properties"
+	storageuid "github.com/gofrs/uuid"
 	"github.com/google/uuid"
 	"github.com/kylelemons/godebug/pretty"
-	storageuid "github.com/satori/go.uuid"
 )
 
 // StatusCode is the ingestion status
