@@ -56,16 +56,25 @@ type Ingestion struct {
 
 	connMu     sync.Mutex
 	streamConn *conn.Conn
+
+	bufferSize int
+	maxBuffers int
 }
 
-// New is the constructor for Ingestion.
-func New(client *kusto.Client, db, table string) (*Ingestion, error) {
-	mgr, err := getManager(client)
-	if err != nil {
-		return nil, err
-	}
+// Option is an optional argument to New().
+type Option func(s *Ingestion)
 
-	fs, err := filesystem.New(db, table, mgr)
+// WithStaticBuffer configures the ingest client to upload data to Kusto using a set of one or more static memory buffers with a fixed size.
+func WithStaticBuffer(bufferSize int, maxBuffers int) Option {
+	return func(s *Ingestion) {
+		s.bufferSize = bufferSize
+		s.maxBuffers = maxBuffers
+	}
+}
+
+// New is a constructor for Ingestion.
+func New(client *kusto.Client, db, table string, options ...Option) (*Ingestion, error) {
+	mgr, err := getManager(client)
 	if err != nil {
 		return nil, err
 	}
@@ -75,8 +84,18 @@ func New(client *kusto.Client, db, table string) (*Ingestion, error) {
 		mgr:    mgr,
 		db:     db,
 		table:  table,
-		fs:     fs,
 	}
+
+	for _, option := range options {
+		option(i)
+	}
+
+	fs, err := filesystem.New(db, table, mgr, filesystem.WithStaticBuffer(i.bufferSize, i.maxBuffers))
+	if err != nil {
+		return nil, err
+	}
+
+	i.fs = fs
 
 	return i, nil
 }

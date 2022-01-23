@@ -34,15 +34,15 @@ const (
 	// made a 5x improvement in speed. We don't have any numbers from the service side to give us numbers we should use, so this
 	// is our best guess from observation. DO NOT CHANGE UNLESS YOU KNOW BETTER.
 
-	blockSize   = 8 * _1MiB
-	concurrency = 50
+	BlockSize   = 8 * _1MiB
+	Concurrency = 50
 )
 
-// uploadBlobStream provides a type that mimics azblob.UploadStreamToBlockBlob to allow fakes for testing.
-type uploadBlobStream func(context.Context, io.Reader, azblob.BlockBlobURL, azblob.UploadStreamToBlockBlobOptions) (azblob.CommonResponse, error)
+// stream provides a type that mimics azblob.UploadStreamToBlockBlob to allow fakes for testing.
+type stream func(context.Context, io.Reader, azblob.BlockBlobURL, azblob.UploadStreamToBlockBlobOptions) (azblob.CommonResponse, error)
 
-// uploadBlobFile provides a type that mimics azblob.UploadFileToBlockBlob to allow fakes for test
-type uploadBlobFile func(context.Context, *os.File, azblob.BlockBlobURL, azblob.UploadToBlockBlobOptions) (azblob.CommonResponse, error)
+// upload provides a type that mimics azblob.UploadFileToBlockBlob to allow fakes for test
+type upload func(context.Context, *os.File, azblob.BlockBlobURL, azblob.UploadToBlockBlobOptions) (azblob.CommonResponse, error)
 
 // Ingestion provides methods for taking data from a filesystem of some type and ingesting it into Kusto.
 // This object is scoped for a single database and table.
@@ -51,19 +51,54 @@ type Ingestion struct {
 	table string
 	mgr   *resources.Manager
 
-	uploadBlobStream uploadBlobStream
-	uploadBlobFile   uploadBlobFile
+	stream          stream
+	upload          upload
+	transferManager azblob.TransferManager
+
+	bufferSize int
+	maxBuffers int
+}
+
+// Option is an optional argument to New().
+type Option func(s *Ingestion)
+
+// WithStaticBuffer sets a static buffer with a buffer size and max amount of buffers for uploading blobs to kusto.
+func WithStaticBuffer(bufferSize int, maxBuffers int) Option {
+	return func(s *Ingestion) {
+		s.bufferSize = bufferSize
+		s.maxBuffers = maxBuffers
+	}
 }
 
 // New is the constructor for Ingestion.
-func New(db, table string, mgr *resources.Manager) (*Ingestion, error) {
+func New(db, table string, mgr *resources.Manager, options ...Option) (*Ingestion, error) {
 	i := &Ingestion{
-		db:               db,
-		table:            table,
-		mgr:              mgr,
-		uploadBlobStream: azblob.UploadStreamToBlockBlob,
-		uploadBlobFile:   azblob.UploadFileToBlockBlob,
+		db:     db,
+		table:  table,
+		mgr:    mgr,
+		stream: azblob.UploadStreamToBlockBlob,
+		upload: azblob.UploadFileToBlockBlob,
 	}
+
+	for _, opt := range options {
+		opt(i)
+	}
+
+	var transferManager azblob.TransferManager
+	var err error
+	if i.bufferSize == 0 && i.maxBuffers == 0 {
+		transferManager, err = azblob.NewSyncPool(BlockSize, Concurrency)
+	} else {
+		transferManager, err = azblob.NewStaticBuffer(i.bufferSize, i.maxBuffers)
+		if err != nil {
+			err = fmt.Errorf("invalid WithStaticBuffer option : %v", err)
+		}
+	}
+	if err != nil {
+		return nil, err
+	}
+	i.transferManager = transferManager
+
 	return i, nil
 }
 
@@ -133,11 +168,11 @@ func (i *Ingestion) Reader(ctx context.Context, reader io.Reader, props properti
 	gstream := gzip.New()
 	gstream.Reset(ioutil.NopCloser(reader))
 
-	_, err = i.uploadBlobStream(
+	_, err = i.stream(
 		ctx,
 		gstream,
 		blobURL,
-		azblob.UploadStreamToBlockBlobOptions{BufferSize: blockSize, MaxBuffers: concurrency},
+		azblob.UploadStreamToBlockBlobOptions{TransferManager: i.transferManager},
 	)
 
 	if err != nil {
@@ -275,11 +310,11 @@ func (i *Ingestion) localToBlob(ctx context.Context, from string, to azblob.Cont
 		gstream := gzip.New()
 		gstream.Reset(file)
 
-		_, err = i.uploadBlobStream(
+		_, err = i.stream(
 			ctx,
 			gstream,
 			blobURL,
-			azblob.UploadStreamToBlockBlobOptions{BufferSize: blockSize, MaxBuffers: concurrency},
+			azblob.UploadStreamToBlockBlobOptions{TransferManager: i.transferManager},
 		)
 
 		if err != nil {
@@ -290,13 +325,13 @@ func (i *Ingestion) localToBlob(ctx context.Context, from string, to azblob.Cont
 
 	// The high-level API UploadFileToBlockBlob function uploads blocks in parallel for optimal performance, and can handle large files as well.
 	// This function calls StageBlock/CommitBlockList for files larger 256 MBs, and calls Upload for any file smaller
-	_, err = i.uploadBlobFile(
+	_, err = i.upload(
 		ctx,
 		file,
 		blobURL,
 		azblob.UploadToBlockBlobOptions{
-			BlockSize:   blockSize,
-			Parallelism: concurrency,
+			BlockSize:   BlockSize,
+			Parallelism: Concurrency,
 		},
 	)
 
