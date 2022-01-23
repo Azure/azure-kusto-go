@@ -333,3 +333,5 @@ sample.go
 # VS Code
 .vscode/*.*
 *.bak
+
+vendor/
