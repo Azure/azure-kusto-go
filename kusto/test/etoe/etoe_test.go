@@ -15,7 +15,6 @@ import (
 	"github.com/Azure/azure-kusto-go/kusto/data/value"
 	"github.com/Azure/azure-kusto-go/kusto/ingest"
 	"github.com/Azure/azure-kusto-go/kusto/unsafe"
-
 	"github.com/google/uuid"
 	"github.com/kylelemons/godebug/pretty"
 )
@@ -355,17 +354,7 @@ func TestFileIngestion(t *testing.T) {
 		panic(err)
 	}
 
-	secondaryClient, err := kusto.New(testConfig.SecondaryEndpoint, testConfig.Authorizer)
-	if err != nil {
-		panic(err)
-	}
-
 	ingestor, err := ingest.New(client, testConfig.Database, "Logs")
-	if err != nil {
-		panic(err)
-	}
-
-	secondaryIngestor, err := ingest.New(secondaryClient, testConfig.SecondaryDatabase, "Logs")
 	if err != nil {
 		panic(err)
 	}
@@ -396,8 +385,6 @@ func TestFileIngestion(t *testing.T) {
 		// compare allows the test to have a custom compare operation. If nil, the data from doer's update argument is
 		// compared against want using pretty.Compare().
 		compare func(got, want interface{}) error
-		// useSecondaryClient instructs if the secondary client should be used for the test.
-		useSecondaryClient bool
 	}{
 		{
 			desc:    "Ingest from blob with bad existing mapping",
@@ -502,33 +489,6 @@ func TestFileIngestion(t *testing.T) {
 			},
 			want: mockRows,
 		},
-		{
-			desc: "Ingestion to two different clusters",
-			src:  createCsvFileFromData(mockRows),
-			stmt: kusto.NewStmt("Logs | order by header_api_version asc"),
-			setup: func() error {
-				err := createIngestionTable(client, testConfig.Database)
-				if err != nil {
-					return err
-				}
-				return createIngestionTable(secondaryClient, testConfig.SecondaryDatabase)
-			},
-			doer: func(row *table.Row, update interface{}) error {
-				rec := LogRow{}
-				if err := row.ToStruct(&rec); err != nil {
-					return err
-				}
-				recs := update.(*[]LogRow)
-				*recs = append(*recs, rec)
-				return nil
-			},
-			gotInit: func() interface{} {
-				v := []LogRow{}
-				return &v
-			},
-			want:               mockRows,
-			useSecondaryClient: true,
-		},
 	}
 
 	for _, test := range tests {
@@ -552,12 +512,6 @@ func TestFileIngestion(t *testing.T) {
 			if err == nil {
 				err = <-res.Wait(ctx)
 			}
-			if test.useSecondaryClient {
-				res, err := secondaryIngestor.FromFile(ctx, test.src, test.options...)
-				if err == nil {
-					err = <-res.Wait(ctx)
-				}
-			}
 
 			switch {
 			case err == nil && test.wantErr:
@@ -572,12 +526,6 @@ func TestFileIngestion(t *testing.T) {
 
 			if err := waitForIngest(ctx, client, testConfig.Database, test.stmt, test.compare, test.doer, test.want, test.gotInit); err != nil {
 				t.Errorf("TestFileIngestion(%s): %s", test.desc, err)
-			}
-
-			if test.useSecondaryClient {
-				if err := waitForIngest(ctx, secondaryClient, testConfig.SecondaryDatabase, test.stmt, test.compare, test.doer, test.want, test.gotInit); err != nil {
-					t.Errorf("TestFileIngestion(%s): %s", test.desc, err)
-				}
 			}
 		}()
 	}
@@ -765,6 +713,123 @@ func TestReaderIngestion(t *testing.T) {
 			if err := waitForIngest(ctx, client, testConfig.Database, test.stmt, test.compare, test.doer, test.want, test.gotInit); err != nil {
 				t.Errorf("TestReaderIngestion(%s): %s", test.desc, err)
 			}
+		}()
+	}
+}
+
+func TestMultipleClusters(t *testing.T) {
+	t.Parallel()
+
+	if skipETOE || testing.Short() {
+		t.Skipf("end to end tests disabled: missing config.json file in etoe directory")
+	}
+	if testConfig.SecondaryEndpoint == "" || testConfig.SecondaryDatabase == "" {
+		t.Skipf("multiple clusters tests diasbled: needs SecondaryEndpoint and SecondaryDatabase")
+	}
+
+	ctx, cancel := context.WithCancel(context.Background())
+	defer cancel()
+
+	client, err := kusto.New(testConfig.Endpoint, testConfig.Authorizer)
+	if err != nil {
+		panic(err)
+	}
+
+	ingestor, err := ingest.New(client, testConfig.Database, "Logs")
+	if err != nil {
+		panic(err)
+	}
+
+	secondaryClient, err := kusto.New(testConfig.SecondaryEndpoint, testConfig.Authorizer)
+	if err != nil {
+		panic(err)
+	}
+	secondaryIngestor, err := ingest.New(secondaryClient, testConfig.SecondaryDatabase, "Logs")
+	if err != nil {
+		panic(err)
+	}
+
+	mockRows := createMockLogRows()
+
+	tests := []struct {
+		// desc describes the test.
+		desc string
+		// src represents where we are getting our data.
+		src string
+		// stmt is used to query for the results.
+		stmt kusto.Stmt
+		// setup is a function that will be called before the test runs.
+		setup func() error
+		// doer is called from within the function passed to RowIterator.Do(). It allows us to collect the data we receive.
+		doer func(row *table.Row, update interface{}) error
+		// gotInit creates the variable that will be used by doer's update argument.
+		gotInit func() interface{}
+		// want is the data we want to receive from the query.
+		want interface{}
+	}{
+		{
+			desc: "Ingestion to two different clusters",
+			src:  createCsvFileFromData(mockRows),
+			stmt: kusto.NewStmt("Logs | order by header_api_version asc"),
+			setup: func() error {
+				if secondaryClient == nil {
+					t.Skip()
+				}
+
+				err := createIngestionTable(client, testConfig.Database)
+				if err != nil {
+					return err
+				}
+				return createIngestionTable(secondaryClient, testConfig.SecondaryDatabase)
+			},
+			doer: func(row *table.Row, update interface{}) error {
+				rec := LogRow{}
+				if err := row.ToStruct(&rec); err != nil {
+					return err
+				}
+				recs := update.(*[]LogRow)
+				*recs = append(*recs, rec)
+				return nil
+			},
+			gotInit: func() interface{} {
+				v := []LogRow{}
+				return &v
+			},
+			want: mockRows,
+		},
+	}
+
+	for _, test := range tests {
+		func() {
+			if test.setup != nil {
+				if err := test.setup(); err != nil {
+					panic(err)
+				}
+			}
+
+			res, err := ingestor.FromFile(ctx, test.src, ingest.FlushImmediately(), ingest.ReportResultToTable())
+			if err == nil {
+				err = <-res.Wait(ctx)
+			}
+
+			res, err = secondaryIngestor.FromFile(ctx, test.src, ingest.FlushImmediately(), ingest.ReportResultToTable())
+			if err == nil {
+				err = <-res.Wait(ctx)
+			}
+
+			if err != nil {
+				t.Errorf("TestMultipleClusters(%s): %s", test.desc, err)
+				return
+			}
+
+			if err := waitForIngest(ctx, client, testConfig.Database, test.stmt, nil, test.doer, test.want, test.gotInit); err != nil {
+				t.Errorf("TestFileIngestion(%s): %s", test.desc, err)
+			}
+
+			if err := waitForIngest(ctx, secondaryClient, testConfig.SecondaryDatabase, test.stmt, nil, test.doer, test.want, test.gotInit); err != nil {
+				t.Errorf("TestFileIngestion(%s): %s", test.desc, err)
+			}
+
 		}()
 	}
 }
