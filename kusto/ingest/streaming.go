@@ -15,24 +15,22 @@ import (
 	"github.com/Azure/azure-kusto-go/kusto/ingest/internal/properties"
 )
 
-// StreamingIngestion provides data ingestion from external sources into Kusto.
-type StreamingIngestion struct {
-	db    string
-	table string
-
-	client *kusto.Client
-
+// Streaming provides data ingestion from external sources into Kusto.
+type Streaming struct {
+	db         string
+	table      string
+	client     *kusto.Client
 	streamConn *conn.Conn
 }
 
-// NewStreaming is the constructor for StreamingIngestion.
-func NewStreaming(client *kusto.Client, db, table string) (*StreamingIngestion, error) {
+// NewStreaming is the constructor for Streaming.
+func NewStreaming(client *kusto.Client, db, table string) (*Streaming, error) {
 	streamConn, err := conn.New(client.Endpoint(), client.Auth())
 	if err != nil {
 		return nil, err
 	}
 
-	i := &StreamingIngestion{
+	i := &Streaming{
 		db:         db,
 		table:      table,
 		client:     client,
@@ -44,7 +42,7 @@ func NewStreaming(client *kusto.Client, db, table string) (*StreamingIngestion, 
 
 // FromFile allows uploading a data file for Kusto from either a local path or a blobstore URI path.
 // This method is thread-safe.
-func (i *StreamingIngestion) FromFile(ctx context.Context, fPath string, options ...FileOption) (*Result, error) {
+func (i *Streaming) FromFile(ctx context.Context, fPath string, options ...FileOption) (*Result, error) {
 	local, err := filesystem.IsLocalPath(fPath)
 	if err != nil {
 		return nil, err
@@ -56,7 +54,7 @@ func (i *StreamingIngestion) FromFile(ctx context.Context, fPath string, options
 	props := i.newProp()
 
 	for _, option := range options {
-		err := option.Run(&props, StreamingIngest|IngestFromFile)
+		err := option.Run(&props, StreamingClient, FromFile)
 		if err != nil {
 			return nil, err
 		}
@@ -77,17 +75,17 @@ func (i *StreamingIngestion) FromFile(ctx context.Context, fPath string, options
 		return nil, err
 	}
 
-	return streamImpl(i.db, i.table, i.streamConn, ctx, file, props)
+	return streamImpl(i.streamConn, ctx, file, props)
 }
 
 // FromReader allows uploading a data file for Kusto from an io.Reader. The content is uploaded to Blobstore and
 // ingested after all data in the reader is processed. Content should not use compression as the content will be
 // compressed with gzip. This method is thread-safe.
-func (i *StreamingIngestion) FromReader(ctx context.Context, reader io.Reader, options ...FileOption) (*Result, error) {
+func (i *Streaming) FromReader(ctx context.Context, reader io.Reader, options ...FileOption) (*Result, error) {
 	props := i.newProp()
 
 	for _, prop := range options {
-		err := prop.Run(&props, StreamingIngest|IngestFromReader)
+		err := prop.Run(&props, StreamingClient, FromReader)
 		if err != nil {
 			return nil, err
 		}
@@ -98,10 +96,10 @@ func (i *StreamingIngestion) FromReader(ctx context.Context, reader io.Reader, o
 		return nil, fmt.Errorf("must provide option FileFormat() when using FromReader()")
 	}
 
-	return streamImpl(i.db, i.table, i.streamConn, ctx, reader, props)
+	return streamImpl(i.streamConn, ctx, reader, props)
 }
 
-func streamImpl(db, table string, c *conn.Conn, ctx context.Context, payload io.Reader, props properties.All) (*Result, error) {
+func streamImpl(c *conn.Conn, ctx context.Context, payload io.Reader, props properties.All) (*Result, error) {
 	compress := !props.Source.DontCompress
 	if compress {
 		var closer io.ReadCloser
@@ -115,7 +113,9 @@ func streamImpl(db, table string, c *conn.Conn, ctx context.Context, payload io.
 		payload = zw
 	}
 
-	err := c.Write(ctx, db, table, payload, props.Ingestion.Additional.Format, props.Ingestion.Additional.IngestionMappingRef, props.Streaming.ClientRequestId)
+	err := c.Write(ctx, props.Ingestion.DatabaseName, props.Ingestion.TableName, payload, props.Ingestion.Additional.Format,
+		props.Ingestion.Additional.IngestionMappingRef,
+		props.Streaming.ClientRequestId)
 
 	if err != nil {
 		if e, ok := err.(*errors.Error); ok {
@@ -131,7 +131,7 @@ func streamImpl(db, table string, c *conn.Conn, ctx context.Context, payload io.
 	return result, nil
 }
 
-func (i *StreamingIngestion) newProp() properties.All {
+func (i *Streaming) newProp() properties.All {
 	return properties.All{
 		Ingestion: properties.Ingestion{
 			DatabaseName: i.db,

@@ -82,7 +82,7 @@ func New(client *kusto.Client, db, table string) (*Ingestion, error) {
 	return i, nil
 }
 
-func (i *Ingestion) prepForIngestion(ctx context.Context, options []FileOption, scope OptionScope) (*Result, properties.All, error) {
+func (i *Ingestion) prepForIngestion(ctx context.Context, options []FileOption, scope TypeScope) (*Result, properties.All, error) {
 	result := newResult()
 
 	auth, err := i.mgr.AuthContext(ctx)
@@ -92,7 +92,7 @@ func (i *Ingestion) prepForIngestion(ctx context.Context, options []FileOption, 
 
 	props := i.newProp(auth)
 	for _, o := range options {
-		if err := o.Run(&props, QueuedIngest|scope); err != nil {
+		if err := o.Run(&props, QueuedClient, scope); err != nil {
 			return nil, properties.All{}, err
 		}
 	}
@@ -132,11 +132,11 @@ func (i *Ingestion) FromFile(ctx context.Context, fPath string, options ...FileO
 		return nil, err
 	}
 
-	var scope OptionScope
+	var scope TypeScope
 	if local {
-		scope = IngestFromFile
+		scope = FromFile
 	} else {
-		scope = IngestFromBlob
+		scope = FromBlob
 	}
 
 	result, props, err := i.prepForIngestion(ctx, options, scope)
@@ -165,7 +165,7 @@ func (i *Ingestion) FromFile(ctx context.Context, fPath string, options ...FileO
 // ingested after all data in the reader is processed. Content should not use compression as the content will be
 // compressed with gzip. This method is thread-safe.
 func (i *Ingestion) FromReader(ctx context.Context, reader io.Reader, options ...FileOption) (*Result, error) {
-	result, props, err := i.prepForIngestion(ctx, options, IngestFromReader)
+	result, props, err := i.prepForIngestion(ctx, options, FromReader)
 	if err != nil {
 		return nil, err
 	}
@@ -208,7 +208,7 @@ func (i *Ingestion) Stream(ctx context.Context, payload []byte, format DataForma
 		},
 	}
 
-	_, err = streamImpl(i.db, i.table, c, ctx, bytes.NewReader(payload), props)
+	_, err = streamImpl(c, ctx, bytes.NewReader(payload), props)
 
 	return err
 }
