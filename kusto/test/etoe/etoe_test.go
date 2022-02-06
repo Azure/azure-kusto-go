@@ -395,7 +395,7 @@ func TestFileIngestion(t *testing.T) {
 			ingestor: queuedIngestor,
 			src:      "https://adxingestiondemo.blob.core.windows.net/data/demo.json",
 			options:  []ingest.FileOption{ingest.IngestionMappingRef("Logs_bad_mapping", ingest.JSON)},
-			wantErr: ingest.StatusFromMap(map[string]interface{}{
+			wantErr: ingest.StatusFromMapForTests(map[string]interface{}{
 				"Status":        "Failed",
 				"FailureStatus": "Permanent",
 				"ErrorCode":     "BadRequest_MappingReferenceWasNotFound",
@@ -719,7 +719,7 @@ func TestReaderIngestion(t *testing.T) {
 			ingestor: queuedIngestor,
 			src:      "testdata/demo.json",
 			options:  []ingest.FileOption{ingest.FileFormat(ingest.JSON), ingest.IngestionMappingRef("Logs_bad_mapping", ingest.JSON)},
-			wantErr: ingest.StatusFromMap(map[string]interface{}{
+			wantErr: ingest.StatusFromMapForTests(map[string]interface{}{
 				"Status":        "Failed",
 				"FailureStatus": "Permanent",
 				"ErrorCode":     "BadRequest_MappingReferenceWasNotFound",

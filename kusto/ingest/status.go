@@ -201,8 +201,8 @@ func (r *statusRecord) FromMap(data map[string]interface{}) {
 	}
 }
 
-// StatusFromMap converts an ingestion status record to a key value map.
-func StatusFromMap(data map[string]interface{}) error {
+// StatusFromMapForTests converts an ingestion status record to a key value map. This is useful for comparison in tests.
+func StatusFromMapForTests(data map[string]interface{}) error {
 	r := newStatusRecord()
 	r.FromMap(data)
 	return r
