@@ -10,7 +10,6 @@ import (
 	"sync"
 	"time"
 
-	"github.com/Azure/azure-kusto-go/kusto"
 	"github.com/Azure/azure-kusto-go/kusto/data/errors"
 	"github.com/Azure/azure-kusto-go/kusto/ingest/internal/conn"
 	"github.com/Azure/azure-kusto-go/kusto/ingest/internal/filesystem"
@@ -24,7 +23,7 @@ type Ingestion struct {
 	db    string
 	table string
 
-	client *kusto.Client
+	client QueryClient
 	mgr    *resources.Manager
 
 	fs *filesystem.Ingestion
@@ -48,7 +47,7 @@ func WithStaticBuffer(bufferSize int, maxBuffers int) Option {
 }
 
 // New is a constructor for Ingestion.
-func New(client *kusto.Client, db, table string, options ...Option) (*Ingestion, error) {
+func New(client QueryClient, db, table string, options ...Option) (*Ingestion, error) {
 	mgr, err := resources.New(client)
 	if err != nil {
 		return nil, err
