@@ -14,15 +14,19 @@ import (
 
 // Config represents a config.json file that must be in the directory and hold information to do the integration tests.
 type Config struct {
-	// Endpoint is the  endpoint name to connect with
+	// Endpoint is the endpoint name to connect with
 	Endpoint string
-	// Database is the name of an exisiting database that can be used for tests
+	// SecondaryEndpoint is the endpoint name to connect with for the secondary cluster
+	SecondaryEndpoint string
+	// Database is the name of an existing database that can be used for tests
 	Database string
+	// SecondaryDatabase is the name of an existing database in the secondary that can be used for tests
+	SecondaryDatabase string
 	// ClientID is the object-id of the principal authorized to connect to the database
 	ClientID string
 	// ClientSecret is the key used to get a token on behalf of the principal
 	ClientSecret string
-	// TenantID is the tenant on which the prinicpal exisets
+	// TenantID is the tenant on which the principal exists
 	TenantID string
 	// Authorizer generates bearer tokens on behalf of the principal
 	Authorizer kusto.Authorization
@@ -63,11 +67,13 @@ func init() {
 	} else {
 		// if couldn't find a config file, we try to read them from env
 		testConfig = Config{
-			Endpoint:     os.Getenv("ENGINE_CONNECTION_STRING"),
-			Database:     os.Getenv("TEST_DATABASE"),
-			ClientID:     os.Getenv("APP_ID"),
-			ClientSecret: os.Getenv("APP_KEY"),
-			TenantID:     os.Getenv("AUTH_ID"),
+			Endpoint:          os.Getenv("ENGINE_CONNECTION_STRING"),
+			SecondaryEndpoint: os.Getenv("SECONDARY_ENGINE_CONNECTION_STRING"),
+			Database:          os.Getenv("TEST_DATABASE"),
+			SecondaryDatabase: os.Getenv("SECONDARY_DATABASE"),
+			ClientID:          os.Getenv("APP_ID"),
+			ClientSecret:      os.Getenv("APP_KEY"),
+			TenantID:          os.Getenv("AUTH_ID"),
 		}
 
 		if testConfig.Endpoint == "" {

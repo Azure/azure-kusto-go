@@ -355,7 +355,17 @@ func TestFileIngestion(t *testing.T) {
 		panic(err)
 	}
 
+	secondaryClient, err := kusto.New(testConfig.SecondaryEndpoint, testConfig.Authorizer)
+	if err != nil {
+		panic(err)
+	}
+
 	ingestor, err := ingest.New(client, testConfig.Database, "Logs")
+	if err != nil {
+		panic(err)
+	}
+
+	secondaryIngestor, err := ingest.New(secondaryClient, testConfig.SecondaryDatabase, "Logs")
 	if err != nil {
 		panic(err)
 	}
@@ -386,6 +396,8 @@ func TestFileIngestion(t *testing.T) {
 		// compare allows the test to have a custom compare operation. If nil, the data from doer's update argument is
 		// compared against want using pretty.Compare().
 		compare func(got, want interface{}) error
+		// useSecondaryClient instructs if the secondary client should be used for the test.
+		useSecondaryClient bool
 	}{
 		{
 			desc:    "Ingest from blob with bad existing mapping",
@@ -402,7 +414,7 @@ func TestFileIngestion(t *testing.T) {
 					kusto.QueryValues{"tableName": "Logs"},
 				),
 			),
-			setup: func() error { return createIngestionTable(client) },
+			setup: func() error { return createIngestionTable(client, testConfig.Database) },
 			doer: func(row *table.Row, update interface{}) error {
 				rec := CountResult{}
 				if err := row.ToStruct(&rec); err != nil {
@@ -474,7 +486,7 @@ func TestFileIngestion(t *testing.T) {
 			desc:  "Ingestion from local file test 2",
 			src:   createCsvFileFromData(mockRows),
 			stmt:  kusto.NewStmt("Logs | order by header_api_version asc"),
-			setup: func() error { return createIngestionTable(client) },
+			setup: func() error { return createIngestionTable(client, testConfig.Database) },
 			doer: func(row *table.Row, update interface{}) error {
 				rec := LogRow{}
 				if err := row.ToStruct(&rec); err != nil {
@@ -489,6 +501,33 @@ func TestFileIngestion(t *testing.T) {
 				return &v
 			},
 			want: mockRows,
+		},
+		{
+			desc: "Ingestion to two different clusters",
+			src:  createCsvFileFromData(mockRows),
+			stmt: kusto.NewStmt("Logs | order by header_api_version asc"),
+			setup: func() error {
+				err := createIngestionTable(client, testConfig.Database)
+				if err != nil {
+					return err
+				}
+				return createIngestionTable(secondaryClient, testConfig.SecondaryDatabase)
+			},
+			doer: func(row *table.Row, update interface{}) error {
+				rec := LogRow{}
+				if err := row.ToStruct(&rec); err != nil {
+					return err
+				}
+				recs := update.(*[]LogRow)
+				*recs = append(*recs, rec)
+				return nil
+			},
+			gotInit: func() interface{} {
+				v := []LogRow{}
+				return &v
+			},
+			want:               mockRows,
+			useSecondaryClient: true,
 		},
 	}
 
@@ -513,6 +552,12 @@ func TestFileIngestion(t *testing.T) {
 			if err == nil {
 				err = <-res.Wait(ctx)
 			}
+			if test.useSecondaryClient {
+				res, err := secondaryIngestor.FromFile(ctx, test.src, test.options...)
+				if err == nil {
+					err = <-res.Wait(ctx)
+				}
+			}
 
 			switch {
 			case err == nil && test.wantErr:
@@ -525,8 +570,14 @@ func TestFileIngestion(t *testing.T) {
 				return
 			}
 
-			if err := waitForIngest(ctx, client, test.stmt, test.compare, test.doer, test.want, test.gotInit); err != nil {
+			if err := waitForIngest(ctx, client, testConfig.Database, test.stmt, test.compare, test.doer, test.want, test.gotInit); err != nil {
 				t.Errorf("TestFileIngestion(%s): %s", test.desc, err)
+			}
+
+			if test.useSecondaryClient {
+				if err := waitForIngest(ctx, secondaryClient, testConfig.SecondaryDatabase, test.stmt, test.compare, test.doer, test.want, test.gotInit); err != nil {
+					t.Errorf("TestFileIngestion(%s): %s", test.desc, err)
+				}
 			}
 		}()
 	}
@@ -595,7 +646,7 @@ func TestReaderIngestion(t *testing.T) {
 					kusto.QueryValues{"tableName": "Logs"},
 				),
 			),
-			setup: func() error { return createIngestionTable(client) },
+			setup: func() error { return createIngestionTable(client, testConfig.Database) },
 			doer: func(row *table.Row, update interface{}) error {
 				rec := CountResult{}
 				if err := row.ToStruct(&rec); err != nil {
@@ -648,7 +699,7 @@ func TestReaderIngestion(t *testing.T) {
 				ingest.FileFormat(ingest.CSV),
 			},
 			stmt:  kusto.NewStmt("Logs | order by header_api_version asc"),
-			setup: func() error { return createIngestionTable(client) },
+			setup: func() error { return createIngestionTable(client, testConfig.Database) },
 			doer: func(row *table.Row, update interface{}) error {
 				rec := LogRow{}
 				if err := row.ToStruct(&rec); err != nil {
@@ -711,7 +762,7 @@ func TestReaderIngestion(t *testing.T) {
 				return
 			}
 
-			if err := waitForIngest(ctx, client, test.stmt, test.compare, test.doer, test.want, test.gotInit); err != nil {
+			if err := waitForIngest(ctx, client, testConfig.Database, test.stmt, test.compare, test.doer, test.want, test.gotInit); err != nil {
 				t.Errorf("TestReaderIngestion(%s): %s", test.desc, err)
 			}
 		}()
@@ -835,7 +886,7 @@ func TestStreamingIngestion(t *testing.T) {
 			),
 		)
 
-		if err := waitForIngest(ctx, client, stmt, test.compare, test.doer, test.want, test.gotInit); err != nil {
+		if err := waitForIngest(ctx, client, testConfig.Database, stmt, test.compare, test.doer, test.want, test.gotInit); err != nil {
 			t.Errorf("TestStreamingIngestion(%s): %s", test.desc, err)
 		}
 	}
@@ -962,7 +1013,7 @@ func csvFileFromString() string {
 	return fname
 }
 
-func createIngestionTable(client *kusto.Client) error {
+func createIngestionTable(client *kusto.Client, database string) error {
 	var dropStmt = kusto.NewStmt(".drop table Logs ifexists")
 	var createStmt = kusto.NewStmt(".create table Logs (header_time: datetime, header_id: guid, header_api_version: string, payload_data: string, payload_user: string) ")
 	var addMappingStmt = kusto.NewStmt(".create table Logs ingestion json mapping 'Logs_mapping' '[{\"column\":\"header_time\",\"path\":\"$.header.time\",\"datatype\":\"datetime\"},{\"column\":\"header_id\",\"path\":\"$.header.id\",\"datatype\":\"guid\"},{\"column\":\"header_api_version\",\"path\":\"$.header.api_version\",\"datatype\":\"string\"},{\"column\":\"payload_data\",\"path\":\"$.payload.data\",\"datatype\":\"string\"},{\"column\":\"payload_user\",\"path\":\"$.payload.user\",\"datatype\":\"string\"}]'")
@@ -970,7 +1021,7 @@ func createIngestionTable(client *kusto.Client) error {
 	commandsToRun := []kusto.Stmt{dropStmt, createStmt, addMappingStmt}
 
 	for _, cmd := range commandsToRun {
-		if _, err := client.Mgmt(context.Background(), testConfig.Database, cmd); err != nil {
+		if _, err := client.Mgmt(context.Background(), database, cmd); err != nil {
 			return err
 		}
 	}
@@ -995,7 +1046,7 @@ func executeCommands(client *kusto.Client, commandsToRun ...kusto.Stmt) error {
 	return nil
 }
 
-func waitForIngest(ctx context.Context, client *kusto.Client, stmt kusto.Stmt, compare func(got, want interface{}) error,
+func waitForIngest(ctx context.Context, client *kusto.Client, database string, stmt kusto.Stmt, compare func(got, want interface{}) error,
 	doer func(row *table.Row, update interface{}) error, want interface{}, gotInit func() interface{}) error {
 
 	deadline := time.Now().Add(1 * time.Minute)
@@ -1008,7 +1059,7 @@ func waitForIngest(ctx context.Context, client *kusto.Client, stmt kusto.Stmt, c
 		time.Sleep(5 * time.Second)
 		loopErr = nil
 
-		iter, err := client.Query(ctx, testConfig.Database, stmt)
+		iter, err := client.Query(ctx, database, stmt)
 		if err != nil {
 			return err
 		}

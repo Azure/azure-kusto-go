@@ -8,7 +8,6 @@ import (
 	"fmt"
 	"io"
 	"sync"
-	"sync/atomic"
 	"time"
 
 	"github.com/Azure/azure-kusto-go/kusto"
@@ -19,30 +18,6 @@ import (
 	"github.com/Azure/azure-kusto-go/kusto/ingest/internal/resources"
 	"github.com/google/uuid"
 )
-
-var (
-	manager   atomic.Value // *resources.Manager
-	managerMu sync.Mutex
-)
-
-// getManager retrieves a Manager or creates a new one with client. Clients, other than having timeout options,
-// are all the same. Managers all have the same context. This acts as a singleton to prevent propogating
-// mulitple managers around that have background goroutines running.
-func getManager(client *kusto.Client) (*resources.Manager, error) {
-	i := manager.Load()
-	if i == nil {
-		managerMu.Lock()
-		defer managerMu.Unlock()
-
-		mgr, err := resources.New(client)
-		if err != nil {
-			return nil, err
-		}
-		manager.Store(mgr)
-		return mgr, nil
-	}
-	return i.(*resources.Manager), nil
-}
 
 // Ingestion provides data ingestion from external sources into Kusto.
 type Ingestion struct {
@@ -74,7 +49,7 @@ func WithStaticBuffer(bufferSize int, maxBuffers int) Option {
 
 // New is a constructor for Ingestion.
 func New(client *kusto.Client, db, table string, options ...Option) (*Ingestion, error) {
-	mgr, err := getManager(client)
+	mgr, err := resources.New(client)
 	if err != nil {
 		return nil, err
 	}
