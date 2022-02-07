@@ -624,38 +624,6 @@ func TestFileIngestion(t *testing.T) {
 	}
 }
 
-func assertErrorsMatch(t *testing.T, got, want error) bool {
-	if ingest.IsStatusRecord(got) {
-		if want == nil || !ingest.IsStatusRecord(want) {
-			return false
-		}
-
-		codeGot, _ := ingest.GetErrorCode(got)
-		codeWant, _ := ingest.GetErrorCode(want)
-
-		statusGot, _ := ingest.GetIngestionStatus(got)
-		statusWant, _ := ingest.GetIngestionStatus(want)
-
-		failureStatusGot, _ := ingest.GetIngestionFailureStatus(got)
-		failureStatusWant, _ := ingest.GetIngestionFailureStatus(want)
-
-		return assert.Equal(t, codeWant, codeGot) &&
-			assert.Equal(t, statusWant, statusGot) &&
-			assert.Equal(t, failureStatusWant, failureStatusGot)
-
-	} else if e, ok := got.(*errors.Error); ok {
-		if want == nil {
-			return false
-		}
-		if wantE, ok := want.(*errors.Error); ok {
-			return assert.Equal(t, wantE.Op, e.Op) && assert.Equal(t, wantE.Kind, e.Kind)
-		}
-		return false
-	}
-
-	return assert.Equal(t, want, got)
-}
-
 func TestReaderIngestion(t *testing.T) {
 	if skipETOE || testing.Short() {
 		t.SkipNow()
@@ -678,7 +646,7 @@ func TestReaderIngestion(t *testing.T) {
 		panic(err)
 	}
 
-	streamingIngestor, err := ingest.New(client, testConfig.Database, streamingTable)
+	streamingIngestor, err := ingest.NewStreaming(client, testConfig.Database, streamingTable)
 	if err != nil {
 		panic(err)
 	}
@@ -967,31 +935,47 @@ func TestMultipleClusters(t *testing.T) {
 		panic(err)
 	}
 
-	ingestor, err := ingest.New(client, testConfig.Database, "Logs")
-	if err != nil {
-		panic(err)
-	}
-
 	secondaryClient, err := kusto.New(testConfig.SecondaryEndpoint, testConfig.Authorizer)
 	if err != nil {
 		panic(err)
 	}
-	secondaryIngestor, err := ingest.New(secondaryClient, testConfig.SecondaryDatabase, "Logs")
+
+	queuedTable := fmt.Sprintf("goe2e_queued_multiple_logs_%d", time.Now().Unix())
+	secondaryQueuedTable := fmt.Sprintf("goe2e_secondary_queued_multiple_logs_%d", time.Now().Unix())
+	streamingTable := fmt.Sprintf("goe2e_secondary_streaming_multiple_logs_%d", time.Now().Unix())
+	secondaryStreamingTable := fmt.Sprintf("goe2e_secondary_streaming_multiple_logs_%d", time.Now().Unix())
+
+	queuedIngestor, err := ingest.New(client, testConfig.Database, queuedTable)
+	if err != nil {
+		panic(err)
+	}
+	secondaryQueuedIngestor, err := ingest.New(secondaryClient, testConfig.SecondaryDatabase, secondaryQueuedTable)
 	if err != nil {
 		panic(err)
 	}
 
-	mockRows := createMockLogRows()
+	streamingIngestor, err := ingest.NewStreaming(client, testConfig.Database, streamingTable)
+	if err != nil {
+		panic(err)
+	}
+	secondaryStreamingIngestor, err := ingest.NewStreaming(secondaryClient, testConfig.SecondaryDatabase, secondaryStreamingTable)
+	if err != nil {
+		panic(err)
+	}
 
 	tests := []struct {
 		// desc describes the test.
 		desc string
+		// setup is a function that will be called before the test runs.
+		setup func() error
+		// the type of ingestor for the test
+		ingestor ingest.Ingestor
+		// the type of ingsetor for the secondary cluster for the test
+		secondaryIngestor ingest.Ingestor
 		// src represents where we are getting our data.
 		src string
 		// stmt is used to query for the results.
 		stmt kusto.Stmt
-		// setup is a function that will be called before the test runs.
-		setup func() error
 		// doer is called from within the function passed to RowIterator.Do(). It allows us to collect the data we receive.
 		doer func(row *table.Row, update interface{}) error
 		// gotInit creates the variable that will be used by doer's update argument.
@@ -1000,69 +984,111 @@ func TestMultipleClusters(t *testing.T) {
 		want interface{}
 	}{
 		{
-			desc: "Ingestion to two different clusters",
-			src:  createCsvFileFromData(mockRows),
-			stmt: kusto.NewStmt("Logs | order by header_api_version asc"),
+			desc: "Ingestion from multiple clusters with queued ingestion",
 			setup: func() error {
-				if secondaryClient == nil {
-					t.Skip()
-				}
-
-				err := createIngestionTable(client, testConfig.Database)
+				err := createIngestionTableWithDB(t, client, testConfig.Database, queuedTable, false)
 				if err != nil {
 					return err
 				}
-				return createIngestionTable(secondaryClient, testConfig.SecondaryDatabase)
+				err = createIngestionTableWithDB(t, secondaryClient, testConfig.SecondaryDatabase, secondaryQueuedTable, false)
+				if err != nil {
+					return err
+				}
+
+				return nil
 			},
+			ingestor:          queuedIngestor,
+			secondaryIngestor: secondaryQueuedIngestor,
+			src:               csvFileFromString(),
+			stmt: pCountStmt.MustParameters(
+				kusto.NewParameters().Must(
+					kusto.QueryValues{"tableName": queuedTable},
+				),
+			),
 			doer: func(row *table.Row, update interface{}) error {
-				rec := LogRow{}
+				rec := CountResult{}
 				if err := row.ToStruct(&rec); err != nil {
 					return err
 				}
-				recs := update.(*[]LogRow)
+				recs := update.(*[]CountResult)
 				*recs = append(*recs, rec)
 				return nil
 			},
 			gotInit: func() interface{} {
-				v := []LogRow{}
+				v := []CountResult{}
 				return &v
 			},
-			want: mockRows,
+			want: &[]CountResult{{Count: 3}},
+		},
+		{
+			desc: "Ingestion from local file streaming",
+			setup: func() error {
+				err := createIngestionTableWithDB(t, client, testConfig.Database, streamingTable, false)
+				if err != nil {
+					return err
+				}
+				err = createIngestionTableWithDB(t, secondaryClient, testConfig.SecondaryDatabase, secondaryStreamingTable, false)
+				if err != nil {
+					return err
+				}
+
+				return nil
+			},
+			ingestor:          streamingIngestor,
+			secondaryIngestor: secondaryStreamingIngestor,
+			src:               csvFileFromString(),
+			stmt: pCountStmt.MustParameters(
+				kusto.NewParameters().Must(
+					kusto.QueryValues{"tableName": streamingTable},
+				),
+			),
+			doer: func(row *table.Row, update interface{}) error {
+				rec := CountResult{}
+				if err := row.ToStruct(&rec); err != nil {
+					return err
+				}
+				recs := update.(*[]CountResult)
+				*recs = append(*recs, rec)
+				return nil
+			},
+			gotInit: func() interface{} {
+				v := []CountResult{}
+				return &v
+			},
+			want: &[]CountResult{{Count: 3}},
 		},
 	}
 
 	for _, test := range tests {
-		func() {
-			if test.setup != nil {
-				if err := test.setup(); err != nil {
-					panic(err)
-				}
+		t.Run(test.desc, func(t *testing.T) {
+
+			var options []ingest.FileOption
+			if _, ok := test.ingestor.(*ingest.Ingestion); ok {
+				options = append(options, ingest.FlushImmediately(), ingest.ReportResultToTable())
 			}
 
-			res, err := ingestor.FromFile(ctx, test.src, ingest.FlushImmediately(), ingest.ReportResultToTable())
+			res, err := test.ingestor.FromFile(ctx, test.src, options...)
 			if err == nil {
 				err = <-res.Wait(ctx)
 			}
 
-			res, err = secondaryIngestor.FromFile(ctx, test.src, ingest.FlushImmediately(), ingest.ReportResultToTable())
+			res, err = test.secondaryIngestor.FromFile(ctx, test.src, options...)
 			if err == nil {
 				err = <-res.Wait(ctx)
 			}
 
-			if err != nil {
-				t.Errorf("TestMultipleClusters(%s): %s", test.desc, err)
+			if !assertErrorsMatch(t, err, nil) {
+				t.Errorf("TestFileIngestion(%s): queuedIngestor.FromFile(): got err == %v, want err == %v", test.desc, err, nil)
 				return
 			}
 
-			if err := waitForIngest(ctx, client, testConfig.Database, test.stmt, nil, test.doer, test.want, test.gotInit); err != nil {
-				t.Errorf("TestFileIngestion(%s): %s", test.desc, err)
+			if err != nil {
+				return
 			}
 
-			if err := waitForIngest(ctx, secondaryClient, testConfig.SecondaryDatabase, test.stmt, nil, test.doer, test.want, test.gotInit); err != nil {
-				t.Errorf("TestFileIngestion(%s): %s", test.desc, err)
-			}
-
-		}()
+			require.NoError(t, waitForIngest(t, ctx, client, testConfig.Database, test.stmt, test.doer, test.want, test.gotInit))
+			require.NoError(t, waitForIngest(t, ctx, secondaryClient, testConfig.SecondaryDatabase, test.stmt, test.doer, test.want, test.gotInit))
+		})
 	}
 }
 
@@ -1171,6 +1197,38 @@ func TestStreamingIngestion(t *testing.T) {
 	}
 }
 
+func assertErrorsMatch(t *testing.T, got, want error) bool {
+	if ingest.IsStatusRecord(got) {
+		if want == nil || !ingest.IsStatusRecord(want) {
+			return false
+		}
+
+		codeGot, _ := ingest.GetErrorCode(got)
+		codeWant, _ := ingest.GetErrorCode(want)
+
+		statusGot, _ := ingest.GetIngestionStatus(got)
+		statusWant, _ := ingest.GetIngestionStatus(want)
+
+		failureStatusGot, _ := ingest.GetIngestionFailureStatus(got)
+		failureStatusWant, _ := ingest.GetIngestionFailureStatus(want)
+
+		return assert.Equal(t, codeWant, codeGot) &&
+			assert.Equal(t, statusWant, statusGot) &&
+			assert.Equal(t, failureStatusWant, failureStatusGot)
+
+	} else if e, ok := got.(*errors.Error); ok {
+		if want == nil {
+			return false
+		}
+		if wantE, ok := want.(*errors.Error); ok {
+			return assert.Equal(t, wantE.Op, e.Op) && assert.Equal(t, wantE.Kind, e.Kind)
+		}
+		return false
+	}
+
+	return assert.Equal(t, want, got)
+}
+
 func getExpectedResult() AllDataType {
 	t, err := time.Parse(time.RFC3339Nano, "2020-03-04T14:05:01.3109965Z")
 	if err != nil {
@@ -1208,6 +1266,10 @@ func getExpectedResult() AllDataType {
 }
 
 func createIngestionTable(t *testing.T, client *kusto.Client, tableName string, withInitialRow bool) error {
+	return createIngestionTableWithDB(t, client, testConfig.Database, tableName, withInitialRow)
+}
+
+func createIngestionTableWithDB(t *testing.T, client *kusto.Client, database string, tableName string, withInitialRow bool) error {
 	dropUnsafe := kusto.NewStmt(".drop table ", kusto.UnsafeStmt(unsafe.Stmt{Add: true})).UnsafeAdd(tableName).Add(" ifexists")
 	var createUnsafe kusto.Stmt
 	if withInitialRow {
@@ -1219,10 +1281,10 @@ func createIngestionTable(t *testing.T, client *kusto.Client, tableName string, 
 	addMappingUnsafe := kusto.NewStmt(".create table ", kusto.UnsafeStmt(unsafe.Stmt{Add: true})).UnsafeAdd(tableName).Add(" ingestion json mapping 'Logs_mapping' '[{\"column\":\"header_time\",\"path\":\"$.header.time\",\"datatype\":\"datetime\"},{\"column\":\"header_id\",\"path\":\"$.header.id\",\"datatype\":\"guid\"},{\"column\":\"header_api_version\",\"path\":\"$.header.api_version\",\"datatype\":\"string\"},{\"column\":\"payload_data\",\"path\":\"$.payload.data\",\"datatype\":\"string\"},{\"column\":\"payload_user\",\"path\":\"$.payload.user\",\"datatype\":\"string\"}]'")
 
 	t.Cleanup(func() {
-		_ = executeCommands(client, dropUnsafe)
+		_ = executeCommands(client, database, dropUnsafe)
 	})
 
-	return executeCommands(client, dropUnsafe, createUnsafe, addMappingUnsafe, clearStreamingCacheStatement)
+	return executeCommands(client, database, dropUnsafe, createUnsafe, addMappingUnsafe, clearStreamingCacheStatement)
 }
 
 func createMockLogRows() []LogRow {
@@ -1315,9 +1377,9 @@ func createStringyLogsData() string {
 		"{\"header\":{\"time\":\"24-Aug-18 09:42:56\", \"id\":\"e52cd01e-6984-4821-a4aa-a97c334517e5\", \"api_version\":\"v2\"}, \"payload\":{\"data\":\"LEWDDGKXFGMRTFITKCWYH\", \"user\":\"owild@fabrikam.com\"}}\n"
 }
 
-func executeCommands(client *kusto.Client, commandsToRun ...kusto.Stmt) error {
+func executeCommands(client *kusto.Client, database string, commandsToRun ...kusto.Stmt) error {
 	for _, cmd := range commandsToRun {
-		if _, err := client.Mgmt(context.Background(), testConfig.Database, cmd, kusto.AllowWrite()); err != nil {
+		if _, err := client.Mgmt(context.Background(), database, cmd, kusto.AllowWrite()); err != nil {
 			return err
 		}
 	}
