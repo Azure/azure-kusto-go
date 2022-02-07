@@ -6,7 +6,7 @@
 This is a data plane SDK (it is for interacting with Azure Data Explorer service). For the control plane (resource administration), go [here](https://github.com/Azure/azure-sdk-for-go/tree/master/services/kusto/mgmt)
 
 ## What's New
-### Version 0.5.1
+### Version 0.5.2
 #### Fixes
 * **Critical bug** - When ingesting to multiple clusters all data is sent to one cluster.
 As always, we recommend re-using clients and ingestors whenever possible.
