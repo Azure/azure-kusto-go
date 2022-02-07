@@ -17,7 +17,7 @@ import (
 
 // mgmter is a private interface that allows us to write hermetic tests against the kusto.Client.Mgmt() method.
 type mgmter interface {
-	Mgmt(context.Context, string, kusto.Stmt, ...kusto.MgmtOption) (*kusto.RowIterator, error)
+	Mgmt(ctx context.Context, db string, query kusto.Stmt, options ...kusto.MgmtOption) (*kusto.RowIterator, error)
 }
 
 var objectTypes = map[string]bool{
@@ -134,7 +134,7 @@ type Manager struct {
 }
 
 // New is the constructor for Manager.
-func New(client *kusto.Client) (*Manager, error) {
+func New(client mgmter) (*Manager, error) {
 	m := &Manager{client: client, done: make(chan struct{})}
 	if err := m.fetch(context.Background()); err != nil {
 		return nil, err

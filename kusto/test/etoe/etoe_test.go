@@ -15,7 +15,6 @@ import (
 	"github.com/Azure/azure-kusto-go/kusto/data/value"
 	"github.com/Azure/azure-kusto-go/kusto/ingest"
 	"github.com/Azure/azure-kusto-go/kusto/unsafe"
-
 	"github.com/google/uuid"
 	"github.com/kylelemons/godebug/pretty"
 )
@@ -402,7 +401,7 @@ func TestFileIngestion(t *testing.T) {
 					kusto.QueryValues{"tableName": "Logs"},
 				),
 			),
-			setup: func() error { return createIngestionTable(client) },
+			setup: func() error { return createIngestionTable(client, testConfig.Database) },
 			doer: func(row *table.Row, update interface{}) error {
 				rec := CountResult{}
 				if err := row.ToStruct(&rec); err != nil {
@@ -474,7 +473,7 @@ func TestFileIngestion(t *testing.T) {
 			desc:  "Ingestion from local file test 2",
 			src:   createCsvFileFromData(mockRows),
 			stmt:  kusto.NewStmt("Logs | order by header_api_version asc"),
-			setup: func() error { return createIngestionTable(client) },
+			setup: func() error { return createIngestionTable(client, testConfig.Database) },
 			doer: func(row *table.Row, update interface{}) error {
 				rec := LogRow{}
 				if err := row.ToStruct(&rec); err != nil {
@@ -525,7 +524,7 @@ func TestFileIngestion(t *testing.T) {
 				return
 			}
 
-			if err := waitForIngest(ctx, client, test.stmt, test.compare, test.doer, test.want, test.gotInit); err != nil {
+			if err := waitForIngest(ctx, client, testConfig.Database, test.stmt, test.compare, test.doer, test.want, test.gotInit); err != nil {
 				t.Errorf("TestFileIngestion(%s): %s", test.desc, err)
 			}
 		}()
@@ -595,7 +594,7 @@ func TestReaderIngestion(t *testing.T) {
 					kusto.QueryValues{"tableName": "Logs"},
 				),
 			),
-			setup: func() error { return createIngestionTable(client) },
+			setup: func() error { return createIngestionTable(client, testConfig.Database) },
 			doer: func(row *table.Row, update interface{}) error {
 				rec := CountResult{}
 				if err := row.ToStruct(&rec); err != nil {
@@ -648,7 +647,7 @@ func TestReaderIngestion(t *testing.T) {
 				ingest.FileFormat(ingest.CSV),
 			},
 			stmt:  kusto.NewStmt("Logs | order by header_api_version asc"),
-			setup: func() error { return createIngestionTable(client) },
+			setup: func() error { return createIngestionTable(client, testConfig.Database) },
 			doer: func(row *table.Row, update interface{}) error {
 				rec := LogRow{}
 				if err := row.ToStruct(&rec); err != nil {
@@ -711,9 +710,126 @@ func TestReaderIngestion(t *testing.T) {
 				return
 			}
 
-			if err := waitForIngest(ctx, client, test.stmt, test.compare, test.doer, test.want, test.gotInit); err != nil {
+			if err := waitForIngest(ctx, client, testConfig.Database, test.stmt, test.compare, test.doer, test.want, test.gotInit); err != nil {
 				t.Errorf("TestReaderIngestion(%s): %s", test.desc, err)
 			}
+		}()
+	}
+}
+
+func TestMultipleClusters(t *testing.T) {
+	t.Parallel()
+
+	if skipETOE || testing.Short() {
+		t.Skipf("end to end tests disabled: missing config.json file in etoe directory")
+	}
+	if testConfig.SecondaryEndpoint == "" || testConfig.SecondaryDatabase == "" {
+		t.Skipf("multiple clusters tests diasbled: needs SecondaryEndpoint and SecondaryDatabase")
+	}
+
+	ctx, cancel := context.WithCancel(context.Background())
+	defer cancel()
+
+	client, err := kusto.New(testConfig.Endpoint, testConfig.Authorizer)
+	if err != nil {
+		panic(err)
+	}
+
+	ingestor, err := ingest.New(client, testConfig.Database, "Logs")
+	if err != nil {
+		panic(err)
+	}
+
+	secondaryClient, err := kusto.New(testConfig.SecondaryEndpoint, testConfig.Authorizer)
+	if err != nil {
+		panic(err)
+	}
+	secondaryIngestor, err := ingest.New(secondaryClient, testConfig.SecondaryDatabase, "Logs")
+	if err != nil {
+		panic(err)
+	}
+
+	mockRows := createMockLogRows()
+
+	tests := []struct {
+		// desc describes the test.
+		desc string
+		// src represents where we are getting our data.
+		src string
+		// stmt is used to query for the results.
+		stmt kusto.Stmt
+		// setup is a function that will be called before the test runs.
+		setup func() error
+		// doer is called from within the function passed to RowIterator.Do(). It allows us to collect the data we receive.
+		doer func(row *table.Row, update interface{}) error
+		// gotInit creates the variable that will be used by doer's update argument.
+		gotInit func() interface{}
+		// want is the data we want to receive from the query.
+		want interface{}
+	}{
+		{
+			desc: "Ingestion to two different clusters",
+			src:  createCsvFileFromData(mockRows),
+			stmt: kusto.NewStmt("Logs | order by header_api_version asc"),
+			setup: func() error {
+				if secondaryClient == nil {
+					t.Skip()
+				}
+
+				err := createIngestionTable(client, testConfig.Database)
+				if err != nil {
+					return err
+				}
+				return createIngestionTable(secondaryClient, testConfig.SecondaryDatabase)
+			},
+			doer: func(row *table.Row, update interface{}) error {
+				rec := LogRow{}
+				if err := row.ToStruct(&rec); err != nil {
+					return err
+				}
+				recs := update.(*[]LogRow)
+				*recs = append(*recs, rec)
+				return nil
+			},
+			gotInit: func() interface{} {
+				v := []LogRow{}
+				return &v
+			},
+			want: mockRows,
+		},
+	}
+
+	for _, test := range tests {
+		func() {
+			if test.setup != nil {
+				if err := test.setup(); err != nil {
+					panic(err)
+				}
+			}
+
+			res, err := ingestor.FromFile(ctx, test.src, ingest.FlushImmediately(), ingest.ReportResultToTable())
+			if err == nil {
+				err = <-res.Wait(ctx)
+			}
+
+			res, err = secondaryIngestor.FromFile(ctx, test.src, ingest.FlushImmediately(), ingest.ReportResultToTable())
+			if err == nil {
+				err = <-res.Wait(ctx)
+			}
+
+			if err != nil {
+				t.Errorf("TestMultipleClusters(%s): %s", test.desc, err)
+				return
+			}
+
+			if err := waitForIngest(ctx, client, testConfig.Database, test.stmt, nil, test.doer, test.want, test.gotInit); err != nil {
+				t.Errorf("TestFileIngestion(%s): %s", test.desc, err)
+			}
+
+			if err := waitForIngest(ctx, secondaryClient, testConfig.SecondaryDatabase, test.stmt, nil, test.doer, test.want, test.gotInit); err != nil {
+				t.Errorf("TestFileIngestion(%s): %s", test.desc, err)
+			}
+
 		}()
 	}
 }
@@ -835,7 +951,7 @@ func TestStreamingIngestion(t *testing.T) {
 			),
 		)
 
-		if err := waitForIngest(ctx, client, stmt, test.compare, test.doer, test.want, test.gotInit); err != nil {
+		if err := waitForIngest(ctx, client, testConfig.Database, stmt, test.compare, test.doer, test.want, test.gotInit); err != nil {
 			t.Errorf("TestStreamingIngestion(%s): %s", test.desc, err)
 		}
 	}
@@ -962,7 +1078,7 @@ func csvFileFromString() string {
 	return fname
 }
 
-func createIngestionTable(client *kusto.Client) error {
+func createIngestionTable(client *kusto.Client, database string) error {
 	var dropStmt = kusto.NewStmt(".drop table Logs ifexists")
 	var createStmt = kusto.NewStmt(".create table Logs (header_time: datetime, header_id: guid, header_api_version: string, payload_data: string, payload_user: string) ")
 	var addMappingStmt = kusto.NewStmt(".create table Logs ingestion json mapping 'Logs_mapping' '[{\"column\":\"header_time\",\"path\":\"$.header.time\",\"datatype\":\"datetime\"},{\"column\":\"header_id\",\"path\":\"$.header.id\",\"datatype\":\"guid\"},{\"column\":\"header_api_version\",\"path\":\"$.header.api_version\",\"datatype\":\"string\"},{\"column\":\"payload_data\",\"path\":\"$.payload.data\",\"datatype\":\"string\"},{\"column\":\"payload_user\",\"path\":\"$.payload.user\",\"datatype\":\"string\"}]'")
@@ -970,7 +1086,7 @@ func createIngestionTable(client *kusto.Client) error {
 	commandsToRun := []kusto.Stmt{dropStmt, createStmt, addMappingStmt}
 
 	for _, cmd := range commandsToRun {
-		if _, err := client.Mgmt(context.Background(), testConfig.Database, cmd); err != nil {
+		if _, err := client.Mgmt(context.Background(), database, cmd); err != nil {
 			return err
 		}
 	}
@@ -995,7 +1111,7 @@ func executeCommands(client *kusto.Client, commandsToRun ...kusto.Stmt) error {
 	return nil
 }
 
-func waitForIngest(ctx context.Context, client *kusto.Client, stmt kusto.Stmt, compare func(got, want interface{}) error,
+func waitForIngest(ctx context.Context, client *kusto.Client, database string, stmt kusto.Stmt, compare func(got, want interface{}) error,
 	doer func(row *table.Row, update interface{}) error, want interface{}, gotInit func() interface{}) error {
 
 	deadline := time.Now().Add(1 * time.Minute)
@@ -1008,7 +1124,7 @@ func waitForIngest(ctx context.Context, client *kusto.Client, stmt kusto.Stmt, c
 		time.Sleep(5 * time.Second)
 		loopErr = nil
 
-		iter, err := client.Query(ctx, testConfig.Database, stmt)
+		iter, err := client.Query(ctx, database, stmt)
 		if err != nil {
 			return err
 		}
