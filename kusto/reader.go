@@ -19,12 +19,13 @@ import (
 
 // send allows us to send a table on a channel and know when everything has been written.
 type send struct {
-	inColumns    table.Columns
-	inRows       []value.Values
-	inProgress   v2.TableProgress
-	inNonPrimary v2.DataTable
-	inCompletion v2.DataSetCompletion
-	inErr        error
+	inColumns           table.Columns
+	inRows              []value.Values
+	inTableFragmentType string
+	inProgress          v2.TableProgress
+	inNonPrimary        v2.DataTable
+	inCompletion        v2.DataSetCompletion
+	inErr               error
 
 	wg *sync.WaitGroup
 }
@@ -33,6 +34,13 @@ func (s send) done() {
 	if s.wg != nil {
 		s.wg.Done()
 	}
+}
+
+// A set of rows with values.
+// Replace indicates whether the existing result set should be cleared and replaced with this row.
+type Rows struct {
+	Values  value.Values
+	Replace bool
 }
 
 // RowIterator is used to iterate over the returned Row objects returned by Kusto.
@@ -54,7 +62,7 @@ type RowIterator struct {
 	inCompletion chan send
 	inErr        chan send
 
-	rows chan value.Values
+	rows chan Rows
 
 	mu sync.Mutex
 
@@ -93,7 +101,7 @@ func newRowIterator(ctx context.Context, cancel context.CancelFunc, execResp exe
 		inCompletion: make(chan send, 1),
 		inErr:        make(chan send),
 
-		rows:       make(chan value.Values, 1000),
+		rows:       make(chan Rows, 1000),
 		nonPrimary: make(map[frames.TableKind]v2.DataTable),
 	}
 	columnsReady := ri.start()
@@ -122,10 +130,10 @@ func (r *RowIterator) start() chan struct{} {
 					close(r.rows)
 					return
 				}
-				for _, row := range sent.inRows {
+				for k, values := range sent.inRows {
 					select {
 					case <-r.ctx.Done():
-					case r.rows <- row:
+					case r.rows <- Rows{Values: values, Replace: k == 0 && sent.inTableFragmentType == "DataReplace"}:
 					}
 				}
 				sent.done()
@@ -218,7 +226,7 @@ func (r *RowIterator) Next() (*table.Row, error) {
 			}
 			return nil, io.EOF
 		}
-		return &table.Row{ColumnTypes: r.columns, Values: kvs, Op: r.op}, nil
+		return &table.Row{ColumnTypes: r.columns, Values: kvs.Values, Op: r.op, Replace: kvs.Replace}, nil
 	}
 }
 

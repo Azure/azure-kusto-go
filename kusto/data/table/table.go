@@ -55,6 +55,8 @@ type Row struct {
 	Values value.Values
 	// Op is the operation that resulted in the row. This is for internal use.
 	Op errors.Op
+	// Replace indicates whether the existing result set should be cleared and replaced with this row.
+	Replace bool
 
 	columnNames []string
 }
