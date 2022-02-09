@@ -168,3 +168,35 @@ func TestRowToStruct(t *testing.T) {
 		}
 	}
 }
+
+func TestExtractValue(t *testing.T) {
+	t.Parallel()
+	columns := Columns{
+		{Name: "Id", Type: types.Long},
+		{Name: "FirstName", Type: types.String},
+		{Name: "LastName", Type: types.String},
+		{Name: "NotInStruct", Type: types.DateTime},
+		{Name: "NullReal", Type: types.Real},
+		{Name: "NullString", Type: types.String},
+	}
+	row := &Row{
+		ColumnTypes: columns,
+		Values: value.Values{
+			value.Long{Value: 1, Valid: true},
+			value.String{Value: "John", Valid: true},
+			value.String{Value: "Doak", Valid: true},
+			value.DateTime{Value: time.Now(), Valid: true},
+			value.Real{Valid: false},
+			value.String{Valid: false},
+		},
+	}
+	var id int64
+	var firstName string
+	var lastName string
+	var nullReal float64
+	var nullString string
+	row.ExtractValues(&id, &firstName, &lastName, nil, &nullReal, &nullString)
+	if id != 1 || firstName != "John" || lastName != "Doak" || nullReal != 0.0 || nullString != "" {
+		t.Errorf("TestExtractValue: got %d, %s, %s, %f, %s, want 1, John, Doak, 0.0, ''", id, firstName, lastName, nullReal, nullString)
+	}
+}
