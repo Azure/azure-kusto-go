@@ -2,6 +2,8 @@
 package v2
 
 import (
+	"fmt"
+
 	"github.com/Azure/azure-kusto-go/kusto/data/errors"
 	"github.com/Azure/azure-kusto-go/kusto/data/table"
 	"github.com/Azure/azure-kusto-go/kusto/data/value"
@@ -75,6 +77,10 @@ func (d *DataTable) UnmarshalRaw(raw json.RawMessage) error {
 // IsFrame implements frame.Frame.
 func (DataTable) IsFrame() {}
 
+type OneAPIError struct {
+	Error map[string]interface{} `json:"error"`
+}
+
 // DataSetCompletion indicates the stream id done. It implements Frame.
 type DataSetCompletion struct {
 	Base
@@ -83,7 +89,7 @@ type DataSetCompletion struct {
 	// Cancelled indicates that the request was cancelled.
 	Cancelled bool
 	// OneAPIErrors is a list of errors encountered.
-	OneAPIErrors []string `json:"OneApiErrors"`
+	OneAPIErrors []OneAPIError `json:"OneApiErrors"`
 
 	Op errors.Op `json:"-"`
 }
@@ -214,8 +220,12 @@ func rawToOneAPIErr(raw json.RawMessage, op errors.Op) error {
 	}
 
 	if oe, ok := m[frames.FieldRows]; ok {
-		if err := errors.OneToErr(oe.(map[string]interface{}), op); err != nil {
-			return err
+		if oe_conv, ok := oe.(map[string]interface{}); ok {
+			if err := errors.OneToErr(oe_conv, op); err != nil {
+				return err
+			}
+		} else {
+			fmt.Printf("unrecognized error: %v\n", oe)
 		}
 	}
 	return nil

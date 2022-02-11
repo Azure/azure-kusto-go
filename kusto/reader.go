@@ -4,6 +4,7 @@ package kusto
 
 import (
 	"context"
+	"encoding/json"
 	"flag"
 	"fmt"
 	"io"
@@ -148,10 +149,18 @@ func (r *RowIterator) start() chan struct{} {
 				sent.done()
 				r.mu.Unlock()
 			case sent := <-r.inCompletion:
-				r.mu.Lock()
-				r.dsCompletion = sent.inCompletion
-				sent.done()
-				r.mu.Unlock()
+				if sent.inCompletion.HasErrors {
+					errMsg, _ := json.MarshalIndent(sent.inCompletion.OneAPIErrors[0].Error, "", "  ")
+					r.setError(fmt.Errorf("Query completed with error: %s", errMsg))
+					sent.done()
+					close(r.rows)
+					return
+				} else {
+					r.mu.Lock()
+					r.dsCompletion = sent.inCompletion
+					sent.done()
+					r.mu.Unlock()
+				}
 			case sent := <-r.inErr:
 				r.setError(sent.inErr)
 				sent.done()

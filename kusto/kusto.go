@@ -309,14 +309,18 @@ func (c *Client) setQueryOptions(ctx context.Context, op errors.Op, query Stmt, 
 
 	opt := &queryOptions{
 		requestProperties: &requestProperties{
-			Options:    map[string]interface{}{},
+			Options: map[string]interface{}{
+				"request_readonly":                 true,
+				"request_remote_entities_disabled": false,
+				"results_progressive_enabled":      false,
+			},
 			Parameters: params,
 		},
 	}
 	if op == errors.OpQuery {
 		// We want progressive frames by default for Query(), but not Mgmt() because it uses v1 framing and ingestion endpoints
 		// do not support it.
-		opt.requestProperties.Options["results_progressive_enabled"] = true
+		opt.requestProperties.Options["results_progressive_enabled"] = false
 	}
 
 	for _, o := range options {
