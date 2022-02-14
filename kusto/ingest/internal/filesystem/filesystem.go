@@ -206,13 +206,9 @@ func (i *Ingestion) Blob(ctx context.Context, from string, fileSize int64, props
 		props.Ingestion.RawDataSize = fileSize
 	}
 
-	// If they did not tell us how the file was encoded, try to discover it from the file extension.
-	if props.Ingestion.Additional.Format == properties.DFUnknown {
-		et := properties.DataFormatDiscovery(from)
-		if et == properties.DFUnknown {
-			return errors.ES(errors.OpFileIngest, errors.KClientArgs, "could not discover the file format from name of the file(%s)", from).SetNoRetry()
-		}
-		props.Ingestion.Additional.Format = et
+	err = CompleteFormatFromFileName(&props, from)
+	if err != nil {
+		return err
 	}
 
 	j, err := props.Ingestion.MarshalJSONString()
@@ -223,6 +219,21 @@ func (i *Ingestion) Blob(ctx context.Context, from string, fileSize int64, props
 	if _, err := to.Enqueue(ctx, j, 0, 0); err != nil {
 		return errors.E(errors.OpFileIngest, errors.KBlobstore, err)
 	}
+
+	return nil
+}
+
+func CompleteFormatFromFileName(props *properties.All, from string) error {
+	// If they did not tell us how the file was encoded, try to discover it from the file extension.
+	if props.Ingestion.Additional.Format != properties.DFUnknown {
+		return nil
+	}
+
+	et := properties.DataFormatDiscovery(from)
+	if et == properties.DFUnknown {
+		return errors.ES(errors.OpFileIngest, errors.KClientArgs, "could not discover the file format from name of the file(%s)", from).SetNoRetry()
+	}
+	props.Ingestion.Additional.Format = et
 
 	return nil
 }
