@@ -24,6 +24,8 @@ type Streaming struct {
 }
 
 // NewStreaming is the constructor for Streaming.
+// More information can be found here:
+// https://docs.microsoft.com/en-us/azure/kusto/management/create-ingestion-mapping-command
 func NewStreaming(client *kusto.Client, db, table string) (*Streaming, error) {
 	streamConn, err := conn.New(client.Endpoint(), client.Auth())
 	if err != nil {

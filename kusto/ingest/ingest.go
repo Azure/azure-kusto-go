@@ -177,10 +177,8 @@ func (i *Ingestion) FromReader(ctx context.Context, reader io.Reader, options ..
 	return result, nil
 }
 
-// Stream takes a payload that is encoded in format with a server stored mappingName, compresses it and uploads it to Kusto.
-// payload must be a fully formed entry of format and < 4MiB or this will fail. We currently support
-// CSV, TSV, SCSV, SOHSV, PSV, JSON and AVRO. If using JSON or AVRO, you must provide a .mappingName that references
-// the name of the pre-created ingestion mapping defined on the table. Otherwise mappingName can be an empty string.
+// Deprecated: Stream usea streaming ingest client instead - `ingest.NewStreaming`.
+// takes a payload that is encoded in format with a server stored mappingName, compresses it and uploads it to Kusto.
 // More information can be found here:
 // https://docs.microsoft.com/en-us/azure/kusto/management/create-ingestion-mapping-command
 // The context object can be used with a timeout or cancel to limit the request time.
