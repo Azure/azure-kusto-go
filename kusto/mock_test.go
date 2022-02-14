@@ -125,8 +125,8 @@ func TestRow(t *testing.T) {
 				value.Values{value.Int{Value: 1, Valid: true}, value.String{}, value.Long{}},
 			},
 			want: []value.Values{
-				value.Values{value.Int{Value: 2, Valid: true}, value.String{}, value.Long{}},
-				value.Values{value.Int{Value: 1, Valid: true}, value.String{}, value.Long{}},
+				{value.Int{Value: 2, Valid: true}, value.String{}, value.Long{}},
+				{value.Int{Value: 1, Valid: true}, value.String{}, value.Long{}},
 			},
 		},
 	}
