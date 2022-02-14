@@ -9,36 +9,61 @@ import (
 	"github.com/Azure/azure-kusto-go/kusto/ingest/internal/properties"
 )
 
-type TypeScope uint
+type SourceScope uint
+
 type ClientScope uint
 
 const (
-	FromFile TypeScope = 1 << iota
+	FromFile SourceScope = 1 << iota
 	FromReader
 	FromBlob
 	QueuedClient ClientScope = 1 << iota
 	StreamingClient
 )
 
+func (s SourceScope) String() string {
+	switch s {
+	case FromFile:
+		return "FromFile"
+	case FromReader:
+		return "FromReader"
+	case FromBlob:
+		return "FromBlob"
+	default:
+		panic(fmt.Sprintf("unknown SourceScope %d", s))
+	}
+}
+
+func (s ClientScope) String() string {
+	switch s {
+	case QueuedClient:
+		return "QueuedClient"
+	case StreamingClient:
+		return "StreamingClient"
+	default:
+		panic(fmt.Sprintf("unknown ClientScope %d", s))
+	}
+}
+
 // FileOption is an optional argument to FromFile().
 type FileOption interface {
 	fmt.Stringer
 
-	TypeScopes() TypeScope
+	SourceScopes() SourceScope
 	ClientScopes() ClientScope
 
-	Run(p *properties.All, clientType ClientScope, ingestionType TypeScope) error
+	Run(p *properties.All, clientType ClientScope, sourceType SourceScope) error
 }
 
 type option struct {
 	run          func(p *properties.All) error
 	clientScopes ClientScope
-	typeScopes   TypeScope
+	sourceScope  SourceScope
 	name         string
 }
 
-func (o option) TypeScopes() TypeScope {
-	return o.typeScopes
+func (o option) SourceScopes() SourceScope {
+	return o.sourceScope
 }
 
 func (o option) ClientScopes() ClientScope {
@@ -49,18 +74,18 @@ func (o option) String() string {
 	return o.name
 }
 
-func (o option) Run(p *properties.All, clientType ClientScope, ingestionType TypeScope) error {
+func (o option) Run(p *properties.All, clientType ClientScope, sourceType SourceScope) error {
 	errType := errors.OpFileIngest
 	if clientType&StreamingClient != 0 {
 		errType = errors.OpIngestStream
 	}
 
 	if o.clientScopes&clientType == 0 {
-		return errors.ES(errType, errors.KClientArgs, fmt.Sprintf("%s is not valid for client type", o.name))
+		return errors.ES(errType, errors.KClientArgs, fmt.Sprintf("%s is not valid for client '%s'", o.name, clientType))
 	}
 
-	if o.typeScopes&ingestionType == 0 {
-		return errors.ES(errType, errors.KClientArgs, fmt.Sprintf("%s is not valid for ingestion type", o.name))
+	if o.sourceScope&sourceType == 0 {
+		return errors.ES(errType, errors.KClientArgs, fmt.Sprintf("%s is not valid for ingestion source type '%s' for client '%s'", o.name, sourceType, clientType))
 	}
 
 	return o.run(p)
@@ -74,7 +99,7 @@ func FlushImmediately() FileOption {
 			return nil
 		},
 		clientScopes: QueuedClient,
-		typeScopes:   FromFile | FromReader | FromBlob,
+		sourceScope:  FromFile | FromReader | FromBlob,
 		name:         "FlushImmediately",
 	}
 }
@@ -166,7 +191,7 @@ func IngestionMapping(mapping interface{}, mappingKind DataFormat) FileOption {
 			return nil
 		},
 		clientScopes: QueuedClient,
-		typeScopes:   FromFile | FromReader | FromBlob,
+		sourceScope:  FromFile | FromReader | FromBlob,
 		name:         "IngestionMapping",
 	}
 }
@@ -185,7 +210,7 @@ func IngestionMappingRef(refName string, mappingKind DataFormat) FileOption {
 			return nil
 		},
 		clientScopes: QueuedClient | StreamingClient,
-		typeScopes:   FromFile | FromReader | FromBlob,
+		sourceScope:  FromFile | FromReader | FromBlob,
 		name:         "IngestionMappingRef",
 	}
 }
@@ -198,7 +223,7 @@ func DeleteSource() FileOption {
 			return nil
 		},
 		clientScopes: QueuedClient | StreamingClient,
-		typeScopes:   FromFile,
+		sourceScope:  FromFile,
 		name:         "DeleteSource",
 	}
 }
@@ -210,7 +235,7 @@ func IgnoreSizeLimit() FileOption {
 			p.Ingestion.IgnoreSizeLimit = true
 			return nil
 		},
-		typeScopes:   FromFile | FromReader | FromBlob,
+		sourceScope:  FromFile | FromReader | FromBlob,
 		clientScopes: QueuedClient,
 		name:         "IgnoreSizeLimit",
 	}
@@ -223,7 +248,7 @@ func Tags(tags []string) FileOption {
 			p.Ingestion.Additional.Tags = tags
 			return nil
 		},
-		typeScopes:   FromFile | FromReader | FromBlob,
+		sourceScope:  FromFile | FromReader | FromBlob,
 		clientScopes: QueuedClient,
 		name:         "Tags",
 	}
@@ -238,7 +263,7 @@ func IfNotExists(ingestByTag string) FileOption {
 			p.Ingestion.Additional.IngestIfNotExists = ingestByTag
 			return nil
 		},
-		typeScopes:   FromFile | FromReader | FromBlob,
+		sourceScope:  FromFile | FromReader | FromBlob,
 		clientScopes: QueuedClient,
 		name:         "IfNotExists",
 	}
@@ -254,7 +279,7 @@ func ReportResultToTable() FileOption {
 			p.Ingestion.ReportMethod = properties.ReportStatusToTable
 			return nil
 		},
-		typeScopes:   FromFile | FromReader | FromBlob,
+		sourceScope:  FromFile | FromReader | FromBlob,
 		clientScopes: QueuedClient,
 		name:         "ReportResultToTable",
 	}
@@ -268,7 +293,7 @@ func SetCreationTime(t time.Time) FileOption {
 			p.Ingestion.Additional.CreationTime = t
 			return nil
 		},
-		typeScopes:   FromFile | FromReader | FromBlob,
+		sourceScope:  FromFile | FromReader | FromBlob,
 		clientScopes: QueuedClient,
 		name:         "SetCreationTime",
 	}
@@ -324,7 +349,7 @@ func ValidationPolicy(policy ValPolicy) FileOption {
 			p.Ingestion.Additional.ValidationPolicy = string(b)
 			return nil
 		},
-		typeScopes:   FromFile | FromReader | FromBlob,
+		sourceScope:  FromFile | FromReader | FromBlob,
 		clientScopes: QueuedClient,
 		name:         "ValidationPolicy",
 	}
@@ -339,7 +364,7 @@ func FileFormat(et DataFormat) FileOption {
 			p.Ingestion.Additional.Format = et
 			return nil
 		},
-		typeScopes:   FromFile | FromReader | FromBlob,
+		sourceScope:  FromFile | FromReader | FromBlob,
 		clientScopes: QueuedClient | StreamingClient,
 		name:         "FileFormat",
 	}
@@ -352,7 +377,7 @@ func ClientRequestId(clientRequestId string) FileOption {
 			p.Streaming.ClientRequestId = clientRequestId
 			return nil
 		},
-		typeScopes:   FromFile | FromReader | FromBlob,
+		sourceScope:  FromFile | FromReader | FromBlob,
 		clientScopes: StreamingClient,
 		name:         "ClientRequestId",
 	}

@@ -942,7 +942,7 @@ func TestMultipleClusters(t *testing.T) {
 
 	queuedTable := fmt.Sprintf("goe2e_queued_multiple_logs_%d", time.Now().Unix())
 	secondaryQueuedTable := fmt.Sprintf("goe2e_secondary_queued_multiple_logs_%d", time.Now().Unix())
-	streamingTable := fmt.Sprintf("goe2e_secondary_streaming_multiple_logs_%d", time.Now().Unix())
+	streamingTable := fmt.Sprintf("goe2e_streaming_multiple_logs_%d", time.Now().Unix())
 	secondaryStreamingTable := fmt.Sprintf("goe2e_secondary_streaming_multiple_logs_%d", time.Now().Unix())
 
 	queuedIngestor, err := ingest.New(client, testConfig.Database, queuedTable)
@@ -976,6 +976,8 @@ func TestMultipleClusters(t *testing.T) {
 		src string
 		// stmt is used to query for the results.
 		stmt kusto.Stmt
+		// stmt is used to query for the results in the secondary cluster.
+		secondaryStmt kusto.Stmt
 		// doer is called from within the function passed to RowIterator.Do(). It allows us to collect the data we receive.
 		doer func(row *table.Row, update interface{}) error
 		// gotInit creates the variable that will be used by doer's update argument.
@@ -1003,6 +1005,11 @@ func TestMultipleClusters(t *testing.T) {
 			stmt: pCountStmt.MustParameters(
 				kusto.NewParameters().Must(
 					kusto.QueryValues{"tableName": queuedTable},
+				),
+			),
+			secondaryStmt: pCountStmt.MustParameters(
+				kusto.NewParameters().Must(
+					kusto.QueryValues{"tableName": secondaryQueuedTable},
 				),
 			),
 			doer: func(row *table.Row, update interface{}) error {
@@ -1042,6 +1049,11 @@ func TestMultipleClusters(t *testing.T) {
 					kusto.QueryValues{"tableName": streamingTable},
 				),
 			),
+			secondaryStmt: pCountStmt.MustParameters(
+				kusto.NewParameters().Must(
+					kusto.QueryValues{"tableName": secondaryStreamingTable},
+				),
+			),
 			doer: func(row *table.Row, update interface{}) error {
 				rec := CountResult{}
 				if err := row.ToStruct(&rec); err != nil {
@@ -1061,6 +1073,11 @@ func TestMultipleClusters(t *testing.T) {
 
 	for _, test := range tests {
 		t.Run(test.desc, func(t *testing.T) {
+			if test.setup != nil {
+				if err := test.setup(); err != nil {
+					panic(err)
+				}
+			}
 
 			var options []ingest.FileOption
 			if _, ok := test.ingestor.(*ingest.Ingestion); ok {
@@ -1072,13 +1089,18 @@ func TestMultipleClusters(t *testing.T) {
 				err = <-res.Wait(ctx)
 			}
 
+			if !assertErrorsMatch(t, err, nil) {
+				t.Errorf("TestMultipleClusters(%s): ingestor.FromFile(): got err == %v, want err == %v", test.desc, err, nil)
+				return
+			}
+
 			res, err = test.secondaryIngestor.FromFile(ctx, test.src, options...)
 			if err == nil {
 				err = <-res.Wait(ctx)
 			}
 
 			if !assertErrorsMatch(t, err, nil) {
-				t.Errorf("TestFileIngestion(%s): queuedIngestor.FromFile(): got err == %v, want err == %v", test.desc, err, nil)
+				t.Errorf("TestMultipleClusters(%s): secondaryIngestor.FromFile(): got err == %v, want err == %v", test.desc, err, nil)
 				return
 			}
 
@@ -1087,7 +1109,7 @@ func TestMultipleClusters(t *testing.T) {
 			}
 
 			require.NoError(t, waitForIngest(t, ctx, client, testConfig.Database, test.stmt, test.doer, test.want, test.gotInit))
-			require.NoError(t, waitForIngest(t, ctx, secondaryClient, testConfig.SecondaryDatabase, test.stmt, test.doer, test.want, test.gotInit))
+			require.NoError(t, waitForIngest(t, ctx, secondaryClient, testConfig.SecondaryDatabase, test.secondaryStmt, test.doer, test.want, test.gotInit))
 		})
 	}
 }
@@ -1393,37 +1415,42 @@ func waitForIngest(t *testing.T, ctx context.Context, client *kusto.Client, data
 
 	failed := false
 	var got interface{}
+	var err error
+	shouldContinue := true
 
-	for {
-		if time.Now().After(deadline) {
-			break
-		}
-		time.Sleep(5 * time.Second)
-		failed = false
+	for shouldContinue {
+		shouldContinue, err = func() (bool, error) {
+			if time.Now().After(deadline) {
+				return false, nil
+			}
+			failed = false
 
-		iter, err := client.Query(ctx, database, stmt)
-		if err != nil {
-			return err
-		}
-		defer iter.Stop()
+			iter, err := client.Query(ctx, database, stmt)
+			if err != nil {
+				return false, err
+			}
+			defer iter.Stop()
 
-		got = gotInit()
-		err = iter.Do(func(row *table.Row) error {
-			return doer(row, got)
-		})
-		if err != nil {
-			return fmt.Errorf("had iter.Do() error: %s", err)
-		}
+			got = gotInit()
+			err = iter.Do(func(row *table.Row) error {
+				return doer(row, got)
+			})
+			if err != nil {
+				return false, fmt.Errorf("had iter.Do() error: %s", err)
+			}
 
-		if !assert.ObjectsAreEqualValues(want, got) {
-			failed = true
-			continue
-		}
-		break
+			if !assert.ObjectsAreEqualValues(want, got) {
+				failed = true
+				time.Sleep(3 * time.Second)
+				return true, nil
+			}
+
+			return false, nil
+		}()
 	}
 	if failed {
 		require.EqualValues(t, want, got)
 	}
 
-	return nil
+	return err
 }

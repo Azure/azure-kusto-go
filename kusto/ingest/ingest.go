@@ -75,7 +75,7 @@ func New(client QueryClient, db, table string, options ...Option) (*Ingestion, e
 	return i, nil
 }
 
-func (i *Ingestion) prepForIngestion(ctx context.Context, options []FileOption, scope TypeScope) (*Result, properties.All, error) {
+func (i *Ingestion) prepForIngestion(ctx context.Context, options []FileOption, scope SourceScope) (*Result, properties.All, error) {
 	result := newResult()
 
 	auth, err := i.mgr.AuthContext(ctx)
@@ -125,7 +125,7 @@ func (i *Ingestion) FromFile(ctx context.Context, fPath string, options ...FileO
 		return nil, err
 	}
 
-	var scope TypeScope
+	var scope SourceScope
 	if local {
 		scope = FromFile
 	} else {
