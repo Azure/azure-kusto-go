@@ -25,7 +25,7 @@ jobs:
         uses: actions/checkout@v2
 
       - name: Check Format
-        run: if [ "$(gofmt -s -l . | tee /dev/fd/2 | wc -l)" -gt 0 ]; then exit 1; fi
+        run: if [ "$(gofmt -d -s -l . | tee /dev/fd/2 | wc -l)" -gt 0 ]; then exit 1; fi
 
       - name: Get dependencies
         run: |
