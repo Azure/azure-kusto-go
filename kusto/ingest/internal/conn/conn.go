@@ -5,6 +5,7 @@ import (
 	"bytes"
 	"context"
 	"fmt"
+	"io"
 	"io/ioutil"
 	"net/http"
 	"net/url"
@@ -17,7 +18,6 @@ import (
 	"github.com/Azure/azure-kusto-go/kusto/data/errors"
 	"github.com/Azure/azure-kusto-go/kusto/ingest/internal/properties"
 	"github.com/Azure/azure-kusto-go/kusto/internal/version"
-
 	"github.com/Azure/go-autorest/autorest"
 	"github.com/google/uuid"
 )
@@ -97,10 +97,12 @@ var writeOp = errors.OpIngestStream
 
 // Write writes into database "db", table "table" what is stored in "payload" which should be encoded in "format" and
 // have a server side data mapping reference named "mappingName".  "mappingName" can be nil if the format doesn't require it.
-func (c *Conn) Write(ctx context.Context, db, table string, payload *bytes.Buffer, format properties.DataFormat, mappingName string) error {
+func (c *Conn) Write(ctx context.Context, db, table string, payload io.Reader, format properties.DataFormat, mappingName string, clientRequestId string) error {
 	defer func() {
-		payload.Reset()
-		BuffPool.Put(payload)
+		if buf, ok := payload.(*bytes.Buffer); ok {
+			buf.Reset()
+			BuffPool.Put(buf)
+		}
 	}()
 
 	switch {
@@ -122,8 +124,13 @@ func (c *Conn) Write(ctx context.Context, db, table string, payload *bytes.Buffe
 		c.headersPool <- copyHeaders(c.reqHeaders)
 	}()
 
+	if clientRequestId != "" {
+		headers.Add("x-ms-client-request-id", clientRequestId)
+	} else {
+		headers.Add("x-ms-client-request-id", "KGC.execute;"+uuid.New().String())
+	}
+
 	headers.Add("Content-Type", "application/json; charset=utf-8")
-	headers.Add("x-ms-client-request-id", "KGC.execute;"+uuid.New().String())
 	headers.Add("Content-Encoding", "gzip")
 
 	u, _ := url.Parse(c.baseURL.String()) // Safe copy of a known good URL object
@@ -136,11 +143,17 @@ func (c *Conn) Write(ctx context.Context, db, table string, payload *bytes.Buffe
 	qv.Add("streamFormat", format.CamelCase())
 	u.RawQuery = qv.Encode()
 
+	var closeablePayload io.ReadCloser
+	var ok bool
+	if closeablePayload, ok = payload.(io.ReadCloser); !ok {
+		closeablePayload = ioutil.NopCloser(payload)
+	}
+
 	req := &http.Request{
 		Method: http.MethodPost,
 		URL:    u,
 		Header: headers,
-		Body:   ioutil.NopCloser(payload),
+		Body:   closeablePayload,
 	}
 
 	if !c.inTest {

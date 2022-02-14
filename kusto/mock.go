@@ -1,13 +1,18 @@
 package kusto
 
 import (
+	"context"
 	"fmt"
 	"io"
 	"reflect"
+	"sync"
 
 	"github.com/Azure/azure-kusto-go/kusto/data/errors"
 	"github.com/Azure/azure-kusto-go/kusto/data/table"
 	"github.com/Azure/azure-kusto-go/kusto/data/value"
+	"github.com/Azure/azure-kusto-go/kusto/internal/frames"
+	v1 "github.com/Azure/azure-kusto-go/kusto/internal/frames/v1"
+	"github.com/Azure/go-autorest/autorest"
 )
 
 type columnData struct {
@@ -125,4 +130,32 @@ func (m *MockRows) Error(err error) error {
 	}
 	m.playback = append(m.playback, err)
 	return nil
+}
+
+type mockConn struct {
+}
+
+func (m mockConn) query(_ context.Context, _ string, _ Stmt, _ *queryOptions) (execResp, error) {
+	return execResp{}, nil
+}
+
+func (m mockConn) mgmt(_ context.Context, _ string, _ Stmt, _ *mgmtOptions) (execResp, error) {
+	framesCh := make(chan frames.Frame, 100)
+	framesCh <- v1.DataTable{}
+	close(framesCh)
+	return execResp{
+		reqHeader:  nil,
+		respHeader: nil,
+		frameCh:    framesCh,
+	}, nil
+}
+
+func NewMockClient() *Client {
+	return &Client{
+		conn:       mockConn{},
+		ingestConn: mockConn{},
+		endpoint:   "https://sdkse2etest.eastus.kusto.windows.net",
+		auth:       Authorization{Authorizer: autorest.NewBasicAuthorizer("", "")},
+		mu:         sync.Mutex{},
+	}
 }

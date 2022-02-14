@@ -16,7 +16,6 @@ import (
 
 	"github.com/Azure/azure-kusto-go/kusto"
 	"github.com/Azure/azure-kusto-go/kusto/ingest/internal/properties"
-
 	"github.com/google/uuid"
 	"github.com/kylelemons/godebug/pretty"
 )
@@ -144,7 +143,7 @@ func TestStream(t *testing.T) {
 				panic(err)
 			}
 
-			err = conn.Write(ctx, "database", "table", &payload, properties.JSON, test.mappingName)
+			err = conn.Write(ctx, "database", "table", &payload, properties.JSON, test.mappingName, "")
 
 			switch {
 			case err == nil && test.err:

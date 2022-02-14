@@ -144,6 +144,12 @@ func (r *Result) poll(ctx context.Context) {
 	}
 }
 
+// IsStatusRecord verifies that the given error is a status record.
+func IsStatusRecord(err error) bool {
+	_, ok := err.(statusRecord)
+	return ok
+}
+
 // GetIngestionStatus extracts the ingestion status code from an ingestion error
 func GetIngestionStatus(err error) (StatusCode, error) {
 	if s, ok := err.(statusRecord); ok {
@@ -160,6 +166,15 @@ func GetIngestionFailureStatus(err error) (FailureStatusCode, error) {
 	}
 
 	return Unknown, fmt.Errorf("Error is not an Ingestion Result")
+}
+
+// GetErrorCode extracts the error code from an ingestion error
+func GetErrorCode(err error) (string, error) {
+	if s, ok := err.(statusRecord); ok {
+		return s.ErrorCode, nil
+	}
+
+	return "", fmt.Errorf("Error is not an Ingestion Result")
 }
 
 // IsRetryable indicates whether there's any merit in retying ingestion
