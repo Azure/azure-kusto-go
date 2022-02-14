@@ -24,6 +24,9 @@ jobs:
       - name: Check out code into the Go module directory
         uses: actions/checkout@v2
 
+      - name: Check Format
+        run: if [ "$(gofmt -s -l . | tee /dev/ttty | wc -l)" -gt 0 ]; then exit 1; fi
+
       - name: Get dependencies
         run: |
           cd kusto
