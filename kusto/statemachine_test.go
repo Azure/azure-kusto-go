@@ -407,6 +407,7 @@ func TestProgressive(t *testing.T) {
 							value.Long{Value: 0, Valid: false},
 						},
 					},
+					TableFragmentType: "DataReplace",
 				},
 				v2.TableCompletion{},
 				v2.DataTable{
@@ -453,7 +454,8 @@ func TestProgressive(t *testing.T) {
 						value.String{Value: "Dubovski", Valid: true},
 						value.Long{Value: 0, Valid: false},
 					},
-					Op: errors.OpQuery,
+					Replace: true,
+					Op:      errors.OpQuery,
 				},
 			},
 			nonPrimary: map[frames.TableKind]frames.Frame{
