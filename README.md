@@ -66,6 +66,9 @@ defer iter.Stop()
 // .Do() will call the function for every row in the table.
 err = iter.Do(
 	func(row *table.Row) error {
+		if row.Replace {
+			fmt.Println("---") // Replace flag indicates that the query result should be cleared and replaced with this row
+		}
 		fmt.Println(row) // As a convenience, printing a *table.Row will output csv
 		return nil
 	},
@@ -101,6 +104,9 @@ err = iter.Do(
 		rec := NodeRec{}
 		if err := row.ToStruct(&rec); err != nil {
 			return err
+		}
+		if row.Replace {
+			recs = recs[:0] // Replace flag indicates that the query result should be cleared and replaced with this row
 		}
 		recs = append(recs, rec)
 		return nil

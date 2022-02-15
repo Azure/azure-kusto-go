@@ -50,6 +50,9 @@ func Example_simple() {
 			if err := row.ToStruct(&rec); err != nil {
 				return err
 			}
+			if row.Replace {
+				recs = recs[:0]
+			}
 			recs = append(recs, rec)
 			return nil
 		},
@@ -222,6 +225,9 @@ func ExampleClient_Query_do() {
 
 	err = iter.Do(
 		func(row *table.Row) error {
+			if row.Replace {
+				fmt.Println("---") // Replace flag indicates that the query result should be cleared and replaced with this row
+			}
 			for _, v := range row.Values {
 				fmt.Printf("%s,", v)
 			}

@@ -273,7 +273,7 @@ func (p *progressiveSM) fragment() (stateFn, error) {
 		select {
 		case <-p.ctx.Done():
 			return nil, p.ctx.Err()
-		case p.iter.inRows <- send{inRows: table.KustoRows, wg: p.wg}:
+		case p.iter.inRows <- send{inRows: table.KustoRows, inTableFragmentType: table.TableFragmentType, wg: p.wg}:
 		}
 	} else {
 		p.nonPrimary.Rows = append(p.nonPrimary.Rows, p.currentFrame.(v2.TableFragment).Rows...)
