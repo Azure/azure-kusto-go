@@ -406,6 +406,11 @@ func TestProgressive(t *testing.T) {
 							value.String{Value: "Dubovski", Valid: true},
 							value.Long{Value: 0, Valid: false},
 						},
+						{
+							value.DateTime{Value: nowish, Valid: true},
+							value.String{Value: "Evcpwtlj", Valid: true},
+							value.Long{Value: 1, Valid: true},
+						},
 					},
 					TableFragmentType: "DataReplace",
 				},
@@ -456,6 +461,19 @@ func TestProgressive(t *testing.T) {
 					},
 					Replace: true,
 					Op:      errors.OpQuery,
+				},
+				&table.Row{
+					ColumnTypes: table.Columns{
+						{Name: "Timestamp", Type: "datetime"},
+						{Name: "Name", Type: "string"},
+						{Name: "ID", Type: "long"},
+					},
+					Values: value.Values{
+						value.DateTime{Value: nowish, Valid: true},
+						value.String{Value: "Evcpwtlj", Valid: true},
+						value.Long{Value: 1, Valid: true},
+					},
+					Op: errors.OpQuery,
 				},
 			},
 			nonPrimary: map[frames.TableKind]frames.Frame{
