@@ -106,7 +106,7 @@ func (r *Row) Columns(ptrs ...interface{}) error {
 }
 
 // ExtractValues fetches all values in the row at once.
-// The value of the kth column will be decoded into the kth argument to Columns.
+// The value of the kth column will be decoded into the kth argument to ExtractValues.
 // The number of arguments must be equal to the number of columns.
 // Pass nil to specify that a column should be ignored.
 // ptrs should be compatible with column types. An error in decoding may leave
