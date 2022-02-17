@@ -6,8 +6,8 @@ import (
 
 	"github.com/Azure/azure-kusto-go/kusto/data/types"
 	"github.com/Azure/azure-kusto-go/kusto/data/value"
-
-	"github.com/kylelemons/godebug/pretty"
+	"github.com/google/uuid"
+	"github.com/stretchr/testify/assert"
 )
 
 func TestRowColumns(t *testing.T) {
@@ -45,23 +45,16 @@ func TestRowColumns(t *testing.T) {
 	for _, test := range tests {
 		row := &Row{ColumnTypes: test.columns}
 		err := row.Columns(test.ptrs...)
-		switch {
-		case err == nil && test.err:
-			t.Errorf("TestRowColumns(%s): got err == nil, want err != nil", test.desc)
+		if test.err {
+			assert.Error(t, err)
 			continue
-		case err != nil && !test.err:
-			t.Errorf("TestRowColumns(%s): got err == %s, want err == nil", test.desc, err)
-			continue
-		case err != nil:
-			continue
+		} else {
+			assert.NoError(t, err)
 		}
 
-		if *strPtr != "hello" {
-			t.Errorf("TestRowColumns(%s): *strPtr: got %s, want 'hello'", test.desc, *strPtr)
-		}
-		if colPtr.Name != "world" {
-			t.Errorf("TestRowColumns(%s): colPtr.ColumnName: got %s, want 'world'", test.desc, colPtr.Name)
-		}
+		assert.Equal(t, "hello", *strPtr)
+		assert.Equal(t, "world", colPtr.Name)
+
 	}
 }
 
@@ -152,24 +145,19 @@ func TestRowToStruct(t *testing.T) {
 	for _, test := range tests {
 		row := &Row{ColumnTypes: test.columns, Values: test.row}
 		err := row.ToStruct(test.got)
-		switch {
-		case err == nil && test.err:
-			t.Errorf("TestRowToStruct(%s): got err == nil, want err != nil", test.desc)
+
+		if test.err {
+			assert.Error(t, err)
 			continue
-		case err != nil && !test.err:
-			t.Errorf("TestRowToStruct(%s): got err == %s, want err == nil", test.desc, err)
-			continue
-		case err != nil:
-			continue
+		} else {
+			assert.NoError(t, err)
 		}
 
-		if diff := pretty.Compare(test.want, test.got); diff != "" {
-			t.Errorf("TestRowToStruct(%s): -want/+got:\n%s", test.desc, diff)
-		}
+		assert.Equal(t, test.want, test.got)
 	}
 }
 
-func TestExtractValue(t *testing.T) {
+func TestExtractValuePartial(t *testing.T) {
 	t.Parallel()
 	columns := Columns{
 		{Name: "Id", Type: types.Long},
@@ -195,8 +183,63 @@ func TestExtractValue(t *testing.T) {
 	var lastName string
 	var nullReal float64
 	var nullString string
-	row.ExtractValues(&id, &firstName, &lastName, nil, &nullReal, &nullString)
-	if id != 1 || firstName != "John" || lastName != "Doak" || nullReal != 0.0 || nullString != "" {
-		t.Errorf("TestExtractValue: got %d, %s, %s, %f, %s, want 1, John, Doak, 0.0, ''", id, firstName, lastName, nullReal, nullString)
+	assert.NoError(t, row.ExtractValues(&id, &firstName, &lastName, nil, &nullReal, &nullString))
+
+	assert.Equal(t, firstName, "John")
+	assert.Equal(t, lastName, "Doak")
+	assert.Equal(t, nullReal, 0.0)
+	assert.Equal(t, nullString, "")
+}
+
+func TestExtractValueAll(t *testing.T) {
+	t.Parallel()
+	columns := Columns{
+		{Name: "Bool", Type: types.Bool},
+		{Name: "DateTime", Type: types.DateTime},
+		{Name: "Dynamic", Type: types.Dynamic},
+		{Name: "GUID", Type: types.GUID},
+		{Name: "Int", Type: types.Int},
+		{Name: "Long", Type: types.Long},
+		{Name: "Real", Type: types.Real},
+		{Name: "String", Type: types.String},
+		{Name: "Timespan", Type: types.Timespan},
+		{Name: "Decimal", Type: types.Decimal},
 	}
+	row := &Row{
+		ColumnTypes: columns,
+		Values: value.Values{
+			value.Bool{Value: true, Valid: true},
+			value.DateTime{Value: time.Time{}, Valid: true},
+			value.Dynamic{Value: make([]byte, 0), Valid: true},
+			value.GUID{Value: uuid.UUID{}, Valid: true},
+			value.Int{Value: 1, Valid: true},
+			value.Long{Value: 2, Valid: true},
+			value.Real{Value: 3.4, Valid: true},
+			value.String{Value: "test", Valid: true},
+			value.Timespan{Value: 10, Valid: true},
+			value.Decimal{Value: "5.6", Valid: true},
+		},
+	}
+	var boolVar bool
+	var datetimeVar time.Time
+	var dynamicVar []byte
+	var guidVar uuid.UUID
+	var intVar int32
+	var longVar int64
+	var realVar float64
+	var stringVar string
+	var timespanVar time.Duration
+	var decimalVar string
+	assert.NoError(t, row.ExtractValues(&boolVar, &datetimeVar, &dynamicVar, &guidVar, &intVar, &longVar, &realVar, &stringVar, &timespanVar, &decimalVar))
+
+	assert.Equal(t, true, boolVar)
+	assert.Equal(t, time.Time{}, datetimeVar)
+	assert.Equal(t, []byte{}, dynamicVar)
+	assert.Equal(t, uuid.UUID{}, guidVar)
+	assert.Equal(t, int32(1), intVar)
+	assert.Equal(t, int64(2), longVar)
+	assert.Equal(t, 3.4, realVar)
+	assert.Equal(t, "test", stringVar)
+	assert.Equal(t, time.Duration(10), timespanVar)
+	assert.Equal(t, "5.6", decimalVar)
 }
