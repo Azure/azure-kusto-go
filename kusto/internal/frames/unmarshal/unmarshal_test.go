@@ -49,7 +49,7 @@ func TestUnmarshalRows(t *testing.T) {
 	}
 
 	for _, test := range tests {
-		rows, err := Rows(table.Columns{table.Column{Name: "store", Type: test.columnType}}, [][]interface{}{[]interface{}{test.value}})
+		rows, err := Rows(table.Columns{table.Column{Name: "store", Type: test.columnType}}, [][]interface{}{{test.value}})
 		if err != nil {
 			t.Errorf("TestUnmarshalRows(%v): got err == %s, want err == nil", test.value, err)
 			continue

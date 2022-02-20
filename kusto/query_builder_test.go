@@ -282,7 +282,7 @@ func TestDefinitions(t *testing.T) {
 		}
 
 		clone := params.clone()
-		clone.With(map[string]ParamType{"hellyeah": ParamType{Type: types.Bool}})
+		clone.With(map[string]ParamType{"hellyeah": {Type: types.Bool}})
 
 		if _, ok := params.m["hellyeah"]; ok {
 			t.Errorf("TestParameters(%s): clone modification modified original", test.desc)
@@ -305,109 +305,109 @@ func TestParameters(t *testing.T) {
 	}{
 		{
 			desc:    "Value key doesn't exist in Parameters",
-			qParams: NewDefinitions().Must(map[string]ParamType{"key1": ParamType{Type: types.Bool}}),
+			qParams: NewDefinitions().Must(map[string]ParamType{"key1": {Type: types.Bool}}),
 			qValues: NewParameters().Must(map[string]interface{}{"key2": true}),
 			err:     true,
 		},
 		{
 			desc:    "Should be time.Time, isn't",
-			qParams: NewDefinitions().Must(map[string]ParamType{"key1": ParamType{Type: types.DateTime}}),
+			qParams: NewDefinitions().Must(map[string]ParamType{"key1": {Type: types.DateTime}}),
 			qValues: NewParameters().Must(map[string]interface{}{"key1": 1}),
 			err:     true,
 		},
 		{
 			desc:    "Should be uuid.UUID, isn't",
-			qParams: NewDefinitions().Must(map[string]ParamType{"key1": ParamType{Type: types.GUID}}),
+			qParams: NewDefinitions().Must(map[string]ParamType{"key1": {Type: types.GUID}}),
 			qValues: NewParameters().Must(map[string]interface{}{"key1": 1}),
 			err:     true,
 		},
 		{
 			desc:    "Should be int32, isn't",
-			qParams: NewDefinitions().Must(map[string]ParamType{"key1": ParamType{Type: types.Int}}),
+			qParams: NewDefinitions().Must(map[string]ParamType{"key1": {Type: types.Int}}),
 			qValues: NewParameters().Must(map[string]interface{}{"key1": int64(1)}),
 			err:     true,
 		},
 		{
 			desc:    "Should be int64, isn't",
-			qParams: NewDefinitions().Must(map[string]ParamType{"key1": ParamType{Type: types.Long}}),
+			qParams: NewDefinitions().Must(map[string]ParamType{"key1": {Type: types.Long}}),
 			qValues: NewParameters().Must(map[string]interface{}{"key1": int32(1)}),
 			err:     true,
 		},
 		{
 			desc:    "Should be float64, isn't",
-			qParams: NewDefinitions().Must(map[string]ParamType{"key1": ParamType{Type: types.Real}}),
+			qParams: NewDefinitions().Must(map[string]ParamType{"key1": {Type: types.Real}}),
 			qValues: NewParameters().Must(map[string]interface{}{"key1": 1}),
 			err:     true,
 		},
 		{
 			desc:    "Should be string, isn't",
-			qParams: NewDefinitions().Must(map[string]ParamType{"key1": ParamType{Type: types.String}}),
+			qParams: NewDefinitions().Must(map[string]ParamType{"key1": {Type: types.String}}),
 			qValues: NewParameters().Must(map[string]interface{}{"key1": 1}),
 			err:     true,
 		},
 		{
 			desc:    "Should be time.Duration, isn't",
-			qParams: NewDefinitions().Must(map[string]ParamType{"key1": ParamType{Type: types.Timespan}}),
+			qParams: NewDefinitions().Must(map[string]ParamType{"key1": {Type: types.Timespan}}),
 			qValues: NewParameters().Must(map[string]interface{}{"key1": 1}),
 			err:     true,
 		},
 		{
 			desc:    "Should be string representing decimal or *big.Float, isn't",
-			qParams: NewDefinitions().Must(map[string]ParamType{"key1": ParamType{Type: types.Decimal}}),
+			qParams: NewDefinitions().Must(map[string]ParamType{"key1": {Type: types.Decimal}}),
 			qValues: NewParameters().Must(map[string]interface{}{"key1": 1}),
 			err:     true,
 		},
 		{
 			desc:    "Success time.Time",
-			qParams: NewDefinitions().Must(map[string]ParamType{"key1": ParamType{Type: types.DateTime}}),
+			qParams: NewDefinitions().Must(map[string]ParamType{"key1": {Type: types.DateTime}}),
 			qValues: NewParameters().Must(map[string]interface{}{"key1": now}),
 			want:    map[string]string{"key1": fmt.Sprintf("datetime(%s)", now.Format(time.RFC3339Nano))},
 		},
 		{
 			desc:    "Success uuid.UUID",
-			qParams: NewDefinitions().Must(map[string]ParamType{"key1": ParamType{Type: types.GUID}}),
+			qParams: NewDefinitions().Must(map[string]ParamType{"key1": {Type: types.GUID}}),
 			qValues: NewParameters().Must(map[string]interface{}{"key1": uu}),
 			want:    map[string]string{"key1": fmt.Sprintf("guid(%s)", uu.String())},
 		},
 		{
 			desc:    "Success int32",
-			qParams: NewDefinitions().Must(map[string]ParamType{"key1": ParamType{Type: types.Int}}),
+			qParams: NewDefinitions().Must(map[string]ParamType{"key1": {Type: types.Int}}),
 			qValues: NewParameters().Must(map[string]interface{}{"key1": int32(1)}),
 			want:    map[string]string{"key1": fmt.Sprintf("int(%d)", 1)},
 		},
 		{
 			desc:    "Success int64",
-			qParams: NewDefinitions().Must(map[string]ParamType{"key1": ParamType{Type: types.Long}}),
+			qParams: NewDefinitions().Must(map[string]ParamType{"key1": {Type: types.Long}}),
 			qValues: NewParameters().Must(map[string]interface{}{"key1": int64(1)}),
 			want:    map[string]string{"key1": fmt.Sprintf("long(%d)", 1)},
 		},
 		{
 			desc:    "Success float64",
-			qParams: NewDefinitions().Must(map[string]ParamType{"key1": ParamType{Type: types.Real}}),
+			qParams: NewDefinitions().Must(map[string]ParamType{"key1": {Type: types.Real}}),
 			qValues: NewParameters().Must(map[string]interface{}{"key1": 1.1}),
 			want:    map[string]string{"key1": fmt.Sprintf("real(%f)", 1.1)},
 		},
 		{
 			desc:    "Success string",
-			qParams: NewDefinitions().Must(map[string]ParamType{"key1": ParamType{Type: types.String}}),
+			qParams: NewDefinitions().Must(map[string]ParamType{"key1": {Type: types.String}}),
 			qValues: NewParameters().Must(map[string]interface{}{"key1": "string"}),
 			want:    map[string]string{"key1": "string"},
 		},
 		{
 			desc:    "Success time.Duration",
-			qParams: NewDefinitions().Must(map[string]ParamType{"key1": ParamType{Type: types.Timespan}}),
+			qParams: NewDefinitions().Must(map[string]ParamType{"key1": {Type: types.Timespan}}),
 			qValues: NewParameters().Must(map[string]interface{}{"key1": 3 * time.Second}),
 			want:    map[string]string{"key1": "timespan(00:00:03)"},
 		},
 		{
 			desc:    "Success string representing decimal",
-			qParams: NewDefinitions().Must(map[string]ParamType{"key1": ParamType{Type: types.Decimal}}),
+			qParams: NewDefinitions().Must(map[string]ParamType{"key1": {Type: types.Decimal}}),
 			qValues: NewParameters().Must(map[string]interface{}{"key1": "1.3"}),
 			want:    map[string]string{"key1": fmt.Sprintf("decimal(%s)", "1.3")},
 		},
 		{
 			desc:    "Success *big.Float",
-			qParams: NewDefinitions().Must(map[string]ParamType{"key1": ParamType{Type: types.Decimal}}),
+			qParams: NewDefinitions().Must(map[string]ParamType{"key1": {Type: types.Decimal}}),
 			qValues: NewParameters().Must(map[string]interface{}{"key1": big.NewFloat(3.2)}),
 			want:    map[string]string{"key1": fmt.Sprintf("decimal(%s)", big.NewFloat(3.2).String())},
 		},
