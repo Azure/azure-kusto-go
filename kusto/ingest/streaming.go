@@ -6,7 +6,6 @@ import (
 	"io/ioutil"
 	"os"
 
-	"github.com/Azure/azure-kusto-go/kusto"
 	"github.com/Azure/azure-kusto-go/kusto/data/errors"
 	"github.com/Azure/azure-kusto-go/kusto/ingest/internal/conn"
 	"github.com/Azure/azure-kusto-go/kusto/ingest/internal/filesystem"
@@ -18,14 +17,14 @@ import (
 type Streaming struct {
 	db         string
 	table      string
-	client     *kusto.Client
+	client     QueryClient
 	streamConn *conn.Conn
 }
 
 // NewStreaming is the constructor for Streaming.
 // More information can be found here:
 // https://docs.microsoft.com/en-us/azure/kusto/management/create-ingestion-mapping-command
-func NewStreaming(client *kusto.Client, db, table string) (*Streaming, error) {
+func NewStreaming(client QueryClient, db, table string) (*Streaming, error) {
 	streamConn, err := conn.New(client.Endpoint(), client.Auth())
 	if err != nil {
 		return nil, err
