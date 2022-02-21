@@ -218,6 +218,27 @@ func TestQueries(t *testing.T) {
 				if err := row.ToStruct(&rec); err != nil {
 					return err
 				}
+
+				valuesRec := AllDataType{}
+
+				err := row.ExtractValues(&valuesRec.Vnum,
+					&valuesRec.Vdec,
+					&valuesRec.Vdate,
+					&valuesRec.Vspan,
+					&valuesRec.Vobj,
+					&valuesRec.Vb,
+					&valuesRec.Vreal,
+					&valuesRec.Vstr,
+					&valuesRec.Vlong,
+					&valuesRec.Vguid,
+				)
+
+				if err != nil {
+					return err
+				}
+
+				assert.Equal(t, rec, valuesRec)
+
 				recs := update.(*[]AllDataType)
 				*recs = append(*recs, rec)
 				return nil
@@ -238,6 +259,27 @@ func TestQueries(t *testing.T) {
 				if err := row.ToStruct(&rec); err != nil {
 					return err
 				}
+
+				valuesRec := AllDataType{}
+
+				err := row.ExtractValues(&valuesRec.Vnum,
+					&valuesRec.Vdec,
+					&valuesRec.Vdate,
+					&valuesRec.Vspan,
+					&valuesRec.Vobj,
+					&valuesRec.Vb,
+					&valuesRec.Vreal,
+					&valuesRec.Vstr,
+					&valuesRec.Vlong,
+					&valuesRec.Vguid,
+				)
+
+				if err != nil {
+					return err
+				}
+
+				assert.Equal(t, rec, valuesRec)
+
 				recs := update.(*[]AllDataType)
 				*recs = append(*recs, rec)
 				return nil
@@ -259,6 +301,21 @@ func TestQueries(t *testing.T) {
 					return err
 				}
 				recs := update.(*[]DynamicTypeVariations)
+
+				valuesRec := DynamicTypeVariations{}
+
+				err := row.ExtractValues(&valuesRec.PlainValue,
+					&valuesRec.PlainArray,
+					&valuesRec.PlainJson,
+					&valuesRec.JsonArray,
+				)
+
+				if err != nil {
+					return err
+				}
+
+				assert.Equal(t, rec, valuesRec)
+
 				*recs = append(*recs, rec)
 				return nil
 			},

@@ -76,8 +76,8 @@ func (r *Row) Size() int {
 	return len(r.ColumnTypes)
 }
 
-// Columns fetches all the columns in the row at once.
-// The value of the kth column will be decoded into the kth argument to Columns.
+// Columns fetches all column names in the row at once.
+// The name of the kth column will be decoded into the kth argument to Columns.
 // The number of arguments must be equal to the number of columns.
 // Pass nil to specify that a column should be ignored.
 // ptrs may be either the *string or *types.Column type. An error in decoding may leave
@@ -99,6 +99,29 @@ func (r *Row) Columns(ptrs ...interface{}) error {
 			v.Type = col.Type
 		default:
 			return errors.ES(r.Op, errors.KClientArgs, ".Columns() received argument at position %d that was not a *string, *types.Columns: was %T", i, ptrs[i])
+		}
+	}
+
+	return nil
+}
+
+// ExtractValues fetches all values in the row at once.
+// The value of the kth column will be decoded into the kth argument to ExtractValues.
+// The number of arguments must be equal to the number of columns.
+// Pass nil to specify that a column should be ignored.
+// ptrs should be compatible with column types. An error in decoding may leave
+// some ptrs set and others not.
+func (r *Row) ExtractValues(ptrs ...interface{}) error {
+	if len(ptrs) != len(r.ColumnTypes) {
+		return errors.ES(r.Op, errors.KClientArgs, ".Columns() requires %d arguments for this row, had %d", len(r.ColumnTypes), len(ptrs))
+	}
+
+	for i, val := range r.Values {
+		if ptrs[i] == nil {
+			continue
+		}
+		if err := val.Convert(reflect.ValueOf(ptrs[i]).Elem()); err != nil {
+			return err
 		}
 	}
 
