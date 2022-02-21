@@ -2,7 +2,6 @@ package ingest
 
 import (
 	"context"
-	"fmt"
 	"io"
 	"io/ioutil"
 	"os"
@@ -91,11 +90,6 @@ func (i *Streaming) FromReader(ctx context.Context, reader io.Reader, options ..
 		if err != nil {
 			return nil, err
 		}
-	}
-
-	if props.Ingestion.Additional.Format == DFUnknown {
-		// TODO - other SDKs default to CSV. Should we do this here for parity?
-		return nil, fmt.Errorf("must provide option FileFormat() when using FromReader()")
 	}
 
 	return streamImpl(i.streamConn, ctx, reader, props)

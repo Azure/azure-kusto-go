@@ -100,29 +100,28 @@ type dfDescriptor struct {
 	camelName        string
 	jsonName         string
 	detectableExt    string
-	MappingReq       bool
 	validMappingKind bool
 }
 
 var dfDescriptions = []dfDescriptor{
-	{"", "", "", false, false},
-	{"Avro", "avro", ".avro", true, true},
-	{"ApacheAvro", "avro", "", true, false},
-	{"Csv", "csv", ".csv", false, true},
-	{"Json", "json", ".json", true, true},
-	{"MultiJson", "multijson", "", true, false},
-	{"Orc", "orc", ".orc", false, true},
-	{"Parquet", "parquet", ".parquet", false, true},
-	{"Psv", "psv", ".psv", false, false},
-	{"Raw", "raw", ".raw", false, false},
-	{"Scsv", "scsv", ".scsv", false, false},
-	{"Sohsv", "sohsv", ".sohsv", false, false},
-	{"SStream", "sstream", ".ss", false, false},
-	{"Tsv", "tsv", ".tsv", false, false},
-	{"Tsve", "tsve", ".tsve", false, false},
-	{"Txt", "txt", ".txt", false, false},
-	{"W3cLogFile", "w3clogfile", ".w3clogfile", false, false},
-	{"SingleJson", "singlejson", "", true, false},
+	{"", "", "", false},
+	{"Avro", "avro", ".avro", true},
+	{"ApacheAvro", "avro", "", false},
+	{"Csv", "csv", ".csv", true},
+	{"Json", "json", ".json", true},
+	{"MultiJson", "multijson", "", false},
+	{"Orc", "orc", ".orc", true},
+	{"Parquet", "parquet", ".parquet", true},
+	{"Psv", "psv", ".psv", false},
+	{"Raw", "raw", ".raw", false},
+	{"Scsv", "scsv", ".scsv", false},
+	{"Sohsv", "sohsv", ".sohsv", false},
+	{"SStream", "sstream", ".ss", false},
+	{"Tsv", "tsv", ".tsv", false},
+	{"Tsve", "tsve", ".tsve", false},
+	{"Txt", "txt", ".txt", false},
+	{"W3cLogFile", "w3clogfile", ".w3clogfile", false},
+	{"SingleJson", "singlejson", "", false},
 }
 
 // IngestionReportLevel defines which ingestion statuses are reported by the DM.
@@ -179,15 +178,6 @@ func (d DataFormat) MarshalJSON() ([]byte, error) {
 	}
 
 	return []byte(fmt.Sprintf("%q", d.String())), nil
-}
-
-// RequiresMapping indicates whether a data format must be provided with valid mapping file information.
-func (d DataFormat) RequiresMapping() bool {
-	if d > 0 && int(d) < len(dfDescriptions) {
-		return dfDescriptions[d].MappingReq
-	}
-
-	return false
 }
 
 // IsValidMappingKind returns true if a dataformat can be used as a MappingKind.

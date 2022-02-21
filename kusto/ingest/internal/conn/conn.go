@@ -106,15 +106,6 @@ func (c *Conn) Write(ctx context.Context, db, table string, payload io.Reader, f
 	}()
 
 	switch {
-	case format.RequiresMapping():
-		if mappingName == "" {
-			return errors.ES(writeOp,
-				errors.KInternal,
-				"if streaming format is %s, must provide mappingName",
-				format,
-			).SetNoRetry()
-		}
-
 	case format == properties.DFUnknown:
 		format = properties.CSV
 	}
