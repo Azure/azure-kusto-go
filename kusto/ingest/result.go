@@ -66,7 +66,7 @@ func (r *Result) putQueued(mgr *resources.Manager) {
 		return
 	}
 
-	// Write initial record
+	// StreamIngest initial record
 	r.record.Status = Pending
 	err = client.Write(r.record.IngestionSourceID.String(), r.record.ToMap())
 	if err != nil {

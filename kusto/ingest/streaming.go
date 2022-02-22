@@ -11,14 +11,19 @@ import (
 	"github.com/Azure/azure-kusto-go/kusto/ingest/internal/filesystem"
 	"github.com/Azure/azure-kusto-go/kusto/ingest/internal/gzip"
 	"github.com/Azure/azure-kusto-go/kusto/ingest/internal/properties"
+	"github.com/google/uuid"
 )
+
+type streamIngestor interface {
+	StreamIngest(ctx context.Context, db, table string, payload io.Reader, format properties.DataFormat, mappingName string, clientRequestId string) error
+}
 
 // Streaming provides data ingestion from external sources into Kusto.
 type Streaming struct {
 	db         string
 	table      string
 	client     QueryClient
-	streamConn *conn.Conn
+	streamConn streamIngestor
 }
 
 // NewStreaming is the constructor for Streaming.
@@ -43,18 +48,30 @@ func NewStreaming(client QueryClient, db, table string) (*Streaming, error) {
 // FromFile allows uploading a data file for Kusto from either a local path or a blobstore URI path.
 // This method is thread-safe.
 func (i *Streaming) FromFile(ctx context.Context, fPath string, options ...FileOption) (*Result, error) {
+	props := i.newProp()
+	file, err := prepFile(fPath, &props, options)
+	if err != nil {
+		return nil, err
+	}
+	if file == nil { // Non-local file
+		return nil, errors.ES(errors.OpFileIngest, errors.KClientArgs, "blobstore paths are not supported for streaming")
+	}
+
+	return streamImpl(i.streamConn, ctx, file, props)
+}
+
+func prepFile(fPath string, props *properties.All, options []FileOption) (*os.File, error) {
 	local, err := filesystem.IsLocalPath(fPath)
 	if err != nil {
 		return nil, err
 	}
 
 	if !local {
-		return nil, errors.ES(errors.OpFileIngest, errors.KClientArgs, "blobstore paths are not supported for streaming")
+		return nil, nil
 	}
-	props := i.newProp()
 
 	for _, option := range options {
-		err := option.Run(&props, StreamingClient, FromFile)
+		err := option.Run(props, StreamingClient, FromFile)
 		if err != nil {
 			return nil, err
 		}
@@ -65,7 +82,7 @@ func (i *Streaming) FromFile(ctx context.Context, fPath string, options ...FileO
 		props.Source.DontCompress = true
 	}
 
-	err = filesystem.CompleteFormatFromFileName(&props, fPath)
+	err = filesystem.CompleteFormatFromFileName(props, fPath)
 	if err != nil {
 		return nil, err
 	}
@@ -74,8 +91,7 @@ func (i *Streaming) FromFile(ctx context.Context, fPath string, options ...FileO
 	if err != nil {
 		return nil, err
 	}
-
-	return streamImpl(i.streamConn, ctx, file, props)
+	return file, nil
 }
 
 // FromReader allows uploading a data file for Kusto from an io.Reader. The content is uploaded to Blobstore and
@@ -94,7 +110,7 @@ func (i *Streaming) FromReader(ctx context.Context, reader io.Reader, options ..
 	return streamImpl(i.streamConn, ctx, reader, props)
 }
 
-func streamImpl(c *conn.Conn, ctx context.Context, payload io.Reader, props properties.All) (*Result, error) {
+func streamImpl(c streamIngestor, ctx context.Context, payload io.Reader, props properties.All) (*Result, error) {
 	compress := !props.Source.DontCompress
 	if compress {
 		var closer io.ReadCloser
@@ -108,7 +124,7 @@ func streamImpl(c *conn.Conn, ctx context.Context, payload io.Reader, props prop
 		payload = zw
 	}
 
-	err := c.Write(ctx, props.Ingestion.DatabaseName, props.Ingestion.TableName, payload, props.Ingestion.Additional.Format,
+	err := c.StreamIngest(ctx, props.Ingestion.DatabaseName, props.Ingestion.TableName, payload, props.Ingestion.Additional.Format,
 		props.Ingestion.Additional.IngestionMappingRef,
 		props.Streaming.ClientRequestId)
 
@@ -131,6 +147,9 @@ func (i *Streaming) newProp() properties.All {
 		Ingestion: properties.Ingestion{
 			DatabaseName: i.db,
 			TableName:    i.table,
+		},
+		Streaming: properties.Streaming{
+			ClientRequestId: "KGC.executeStreaming;" + uuid.New().String(),
 		},
 	}
 }

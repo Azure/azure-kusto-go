@@ -11,6 +11,7 @@ import (
 	"strings"
 	"time"
 
+	"github.com/cenkalti/backoff/v4"
 	"github.com/google/uuid"
 )
 
@@ -221,6 +222,14 @@ type All struct {
 	Source SourceOptions
 	// Streaming provides options that are used when doing an ingestion from a stream.
 	Streaming Streaming
+	// ManagedStreaming provides options that are used when doing an ingestion from a ManagedStreaming client.
+	ManagedStreaming ManagedStreaming
+}
+
+// ManagedStreaming provides options that are used when doing an ingestion from a ManagedStreaming client.
+type ManagedStreaming struct {
+	// Backoff is the backoff strategy to use when retrying a transiently failed ingestion.
+	Backoff backoff.BackOff
 }
 
 // Streaming provides options that are used when doing an ingestion from a stream.

@@ -8,6 +8,7 @@ import (
 	"github.com/Azure/azure-kusto-go/kusto/data/table"
 	"github.com/Azure/azure-kusto-go/kusto/data/types"
 	"github.com/Azure/azure-kusto-go/kusto/ingest/internal/resources"
+	"github.com/stretchr/testify/assert"
 )
 
 type mockClient struct {
@@ -50,7 +51,7 @@ func (m mockClient) Mgmt(context.Context, string, kusto.Stmt, ...kusto.MgmtOptio
 	return iter, nil
 }
 
-func TestManager(t *testing.T) {
+func TestIngestion(t *testing.T) {
 
 	firstMockClient := mockClient{
 		endpoint: "https://test.kusto.windows.net",
@@ -135,9 +136,7 @@ func TestManager(t *testing.T) {
 				mgrMap[mgr] = true
 			}
 
-			if len(mgrMap) != len(test.clients) {
-				t.Errorf("Got duplicated managers, want %d managers, got %d", len(test.clients), len(mgrMap))
-			}
+			assert.Equalf(t, len(mgrMap), len(test.clients), "Got duplicated managers, want %d managers, got %d", len(test.clients), len(mgrMap))
 		})
 	}
 }

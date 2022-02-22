@@ -143,7 +143,7 @@ func TestStream(t *testing.T) {
 				panic(err)
 			}
 
-			err = conn.Write(ctx, "database", "table", &payload, properties.JSON, test.mappingName, "")
+			err = conn.StreamIngest(ctx, "database", "table", &payload, properties.JSON, test.mappingName, "")
 
 			switch {
 			case err == nil && test.err:

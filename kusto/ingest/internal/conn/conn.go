@@ -95,9 +95,9 @@ func newWithoutValidation(endpoint string, auth kusto.Authorization) (*Conn, err
 
 var writeOp = errors.OpIngestStream
 
-// Write writes into database "db", table "table" what is stored in "payload" which should be encoded in "format" and
-// have a server side data mapping reference named "mappingName".  "mappingName" can be nil if the format doesn't require it.
-func (c *Conn) Write(ctx context.Context, db, table string, payload io.Reader, format properties.DataFormat, mappingName string, clientRequestId string) error {
+// StreamIngest ingests into database "db", table "table" what is stored in "payload" which should be encoded in "format" and
+// have a server side data mapping reference named "mappingName".  "mappingName" can be nil.
+func (c *Conn) StreamIngest(ctx context.Context, db, table string, payload io.Reader, format properties.DataFormat, mappingName string, clientRequestId string) error {
 	defer func() {
 		if buf, ok := payload.(*bytes.Buffer); ok {
 			buf.Reset()
