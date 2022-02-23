@@ -49,7 +49,7 @@ func NewStreaming(client QueryClient, db, table string) (*Streaming, error) {
 // This method is thread-safe.
 func (i *Streaming) FromFile(ctx context.Context, fPath string, options ...FileOption) (*Result, error) {
 	props := i.newProp()
-	file, err := prepFile(fPath, &props, options)
+	file, err := prepFile(fPath, &props, &options, StreamingClient)
 	if err != nil {
 		return nil, err
 	}
@@ -60,7 +60,7 @@ func (i *Streaming) FromFile(ctx context.Context, fPath string, options ...FileO
 	return streamImpl(i.streamConn, ctx, file, props)
 }
 
-func prepFile(fPath string, props *properties.All, options []FileOption) (*os.File, error) {
+func prepFile(fPath string, props *properties.All, options *[]FileOption, client ClientScope) (*os.File, error) {
 	local, err := filesystem.IsLocalPath(fPath)
 	if err != nil {
 		return nil, err
@@ -70,8 +70,8 @@ func prepFile(fPath string, props *properties.All, options []FileOption) (*os.Fi
 		return nil, nil
 	}
 
-	for _, option := range options {
-		err := option.Run(props, StreamingClient, FromFile)
+	for _, option := range *options {
+		err := option.Run(props, client, FromFile)
 		if err != nil {
 			return nil, err
 		}
@@ -80,12 +80,15 @@ func prepFile(fPath string, props *properties.All, options []FileOption) (*os.Fi
 	compression := filesystem.CompressionDiscovery(fPath)
 	if compression != properties.CTNone {
 		props.Source.DontCompress = true
+		*options = append(*options, Compress(false))
 	}
 
 	err = filesystem.CompleteFormatFromFileName(props, fPath)
 	if err != nil {
 		return nil, err
 	}
+
+	*options = append(*options, FileFormat(props.Ingestion.Additional.Format))
 
 	file, err := os.Open(fPath)
 	if err != nil {

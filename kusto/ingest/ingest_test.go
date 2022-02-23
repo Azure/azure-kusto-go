@@ -14,6 +14,7 @@ import (
 type mockClient struct {
 	endpoint string
 	auth     kusto.Authorization
+	onMgmt   func(ctx context.Context, db string, query kusto.Stmt, options ...kusto.MgmtOption) (*kusto.RowIterator, error)
 }
 
 func (m mockClient) Auth() kusto.Authorization {
@@ -28,7 +29,14 @@ func (m mockClient) Query(context.Context, string, kusto.Stmt, ...kusto.QueryOpt
 	panic("not implemented")
 }
 
-func (m mockClient) Mgmt(context.Context, string, kusto.Stmt, ...kusto.MgmtOption) (*kusto.RowIterator, error) {
+func (m mockClient) Mgmt(ctx context.Context, db string, query kusto.Stmt, options ...kusto.MgmtOption) (*kusto.RowIterator, error) {
+	if m.onMgmt != nil {
+		rows, err := m.onMgmt(ctx, db, query, options...)
+		if err != nil || rows != nil {
+			return rows, err
+		}
+	}
+
 	rows, err := kusto.NewMockRows(table.Columns{
 		{
 			Name: "ResourceTypeName",

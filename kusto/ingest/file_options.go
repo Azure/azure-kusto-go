@@ -132,13 +132,13 @@ func Compress(compress bool) FileOption {
 	}
 }
 
-func BackOff(off backoff.BackOff) FileOption {
+func BackOff(off *backoff.ExponentialBackOff) FileOption {
 	return option{
 		run: func(p *properties.All) error {
 			p.ManagedStreaming.Backoff = off
 			return nil
 		},
-		clientScopes: QueuedClient | StreamingClient | ManagedClient,
+		clientScopes: ManagedClient,
 		sourceScope:  FromFile | FromReader | FromBlob,
 		name:         "BackOff",
 	}

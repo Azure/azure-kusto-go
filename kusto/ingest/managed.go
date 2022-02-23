@@ -20,7 +20,7 @@ const (
 	maxStreamingSize       = 4 * mb
 	defaultInitialInterval = 1 * time.Second
 	defaultMultiplier      = 2
-	defaultRetryCount      = 2
+	retryCount             = 2
 )
 
 type Managed struct {
@@ -46,8 +46,8 @@ func NewManaged(client QueryClient, db, table string, options ...Option) (*Manag
 }
 
 func (m *Managed) FromFile(ctx context.Context, fPath string, options ...FileOption) (*Result, error) {
-	props := m.newProp(ctx)
-	file, err := prepFile(fPath, &props, options)
+	props := m.newProp()
+	file, err := prepFile(fPath, &props, &options, ManagedClient)
 	if err != nil {
 		return nil, err
 	}
@@ -59,7 +59,7 @@ func (m *Managed) FromFile(ctx context.Context, fPath string, options ...FileOpt
 }
 
 func (m *Managed) FromReader(ctx context.Context, reader io.Reader, options ...FileOption) (*Result, error) {
-	props := m.newProp(ctx)
+	props := m.newProp()
 
 	for _, prop := range options {
 		err := prop.Run(&props, ManagedClient, FromReader)
@@ -120,6 +120,8 @@ func (m *Managed) managedStreamImpl(ctx context.Context, payload io.Reader, prop
 	i := 0
 	managedUuid := uuid.New().String()
 
+	actualBackoff := backoff.WithContext(backoff.WithMaxRetries(props.ManagedStreaming.Backoff, retryCount), ctx)
+
 	err = backoff.Retry(func() error {
 		if !hasCustomId {
 			if i != 0 {
@@ -143,7 +145,7 @@ func (m *Managed) managedStreamImpl(ctx context.Context, payload io.Reader, prop
 			}
 		}
 		return nil
-	}, props.ManagedStreaming.Backoff)
+	}, actualBackoff)
 
 	if err == nil {
 		return result, nil
@@ -157,12 +159,10 @@ func (m *Managed) managedStreamImpl(ctx context.Context, payload io.Reader, prop
 	return nil, err
 }
 
-func (m *Managed) newProp(ctx context.Context) properties.All {
-	off := backoff.NewExponentialBackOff()
-	off.InitialInterval = defaultInitialInterval
-	off.Multiplier = defaultMultiplier
-
-	exp := backoff.WithContext(backoff.WithMaxRetries(off, defaultRetryCount), ctx)
+func (m *Managed) newProp() properties.All {
+	exp := backoff.NewExponentialBackOff()
+	exp.InitialInterval = defaultInitialInterval
+	exp.Multiplier = defaultMultiplier
 
 	return properties.All{
 		Ingestion: properties.Ingestion{
