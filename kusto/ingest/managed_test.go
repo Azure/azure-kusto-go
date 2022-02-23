@@ -58,8 +58,12 @@ func TestManaged(t *testing.T) {
 		options         []FileOption
 		onStreamIngest  testStreamIngestFunc
 		onMgmt          testMgmtFunc
+		expectedStatus  StatusCode
 		expectedError   error
 		expectedCounter int
+		onLocal         func(t *testing.T, ctx context.Context, from string, props properties.All) error
+		onReader        func(t *testing.T, ctx context.Context, reader io.Reader, props properties.All) (string, error)
+		onBlob          func(t *testing.T, ctx context.Context, from string, fileSize int64, props properties.All) error
 	}{
 		{
 			name:    "TestManagedStreamingDefault",
@@ -179,22 +183,24 @@ func TestManaged(t *testing.T) {
 				clientRequestId string) error {
 				return errors.E(errors.OpIngestStream, errors.KHTTPError, fmt.Errorf("error"))
 			},
-			expectedError: errors.E(errors.OpFileIngest, errors.KBlobstore, fmt.Errorf("no Blob Storage container resources are defined, "+
-				"there is no container to upload to")).SetNoRetry(),
 			onMgmt: func(t *testing.T, ctx context.Context, db string, query kusto.Stmt, options ...kusto.MgmtOption) (*kusto.RowIterator, error) {
 				// .get ingestion resources is always called in the ctor
 				if query.String() == ".get ingestion resources" {
 					return resources.SuccessfulFakeResources().Mgmt(ctx, db, query, options...)
 				}
 				if query.String() == ".get kusto identity token" {
-					counter++
 					return nil, nil
 				}
 
 				require.Fail(t, "Unexpected queued ingest call")
 				return nil, nil
 			},
+			onReader: func(t *testing.T, ctx context.Context, reader io.Reader, props properties.All) (string, error) {
+				counter++
+				return "", nil
+			},
 			expectedCounter: 4,
+			expectedStatus:  Queued,
 		},
 	}
 
@@ -219,6 +225,26 @@ func TestManaged(t *testing.T) {
 			}
 
 			ingestion, err := New(mockClient, "defaultDb", "defaultTable")
+			ingestion.fs = resources.FsMock{
+				OnLocal: func(ctx context.Context, from string, props properties.All) error {
+					if test.onLocal == nil {
+						return nil
+					}
+					return test.onLocal(t, ctx, from, props)
+				},
+				OnReader: func(ctx context.Context, reader io.Reader, props properties.All) (string, error) {
+					if test.onReader == nil {
+						return "", nil
+					}
+					return test.onReader(t, ctx, reader, props)
+				},
+				OnBlob: func(ctx context.Context, from string, fileSize int64, props properties.All) error {
+					if test.onBlob == nil {
+						return nil
+					}
+					return test.onBlob(t, ctx, from, fileSize, props)
+				},
+			}
 			require.NoError(t, err)
 			managed := Managed{
 				queued: ingestion,
@@ -241,7 +267,10 @@ func TestManaged(t *testing.T) {
 				assert.Nil(t, result)
 			} else {
 				assert.NoError(t, err)
-				assert.Equal(t, result.record.Status, StatusCode("Success"))
+				if test.expectedStatus == "" {
+					test.expectedStatus = "Success"
+				}
+				assert.Equal(t, result.record.Status, test.expectedStatus)
 			}
 
 			assert.Equal(t, test.expectedCounter, counter)
@@ -254,7 +283,10 @@ func TestManaged(t *testing.T) {
 				assert.Nil(t, result)
 			} else {
 				assert.NoError(t, err)
-				assert.Equal(t, result.record.Status, StatusCode("Success"))
+				if test.expectedStatus == "" {
+					test.expectedStatus = "Success"
+				}
+				assert.Equal(t, result.record.Status, test.expectedStatus)
 			}
 			assert.Equal(t, test.expectedCounter, counter)
 

@@ -4,11 +4,13 @@ import (
 	"context"
 	"errors"
 	"fmt"
+	"io"
 
 	"github.com/Azure/azure-kusto-go/kusto"
 	"github.com/Azure/azure-kusto-go/kusto/data/table"
 	"github.com/Azure/azure-kusto-go/kusto/data/types"
 	"github.com/Azure/azure-kusto-go/kusto/data/value"
+	"github.com/Azure/azure-kusto-go/kusto/ingest/internal/properties"
 )
 
 type FakeMgmt struct {
@@ -115,4 +117,31 @@ func SuccessfulFakeResources() *FakeMgmt {
 		},
 		false,
 	)
+}
+
+type FsMock struct {
+	OnLocal  func(ctx context.Context, from string, props properties.All) error
+	OnReader func(ctx context.Context, reader io.Reader, props properties.All) (string, error)
+	OnBlob   func(ctx context.Context, from string, fileSize int64, props properties.All) error
+}
+
+func (f FsMock) Local(ctx context.Context, from string, props properties.All) error {
+	if f.OnLocal != nil {
+		return f.OnLocal(ctx, from, props)
+	}
+	return nil
+}
+
+func (f FsMock) Reader(ctx context.Context, reader io.Reader, props properties.All) (string, error) {
+	if f.OnReader != nil {
+		return f.OnReader(ctx, reader, props)
+	}
+	return "", nil
+}
+
+func (f FsMock) Blob(ctx context.Context, from string, fileSize int64, props properties.All) error {
+	if f.OnBlob != nil {
+		return f.OnBlob(ctx, from, fileSize, props)
+	}
+	return nil
 }

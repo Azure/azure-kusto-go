@@ -75,7 +75,7 @@ type fakeBlobstore struct {
 	shouldErr bool
 }
 
-func (f *fakeBlobstore) uploadBlobStream(ctx context.Context, reader io.Reader, url azblob.BlockBlobURL, o azblob.UploadStreamToBlockBlobOptions) (azblob.CommonResponse, error) {
+func (f *fakeBlobstore) uploadBlobStream(_ context.Context, reader io.Reader, _ azblob.BlockBlobURL, _ azblob.UploadStreamToBlockBlobOptions) (azblob.CommonResponse, error) {
 	if f.shouldErr {
 		return nil, fmt.Errorf("error")
 	}
@@ -83,7 +83,7 @@ func (f *fakeBlobstore) uploadBlobStream(ctx context.Context, reader io.Reader, 
 	return nil, err
 }
 
-func (f *fakeBlobstore) uploadBlobFile(ctx context.Context, fi *os.File, url azblob.BlockBlobURL, o azblob.UploadToBlockBlobOptions) (azblob.CommonResponse, error) {
+func (f *fakeBlobstore) uploadBlobFile(_ context.Context, fi *os.File, _ azblob.BlockBlobURL, _ azblob.UploadToBlockBlobOptions) (azblob.CommonResponse, error) {
 	if f.shouldErr {
 		return nil, fmt.Errorf("error")
 	}
@@ -105,15 +105,19 @@ func TestLocalToBlob(t *testing.T) {
 	if err != nil {
 		panic(err)
 	}
-	defer os.Remove(f.Name())
-	f.Write([]byte(content))
-	f.Close()
+	defer func(name string) {
+		_ = os.Remove(name)
+	}(f.Name())
+	_, _ = f.Write([]byte(content))
+	_ = f.Close()
 
 	fgzip, err := os.OpenFile("test_file.gz", os.O_CREATE+os.O_RDWR, 0770)
 	if err != nil {
 		panic(err)
 	}
-	defer os.Remove(fgzip.Name())
+	defer func(name string) {
+		_ = os.Remove(name)
+	}(fgzip.Name())
 
 	zw := gzip.NewWriter(fgzip)
 
@@ -121,7 +125,7 @@ func TestLocalToBlob(t *testing.T) {
 	if err != nil {
 		panic(err)
 	}
-	zw.Close()
+	_ = zw.Close()
 
 	_, err = ioutil.ReadFile(f.Name())
 	if err != nil {
@@ -186,7 +190,7 @@ func TestLocalToBlob(t *testing.T) {
 			upload: fbs.uploadBlobFile,
 		}
 
-		_, _, err := in.localToBlob(context.Background(), test.from, to, &properties.All{})
+		_, _, err := in.localToBlob(context.Background(), test.from, to)
 		switch {
 		case err == nil && test.err:
 			t.Errorf("TestLocalToBlob(%s): got err == nil, want err != nil", test.desc)

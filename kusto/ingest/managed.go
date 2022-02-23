@@ -47,15 +47,15 @@ func NewManaged(client QueryClient, db, table string, options ...Option) (*Manag
 
 func (m *Managed) FromFile(ctx context.Context, fPath string, options ...FileOption) (*Result, error) {
 	props := m.newProp()
-	file, err := prepFile(fPath, &props, &options, ManagedClient)
+	file, err := prepFile(fPath, &props, options, ManagedClient)
 	if err != nil {
 		return nil, err
 	}
 	if file == nil { // Non-local file - fallback to queued
-		return m.queued.FromFile(ctx, fPath, filterOptions(options, QueuedClient)...)
+		return m.queued.fromFileProps(ctx, fPath, []FileOption{}, props)
 	}
 
-	return m.managedStreamImpl(ctx, file, props, options)
+	return m.managedStreamImpl(ctx, file, props)
 }
 
 func (m *Managed) FromReader(ctx context.Context, reader io.Reader, options ...FileOption) (*Result, error) {
@@ -68,20 +68,10 @@ func (m *Managed) FromReader(ctx context.Context, reader io.Reader, options ...F
 		}
 	}
 
-	return m.managedStreamImpl(ctx, reader, props, options)
+	return m.managedStreamImpl(ctx, reader, props)
 }
 
-func filterOptions(options []FileOption, client ClientScope) []FileOption {
-	var filtered []FileOption
-	for _, option := range options {
-		if option.ClientScopes()&client != 0 {
-			filtered = append(filtered, option)
-		}
-	}
-	return filtered
-}
-
-func (m *Managed) managedStreamImpl(ctx context.Context, payload io.Reader, props properties.All, options []FileOption) (*Result, error) {
+func (m *Managed) managedStreamImpl(ctx context.Context, payload io.Reader, props properties.All) (*Result, error) {
 	compress := !props.Source.DontCompress
 	if compress {
 		var closer io.ReadCloser
@@ -93,6 +83,7 @@ func (m *Managed) managedStreamImpl(ctx context.Context, payload io.Reader, prop
 		zw.Reset(closer)
 
 		payload = zw
+		props.Source.DontCompress = true
 	}
 	maxSize := int64(maxStreamingSize)
 
@@ -108,13 +99,10 @@ func (m *Managed) managedStreamImpl(ctx context.Context, payload io.Reader, prop
 	if written > maxSize {
 		buf.Reset()
 		combinedBuf := io.MultiReader(buf, payload)
-		return m.queued.FromReader(ctx, combinedBuf, filterOptions(options, QueuedClient)...)
+		return m.queued.fromReaderProps(ctx, combinedBuf, []FileOption{}, props)
 	}
 
 	var result *Result
-
-	streamingOptions := filterOptions(options, StreamingClient)
-	streamingOptions = append(streamingOptions, Compress(false))
 
 	hasCustomId := props.Streaming.ClientRequestId != ""
 	i := 0
@@ -124,13 +112,9 @@ func (m *Managed) managedStreamImpl(ctx context.Context, payload io.Reader, prop
 
 	err = backoff.Retry(func() error {
 		if !hasCustomId {
-			if i != 0 {
-				// Remove previous client request id
-				streamingOptions = streamingOptions[:len(streamingOptions)-1]
-			}
-			streamingOptions = append(streamingOptions, ClientRequestId(fmt.Sprintf("KGC.executeManagedStreamingIngest;%s;%d", managedUuid, i)))
+			props.Streaming.ClientRequestId = fmt.Sprintf("KGC.executeManagedStreamingIngest;%s;%d", managedUuid, i)
 		}
-		result, err = m.streaming.FromReader(ctx, buf, streamingOptions...)
+		result, err = streamImpl(m.streaming.streamConn, ctx, buf, props)
 		buf.Reset()
 		i++
 		if err != nil {
@@ -153,7 +137,7 @@ func (m *Managed) managedStreamImpl(ctx context.Context, payload io.Reader, prop
 
 	// Fallback to queued
 	if errors.Retry(err) {
-		return m.queued.FromReader(ctx, buf, filterOptions(options, QueuedClient)...)
+		return m.queued.fromReaderProps(ctx, buf, []FileOption{}, props)
 	}
 
 	return nil, err

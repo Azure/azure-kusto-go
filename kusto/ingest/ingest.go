@@ -27,7 +27,7 @@ type Ingestion struct {
 	client QueryClient
 	mgr    *resources.Manager
 
-	fs *filesystem.Ingestion
+	fs filesystem.Filesystem
 
 	connMu     sync.Mutex
 	streamConn *conn.Conn
@@ -75,17 +75,19 @@ func New(client QueryClient, db, table string, options ...Option) (*Ingestion, e
 	return i, nil
 }
 
-func (i *Ingestion) prepForIngestion(ctx context.Context, options []FileOption, scope SourceScope) (*Result, properties.All, error) {
+func (i *Ingestion) prepForIngestion(ctx context.Context, options []FileOption, props properties.All, source SourceScope) (*Result, properties.All, error) {
 	result := newResult()
+	props.Ingestion.RetainBlobOnSuccess = true
 
 	auth, err := i.mgr.AuthContext(ctx)
 	if err != nil {
 		return nil, properties.All{}, err
 	}
 
-	props := i.newProp(auth)
+	props.Ingestion.Additional.AuthContext = auth
+
 	for _, o := range options {
-		if err := o.Run(&props, QueuedClient, scope); err != nil {
+		if err := o.Run(&props, QueuedClient, source); err != nil {
 			return nil, properties.All{}, err
 		}
 	}
@@ -120,6 +122,11 @@ func (i *Ingestion) prepForIngestion(ctx context.Context, options []FileOption, 
 // FromFile allows uploading a data file for Kusto from either a local path or a blobstore URI path.
 // This method is thread-safe.
 func (i *Ingestion) FromFile(ctx context.Context, fPath string, options ...FileOption) (*Result, error) {
+	return i.fromFileProps(ctx, fPath, options, i.newProp())
+}
+
+// fromFileProps is an internal function to allow managed streaming to pass a properties object to the ingestion.
+func (i *Ingestion) fromFileProps(ctx context.Context, fPath string, options []FileOption, props properties.All) (*Result, error) {
 	local, err := filesystem.IsLocalPath(fPath)
 	if err != nil {
 		return nil, err
@@ -132,7 +139,7 @@ func (i *Ingestion) FromFile(ctx context.Context, fPath string, options ...FileO
 		scope = FromBlob
 	}
 
-	result, props, err := i.prepForIngestion(ctx, options, scope)
+	result, props, err := i.prepForIngestion(ctx, options, props, scope)
 	if err != nil {
 		return nil, err
 	}
@@ -158,13 +165,18 @@ func (i *Ingestion) FromFile(ctx context.Context, fPath string, options ...FileO
 // ingested after all data in the reader is processed. Content should not use compression as the content will be
 // compressed with gzip. This method is thread-safe.
 func (i *Ingestion) FromReader(ctx context.Context, reader io.Reader, options ...FileOption) (*Result, error) {
-	result, props, err := i.prepForIngestion(ctx, options, FromReader)
+	return i.fromReaderProps(ctx, reader, options, i.newProp())
+}
+
+// fromReaderProps is an internal function to allow managed streaming to pass a properties object to the ingestion.
+func (i *Ingestion) fromReaderProps(ctx context.Context, reader io.Reader, options []FileOption, props properties.All) (*Result, error) {
+	result, props, err := i.prepForIngestion(ctx, options, props, FromReader)
 	if err != nil {
 		return nil, err
 	}
 
 	if props.Ingestion.Additional.Format == DFUnknown {
-		return nil, fmt.Errorf("must provide option FileFormat() when using FromReader()")
+		props.Ingestion.Additional.Format = CSV
 	}
 
 	path, err := i.fs.Reader(ctx, reader, props)
@@ -220,15 +232,11 @@ func (i *Ingestion) getStreamConn() (*conn.Conn, error) {
 	return i.streamConn, nil
 }
 
-func (i *Ingestion) newProp(auth string) properties.All {
+func (i *Ingestion) newProp() properties.All {
 	return properties.All{
 		Ingestion: properties.Ingestion{
-			DatabaseName:        i.db,
-			TableName:           i.table,
-			RetainBlobOnSuccess: true,
-			Additional: properties.Additional{
-				AuthContext: auth,
-			},
+			DatabaseName: i.db,
+			TableName:    i.table,
 		},
 	}
 }

@@ -12,7 +12,6 @@ import (
 	"os"
 	"path"
 	"path/filepath"
-	"regexp"
 	"strings"
 	"time"
 
@@ -37,6 +36,13 @@ const (
 	BlockSize   = 8 * _1MiB
 	Concurrency = 50
 )
+
+// Filesystem provides methods for taking data from a filesystem of some type and ingesting it into Kusto.
+type Filesystem interface {
+	Local(ctx context.Context, from string, props properties.All) error
+	Reader(ctx context.Context, reader io.Reader, props properties.All) (string, error)
+	Blob(ctx context.Context, from string, fileSize int64, props properties.All) error
+}
 
 // stream provides a type that mimics azblob.UploadStreamToBlockBlob to allow fakes for testing.
 type stream func(context.Context, io.Reader, azblob.BlockBlobURL, azblob.UploadStreamToBlockBlobOptions) (azblob.CommonResponse, error)
@@ -109,18 +115,18 @@ func (i *Ingestion) Local(ctx context.Context, from string, props properties.All
 		return err
 	}
 
-	resources, err := i.mgr.Resources()
+	mgrResources, err := i.mgr.Resources()
 	if err != nil {
 		return err
 	}
 
 	// We want to check the queue size here so so we don't upload a file and then find we don't have a Kusto queue to stick
 	// it in. If we don't have a container, that is handled by containerQueue().
-	if len(resources.Queues) == 0 {
+	if len(mgrResources.Queues) == 0 {
 		return errors.ES(errors.OpFileIngest, errors.KBlobstore, "no Kusto queue resources are defined, there is no queue to upload to").SetNoRetry()
 	}
 
-	blobURL, size, err := i.localToBlob(ctx, from, to, &props)
+	blobURL, size, err := i.localToBlob(ctx, from, to)
 	if err != nil {
 		return err
 	}
@@ -149,14 +155,14 @@ func (i *Ingestion) Reader(ctx context.Context, reader io.Reader, props properti
 		return "", err
 	}
 
-	resources, err := i.mgr.Resources()
+	mgrResources, err := i.mgr.Resources()
 	if err != nil {
 		return "", err
 	}
 
 	// We want to check the queue size here so so we don't upload a file and then find we don't have a Kusto queue to stick
 	// it in. If we don't have a container, that is handled by containerQueue().
-	if len(resources.Queues) == 0 {
+	if len(mgrResources.Queues) == 0 {
 		return "", errors.ES(errors.OpFileIngest, errors.KBlobstore, "no Kusto queue resources are defined, there is no queue to upload to").SetNoRetry()
 	}
 
@@ -240,12 +246,12 @@ func CompleteFormatFromFileName(props *properties.All, from string) error {
 
 // upstreamContainer randomly selects a container queue in which to upload our file to blobstore.
 func (i *Ingestion) upstreamContainer() (azblob.ContainerURL, error) {
-	resources, err := i.mgr.Resources()
+	mgrResources, err := i.mgr.Resources()
 	if err != nil {
 		return azblob.ContainerURL{}, errors.E(errors.OpFileIngest, errors.KBlobstore, err)
 	}
 
-	if len(resources.Containers) == 0 {
+	if len(mgrResources.Containers) == 0 {
 		return azblob.ContainerURL{}, errors.ES(
 			errors.OpFileIngest,
 			errors.KBlobstore,
@@ -253,7 +259,7 @@ func (i *Ingestion) upstreamContainer() (azblob.ContainerURL, error) {
 		).SetNoRetry()
 	}
 
-	storageURI := resources.Containers[rand.Intn(len(resources.Containers))]
+	storageURI := mgrResources.Containers[rand.Intn(len(mgrResources.Containers))]
 	service, _ := url.Parse(fmt.Sprintf("https://%s.blob.core.windows.net?%s", storageURI.Account(), storageURI.SAS().Encode()))
 
 	creds := azblob.NewAnonymousCredential()
@@ -263,12 +269,12 @@ func (i *Ingestion) upstreamContainer() (azblob.ContainerURL, error) {
 }
 
 func (i *Ingestion) upstreamQueue() (azqueue.MessagesURL, error) {
-	resources, err := i.mgr.Resources()
+	mgrResources, err := i.mgr.Resources()
 	if err != nil {
 		return azqueue.MessagesURL{}, err
 	}
 
-	if len(resources.Queues) == 0 {
+	if len(mgrResources.Queues) == 0 {
 		return azqueue.MessagesURL{}, errors.ES(
 			errors.OpFileIngest,
 			errors.KBlobstore,
@@ -276,7 +282,7 @@ func (i *Ingestion) upstreamQueue() (azqueue.MessagesURL, error) {
 		).SetNoRetry()
 	}
 
-	queue := resources.Queues[rand.Intn(len(resources.Queues))]
+	queue := mgrResources.Queues[rand.Intn(len(mgrResources.Queues))]
 	service, _ := url.Parse(fmt.Sprintf("https://%s.queue.core.windows.net?%s", queue.Account(), queue.SAS().Encode()))
 
 	creds := azqueue.NewAnonymousCredential()
@@ -289,7 +295,7 @@ var nower = time.Now
 
 // localToBlob copies from a local to to an Azure Blobstore blob. It returns the URL of the Blob, the local file info and an
 // error if there was one.
-func (i *Ingestion) localToBlob(ctx context.Context, from string, to azblob.ContainerURL, props *properties.All) (azblob.BlockBlobURL, int64, error) {
+func (i *Ingestion) localToBlob(ctx context.Context, from string, to azblob.ContainerURL) (azblob.BlockBlobURL, int64, error) {
 	compression := CompressionDiscovery(from)
 	blobName := fmt.Sprintf("%s_%s_%s_%s", i.db, i.table, nower(), filepath.Base(from))
 	if compression == properties.CTNone {
@@ -372,11 +378,6 @@ func CompressionDiscovery(fName string) properties.CompressionType {
 	}
 	return properties.CTNone
 }
-
-var (
-	// gExtractURIProtocol is created outside the fucntion inorder to pay once for regexp creation.
-	gExtractURIProtocol = regexp.MustCompile(`^(.*)://`)
-)
 
 // This allows mocking the stat func later on
 var statFunc = os.Stat
