@@ -116,9 +116,7 @@ func (d Dynamic) Convert(v reflect.Value) error {
 	if v.Type().Kind() != reflect.Ptr {
 		v.Set(valueToSet)
 	} else {
-		ptr := reflect.New(valueToSet.Type())
-		ptr.Elem().Set(valueToSet)
-		v.Set(ptr)
+		v.Elem().Set(valueToSet)
 	}
 	return nil
 }
