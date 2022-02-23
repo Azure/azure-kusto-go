@@ -67,6 +67,15 @@ func TestDynamicConverter(t *testing.T) {
 			},
 		},
 		{
+			Desc:   "convert to []map[string]struct",
+			Value:  value.Dynamic{Value: []byte(`[{"group1":{"name":"A","id":1}},{"group2":{"name":"B","id":2}}]`), Valid: true},
+			Target: reflect.ValueOf(&[]map[string]TestStruct{}),
+			Want: []map[string]TestStruct{
+				{"group1": {Name: "A", ID: 1}},
+				{"group2": {Name: "B", ID: 2}},
+			},
+		},
+		{
 			Desc:   "convert to struct",
 			Value:  value.Dynamic{Value: []byte(`{"name":"A","id":1}`), Valid: true},
 			Target: reflect.ValueOf(&TestStruct{}),
@@ -82,6 +91,17 @@ func TestDynamicConverter(t *testing.T) {
 			Want: map[string]interface{}{
 				"name": "A",
 				"id":   1,
+			},
+		},
+		{
+			Desc:   "convert to map[string]struct",
+			Value:  value.Dynamic{Value: []byte(`{"group1": {"name":"A","id":1}}`), Valid: true},
+			Target: reflect.ValueOf(&map[string]TestStruct{}),
+			Want: map[string]TestStruct{
+				"group1": {
+					Name: "A",
+					ID:   1,
+				},
 			},
 		},
 	}
