@@ -73,6 +73,21 @@ func (d Dynamic) Convert(v reflect.Value) error {
 		}
 		v.Set(reflect.ValueOf(d.Value))
 		return nil
+	case t.Kind() == reflect.Slice:
+		if !d.Valid {
+			return nil
+		}
+		if t.Elem().Kind() != reflect.Interface {
+			return fmt.Errorf("The slice for storing Dynamic must be of type []interface{}")
+		}
+
+		s := []interface{}{}
+		if err := json.Unmarshal([]byte(d.Value), &s); err != nil {
+			return fmt.Errorf("Error occurred while trying to unmarshal Dynamic into a []interface{}: %s", err)
+		}
+
+		v.Set(reflect.ValueOf(s))
+		return nil
 	case t.Kind() == reflect.Map:
 		if !d.Valid {
 			return nil
