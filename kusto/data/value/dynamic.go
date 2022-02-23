@@ -73,34 +73,17 @@ func (d Dynamic) Convert(v reflect.Value) error {
 		} else {
 			valueToSet = reflect.ValueOf(d.Value)
 		}
-	case t.Kind() == reflect.Slice:
+	case t.Kind() == reflect.Slice || t.Kind() == reflect.Map:
 		if !d.Valid {
 			return nil
 		}
 
 		ptr := reflect.New(t)
 		if err := json.Unmarshal([]byte(d.Value), ptr.Interface()); err != nil {
-			return fmt.Errorf("Error occurred while trying to unmarshal Dynamic into a slice: %s", err)
+			return fmt.Errorf("Error occurred while trying to unmarshal Dynamic into a %s: %s", t.Kind(), err)
 		}
 
 		valueToSet = ptr.Elem()
-	case t.Kind() == reflect.Map:
-		if !d.Valid {
-			return nil
-		}
-		if t.Key().Kind() != reflect.String {
-			return fmt.Errorf("Type dymanic and can only be stored in a string, *string, map[string]interface{}, *map[string]interface{}, struct or *struct")
-		}
-		if t.Elem().Kind() != reflect.Interface {
-			return fmt.Errorf("Type dymanic and can only be stored in a string, *string, map[string]interface{}, *map[string]interface{}, struct or *struct")
-		}
-
-		m := map[string]interface{}{}
-		if err := json.Unmarshal([]byte(d.Value), &m); err != nil {
-			return fmt.Errorf("Error occurred while trying to marshal type dynamic into a map[string]interface{}: %s", err)
-		}
-
-		valueToSet = reflect.ValueOf(m)
 	case t.Kind() == reflect.Struct:
 		structPtr := reflect.New(t)
 
