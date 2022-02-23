@@ -29,14 +29,40 @@ func TestFieldsConvert(t *testing.T) {
 		ID:   1,
 	}
 
+	myArrayOfStruct := []SomeJSON{
+		{
+			Name: "Adam",
+			ID:   1,
+		},
+		{
+			Name: "Bob",
+			ID:   2,
+		},
+	}
+
 	myJSON, err := json.Marshal(myStruct)
 	if err != nil {
 		panic(err)
 	}
+
+	myJSONArray, err := json.Marshal(myArrayOfStruct)
+	if err != nil {
+		panic(err)
+	}
+
 	myJSONStr := string(myJSON)
 	myJSONStrPtr := &myJSONStr
+
+	myJSONArrayStr := string(myJSONArray)
+	myJSONArrayStrPtr := &myJSONArrayStr
+
 	jsonMap := map[string]interface{}{}
 	if err := json.Unmarshal(myJSON, &jsonMap); err != nil {
+		panic(err)
+	}
+
+	jsonList := []interface{}{}
+	if err := json.Unmarshal(myJSONArray, &jsonList); err != nil {
 		panic(err)
 	}
 
@@ -188,6 +214,68 @@ func TestFieldsConvert(t *testing.T) {
 				},
 				value.Dynamic{Value: myJSON, Valid: true},
 				&value.Dynamic{Value: myJSON, Valid: true},
+			},
+		},
+		{
+			desc: "valid Dynamic list",
+			columns: Columns{
+				{Type: types.Dynamic, Name: "Struct"},
+				{Type: types.Dynamic, Name: "PtrStruct"},
+				{Type: types.Dynamic, Name: "String"},
+				{Type: types.Dynamic, Name: "PtrString"},
+				{Type: types.Dynamic, Name: "Slice"},
+				{Type: types.Dynamic, Name: "PtrSlice"},
+				{Type: types.Dynamic, Name: "Dynamic"},
+				{Type: types.Dynamic, Name: "PtrDynamic"},
+			},
+			k: value.Dynamic{Value: myJSONArray, Valid: true},
+			ptrStruct: &struct {
+				Struct     []SomeJSON
+				PtrStruct  *[]SomeJSON
+				String     string
+				PtrString  *string
+				Slice      []map[string]interface{}
+				PtrSlice   *[]map[string]interface{}
+				Dynamic    value.Dynamic
+				PtrDynamic *value.Dynamic
+			}{},
+			err: false,
+			want: &struct {
+				Struct     []SomeJSON
+				PtrStruct  *[]SomeJSON
+				String     string
+				PtrString  *string
+				Slice      []map[string]interface{}
+				PtrSlice   *[]map[string]interface{}
+				Dynamic    value.Dynamic
+				PtrDynamic *value.Dynamic
+			}{
+				myArrayOfStruct,
+				&myArrayOfStruct,
+				myJSONArrayStr,
+				myJSONArrayStrPtr,
+				[]map[string]interface{}{
+					{
+						"Name": "Adam",
+						"ID":   1,
+					},
+					{
+						"Name": "Bob",
+						"ID":   2,
+					},
+				},
+				&[]map[string]interface{}{
+					{
+						"Name": "Adam",
+						"ID":   1,
+					},
+					{
+						"Name": "Bob",
+						"ID":   2,
+					},
+				},
+				value.Dynamic{Value: myJSONArray, Valid: true},
+				&value.Dynamic{Value: myJSONArray, Valid: true},
 			},
 		},
 		{
