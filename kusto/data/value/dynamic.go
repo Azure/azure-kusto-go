@@ -99,6 +99,9 @@ func (d Dynamic) Convert(v reflect.Value) error {
 	if v.Type().Kind() != reflect.Ptr {
 		v.Set(valueToSet)
 	} else {
+		if v.IsZero() {
+			v.Set(reflect.New(valueToSet.Type()))
+		}
 		v.Elem().Set(valueToSet)
 	}
 	return nil
