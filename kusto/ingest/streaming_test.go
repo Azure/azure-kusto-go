@@ -31,13 +31,20 @@ func (f fakeStreamIngestor) StreamIngest(ctx context.Context, db, table string, 
 	return f.onStreamIngest(ctx, db, table, payload, format, mappingName, clientRequestId)
 }
 
-func fileAndReaderFromString() (string, *bytes.Reader) {
-	const raw = `,,,,
-	2020-03-10T20:59:30.694177Z,11196991-b193-4610-ae12-bcc03d092927,v0.0.1,Hello world!,Daniel Dubovski
-	2020-03-10T20:59:30.694177Z,,v0.0.2,,`
+func bigCsvFileAndReader() (string, *bytes.Reader) {
+	return fileAndReaderFromString(`,,,,
+	2020-03-10T20:59:30.694177Z,11196991-b193-4610-ae12-bcc03d092927,v0.0.1,` + strings.Repeat("Hello world!", 4*1024*1024) + `,Daniel Dubovski
+	2020-03-10T20:59:30.694177Z,,v0.0.2,,`)
+}
 
-	fname := "data2.csv"
-	file, err := os.Create(fname)
+func csvFileAndReader() (string, *bytes.Reader) {
+	return fileAndReaderFromString(`,,,,
+	2020-03-10T20:59:30.694177Z,11196991-b193-4610-ae12-bcc03d092927,v0.0.1,Hello world!,Daniel Dubovski
+	2020-03-10T20:59:30.694177Z,,v0.0.2,,`)
+}
+
+func fileAndReaderFromString(data string) (string, *bytes.Reader) {
+	file, err := os.CreateTemp(".", "*.csv")
 	if err != nil {
 		panic(err)
 	}
@@ -50,11 +57,11 @@ func fileAndReaderFromString() (string, *bytes.Reader) {
 	}(file)
 
 	writer := io.StringWriter(file)
-	if _, err := writer.WriteString(raw); err != nil {
+	if _, err := writer.WriteString(data); err != nil {
 		panic(err)
 	}
 
-	return fname, bytes.NewReader([]byte(raw))
+	return file.Name(), bytes.NewReader([]byte(data))
 }
 
 func TestStreaming(t *testing.T) {
@@ -66,7 +73,7 @@ func TestStreaming(t *testing.T) {
 	}
 	ctx := context.Background()
 
-	filePath, reader := fileAndReaderFromString()
+	filePath, reader := csvFileAndReader()
 	data, err := ioutil.ReadAll(reader)
 
 	require.NoError(t, err)
@@ -209,6 +216,7 @@ func TestStreaming(t *testing.T) {
 				assert.NoError(t, err)
 				assert.Equal(t, result.record.Status, StatusCode("Success"))
 			}
+
 		})
 	}
 

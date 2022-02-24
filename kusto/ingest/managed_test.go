@@ -37,20 +37,11 @@ func TestManaged(t *testing.T) {
 
 	ctx := context.Background()
 
-	filePath, reader := fileAndReaderFromString()
-	data, err := ioutil.ReadAll(reader)
+	filePath, reader := csvFileAndReader()
+	data, compressedBytes := initFile(t, reader)
 
-	require.NoError(t, err)
-
-	compressedBuffer := gzip.New()
-	compressedBuffer.Reset(io.NopCloser(bytes.NewReader(data)))
-	compressedBytes, err := ioutil.ReadAll(compressedBuffer)
-	require.NoError(t, err)
-
-	seek, err := reader.Seek(0, io.SeekStart)
-	require.Equal(t, int64(0), seek)
-	require.NoError(t, err)
-
+	bigFilePath, bigReader := bigCsvFileAndReader()
+	bigData, _ := initFile(t, bigReader)
 	counter := 0
 
 	tests := []struct {
@@ -64,6 +55,7 @@ func TestManaged(t *testing.T) {
 		onLocal         func(t *testing.T, ctx context.Context, from string, props properties.All) error
 		onReader        func(t *testing.T, ctx context.Context, reader io.Reader, props properties.All) (string, error)
 		onBlob          func(t *testing.T, ctx context.Context, from string, fileSize int64, props properties.All) error
+		isBigFile       bool
 	}{
 		{
 			name:    "TestManagedStreamingDefault",
@@ -157,6 +149,17 @@ func TestManaged(t *testing.T) {
 			options: []FileOption{},
 			onStreamIngest: func(t *testing.T, ctx context.Context, db, table string, payload io.Reader, format properties.DataFormat, mappingName string,
 				clientRequestId string) error {
+				assert.Equal(t, "defaultDb", db)
+				assert.Equal(t, "defaultTable", table)
+				payloadBytes, err := ioutil.ReadAll(payload)
+				assert.NoError(t, err)
+				assert.Equal(t, compressedBytes, payloadBytes)
+				assert.Equal(t, properties.CSV, format)
+				assert.Equal(t, "", mappingName)
+				parts := strings.Split(clientRequestId, ";")
+				assert.Equal(t, "KGC.executeManagedStreamingIngest", parts[0])
+				_, err = uuid.Parse(parts[1])
+				assert.NoError(t, err)
 				return errors.E(errors.OpIngestStream, errors.KHTTPError, fmt.Errorf("error")).SetNoRetry()
 			},
 			expectedError:   errors.E(errors.OpIngestStream, errors.KHTTPError, fmt.Errorf("error")).SetNoRetry(),
@@ -168,6 +171,17 @@ func TestManaged(t *testing.T) {
 			options: []FileOption{},
 			onStreamIngest: func(t *testing.T, ctx context.Context, db, table string, payload io.Reader, format properties.DataFormat, mappingName string,
 				clientRequestId string) error {
+				assert.Equal(t, "defaultDb", db)
+				assert.Equal(t, "defaultTable", table)
+				payloadBytes, err := ioutil.ReadAll(payload)
+				assert.NoError(t, err)
+				assert.Equal(t, compressedBytes, payloadBytes)
+				assert.Equal(t, properties.CSV, format)
+				assert.Equal(t, "", mappingName)
+				parts := strings.Split(clientRequestId, ";")
+				assert.Equal(t, "KGC.executeManagedStreamingIngest", parts[0])
+				_, err = uuid.Parse(parts[1])
+				assert.NoError(t, err)
 				if counter == 0 {
 					return errors.E(errors.OpIngestStream, errors.KHTTPError, fmt.Errorf("error"))
 				}
@@ -181,6 +195,17 @@ func TestManaged(t *testing.T) {
 			options: []FileOption{},
 			onStreamIngest: func(t *testing.T, ctx context.Context, db, table string, payload io.Reader, format properties.DataFormat, mappingName string,
 				clientRequestId string) error {
+				assert.Equal(t, "defaultDb", db)
+				assert.Equal(t, "defaultTable", table)
+				payloadBytes, err := ioutil.ReadAll(payload)
+				assert.NoError(t, err)
+				assert.Equal(t, compressedBytes, payloadBytes)
+				assert.Equal(t, properties.CSV, format)
+				assert.Equal(t, "", mappingName)
+				parts := strings.Split(clientRequestId, ";")
+				assert.Equal(t, "KGC.executeManagedStreamingIngest", parts[0])
+				_, err = uuid.Parse(parts[1])
+				assert.NoError(t, err)
 				return errors.E(errors.OpIngestStream, errors.KHTTPError, fmt.Errorf("error"))
 			},
 			onMgmt: func(t *testing.T, ctx context.Context, db string, query kusto.Stmt, options ...kusto.MgmtOption) (*kusto.RowIterator, error) {
@@ -197,9 +222,47 @@ func TestManaged(t *testing.T) {
 			},
 			onReader: func(t *testing.T, ctx context.Context, reader io.Reader, props properties.All) (string, error) {
 				counter++
+				assert.Equal(t, "defaultDb", props.Ingestion.DatabaseName)
+				assert.Equal(t, "defaultTable", props.Ingestion.TableName)
+				all, err := ioutil.ReadAll(reader)
+				assert.NoError(t, err)
+				assert.Equal(t, compressedBytes, all)
 				return "", nil
 			},
 			expectedCounter: 4,
+			expectedStatus:  Queued,
+		},
+		{
+			name:      "TestBigFile",
+			options:   []FileOption{},
+			isBigFile: true,
+			onStreamIngest: func(t *testing.T, ctx context.Context, db, table string, payload io.Reader, format properties.DataFormat, mappingName string,
+				clientRequestId string) error {
+				require.Fail(t, "Big file shouldn't try to stream")
+				return errors.E(errors.OpIngestStream, errors.KHTTPError, fmt.Errorf("error"))
+			},
+			onMgmt: func(t *testing.T, ctx context.Context, db string, query kusto.Stmt, options ...kusto.MgmtOption) (*kusto.RowIterator, error) {
+				// .get ingestion resources is always called in the ctor
+				if query.String() == ".get ingestion resources" {
+					return resources.SuccessfulFakeResources().Mgmt(ctx, db, query, options...)
+				}
+				if query.String() == ".get kusto identity token" {
+					return nil, nil
+				}
+
+				require.Fail(t, "Unexpected queued ingest call")
+				return nil, nil
+			},
+			onReader: func(t *testing.T, ctx context.Context, reader io.Reader, props properties.All) (string, error) {
+				counter++
+				assert.Equal(t, "defaultDb", props.Ingestion.DatabaseName)
+				assert.Equal(t, "defaultTable", props.Ingestion.TableName)
+				all, err := ioutil.ReadAll(reader)
+				assert.NoError(t, err)
+				assert.Equal(t, bigData, all)
+				return "", nil
+			},
+			expectedCounter: 1,
 			expectedStatus:  Queued,
 		},
 	}
@@ -261,7 +324,17 @@ func TestManaged(t *testing.T) {
 			test.options = append([]FileOption{BackOff(off)}, test.options...)
 
 			counter = 0
-			result, err := managed.FromFile(ctx, filePath, test.options...)
+			var path string
+			var fileData []byte
+			if test.isBigFile {
+				path = bigFilePath
+				fileData = bigData
+				test.options = append([]FileOption{Compress(false)}, test.options...)
+			} else {
+				path = filePath
+				fileData = data
+			}
+			result, err := managed.FromFile(ctx, path, test.options...)
 			if test.expectedError != nil {
 				assert.Equal(t, test.expectedError, err)
 				assert.Nil(t, result)
@@ -277,7 +350,7 @@ func TestManaged(t *testing.T) {
 
 			counter = 0
 			test.options = append([]FileOption{FileFormat(properties.CSV)}, test.options...)
-			result, err = managed.FromReader(ctx, bytes.NewReader(data), test.options...)
+			result, err = managed.FromReader(ctx, bytes.NewReader(fileData), test.options...)
 			if test.expectedError != nil {
 				assert.Equal(t, test.expectedError, err)
 				assert.Nil(t, result)
@@ -293,4 +366,20 @@ func TestManaged(t *testing.T) {
 		})
 	}
 
+}
+
+func initFile(t *testing.T, reader *bytes.Reader) ([]byte, []byte) {
+	data, err := ioutil.ReadAll(reader)
+
+	require.NoError(t, err)
+
+	compressedBuffer := gzip.New()
+	compressedBuffer.Reset(io.NopCloser(bytes.NewReader(data)))
+	compressedBytes, err := ioutil.ReadAll(compressedBuffer)
+	require.NoError(t, err)
+
+	seek, err := reader.Seek(0, io.SeekStart)
+	require.Equal(t, int64(0), seek)
+	require.NoError(t, err)
+	return data, compressedBytes
 }

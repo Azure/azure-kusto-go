@@ -85,20 +85,16 @@ func (m *Managed) managedStreamImpl(ctx context.Context, payload io.Reader, prop
 		payload = zw
 		props.Source.DontCompress = true
 	}
-	maxSize := int64(maxStreamingSize)
+	maxSize := maxStreamingSize
 
-	buf := bytes.NewBuffer(make([]byte, 0, maxSize+1))
-	buf.Reset()
-
-	written, err := io.Copy(buf, io.LimitReader(payload, maxSize+1))
+	buf, err := io.ReadAll(io.LimitReader(payload, int64(maxSize+1)))
 	if err != nil {
 		return nil, err
 	}
 
 	// If the payload is larger than the max size for streaming, we fall back to queued by combining what we read with the rest of the payload
-	if written > maxSize {
-		buf.Reset()
-		combinedBuf := io.MultiReader(buf, payload)
+	if len(buf) > maxSize {
+		combinedBuf := io.MultiReader(bytes.NewReader(buf), payload)
 		return m.queued.fromReaderProps(ctx, combinedBuf, []FileOption{}, props)
 	}
 
@@ -114,8 +110,7 @@ func (m *Managed) managedStreamImpl(ctx context.Context, payload io.Reader, prop
 		if !hasCustomId {
 			props.Streaming.ClientRequestId = fmt.Sprintf("KGC.executeManagedStreamingIngest;%s;%d", managedUuid, i)
 		}
-		result, err = streamImpl(m.streaming.streamConn, ctx, buf, props)
-		buf.Reset()
+		result, err = streamImpl(m.streaming.streamConn, ctx, bytes.NewReader(buf), props)
 		i++
 		if err != nil {
 			if e, ok := err.(*errors.Error); ok {
@@ -137,7 +132,7 @@ func (m *Managed) managedStreamImpl(ctx context.Context, payload io.Reader, prop
 
 	// Fallback to queued
 	if errors.Retry(err) {
-		return m.queued.fromReaderProps(ctx, buf, []FileOption{}, props)
+		return m.queued.fromReaderProps(ctx, bytes.NewReader(buf), []FileOption{}, props)
 	}
 
 	return nil, err
