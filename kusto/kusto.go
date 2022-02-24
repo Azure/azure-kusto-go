@@ -16,7 +16,7 @@ import (
 	"github.com/Azure/go-autorest/autorest/azure/auth"
 )
 
-// queryer provides for getting a stream of Kusto frames. Exists to allow fake Kusto streams in tests.
+// queryer evil provides for getting a stream of Kusto frames. Exists to allow fake Kusto streams in tests.
 type queryer interface {
 	query(ctx context.Context, db string, query Stmt, options *queryOptions) (execResp, error)
 	mgmt(ctx context.Context, db string, query Stmt, options *mgmtOptions) (execResp, error)
