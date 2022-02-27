@@ -3,6 +3,7 @@ package ingest
 import (
 	"bytes"
 	"context"
+	goErrors "errors"
 	"fmt"
 	"io"
 	"io/ioutil"
@@ -166,6 +167,28 @@ func TestManaged(t *testing.T) {
 				return errors.E(errors.OpIngestStream, errors.KHTTPError, fmt.Errorf("error")).SetNoRetry()
 			},
 			expectedError:   errors.E(errors.OpIngestStream, errors.KHTTPError, fmt.Errorf("error")).SetNoRetry(),
+			onMgmt:          failIfQueuedCalled,
+			expectedCounter: 1,
+		},
+		{
+			name:    "TestPermanentErrorNotKusto",
+			options: []FileOption{},
+			onStreamIngest: func(t *testing.T, ctx context.Context, db, table string, payload io.Reader, format properties.DataFormat, mappingName string,
+				clientRequestId string) error {
+				assert.Equal(t, "defaultDb", db)
+				assert.Equal(t, "defaultTable", table)
+				payloadBytes, err := ioutil.ReadAll(payload)
+				assert.NoError(t, err)
+				assert.Equal(t, compressedBytes, payloadBytes)
+				assert.Equal(t, properties.CSV, format)
+				assert.Equal(t, "", mappingName)
+				parts := strings.Split(clientRequestId, ";")
+				assert.Equal(t, "KGC.executeManagedStreamingIngest", parts[0])
+				_, err = uuid.Parse(parts[1])
+				assert.NoError(t, err)
+				return goErrors.New("some error")
+			},
+			expectedError:   errors.E(errors.OpIngestStream, errors.KClientArgs, goErrors.New("some error")),
 			onMgmt:          failIfQueuedCalled,
 			expectedCounter: 1,
 		},

@@ -90,13 +90,11 @@ func TestStream(t *testing.T) {
 			desc:        "AVRO without mappingName",
 			payload:     fakeContent{Name: "Doak", ID: 25},
 			mappingName: "",
-			err:         true,
 		},
 		{
 			desc:        "JSON without mappingName",
 			payload:     fakeContent{Name: "Doak", ID: 25},
 			mappingName: "",
-			err:         true,
 		},
 		{
 			desc:        "Success",

@@ -405,6 +405,7 @@ func TestFileIngestion(t *testing.T) {
 	queuedTable := fmt.Sprintf("goe2e_queued_file_logs_%d", time.Now().Unix())
 	streamingTable := fmt.Sprintf("goe2e_streaming_file_logs_%d", time.Now().Unix())
 	streamingTable2 := fmt.Sprintf("goe2e_streaming_file_logs_2_%d", time.Now().Unix())
+	managedTable := fmt.Sprintf("goe2e_managed_streaming_file_logs_%d", time.Now().Unix())
 
 	queuedIngestor, err := ingest.New(client, testConfig.Database, queuedTable)
 	if err != nil {
@@ -417,6 +418,11 @@ func TestFileIngestion(t *testing.T) {
 	}
 
 	streamingIngestor2, err := ingest.NewStreaming(client, testConfig.Database, streamingTable2)
+	if err != nil {
+		panic(err)
+	}
+
+	managedIngestor, err := ingest.NewManaged(client, testConfig.Database, managedTable)
 	if err != nil {
 		panic(err)
 	}
@@ -476,6 +482,32 @@ func TestFileIngestion(t *testing.T) {
 				),
 			),
 			setup: func() error { return createIngestionTable(t, client, queuedTable, false) },
+			doer: func(row *table.Row, update interface{}) error {
+				rec := CountResult{}
+				if err := row.ToStruct(&rec); err != nil {
+					return err
+				}
+				recs := update.(*[]CountResult)
+				*recs = append(*recs, rec)
+				return nil
+			},
+			gotInit: func() interface{} {
+				v := []CountResult{}
+				return &v
+			},
+			want: &[]CountResult{{Count: 500}},
+		},
+		{
+			desc:     "Ingest from blob with existing mapping managed",
+			ingestor: managedIngestor,
+			src:      "https://adxingestiondemo.blob.core.windows.net/data/demo.json",
+			options:  []ingest.FileOption{ingest.IngestionMappingRef("Logs_mapping", ingest.JSON)},
+			stmt: pCountStmt.MustParameters(
+				kusto.NewParameters().Must(
+					kusto.QueryValues{"tableName": managedTable},
+				),
+			),
+			setup: func() error { return createIngestionTable(t, client, managedTable, false) },
 			doer: func(row *table.Row, update interface{}) error {
 				rec := CountResult{}
 				if err := row.ToStruct(&rec); err != nil {
@@ -641,6 +673,32 @@ func TestFileIngestion(t *testing.T) {
 			},
 			want: &mockRows,
 		},
+		{
+			desc:     "Ingest from local with existing mapping managed streaming",
+			ingestor: managedIngestor,
+			src:      "testdata/demo.json",
+			options:  []ingest.FileOption{ingest.IngestionMappingRef("Logs_mapping", ingest.JSON)},
+			stmt: pCountStmt.MustParameters(
+				kusto.NewParameters().Must(
+					kusto.QueryValues{"tableName": managedTable},
+				),
+			),
+			setup: func() error { return createIngestionTable(t, client, managedTable, false) },
+			doer: func(row *table.Row, update interface{}) error {
+				rec := CountResult{}
+				if err := row.ToStruct(&rec); err != nil {
+					return err
+				}
+				recs := update.(*[]CountResult)
+				*recs = append(*recs, rec)
+				return nil
+			},
+			gotInit: func() interface{} {
+				v := []CountResult{}
+				return &v
+			},
+			want: &[]CountResult{{Count: 500}},
+		},
 	}
 
 	for _, test := range tests {
@@ -692,6 +750,7 @@ func TestReaderIngestion(t *testing.T) {
 	queuedTable := fmt.Sprintf("goe2e_queued_reader_logs_%d", time.Now().Unix())
 	streamingTable := fmt.Sprintf("goe2e_streaming_reader_logs_%d", time.Now().Unix())
 	streamingTable2 := fmt.Sprintf("goe2e_streaming_reader_logs_2_%d", time.Now().Unix())
+	managedTable := fmt.Sprintf("goe2e_managed_streaming_reader_logs_%d", time.Now().Unix())
 
 	client, err := kusto.New(testConfig.Endpoint, testConfig.Authorizer)
 	if err != nil {
@@ -709,6 +768,11 @@ func TestReaderIngestion(t *testing.T) {
 	}
 
 	streamingIngestor2, err := ingest.NewStreaming(client, testConfig.Database, streamingTable2)
+	if err != nil {
+		panic(err)
+	}
+
+	managedIngestor, err := ingest.NewManaged(client, testConfig.Database, managedTable)
 	if err != nil {
 		panic(err)
 	}
@@ -740,7 +804,7 @@ func TestReaderIngestion(t *testing.T) {
 		wantErr error
 	}{
 		{
-			desc:     "Ingest from blob with bad existing mapping",
+			desc:     "Ingest from reader with bad existing mapping",
 			ingestor: queuedIngestor,
 			src:      "testdata/demo.json",
 			options:  []ingest.FileOption{ingest.FileFormat(ingest.JSON), ingest.IngestionMappingRef("Logs_bad_mapping", ingest.JSON)},
@@ -913,6 +977,35 @@ func TestReaderIngestion(t *testing.T) {
 				return &v
 			},
 			want: &mockRows,
+		},
+		{
+			desc:     "Ingest from local with existing mapping managed streaming",
+			ingestor: managedIngestor,
+			src:      "testdata/demo.json",
+			options: []ingest.FileOption{
+				ingest.IngestionMappingRef("Logs_mapping", ingest.JSON),
+				ingest.FileFormat(ingest.JSON),
+			},
+			stmt: pCountStmt.MustParameters(
+				kusto.NewParameters().Must(
+					kusto.QueryValues{"tableName": managedTable},
+				),
+			),
+			setup: func() error { return createIngestionTable(t, client, managedTable, false) },
+			doer: func(row *table.Row, update interface{}) error {
+				rec := CountResult{}
+				if err := row.ToStruct(&rec); err != nil {
+					return err
+				}
+				recs := update.(*[]CountResult)
+				*recs = append(*recs, rec)
+				return nil
+			},
+			gotInit: func() interface{} {
+				v := []CountResult{}
+				return &v
+			},
+			want: &[]CountResult{{Count: 500}},
 		},
 	}
 
@@ -1349,12 +1442,17 @@ func createIngestionTable(t *testing.T, client *kusto.Client, tableName string, 
 }
 
 func createIngestionTableWithDB(t *testing.T, client *kusto.Client, database string, tableName string, withInitialRow bool) error {
+	defaultScheme := "(header_time: datetime, header_id: guid, header_api_version: string, payload_data: string, payload_user: string)"
+	return createIngestionTableWithDBAndScheme(t, client, database, tableName, withInitialRow, defaultScheme)
+}
+
+func createIngestionTableWithDBAndScheme(t *testing.T, client *kusto.Client, database string, tableName string, withInitialRow bool, scheme string) error {
 	dropUnsafe := kusto.NewStmt(".drop table ", kusto.UnsafeStmt(unsafe.Stmt{Add: true})).UnsafeAdd(tableName).Add(" ifexists")
 	var createUnsafe kusto.Stmt
 	if withInitialRow {
 		createUnsafe = kusto.NewStmt(".set ", kusto.UnsafeStmt(unsafe.Stmt{Add: true})).UnsafeAdd(tableName).Add(" <| AllDataTypes")
 	} else {
-		createUnsafe = kusto.NewStmt(".create table ", kusto.UnsafeStmt(unsafe.Stmt{Add: true})).UnsafeAdd(tableName).Add(" (header_time: datetime, header_id: guid, header_api_version: string, payload_data: string, payload_user: string) ")
+		createUnsafe = kusto.NewStmt(".create table ", kusto.UnsafeStmt(unsafe.Stmt{Add: true})).UnsafeAdd(tableName).UnsafeAdd(" " + scheme + " ")
 	}
 
 	addMappingUnsafe := kusto.NewStmt(".create table ", kusto.UnsafeStmt(unsafe.Stmt{Add: true})).UnsafeAdd(tableName).Add(" ingestion json mapping 'Logs_mapping' '[{\"column\":\"header_time\",\"path\":\"$.header.time\",\"datatype\":\"datetime\"},{\"column\":\"header_id\",\"path\":\"$.header.id\",\"datatype\":\"guid\"},{\"column\":\"header_api_version\",\"path\":\"$.header.api_version\",\"datatype\":\"string\"},{\"column\":\"payload_data\",\"path\":\"$.payload.data\",\"datatype\":\"string\"},{\"column\":\"payload_user\",\"path\":\"$.payload.user\",\"datatype\":\"string\"}]'")
