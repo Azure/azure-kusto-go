@@ -44,6 +44,8 @@ func TestManaged(t *testing.T) {
 	bigData, _ := initFile(t, bigReader)
 	counter := 0
 
+	someBlobPath := "https://some-blob.windows.net/some-container/some-blob"
+
 	tests := []struct {
 		name            string
 		options         []FileOption
@@ -56,6 +58,7 @@ func TestManaged(t *testing.T) {
 		onReader        func(t *testing.T, ctx context.Context, reader io.Reader, props properties.All) (string, error)
 		onBlob          func(t *testing.T, ctx context.Context, from string, fileSize int64, props properties.All) error
 		isBigFile       bool
+		blobPath        string
 	}{
 		{
 			name:    "TestManagedStreamingDefault",
@@ -265,6 +268,37 @@ func TestManaged(t *testing.T) {
 			expectedCounter: 1,
 			expectedStatus:  Queued,
 		},
+		{
+			name:     "TestBlob",
+			options:  []FileOption{},
+			blobPath: someBlobPath,
+			onStreamIngest: func(t *testing.T, ctx context.Context, db, table string, payload io.Reader, format properties.DataFormat, mappingName string,
+				clientRequestId string) error {
+				require.Fail(t, "Big file shouldn't try to stream")
+				return errors.E(errors.OpIngestStream, errors.KHTTPError, fmt.Errorf("error"))
+			},
+			onMgmt: func(t *testing.T, ctx context.Context, db string, query kusto.Stmt, options ...kusto.MgmtOption) (*kusto.RowIterator, error) {
+				// .get ingestion resources is always called in the ctor
+				if query.String() == ".get ingestion resources" {
+					return resources.SuccessfulFakeResources().Mgmt(ctx, db, query, options...)
+				}
+				if query.String() == ".get kusto identity token" {
+					return nil, nil
+				}
+
+				require.Fail(t, "Unexpected queued ingest call")
+				return nil, nil
+			},
+			onBlob: func(t *testing.T, ctx context.Context, from string, fileSize int64, props properties.All) error {
+				counter++
+				assert.Equal(t, "defaultDb", props.Ingestion.DatabaseName)
+				assert.Equal(t, "defaultTable", props.Ingestion.TableName)
+				assert.Equal(t, someBlobPath, from)
+				return nil
+			},
+			expectedCounter: 1,
+			expectedStatus:  Queued,
+		},
 	}
 
 	for _, test := range tests {
@@ -324,6 +358,14 @@ func TestManaged(t *testing.T) {
 			test.options = append([]FileOption{BackOff(off)}, test.options...)
 
 			counter = 0
+
+			if test.blobPath != "" {
+				result, err := managed.FromFile(ctx, test.blobPath, test.options...)
+				assert.NoError(t, err)
+				assert.Equal(t, result.record.Status, test.expectedStatus)
+				return
+			}
+
 			var path string
 			var fileData []byte
 			if test.isBigFile {
