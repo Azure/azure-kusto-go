@@ -7,7 +7,6 @@ on:
     branches: [ master ]
 
 jobs:
-
   build:
     name: Build
     runs-on: ubuntu-latest
@@ -50,11 +49,22 @@ jobs:
           TEST_DATABASE: ${{ secrets.TEST_DATABASE }}
           SECONDARY_ENGINE_CONNECTION_STRING: ${{ secrets.SECONDARY_ENGINE_CONNECTION_STRING }}
           SECONDARY_DATABASE: ${{ secrets.SECONDARY_DATABASE }}
-      - name: Publish Unit Test Results
-        uses: EnricoMi/publish-unit-test-result-action@v1
+      - name: Upload Test Results
         if: always()
+        uses: actions/upload-artifact@v2
         with:
-          files: |
+          name: Unit Test Results
+          path: |
             kusto/report.xml
       - name: Upload coverage to Codecov
         uses: codecov/codecov-action@v2
+
+  event_file:
+    name: "Event File"
+    runs-on: ubuntu-latest
+    steps:
+      - name: Upload
+        uses: actions/upload-artifact@v2
+        with:
+          name: Event File
+          path: ${{ github.event_path }}
