@@ -8,9 +8,9 @@ import (
 
 	"github.com/Azure/azure-kusto-go/kusto/data/types"
 	"github.com/Azure/azure-kusto-go/kusto/data/value"
+	"github.com/stretchr/testify/assert"
 
 	"github.com/google/uuid"
-	"github.com/kylelemons/godebug/pretty"
 )
 
 var now = time.Now()
@@ -206,11 +206,11 @@ func TestFieldsConvert(t *testing.T) {
 				myJSONStrPtr,
 				map[string]interface{}{
 					"Name": "Adam",
-					"ID":   1,
+					"ID":   float64(1),
 				},
 				&map[string]interface{}{
 					"Name": "Adam",
-					"ID":   1,
+					"ID":   float64(1),
 				},
 				value.Dynamic{Value: myJSON, Valid: true},
 				&value.Dynamic{Value: myJSON, Valid: true},
@@ -257,25 +257,113 @@ func TestFieldsConvert(t *testing.T) {
 				[]map[string]interface{}{
 					{
 						"Name": "Adam",
-						"ID":   1,
+						"ID":   float64(1),
 					},
 					{
 						"Name": "Bob",
-						"ID":   2,
+						"ID":   float64(2),
 					},
 				},
 				&[]map[string]interface{}{
 					{
 						"Name": "Adam",
-						"ID":   1,
+						"ID":   float64(1),
 					},
 					{
 						"Name": "Bob",
-						"ID":   2,
+						"ID":   float64(2),
 					},
 				},
 				value.Dynamic{Value: myJSONArray, Valid: true},
 				&value.Dynamic{Value: myJSONArray, Valid: true},
+			},
+		},
+		{
+			desc: "non-valid Dynamic",
+			columns: Columns{
+				{Type: types.Dynamic, Name: "Struct"},
+				{Type: types.Dynamic, Name: "PtrStruct"},
+				{Type: types.Dynamic, Name: "String"},
+				{Type: types.Dynamic, Name: "PtrString"},
+				{Type: types.Dynamic, Name: "Map"},
+				{Type: types.Dynamic, Name: "PtrMap"},
+				{Type: types.Dynamic, Name: "Dynamic"},
+				{Type: types.Dynamic, Name: "PtrDynamic"},
+			},
+			k: value.Dynamic{Value: myJSON, Valid: false},
+			ptrStruct: &struct {
+				Struct     SomeJSON
+				PtrStruct  *SomeJSON
+				String     string
+				PtrString  *string
+				Map        map[string]interface{}
+				PtrMap     *map[string]interface{}
+				Dynamic    value.Dynamic
+				PtrDynamic *value.Dynamic
+			}{},
+			err: false,
+			want: &struct {
+				Struct     SomeJSON
+				PtrStruct  *SomeJSON
+				String     string
+				PtrString  *string
+				Map        map[string]interface{}
+				PtrMap     *map[string]interface{}
+				Dynamic    value.Dynamic
+				PtrDynamic *value.Dynamic
+			}{
+				myStruct,
+				&myStruct,
+				myJSONStr,
+				myJSONStrPtr,
+				nil,
+				nil,
+				value.Dynamic{Value: myJSON, Valid: false},
+				&value.Dynamic{Value: myJSON, Valid: false},
+			},
+		},
+		{
+			desc: "non-valid Dynamic list",
+			columns: Columns{
+				{Type: types.Dynamic, Name: "Struct"},
+				{Type: types.Dynamic, Name: "PtrStruct"},
+				{Type: types.Dynamic, Name: "String"},
+				{Type: types.Dynamic, Name: "PtrString"},
+				{Type: types.Dynamic, Name: "Slice"},
+				{Type: types.Dynamic, Name: "PtrSlice"},
+				{Type: types.Dynamic, Name: "Dynamic"},
+				{Type: types.Dynamic, Name: "PtrDynamic"},
+			},
+			k: value.Dynamic{Value: myJSONArray, Valid: false},
+			ptrStruct: &struct {
+				Struct     []SomeJSON
+				PtrStruct  *[]SomeJSON
+				String     string
+				PtrString  *string
+				Slice      []map[string]interface{}
+				PtrSlice   *[]map[string]interface{}
+				Dynamic    value.Dynamic
+				PtrDynamic *value.Dynamic
+			}{},
+			err: false,
+			want: &struct {
+				Struct     []SomeJSON
+				PtrStruct  *[]SomeJSON
+				String     string
+				PtrString  *string
+				Slice      []map[string]interface{}
+				PtrSlice   *[]map[string]interface{}
+				Dynamic    value.Dynamic
+				PtrDynamic *value.Dynamic
+			}{
+				nil,
+				nil,
+				myJSONArrayStr,
+				myJSONArrayStrPtr,
+				nil,
+				nil,
+				value.Dynamic{Value: myJSONArray, Valid: false},
+				&value.Dynamic{Value: myJSONArray, Valid: false},
 			},
 		},
 		{
@@ -580,27 +668,25 @@ func TestFieldsConvert(t *testing.T) {
 	}
 
 	for _, test := range tests {
-		fields := newFields(test.columns, reflect.TypeOf(test.ptrStruct))
+		test := test // Capture
+		t.Run(test.desc, func(t *testing.T) {
+			t.Parallel()
+			fields := newFields(test.columns, reflect.TypeOf(test.ptrStruct))
 
-		ty := reflect.TypeOf(test.ptrStruct)
-		v := reflect.ValueOf(test.ptrStruct)
-		for _, column := range test.columns {
-			err = fields.convert(column, test.k, ty, v)
-			switch {
-			case err == nil && test.err:
-				t.Errorf("TestFieldsConvert(%s): got err == nil, want err != nil", test.desc)
-				continue
-			case err != nil && !test.err:
-				t.Errorf("TestFieldsConvert(%s): got err == %s, want err == nil", test.desc, err)
-				continue
-			case err != nil:
-				continue
+			ty := reflect.TypeOf(test.ptrStruct)
+			v := reflect.ValueOf(test.ptrStruct)
+			for _, column := range test.columns {
+				err = fields.convert(column, test.k, ty, v)
+				if test.err {
+					assert.Error(t, err)
+				} else {
+					assert.NoError(t, err)
+				}
 			}
-		}
 
-		if diff := pretty.Compare(test.want, test.ptrStruct); diff != "" {
-			t.Errorf("TestFieldsConvert(%s): -want/+got:\n%s", test.desc, diff)
-		}
+			assert.EqualValues(t, test.want, test.ptrStruct)
+		})
+
 	}
 }
 
