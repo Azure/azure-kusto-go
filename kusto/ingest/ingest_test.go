@@ -137,7 +137,9 @@ func TestIngestion(t *testing.T) {
 	}
 
 	for _, test := range tests {
+		test := test // Capture
 		t.Run(test.name, func(t *testing.T) {
+			t.Parallel()
 			mgrMap := make(map[*resources.Manager]bool)
 			for _, client := range test.clients {
 				mgr := client().mgr

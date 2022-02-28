@@ -127,7 +127,9 @@ func TestOptions(t *testing.T) {
 	}
 
 	for _, test := range tests {
+		test := test // capture
 		t.Run(test.desc, func(t *testing.T) {
+			t.Parallel()
 			ctx := context.Background()
 			var err error = nil
 			switch test.from {
