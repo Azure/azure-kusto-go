@@ -676,7 +676,7 @@ func TestFieldsConvert(t *testing.T) {
 			ty := reflect.TypeOf(test.ptrStruct)
 			v := reflect.ValueOf(test.ptrStruct)
 			for _, column := range test.columns {
-				err = fields.convert(column, test.k, ty, v)
+				err := fields.convert(column, test.k, ty, v)
 				if test.err {
 					assert.Error(t, err)
 				} else {
