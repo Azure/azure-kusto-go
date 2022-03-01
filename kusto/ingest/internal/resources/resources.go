@@ -8,6 +8,7 @@ import (
 	"fmt"
 	"net/url"
 	"strings"
+	"sync"
 	"sync/atomic"
 	"time"
 
@@ -131,6 +132,7 @@ type Manager struct {
 	resources                 atomic.Value // Stores Ingestion
 	kustoToken                token
 	kustoTokenCacheExpiration time.Time
+	lock                      sync.Mutex
 }
 
 // New is the constructor for Manager.
@@ -142,6 +144,8 @@ func New(client mgmter) (*Manager, error) {
 
 	m.kustoTokenCacheExpiration = time.Now().UTC()
 	go m.renewResources()
+
+	m.lock = sync.Mutex{}
 
 	return m, nil
 }
@@ -167,6 +171,8 @@ func (m *Manager) renewResources() {
 // AuthContext returns a string representing the authorization context. This auth token is a temporary token
 // that can be used to write a message via ingestion.  This is different than the ADAL token.
 func (m *Manager) AuthContext(ctx context.Context) (string, error) {
+	m.lock.Lock()
+	defer m.lock.Unlock()
 	if m.kustoTokenCacheExpiration.After(time.Now().UTC()) {
 		return m.kustoToken.AuthContext, nil
 	}
