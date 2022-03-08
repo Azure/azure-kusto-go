@@ -1596,7 +1596,7 @@ func waitForIngest(t *testing.T, ctx context.Context, client *kusto.Client, data
 
 			if !assert.ObjectsAreEqualValues(want, got) {
 				failed = true
-				time.Sleep(3 * time.Second)
+				time.Sleep(100 * time.Millisecond)
 				return true, nil
 			}
 
