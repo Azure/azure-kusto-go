@@ -6,7 +6,6 @@ import (
 	"context"
 	"fmt"
 	"io"
-	"io/ioutil"
 	"math/rand"
 	"net/url"
 	"os"
@@ -138,12 +137,6 @@ func (i *Ingestion) Local(ctx context.Context, from string, props properties.All
 		return err
 	}
 
-	if props.Source.DeleteLocalSource {
-		if err := os.Remove(from); err != nil {
-			return errors.ES(errors.OpFileIngest, errors.KLocalFileSystem, "file was uploaded successfully, but we could not delete the local file: %s", err)
-		}
-	}
-
 	return nil
 }
 
@@ -171,12 +164,15 @@ func (i *Ingestion) Reader(ctx context.Context, reader io.Reader, props properti
 	// Here's how to upload a blob.
 	blobURL := to.NewBlockBlobURL(blobName)
 
-	gstream := gzip.New()
-	gstream.Reset(ioutil.NopCloser(reader))
+	size := int64(0)
+
+	if !props.Source.DontCompress {
+		reader = gzip.Compress(reader)
+	}
 
 	_, err = i.stream(
 		ctx,
-		gstream,
+		reader,
 		blobURL,
 		azblob.UploadStreamToBlockBlobOptions{TransferManager: i.transferManager},
 	)
@@ -185,10 +181,14 @@ func (i *Ingestion) Reader(ctx context.Context, reader io.Reader, props properti
 		return blobName, errors.ES(errors.OpFileIngest, errors.KBlobstore, "problem uploading to Blob Storage: %s", err)
 	}
 
+	if gz, ok := reader.(*gzip.Streamer); ok {
+		size = gz.Size()
+	}
+
 	// We always want to delete the blob we create when we ingest from a local file.
 	props.Ingestion.RetainBlobOnSuccess = false
 
-	if err := i.Blob(ctx, blobURL.String(), gstream.Size(), props); err != nil {
+	if err := i.Blob(ctx, blobURL.String(), size, props); err != nil {
 		return blobName, err
 	}
 
@@ -226,6 +226,12 @@ func (i *Ingestion) Blob(ctx context.Context, from string, fileSize int64, props
 		return errors.E(errors.OpFileIngest, errors.KBlobstore, err)
 	}
 
+	if props.Source.DeleteLocalSource && props.Source.OriginalSource != "" {
+		if err := os.Remove(props.Source.OriginalSource); err != nil {
+			return errors.ES(errors.OpFileIngest, errors.KLocalFileSystem, "file was uploaded successfully, but we could not delete the local file: %s", err)
+		}
+	}
+
 	return nil
 }
 
@@ -237,7 +243,8 @@ func CompleteFormatFromFileName(props *properties.All, from string) error {
 
 	et := properties.DataFormatDiscovery(from)
 	if et == properties.DFUnknown {
-		return errors.ES(errors.OpFileIngest, errors.KClientArgs, "could not discover the file format from name of the file(%s)", from).SetNoRetry()
+		// If we can't figure out the file type, default to CSV.
+		et = properties.CSV
 	}
 	props.Ingestion.Additional.Format = et
 

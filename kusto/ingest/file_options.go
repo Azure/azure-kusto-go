@@ -119,20 +119,20 @@ func Table(name string) FileOption {
 	}
 }
 
-// Compress sets whether to compress the data.
-func Compress(compress bool) FileOption {
+// DontCompress sets whether to compress the data.
+func DontCompress() FileOption {
 	return option{
 		run: func(p *properties.All) error {
-			p.Source.DontCompress = !compress
+			p.Source.DontCompress = true
 			return nil
 		},
 		clientScopes: QueuedClient | StreamingClient | ManagedClient,
-		sourceScope:  FromFile | FromReader | FromBlob,
-		name:         "FlushImmediately",
+		sourceScope:  FromFile | FromReader,
+		name:         "DontCompress",
 	}
 }
 
-func BackOff(off *backoff.ExponentialBackOff) FileOption {
+func backOff(off *backoff.ExponentialBackOff) FileOption {
 	return option{
 		run: func(p *properties.All) error {
 			p.ManagedStreaming.Backoff = off
@@ -275,8 +275,7 @@ func DeleteSource() FileOption {
 			p.Source.DeleteLocalSource = true
 			return nil
 		},
-		// This option is not available to ManagedStreaming, due to unexpected behavior when using streaming vs queued ingestion.
-		clientScopes: QueuedClient | StreamingClient,
+		clientScopes: QueuedClient | StreamingClient | ManagedClient,
 		sourceScope:  FromFile,
 		name:         "DeleteSource",
 	}

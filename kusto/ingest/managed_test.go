@@ -378,7 +378,7 @@ func TestManaged(t *testing.T) {
 
 			off := backoff.NewExponentialBackOff()
 			off.InitialInterval = time.Millisecond
-			test.options = append([]FileOption{BackOff(off)}, test.options...)
+			test.options = append([]FileOption{backOff(off)}, test.options...)
 
 			counter = 0
 
@@ -394,7 +394,7 @@ func TestManaged(t *testing.T) {
 			if test.isBigFile {
 				path = bigFilePath
 				fileData = bigData
-				test.options = append([]FileOption{Compress(false)}, test.options...)
+				test.options = append([]FileOption{DontCompress()}, test.options...)
 			} else {
 				path = filePath
 				fileData = data
@@ -414,7 +414,6 @@ func TestManaged(t *testing.T) {
 			assert.Equal(t, test.expectedCounter, counter)
 
 			counter = 0
-			test.options = append([]FileOption{FileFormat(properties.CSV)}, test.options...)
 			result, err = managed.FromReader(ctx, bytes.NewReader(fileData), test.options...)
 			if test.expectedError != nil {
 				assert.Equal(t, test.expectedError, err)

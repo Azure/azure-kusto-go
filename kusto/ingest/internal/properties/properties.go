@@ -249,6 +249,9 @@ type SourceOptions struct {
 
 	// DontCompress indicates to not compress the file.
 	DontCompress bool
+
+	// OriginalSource is the path to the original source file, used for deletion.
+	OriginalSource string
 }
 
 // Ingestion is a JSON serializable set of options that must be provided to the service.

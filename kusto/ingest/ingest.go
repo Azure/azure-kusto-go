@@ -122,11 +122,11 @@ func (i *Ingestion) prepForIngestion(ctx context.Context, options []FileOption, 
 // FromFile allows uploading a data file for Kusto from either a local path or a blobstore URI path.
 // This method is thread-safe.
 func (i *Ingestion) FromFile(ctx context.Context, fPath string, options ...FileOption) (*Result, error) {
-	return i.fromFileProps(ctx, fPath, options, i.newProp())
+	return i.fromFile(ctx, fPath, options, i.newProp())
 }
 
-// fromFileProps is an internal function to allow managed streaming to pass a properties object to the ingestion.
-func (i *Ingestion) fromFileProps(ctx context.Context, fPath string, options []FileOption, props properties.All) (*Result, error) {
+// fromFile is an internal function to allow managed streaming to pass a properties object to the ingestion.
+func (i *Ingestion) fromFile(ctx context.Context, fPath string, options []FileOption, props properties.All) (*Result, error) {
 	local, err := filesystem.IsLocalPath(fPath)
 	if err != nil {
 		return nil, err
@@ -135,6 +135,7 @@ func (i *Ingestion) fromFileProps(ctx context.Context, fPath string, options []F
 	var scope SourceScope
 	if local {
 		scope = FromFile
+		props.Source.OriginalSource = fPath
 	} else {
 		scope = FromBlob
 	}
@@ -165,11 +166,11 @@ func (i *Ingestion) fromFileProps(ctx context.Context, fPath string, options []F
 // ingested after all data in the reader is processed. Content should not use compression as the content will be
 // compressed with gzip. This method is thread-safe.
 func (i *Ingestion) FromReader(ctx context.Context, reader io.Reader, options ...FileOption) (*Result, error) {
-	return i.fromReaderProps(ctx, reader, options, i.newProp())
+	return i.fromReader(ctx, reader, options, i.newProp())
 }
 
-// fromReaderProps is an internal function to allow managed streaming to pass a properties object to the ingestion.
-func (i *Ingestion) fromReaderProps(ctx context.Context, reader io.Reader, options []FileOption, props properties.All) (*Result, error) {
+// fromReader is an internal function to allow managed streaming to pass a properties object to the ingestion.
+func (i *Ingestion) fromReader(ctx context.Context, reader io.Reader, options []FileOption, props properties.All) (*Result, error) {
 	result, props, err := i.prepForIngestion(ctx, options, props, FromReader)
 	if err != nil {
 		return nil, err

@@ -207,7 +207,6 @@ func TestStreaming(t *testing.T) {
 				assert.Equal(t, result.record.Status, StatusCode("Success"))
 			}
 
-			test.options = append([]FileOption{FileFormat(properties.CSV)}, test.options...)
 			result, err = streaming.FromReader(ctx, bytes.NewReader(data), test.options...)
 			if test.expectedError != nil {
 				assert.Equal(t, test.expectedError, err)

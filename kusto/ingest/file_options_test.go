@@ -85,14 +85,6 @@ func TestOptions(t *testing.T) {
 			kind:     errors.KClientArgs,
 		},
 		{
-			desc:     "Invalid option for managed ingestor from file",
-			option:   DeleteSource(),
-			ingestor: managedClient,
-			from:     fromFile,
-			op:       errors.OpFileIngest,
-			kind:     errors.KClientArgs,
-		},
-		{
 			desc:     "Invalid option for queued ingestor from reader",
 			option:   DeleteSource(),
 			ingestor: queuedClient,

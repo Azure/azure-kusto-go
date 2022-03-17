@@ -469,7 +469,7 @@ func TestFileIngestion(t *testing.T) {
 			ingestor: streamingIngestor,
 			src:      "https://adxingestiondemo.blob.core.windows.net/data/demo.json",
 			options:  []ingest.FileOption{ingest.IngestionMappingRef("Logs_mapping", ingest.JSON)},
-			wantErr:  errors.ES(errors.OpFileIngest, errors.KClientArgs, "blobstore paths are not supported for streaming"),
+			wantErr:  ingest.FileIsBlob,
 		},
 		{
 			desc:     "Ingest from blob with existing mapping",

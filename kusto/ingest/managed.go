@@ -5,7 +5,6 @@ import (
 	"context"
 	"fmt"
 	"io"
-	"io/ioutil"
 	"time"
 
 	"github.com/Azure/azure-kusto-go/kusto/data/errors"
@@ -48,11 +47,13 @@ func NewManaged(client QueryClient, db, table string, options ...Option) (*Manag
 func (m *Managed) FromFile(ctx context.Context, fPath string, options ...FileOption) (*Result, error) {
 	props := m.newProp()
 	file, err := prepFile(fPath, &props, options, ManagedClient)
+
+	if err == FileIsBlob { // Non-local file - fallback to queued
+		return m.queued.fromFile(ctx, fPath, []FileOption{}, props)
+	}
+
 	if err != nil {
 		return nil, err
-	}
-	if file == nil { // Non-local file - fallback to queued
-		return m.queued.fromFileProps(ctx, fPath, []FileOption{}, props)
 	}
 
 	return m.managedStreamImpl(ctx, file, props)
@@ -74,15 +75,7 @@ func (m *Managed) FromReader(ctx context.Context, reader io.Reader, options ...F
 func (m *Managed) managedStreamImpl(ctx context.Context, payload io.Reader, props properties.All) (*Result, error) {
 	compress := !props.Source.DontCompress
 	if compress {
-		var closer io.ReadCloser
-		var ok bool
-		if closer, ok = payload.(io.ReadCloser); !ok {
-			closer = ioutil.NopCloser(payload)
-		}
-		zw := gzip.New()
-		zw.Reset(closer)
-
-		payload = zw
+		payload = gzip.Compress(payload)
 		props.Source.DontCompress = true
 	}
 	maxSize := maxStreamingSize
@@ -95,7 +88,7 @@ func (m *Managed) managedStreamImpl(ctx context.Context, payload io.Reader, prop
 	// If the payload is larger than the max size for streaming, we fall back to queued by combining what we read with the rest of the payload
 	if len(buf) > maxSize {
 		combinedBuf := io.MultiReader(bytes.NewReader(buf), payload)
-		return m.queued.fromReaderProps(ctx, combinedBuf, []FileOption{}, props)
+		return m.queued.fromReader(ctx, combinedBuf, []FileOption{}, props)
 	}
 
 	var result *Result
@@ -132,7 +125,7 @@ func (m *Managed) managedStreamImpl(ctx context.Context, payload io.Reader, prop
 
 	// Fallback to queued
 	if errors.Retry(err) {
-		return m.queued.fromReaderProps(ctx, bytes.NewReader(buf), []FileOption{}, props)
+		return m.queued.fromReader(ctx, bytes.NewReader(buf), []FileOption{}, props)
 	}
 
 	return nil, err

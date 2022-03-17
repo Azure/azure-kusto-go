@@ -3,7 +3,6 @@ package ingest
 import (
 	"context"
 	"io"
-	"io/ioutil"
 	"os"
 
 	"github.com/Azure/azure-kusto-go/kusto/data/errors"
@@ -25,6 +24,8 @@ type Streaming struct {
 	client     QueryClient
 	streamConn streamIngestor
 }
+
+var FileIsBlob = errors.ES(errors.OpIngestStream, errors.KClientArgs, "blobstore paths are not supported for streaming")
 
 // NewStreaming is the constructor for Streaming.
 // More information can be found here:
@@ -53,9 +54,6 @@ func (i *Streaming) FromFile(ctx context.Context, fPath string, options ...FileO
 	if err != nil {
 		return nil, err
 	}
-	if file == nil { // Non-local file
-		return nil, errors.ES(errors.OpFileIngest, errors.KClientArgs, "blobstore paths are not supported for streaming")
-	}
 
 	return streamImpl(i.streamConn, ctx, file, props)
 }
@@ -67,8 +65,10 @@ func prepFile(fPath string, props *properties.All, options []FileOption, client 
 	}
 
 	if !local {
-		return nil, nil
+		return nil, FileIsBlob
 	}
+
+	props.Source.OriginalSource = fPath
 
 	for _, option := range options {
 		err := option.Run(props, client, FromFile)
@@ -113,15 +113,11 @@ func (i *Streaming) FromReader(ctx context.Context, reader io.Reader, options ..
 func streamImpl(c streamIngestor, ctx context.Context, payload io.Reader, props properties.All) (*Result, error) {
 	compress := !props.Source.DontCompress
 	if compress {
-		var closer io.ReadCloser
-		var ok bool
-		if closer, ok = payload.(io.ReadCloser); !ok {
-			closer = ioutil.NopCloser(payload)
-		}
-		zw := gzip.New()
-		zw.Reset(closer)
+		payload = gzip.Compress(payload)
+	}
 
-		payload = zw
+	if props.Ingestion.Additional.Format == DFUnknown {
+		props.Ingestion.Additional.Format = CSV
 	}
 
 	err := c.StreamIngest(ctx, props.Ingestion.DatabaseName, props.Ingestion.TableName, payload, props.Ingestion.Additional.Format,
@@ -133,6 +129,13 @@ func streamImpl(c streamIngestor, ctx context.Context, payload io.Reader, props 
 			return nil, e
 		}
 		return nil, errors.E(errors.OpIngestStream, errors.KClientArgs, err)
+	}
+
+	if props.Source.DeleteLocalSource && props.Source.OriginalSource != "" {
+		if err := os.Remove(props.Source.OriginalSource); err != nil {
+			return nil, errors.ES(errors.OpFileIngest, errors.KLocalFileSystem, "file was uploaded successfully, but we could not delete the local file: %s",
+				err)
+		}
 	}
 
 	result := newResult()
