@@ -1,4 +1,4 @@
-package filesystem
+package queued
 
 import (
 	"bytes"
@@ -184,13 +184,13 @@ func TestLocalToBlob(t *testing.T) {
 		fbs := &fakeBlobstore{shouldErr: test.uploadErr, out: &bytes.Buffer{}}
 
 		in := &Ingestion{
-			db:     "database",
-			table:  "table",
-			stream: fbs.uploadBlobStream,
-			upload: fbs.uploadBlobFile,
+			db:           "database",
+			table:        "table",
+			uploadStream: fbs.uploadBlobStream,
+			uploadBlob:   fbs.uploadBlobFile,
 		}
 
-		_, _, err := in.localToBlob(context.Background(), test.from, to)
+		_, _, err := in.localToBlob(context.Background(), test.from, to, &properties.All{})
 		switch {
 		case err == nil && test.err:
 			t.Errorf("TestLocalToBlob(%s): got err == nil, want err != nil", test.desc)

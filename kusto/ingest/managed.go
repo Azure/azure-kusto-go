@@ -48,7 +48,7 @@ func (m *Managed) FromFile(ctx context.Context, fPath string, options ...FileOpt
 	props := m.newProp()
 	file, err := prepFile(fPath, &props, options, ManagedClient)
 
-	if err == FileIsBlob { // Non-local file - fallback to queued
+	if err == FileIsBlobErr { // Non-local file - fallback to queued
 		return m.queued.fromFile(ctx, fPath, []FileOption{}, props)
 	}
 

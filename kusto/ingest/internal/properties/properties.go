@@ -7,10 +7,12 @@ import (
 	"encoding/json"
 	"fmt"
 	"net/url"
+	"os"
 	"path/filepath"
 	"strings"
 	"time"
 
+	"github.com/Azure/azure-kusto-go/kusto/data/errors"
 	"github.com/cenkalti/backoff/v4"
 	"github.com/google/uuid"
 )
@@ -320,6 +322,16 @@ type StatusTableDescription struct {
 	PartitionKey string `json:",omitempty"`
 	// RowKey is the row key of the table entry.
 	RowKey string `json:",omitempty"`
+}
+
+func (p *All) ApplyDeleteLocalSourceOption() error {
+	if p.Source.DeleteLocalSource && p.Source.OriginalSource != "" {
+		if err := os.Remove(p.Source.OriginalSource); err != nil {
+			return errors.ES(errors.OpFileIngest, errors.KLocalFileSystem, "file was uploaded successfully, but we could not delete the local file: %s",
+				err).SetNoRetry()
+		}
+	}
+	return nil
 }
 
 // MarshalJSON implements json.Marshaller. This is for use only by the SDK and may be removed at any time.

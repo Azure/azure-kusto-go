@@ -8,8 +8,8 @@ import (
 	"sync"
 
 	"github.com/Azure/azure-kusto-go/kusto/ingest/internal/conn"
-	"github.com/Azure/azure-kusto-go/kusto/ingest/internal/filesystem"
 	"github.com/Azure/azure-kusto-go/kusto/ingest/internal/properties"
+	"github.com/Azure/azure-kusto-go/kusto/ingest/internal/queued"
 	"github.com/Azure/azure-kusto-go/kusto/ingest/internal/resources"
 	"github.com/google/uuid"
 )
@@ -27,7 +27,7 @@ type Ingestion struct {
 	client QueryClient
 	mgr    *resources.Manager
 
-	fs filesystem.Filesystem
+	fs queued.Queued
 
 	connMu     sync.Mutex
 	streamConn *conn.Conn
@@ -65,7 +65,7 @@ func New(client QueryClient, db, table string, options ...Option) (*Ingestion, e
 		option(i)
 	}
 
-	fs, err := filesystem.New(db, table, mgr, filesystem.WithStaticBuffer(i.bufferSize, i.maxBuffers))
+	fs, err := queued.New(db, table, mgr, queued.WithStaticBuffer(i.bufferSize, i.maxBuffers))
 	if err != nil {
 		return nil, err
 	}
@@ -127,7 +127,7 @@ func (i *Ingestion) FromFile(ctx context.Context, fPath string, options ...FileO
 
 // fromFile is an internal function to allow managed streaming to pass a properties object to the ingestion.
 func (i *Ingestion) fromFile(ctx context.Context, fPath string, options []FileOption, props properties.All) (*Result, error) {
-	local, err := filesystem.IsLocalPath(fPath)
+	local, err := queued.IsLocalPath(fPath)
 	if err != nil {
 		return nil, err
 	}

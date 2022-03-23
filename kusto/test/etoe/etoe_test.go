@@ -469,7 +469,7 @@ func TestFileIngestion(t *testing.T) {
 			ingestor: streamingIngestor,
 			src:      "https://adxingestiondemo.blob.core.windows.net/data/demo.json",
 			options:  []ingest.FileOption{ingest.IngestionMappingRef("Logs_mapping", ingest.JSON)},
-			wantErr:  ingest.FileIsBlob,
+			wantErr:  ingest.FileIsBlobErr,
 		},
 		{
 			desc:     "Ingest from blob with existing mapping",

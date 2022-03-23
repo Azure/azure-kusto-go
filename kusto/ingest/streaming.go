@@ -7,9 +7,9 @@ import (
 
 	"github.com/Azure/azure-kusto-go/kusto/data/errors"
 	"github.com/Azure/azure-kusto-go/kusto/ingest/internal/conn"
-	"github.com/Azure/azure-kusto-go/kusto/ingest/internal/filesystem"
 	"github.com/Azure/azure-kusto-go/kusto/ingest/internal/gzip"
 	"github.com/Azure/azure-kusto-go/kusto/ingest/internal/properties"
+	"github.com/Azure/azure-kusto-go/kusto/ingest/internal/queued"
 	"github.com/google/uuid"
 )
 
@@ -25,7 +25,7 @@ type Streaming struct {
 	streamConn streamIngestor
 }
 
-var FileIsBlob = errors.ES(errors.OpIngestStream, errors.KClientArgs, "blobstore paths are not supported for streaming")
+var FileIsBlobErr = errors.ES(errors.OpIngestStream, errors.KClientArgs, "blobstore paths are not supported for streaming")
 
 // NewStreaming is the constructor for Streaming.
 // More information can be found here:
@@ -59,13 +59,13 @@ func (i *Streaming) FromFile(ctx context.Context, fPath string, options ...FileO
 }
 
 func prepFile(fPath string, props *properties.All, options []FileOption, client ClientScope) (*os.File, error) {
-	local, err := filesystem.IsLocalPath(fPath)
+	local, err := queued.IsLocalPath(fPath)
 	if err != nil {
 		return nil, err
 	}
 
 	if !local {
-		return nil, FileIsBlob
+		return nil, FileIsBlobErr
 	}
 
 	props.Source.OriginalSource = fPath
@@ -77,12 +77,12 @@ func prepFile(fPath string, props *properties.All, options []FileOption, client 
 		}
 	}
 
-	compression := filesystem.CompressionDiscovery(fPath)
+	compression := queued.CompressionDiscovery(fPath)
 	if compression != properties.CTNone {
 		props.Source.DontCompress = true
 	}
 
-	err = filesystem.CompleteFormatFromFileName(props, fPath)
+	err = queued.CompleteFormatFromFileName(props, fPath)
 	if err != nil {
 		return nil, err
 	}
@@ -131,11 +131,9 @@ func streamImpl(c streamIngestor, ctx context.Context, payload io.Reader, props 
 		return nil, errors.E(errors.OpIngestStream, errors.KClientArgs, err)
 	}
 
-	if props.Source.DeleteLocalSource && props.Source.OriginalSource != "" {
-		if err := os.Remove(props.Source.OriginalSource); err != nil {
-			return nil, errors.ES(errors.OpFileIngest, errors.KLocalFileSystem, "file was uploaded successfully, but we could not delete the local file: %s",
-				err)
-		}
+	err = props.ApplyDeleteLocalSourceOption()
+	if err != nil {
+		return nil, err
 	}
 
 	result := newResult()
