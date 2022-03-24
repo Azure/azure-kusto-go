@@ -214,9 +214,20 @@ func rawToOneAPIErr(raw json.RawMessage, op errors.Op) error {
 	}
 
 	if oe, ok := m[frames.FieldRows]; ok {
-		if err := errors.OneToErr(oe.(map[string]interface{}), op); err != nil {
-			return err
+		entireErr, ok := oe.(map[string]interface{})
+		if ok {
+			return errors.OneToErr(entireErr, op)
 		}
+		for _, row := range oe.([]interface{}) {
+			rowErr, ok := row.(map[string]interface{})
+			if !ok {
+				continue
+			}
+			if err := errors.OneToErr(rowErr, op); err != nil {
+				return err
+			}
+		}
+
 	}
 	return nil
 }
