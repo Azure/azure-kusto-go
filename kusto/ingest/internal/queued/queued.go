@@ -159,8 +159,16 @@ func (i *Ingestion) Reader(ctx context.Context, reader io.Reader, props properti
 		return "", errors.ES(errors.OpFileIngest, errors.KBlobstore, "no Kusto queue resources are defined, there is no queue to upload to").SetNoRetry()
 	}
 
-	extension := "gz"
+	shouldCompress := true
+	if props.Source.OriginalSource != "" {
+		shouldCompress = CompressionDiscovery(props.Source.OriginalSource) == properties.CTNone
+	}
 	if props.Source.DontCompress {
+		shouldCompress = false
+	}
+
+	extension := "gz"
+	if !shouldCompress {
 		if props.Source.OriginalSource != "" {
 			extension = filepath.Ext(props.Source.OriginalSource)
 		} else {
@@ -175,7 +183,7 @@ func (i *Ingestion) Reader(ctx context.Context, reader io.Reader, props properti
 
 	size := int64(0)
 
-	if !props.Source.DontCompress {
+	if shouldCompress {
 		reader = gzip.Compress(reader)
 	}
 
