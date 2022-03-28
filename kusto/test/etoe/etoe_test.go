@@ -1090,6 +1090,15 @@ func TestMultipleClusters(t *testing.T) {
 		panic(err)
 	}
 
+	secondaryQueuedIngestor, err := ingest.New(secondaryClient, testConfig.SecondaryDatabase, queuedTable)
+	if err != nil {
+		panic(err)
+	}
+	secondaryStreamingIngestor, err := ingest.NewStreaming(secondaryClient, testConfig.SecondaryDatabase, streamingTable)
+	if err != nil {
+		panic(err)
+	}
+
 	tests := []struct {
 		// desc describes the test.
 		desc string
@@ -1099,6 +1108,8 @@ func TestMultipleClusters(t *testing.T) {
 		secondaryTable string
 		// the type of ingestor for the test
 		ingestor ingest.Ingestor
+		// the type of ingsetor for the secondary cluster for the test
+		secondaryIngestor ingest.Ingestor
 		// src represents where we are getting our data.
 		src string
 		// stmt is used to query for the results.
@@ -1111,12 +1122,13 @@ func TestMultipleClusters(t *testing.T) {
 		want interface{}
 	}{
 		{
-			desc:           "Ingestion from multiple clusters with queued ingestion",
-			table:          queuedTable,
-			secondaryTable: secondaryQueuedTable,
-			ingestor:       queuedIngestor,
-			src:            csvFileFromString(t),
-			stmt:           pCountStmt,
+			desc:              "Ingestion from multiple clusters with queued ingestion",
+			table:             queuedTable,
+			secondaryTable:    secondaryQueuedTable,
+			ingestor:          queuedIngestor,
+			secondaryIngestor: secondaryQueuedIngestor,
+			src:               csvFileFromString(t),
+			stmt:              pCountStmt,
 			doer: func(row *table.Row, update interface{}) error {
 				rec := CountResult{}
 				if err := row.ToStruct(&rec); err != nil {
@@ -1133,12 +1145,13 @@ func TestMultipleClusters(t *testing.T) {
 			want: &[]CountResult{{Count: 3}},
 		},
 		{
-			desc:           "Ingestion from local file streaming",
-			table:          streamingTable,
-			secondaryTable: secondaryStreamingTable,
-			ingestor:       streamingIngestor,
-			src:            csvFileFromString(t),
-			stmt:           pCountStmt,
+			desc:              "Ingestion from local file streaming",
+			table:             streamingTable,
+			secondaryTable:    secondaryStreamingTable,
+			ingestor:          streamingIngestor,
+			secondaryIngestor: secondaryStreamingIngestor,
+			src:               csvFileFromString(t),
+			stmt:              pCountStmt,
 			doer: func(row *table.Row, update interface{}) error {
 				rec := CountResult{}
 				if err := row.ToStruct(&rec); err != nil {
@@ -1195,13 +1208,13 @@ func TestMultipleClusters(t *testing.T) {
 			}
 
 			secondaryOptions := append(options, ingest.Database(testConfig.SecondaryDatabase), ingest.Table(fSecondaryTable))
-			res, err = test.ingestor.FromFile(ctx, test.src, secondaryOptions...)
+			res, err = test.secondaryIngestor.FromFile(ctx, test.src, secondaryOptions...)
 			if err == nil {
 				err = <-res.Wait(ctx)
 			}
 
 			if !assertErrorsMatch(t, err, nil) {
-				t.Errorf("TestMultipleClusters(%s): secondaryIngestor.FromFile(): got err == %v, want err == %v", test.desc, err, nil)
+				t.Errorf("TestMultipleClusters(%s): ingestor.FromFile(): got err == %v, want err == %v", test.desc, err, nil)
 				return
 			}
 
