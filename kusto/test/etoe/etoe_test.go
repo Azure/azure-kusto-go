@@ -1167,7 +1167,7 @@ func TestMultipleClusters(t *testing.T) {
 			fTable := fmt.Sprintf("%s_%d_%d", test.table, time.Now().UnixNano(), rand.Int())
 			fSecondaryTable := fmt.Sprintf("%s_%d_%d", test.secondaryTable, time.Now().UnixNano(), rand.Int())
 			require.NoError(t, createIngestionTableWithDB(t, client, testConfig.Database, fTable, false))
-			require.NoError(t, createIngestionTableWithDB(t, client, testConfig.SecondaryDatabase, fSecondaryTable, false))
+			require.NoError(t, createIngestionTableWithDB(t, secondaryClient, testConfig.SecondaryDatabase, fSecondaryTable, false))
 
 			test.stmt = test.stmt.MustParameters(
 				kusto.NewParameters().Must(
