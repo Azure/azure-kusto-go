@@ -1479,7 +1479,7 @@ func createCsvFileFromData(t *testing.T, data []LogRow) string {
 		t.Logf("Removing file %s", fname)
 		err := os.Remove(fname)
 		if err != nil {
-			panic(err)
+			t.Logf("Failed to remove file %s", fname)
 		}
 	})
 
@@ -1513,7 +1513,7 @@ func fileFromString(t *testing.T, raw string) string {
 		t.Logf("Removing file %s", fname)
 		err := os.Remove(fname)
 		if err != nil {
-			panic(err)
+			t.Logf("Failed to remove file %s", fname)
 		}
 	})
 
