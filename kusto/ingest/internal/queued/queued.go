@@ -316,7 +316,7 @@ var nower = time.Now
 // error if there was one.
 func (i *Ingestion) localToBlob(ctx context.Context, from string, to azblob.ContainerURL, props *properties.All) (azblob.BlockBlobURL, int64, error) {
 	compression := CompressionDiscovery(from)
-	blobName := fmt.Sprintf("%s_%s_%s_%s", i.db, i.table, nower(), filepath.Base(from))
+	blobName := fmt.Sprintf("%s_%s_%s_%s_%s", i.db, i.table, nower(), filepath.Base(uuid.New().String()), filepath.Base(from))
 	if compression == properties.CTNone {
 		blobName = blobName + ".gz"
 	}
