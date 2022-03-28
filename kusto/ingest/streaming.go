@@ -64,18 +64,18 @@ func prepFile(fPath string, props *properties.All, options []FileOption, client 
 		return nil, err
 	}
 
-	if !local {
-		return nil, FileIsBlobErr
-	}
-
-	props.Source.OriginalSource = fPath
-
 	for _, option := range options {
 		err := option.Run(props, client, FromFile)
 		if err != nil {
 			return nil, err
 		}
 	}
+
+	if !local {
+		return nil, FileIsBlobErr
+	}
+
+	props.Source.OriginalSource = fPath
 
 	compression := queued.CompressionDiscovery(fPath)
 	if compression != properties.CTNone {
