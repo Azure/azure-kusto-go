@@ -6,6 +6,7 @@ import (
 	"fmt"
 	"io"
 	"os"
+	"strings"
 	"testing"
 	"time"
 
@@ -698,6 +699,32 @@ func TestFileIngestion(t *testing.T) {
 				return &v
 			},
 			want: &[]CountResult{{Count: 500}},
+		},
+		{
+			desc:     "Ingest big file managed streaming",
+			ingestor: managedIngestor,
+			src:      bigCsvFileFromString(),
+			options:  []ingest.FileOption{ingest.DontCompress(), ingest.FlushImmediately(), ingest.ReportResultToTable()},
+			stmt: pCountStmt.MustParameters(
+				kusto.NewParameters().Must(
+					kusto.QueryValues{"tableName": managedTable},
+				),
+			),
+			setup: func() error { return createIngestionTable(t, client, managedTable, false) },
+			doer: func(row *table.Row, update interface{}) error {
+				rec := CountResult{}
+				if err := row.ToStruct(&rec); err != nil {
+					return err
+				}
+				recs := update.(*[]CountResult)
+				*recs = append(*recs, rec)
+				return nil
+			},
+			gotInit: func() interface{} {
+				v := []CountResult{}
+				return &v
+			},
+			want: &[]CountResult{{Count: 3}},
 		},
 	}
 
@@ -1520,12 +1547,7 @@ func createCsvFileFromData(data []LogRow) string {
 
 	return fname
 }
-
-func csvFileFromString() string {
-	const raw = `,,,,
-	2020-03-10T20:59:30.694177Z,11196991-b193-4610-ae12-bcc03d092927,v0.0.1,Hello world!,Daniel Dubovski
-	2020-03-10T20:59:30.694177Z,,v0.0.2,,`
-
+func fileFromString(raw string) string {
 	fname := "data2.csv"
 	file, err := os.Create(fname)
 	if err != nil {
@@ -1545,6 +1567,18 @@ func csvFileFromString() string {
 	}
 
 	return fname
+}
+
+func csvFileFromString() string {
+	return fileFromString(`,,,,
+	2020-03-10T20:59:30.694177Z,11196991-b193-4610-ae12-bcc03d092927,v0.0.1,Hello world!,Daniel Dubovski
+	2020-03-10T20:59:30.694177Z,,v0.0.2,,`)
+}
+
+func bigCsvFileFromString() string {
+	return fileFromString(`,,,,
+	2020-03-10T20:59:30.694177Z,11196991-b193-4610-ae12-bcc03d092927,v0.0.1,` + strings.Repeat("Hello world!", 4*1024*1024) + `,Daniel Dubovski
+	2020-03-10T20:59:30.694177Z,,v0.0.2,,`)
 }
 
 func createStringyLogsData() string {

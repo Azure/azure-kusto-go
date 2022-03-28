@@ -159,7 +159,16 @@ func (i *Ingestion) Reader(ctx context.Context, reader io.Reader, props properti
 		return "", errors.ES(errors.OpFileIngest, errors.KBlobstore, "no Kusto queue resources are defined, there is no queue to upload to").SetNoRetry()
 	}
 
-	blobName := fmt.Sprintf("%s_%s_%s_%s.gz", i.db, i.table, nower(), filepath.Base(uuid.New().String()))
+	extension := "gz"
+	if props.Source.DontCompress {
+		if props.Source.OriginalSource != "" {
+			extension = filepath.Ext(props.Source.OriginalSource)
+		} else {
+			extension = props.Ingestion.Additional.Format.String() // Best effort
+		}
+	}
+
+	blobName := fmt.Sprintf("%s_%s_%s_%s.%s", i.db, i.table, nower(), filepath.Base(uuid.New().String()), extension)
 
 	// Here's how to upload a blob.
 	blobURL := to.NewBlockBlobURL(blobName)
