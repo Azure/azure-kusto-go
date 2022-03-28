@@ -77,7 +77,6 @@ func New(client QueryClient, db, table string, options ...Option) (*Ingestion, e
 
 func (i *Ingestion) prepForIngestion(ctx context.Context, options []FileOption, props properties.All, source SourceScope) (*Result, properties.All, error) {
 	result := newResult()
-	props.Ingestion.RetainBlobOnSuccess = true
 
 	auth, err := i.mgr.AuthContext(ctx)
 	if err != nil {
