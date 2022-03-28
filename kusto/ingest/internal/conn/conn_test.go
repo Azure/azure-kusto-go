@@ -90,13 +90,11 @@ func TestStream(t *testing.T) {
 			desc:        "AVRO without mappingName",
 			payload:     fakeContent{Name: "Doak", ID: 25},
 			mappingName: "",
-			err:         true,
 		},
 		{
 			desc:        "JSON without mappingName",
 			payload:     fakeContent{Name: "Doak", ID: 25},
 			mappingName: "",
-			err:         true,
 		},
 		{
 			desc:        "Success",
@@ -143,7 +141,7 @@ func TestStream(t *testing.T) {
 				panic(err)
 			}
 
-			err = conn.Write(ctx, "database", "table", &payload, properties.JSON, test.mappingName, "")
+			err = conn.StreamIngest(ctx, "database", "table", &payload, properties.JSON, test.mappingName, "")
 
 			switch {
 			case err == nil && test.err:

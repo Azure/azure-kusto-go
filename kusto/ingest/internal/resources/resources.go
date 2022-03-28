@@ -8,6 +8,7 @@ import (
 	"fmt"
 	"net/url"
 	"strings"
+	"sync"
 	"sync/atomic"
 	"time"
 
@@ -131,6 +132,8 @@ type Manager struct {
 	resources                 atomic.Value // Stores Ingestion
 	kustoToken                token
 	kustoTokenCacheExpiration time.Time
+	authLock                  sync.Mutex
+	fetchLock                 sync.Mutex
 }
 
 // New is the constructor for Manager.
@@ -142,6 +145,9 @@ func New(client mgmter) (*Manager, error) {
 
 	m.kustoTokenCacheExpiration = time.Now().UTC()
 	go m.renewResources()
+
+	m.authLock = sync.Mutex{}
+	m.fetchLock = sync.Mutex{}
 
 	return m, nil
 }
@@ -167,6 +173,8 @@ func (m *Manager) renewResources() {
 // AuthContext returns a string representing the authorization context. This auth token is a temporary token
 // that can be used to write a message via ingestion.  This is different than the ADAL token.
 func (m *Manager) AuthContext(ctx context.Context) (string, error) {
+	m.authLock.Lock()
+	defer m.authLock.Unlock()
 	if m.kustoTokenCacheExpiration.After(time.Now().UTC()) {
 		return m.kustoToken.AuthContext, nil
 	}
@@ -237,6 +245,8 @@ func (i *Ingestion) importRec(rec ingestResc) error {
 
 // fetch makes a kusto.Client.Mgmt() call to retrieve the resources used for Ingestion.
 func (m *Manager) fetch(ctx context.Context) error {
+	m.fetchLock.Lock()
+	defer m.fetchLock.Unlock()
 	rows, err := m.client.Mgmt(ctx, "NetDefaultDB", kusto.NewStmt(".get ingestion resources"), kusto.IngestionEndpoint())
 	if err != nil {
 		return fmt.Errorf("problem getting ingestion resources from Kusto: %s", err)

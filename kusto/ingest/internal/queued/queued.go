@@ -1,18 +1,16 @@
 // Package filesystem provides a client with the ability to import data into Kusto via a variety of fileystems
 // such as local storage or blobstore.
-package filesystem
+package queued
 
 import (
 	"context"
 	"fmt"
 	"io"
-	"io/ioutil"
 	"math/rand"
 	"net/url"
 	"os"
 	"path"
 	"path/filepath"
-	"regexp"
 	"strings"
 	"time"
 
@@ -30,7 +28,7 @@ const (
 	_1MiB = 1024 * 1024
 
 	// The numbers below are magic numbers. They were derived from doing Azure to Azure tests of azcopy for various file sizes
-	// to prove that changes weren't going to make azcopy slower. It was found that multipying azcopy's concurrency by 10x (to 50)
+	// to prove that changes weren't going to make azcopy slower. It was found that multiplying azcopy's concurrency by 10x (to 50)
 	// made a 5x improvement in speed. We don't have any numbers from the service side to give us numbers we should use, so this
 	// is our best guess from observation. DO NOT CHANGE UNLESS YOU KNOW BETTER.
 
@@ -38,11 +36,18 @@ const (
 	Concurrency = 50
 )
 
-// stream provides a type that mimics azblob.UploadStreamToBlockBlob to allow fakes for testing.
-type stream func(context.Context, io.Reader, azblob.BlockBlobURL, azblob.UploadStreamToBlockBlobOptions) (azblob.CommonResponse, error)
+// Queued provides methods for taking data from various sources and ingesting it into Kusto using queued ingestion.
+type Queued interface {
+	Local(ctx context.Context, from string, props properties.All) error
+	Reader(ctx context.Context, reader io.Reader, props properties.All) (string, error)
+	Blob(ctx context.Context, from string, fileSize int64, props properties.All) error
+}
 
-// upload provides a type that mimics azblob.UploadFileToBlockBlob to allow fakes for test
-type upload func(context.Context, *os.File, azblob.BlockBlobURL, azblob.UploadToBlockBlobOptions) (azblob.CommonResponse, error)
+// uploadStream provides a type that mimics azblob.UploadStreamToBlockBlob to allow fakes for testing.
+type uploadStream func(context.Context, io.Reader, azblob.BlockBlobURL, azblob.UploadStreamToBlockBlobOptions) (azblob.CommonResponse, error)
+
+// uploadBlob provides a type that mimics azblob.UploadFileToBlockBlob to allow fakes for test
+type uploadBlob func(context.Context, *os.File, azblob.BlockBlobURL, azblob.UploadToBlockBlobOptions) (azblob.CommonResponse, error)
 
 // Ingestion provides methods for taking data from a filesystem of some type and ingesting it into Kusto.
 // This object is scoped for a single database and table.
@@ -51,8 +56,8 @@ type Ingestion struct {
 	table string
 	mgr   *resources.Manager
 
-	stream          stream
-	upload          upload
+	uploadStream    uploadStream
+	uploadBlob      uploadBlob
 	transferManager azblob.TransferManager
 
 	bufferSize int
@@ -73,11 +78,11 @@ func WithStaticBuffer(bufferSize int, maxBuffers int) Option {
 // New is the constructor for Ingestion.
 func New(db, table string, mgr *resources.Manager, options ...Option) (*Ingestion, error) {
 	i := &Ingestion{
-		db:     db,
-		table:  table,
-		mgr:    mgr,
-		stream: azblob.UploadStreamToBlockBlob,
-		upload: azblob.UploadFileToBlockBlob,
+		db:           db,
+		table:        table,
+		mgr:          mgr,
+		uploadStream: azblob.UploadStreamToBlockBlob,
+		uploadBlob:   azblob.UploadFileToBlockBlob,
 	}
 
 	for _, opt := range options {
@@ -109,14 +114,14 @@ func (i *Ingestion) Local(ctx context.Context, from string, props properties.All
 		return err
 	}
 
-	resources, err := i.mgr.Resources()
+	mgrResources, err := i.mgr.Resources()
 	if err != nil {
 		return err
 	}
 
 	// We want to check the queue size here so so we don't upload a file and then find we don't have a Kusto queue to stick
 	// it in. If we don't have a container, that is handled by containerQueue().
-	if len(resources.Queues) == 0 {
+	if len(mgrResources.Queues) == 0 {
 		return errors.ES(errors.OpFileIngest, errors.KBlobstore, "no Kusto queue resources are defined, there is no queue to upload to").SetNoRetry()
 	}
 
@@ -132,12 +137,6 @@ func (i *Ingestion) Local(ctx context.Context, from string, props properties.All
 		return err
 	}
 
-	if props.Source.DeleteLocalSource {
-		if err := os.Remove(from); err != nil {
-			return errors.ES(errors.OpFileIngest, errors.KLocalFileSystem, "file was uploaded successfully, but we could not delete the local file: %s", err)
-		}
-	}
-
 	return nil
 }
 
@@ -149,28 +148,48 @@ func (i *Ingestion) Reader(ctx context.Context, reader io.Reader, props properti
 		return "", err
 	}
 
-	resources, err := i.mgr.Resources()
+	mgrResources, err := i.mgr.Resources()
 	if err != nil {
 		return "", err
 	}
 
 	// We want to check the queue size here so so we don't upload a file and then find we don't have a Kusto queue to stick
 	// it in. If we don't have a container, that is handled by containerQueue().
-	if len(resources.Queues) == 0 {
+	if len(mgrResources.Queues) == 0 {
 		return "", errors.ES(errors.OpFileIngest, errors.KBlobstore, "no Kusto queue resources are defined, there is no queue to upload to").SetNoRetry()
 	}
 
-	blobName := fmt.Sprintf("%s_%s_%s_%s.gz", i.db, i.table, nower(), filepath.Base(uuid.New().String()))
+	shouldCompress := true
+	if props.Source.OriginalSource != "" {
+		shouldCompress = CompressionDiscovery(props.Source.OriginalSource) == properties.CTNone
+	}
+	if props.Source.DontCompress {
+		shouldCompress = false
+	}
+
+	extension := "gz"
+	if !shouldCompress {
+		if props.Source.OriginalSource != "" {
+			extension = filepath.Ext(props.Source.OriginalSource)
+		} else {
+			extension = props.Ingestion.Additional.Format.String() // Best effort
+		}
+	}
+
+	blobName := fmt.Sprintf("%s_%s_%s_%s.%s", i.db, i.table, nower(), filepath.Base(uuid.New().String()), extension)
 
 	// Here's how to upload a blob.
 	blobURL := to.NewBlockBlobURL(blobName)
 
-	gstream := gzip.New()
-	gstream.Reset(ioutil.NopCloser(reader))
+	size := int64(0)
 
-	_, err = i.stream(
+	if shouldCompress {
+		reader = gzip.Compress(reader)
+	}
+
+	_, err = i.uploadStream(
 		ctx,
-		gstream,
+		reader,
 		blobURL,
 		azblob.UploadStreamToBlockBlobOptions{TransferManager: i.transferManager},
 	)
@@ -179,10 +198,14 @@ func (i *Ingestion) Reader(ctx context.Context, reader io.Reader, props properti
 		return blobName, errors.ES(errors.OpFileIngest, errors.KBlobstore, "problem uploading to Blob Storage: %s", err)
 	}
 
+	if gz, ok := reader.(*gzip.Streamer); ok {
+		size = gz.InputSize()
+	}
+
 	// We always want to delete the blob we create when we ingest from a local file.
 	props.Ingestion.RetainBlobOnSuccess = false
 
-	if err := i.Blob(ctx, blobURL.String(), gstream.Size(), props); err != nil {
+	if err := i.Blob(ctx, blobURL.String(), size, props); err != nil {
 		return blobName, err
 	}
 
@@ -220,6 +243,11 @@ func (i *Ingestion) Blob(ctx context.Context, from string, fileSize int64, props
 		return errors.E(errors.OpFileIngest, errors.KBlobstore, err)
 	}
 
+	err = props.ApplyDeleteLocalSourceOption()
+	if err != nil {
+		return err
+	}
+
 	return nil
 }
 
@@ -231,7 +259,8 @@ func CompleteFormatFromFileName(props *properties.All, from string) error {
 
 	et := properties.DataFormatDiscovery(from)
 	if et == properties.DFUnknown {
-		return errors.ES(errors.OpFileIngest, errors.KClientArgs, "could not discover the file format from name of the file(%s)", from).SetNoRetry()
+		// If we can't figure out the file type, default to CSV.
+		et = properties.CSV
 	}
 	props.Ingestion.Additional.Format = et
 
@@ -240,12 +269,12 @@ func CompleteFormatFromFileName(props *properties.All, from string) error {
 
 // upstreamContainer randomly selects a container queue in which to upload our file to blobstore.
 func (i *Ingestion) upstreamContainer() (azblob.ContainerURL, error) {
-	resources, err := i.mgr.Resources()
+	mgrResources, err := i.mgr.Resources()
 	if err != nil {
 		return azblob.ContainerURL{}, errors.E(errors.OpFileIngest, errors.KBlobstore, err)
 	}
 
-	if len(resources.Containers) == 0 {
+	if len(mgrResources.Containers) == 0 {
 		return azblob.ContainerURL{}, errors.ES(
 			errors.OpFileIngest,
 			errors.KBlobstore,
@@ -253,7 +282,7 @@ func (i *Ingestion) upstreamContainer() (azblob.ContainerURL, error) {
 		).SetNoRetry()
 	}
 
-	storageURI := resources.Containers[rand.Intn(len(resources.Containers))]
+	storageURI := mgrResources.Containers[rand.Intn(len(mgrResources.Containers))]
 	service, _ := url.Parse(fmt.Sprintf("https://%s.blob.core.windows.net?%s", storageURI.Account(), storageURI.SAS().Encode()))
 
 	creds := azblob.NewAnonymousCredential()
@@ -263,12 +292,12 @@ func (i *Ingestion) upstreamContainer() (azblob.ContainerURL, error) {
 }
 
 func (i *Ingestion) upstreamQueue() (azqueue.MessagesURL, error) {
-	resources, err := i.mgr.Resources()
+	mgrResources, err := i.mgr.Resources()
 	if err != nil {
 		return azqueue.MessagesURL{}, err
 	}
 
-	if len(resources.Queues) == 0 {
+	if len(mgrResources.Queues) == 0 {
 		return azqueue.MessagesURL{}, errors.ES(
 			errors.OpFileIngest,
 			errors.KBlobstore,
@@ -276,7 +305,7 @@ func (i *Ingestion) upstreamQueue() (azqueue.MessagesURL, error) {
 		).SetNoRetry()
 	}
 
-	queue := resources.Queues[rand.Intn(len(resources.Queues))]
+	queue := mgrResources.Queues[rand.Intn(len(mgrResources.Queues))]
 	service, _ := url.Parse(fmt.Sprintf("https://%s.queue.core.windows.net?%s", queue.Account(), queue.SAS().Encode()))
 
 	creds := azqueue.NewAnonymousCredential()
@@ -317,11 +346,11 @@ func (i *Ingestion) localToBlob(ctx context.Context, from string, to azblob.Cont
 		).SetNoRetry()
 	}
 
-	if compression == properties.CTNone {
+	if compression == properties.CTNone && !props.Source.DontCompress {
 		gstream := gzip.New()
 		gstream.Reset(file)
 
-		_, err = i.stream(
+		_, err = i.uploadStream(
 			ctx,
 			gstream,
 			blobURL,
@@ -331,12 +360,12 @@ func (i *Ingestion) localToBlob(ctx context.Context, from string, to azblob.Cont
 		if err != nil {
 			return azblob.BlockBlobURL{}, 0, errors.ES(errors.OpFileIngest, errors.KBlobstore, "problem uploading to Blob Storage: %s", err)
 		}
-		return blobURL, gstream.Size(), nil
+		return blobURL, gstream.InputSize(), nil
 	}
 
 	// The high-level API UploadFileToBlockBlob function uploads blocks in parallel for optimal performance, and can handle large files as well.
 	// This function calls StageBlock/CommitBlockList for files larger 256 MBs, and calls Upload for any file smaller
-	_, err = i.upload(
+	_, err = i.uploadBlob(
 		ctx,
 		file,
 		blobURL,
@@ -372,11 +401,6 @@ func CompressionDiscovery(fName string) properties.CompressionType {
 	}
 	return properties.CTNone
 }
-
-var (
-	// gExtractURIProtocol is created outside the fucntion inorder to pay once for regexp creation.
-	gExtractURIProtocol = regexp.MustCompile(`^(.*)://`)
-)
 
 // This allows mocking the stat func later on
 var statFunc = os.Stat

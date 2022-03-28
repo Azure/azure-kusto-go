@@ -8,11 +8,13 @@ import (
 	"github.com/Azure/azure-kusto-go/kusto/data/table"
 	"github.com/Azure/azure-kusto-go/kusto/data/types"
 	"github.com/Azure/azure-kusto-go/kusto/ingest/internal/resources"
+	"github.com/stretchr/testify/assert"
 )
 
 type mockClient struct {
 	endpoint string
 	auth     kusto.Authorization
+	onMgmt   func(ctx context.Context, db string, query kusto.Stmt, options ...kusto.MgmtOption) (*kusto.RowIterator, error)
 }
 
 func (m mockClient) Auth() kusto.Authorization {
@@ -27,7 +29,14 @@ func (m mockClient) Query(context.Context, string, kusto.Stmt, ...kusto.QueryOpt
 	panic("not implemented")
 }
 
-func (m mockClient) Mgmt(context.Context, string, kusto.Stmt, ...kusto.MgmtOption) (*kusto.RowIterator, error) {
+func (m mockClient) Mgmt(ctx context.Context, db string, query kusto.Stmt, options ...kusto.MgmtOption) (*kusto.RowIterator, error) {
+	if m.onMgmt != nil {
+		rows, err := m.onMgmt(ctx, db, query, options...)
+		if err != nil || rows != nil {
+			return rows, err
+		}
+	}
+
 	rows, err := kusto.NewMockRows(table.Columns{
 		{
 			Name: "ResourceTypeName",
@@ -50,7 +59,7 @@ func (m mockClient) Mgmt(context.Context, string, kusto.Stmt, ...kusto.MgmtOptio
 	return iter, nil
 }
 
-func TestManager(t *testing.T) {
+func TestIngestion(t *testing.T) {
 
 	firstMockClient := mockClient{
 		endpoint: "https://test.kusto.windows.net",
@@ -128,16 +137,16 @@ func TestManager(t *testing.T) {
 	}
 
 	for _, test := range tests {
+		test := test // Capture
 		t.Run(test.name, func(t *testing.T) {
+			t.Parallel()
 			mgrMap := make(map[*resources.Manager]bool)
 			for _, client := range test.clients {
 				mgr := client().mgr
 				mgrMap[mgr] = true
 			}
 
-			if len(mgrMap) != len(test.clients) {
-				t.Errorf("Got duplicated managers, want %d managers, got %d", len(test.clients), len(mgrMap))
-			}
+			assert.Equalf(t, len(mgrMap), len(test.clients), "Got duplicated managers, want %d managers, got %d", len(test.clients), len(mgrMap))
 		})
 	}
 }

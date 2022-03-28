@@ -2,13 +2,10 @@ package resources
 
 import (
 	"context"
-	"errors"
-	"fmt"
 	"testing"
 
 	"github.com/kylelemons/godebug/pretty"
 
-	"github.com/Azure/azure-kusto-go/kusto"
 	"github.com/Azure/azure-kusto-go/kusto/data/table"
 	"github.com/Azure/azure-kusto-go/kusto/data/types"
 	"github.com/Azure/azure-kusto-go/kusto/data/value"
@@ -90,68 +87,6 @@ func TestParse(t *testing.T) {
 			t.Errorf("TestParse(%s): String(): got %s, want %s", test.desc, got.String(), test.url)
 		}
 	}
-}
-
-type FakeMgmt struct {
-	mock       *kusto.MockRows
-	DBEqual    string
-	QueryEqual string
-	mgmtErr    bool
-}
-
-func NewFakeMgmt(columns table.Columns, rows []value.Values, setErr bool) *FakeMgmt {
-	mock, err := kusto.NewMockRows(columns)
-	if err != nil {
-		panic(err)
-	}
-
-	for _, row := range rows {
-		mock.Row(row)
-	}
-
-	if setErr {
-		mock.Error(errors.New("some error"))
-	}
-
-	return &FakeMgmt{
-		mock: mock,
-	}
-}
-
-func (f *FakeMgmt) SetDBEquals(s string) *FakeMgmt {
-	f.DBEqual = s
-	return f
-}
-
-func (f *FakeMgmt) SetQueryEquals(s string) *FakeMgmt {
-	f.DBEqual = s
-	return f
-}
-
-func (f *FakeMgmt) SetMgmtErr() *FakeMgmt {
-	f.mgmtErr = true
-	return f
-}
-
-func (f *FakeMgmt) Mgmt(ctx context.Context, db string, query kusto.Stmt, options ...kusto.MgmtOption) (*kusto.RowIterator, error) {
-	if f.DBEqual != "" {
-		if db != f.DBEqual {
-			panic(fmt.Sprintf("expected db to be %q, was %q", f.DBEqual, db))
-		}
-	}
-	if f.QueryEqual != "" {
-		if query.String() != f.QueryEqual {
-			panic(fmt.Sprintf("expected query to be %q, was %q", f.QueryEqual, db))
-		}
-	}
-	if f.mgmtErr {
-		return nil, fmt.Errorf("some mgmt error")
-	}
-	iter := &kusto.RowIterator{}
-	if err := iter.Mock(f.mock); err != nil {
-		panic(err)
-	}
-	return iter, nil
 }
 
 func FakeAuthContext(rows []value.Values, setErr bool) *FakeMgmt {
@@ -249,22 +184,6 @@ func TestAuthContext(t *testing.T) {
 	}
 }
 
-func FakeResources(rows []value.Values, setErr bool) *FakeMgmt {
-	cols := table.Columns{
-		{
-			Name: "ResourceTypeName",
-			Type: types.String,
-		},
-		{
-			Name: "StorageRoot",
-			Type: types.String,
-		},
-	}
-
-	fm := NewFakeMgmt(cols, rows, setErr)
-	return fm
-}
-
 func mustParse(s string) *URI {
 	u, err := parse(s)
 	if err != nil {
@@ -310,32 +229,8 @@ func TestResources(t *testing.T) {
 			err: true,
 		},
 		{
-			desc: "Success",
-			fakeMgmt: FakeResources(
-				[]value.Values{
-					{
-						value.String{
-							Valid: true,
-							Value: "TempStorage",
-						},
-						value.String{
-							Valid: true,
-							Value: "https://account.blob.core.windows.net/storageroot0",
-						},
-					},
-					{
-						value.String{
-							Valid: true,
-							Value: "SecuredReadyForAggregationQueue",
-						},
-						value.String{
-							Valid: true,
-							Value: "https://account.blob.core.windows.net/storageroot1",
-						},
-					},
-				},
-				false,
-			),
+			desc:     "Success",
+			fakeMgmt: SuccessfulFakeResources(),
 			want: Ingestion{
 				Queues:     []*URI{mustParse("https://account.blob.core.windows.net/storageroot1")},
 				Containers: []*URI{mustParse("https://account.blob.core.windows.net/storageroot0")},

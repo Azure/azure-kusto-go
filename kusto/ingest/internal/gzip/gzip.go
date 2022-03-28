@@ -5,6 +5,7 @@ package gzip
 import (
 	"compress/gzip"
 	"io"
+	"io/ioutil"
 	"sync"
 	"sync/atomic"
 )
@@ -40,10 +41,22 @@ func (s *Streamer) Reset(reader io.ReadCloser) {
 	s.run()
 }
 
-// Size returns the amount of data that the Streamer streamed. This will only be accurate for
+// InputSize returns the amount of data that the Streamer streamed. This will only be accurate for
 // the full stream after Read() has returned io.EOF and not before.
-func (s *Streamer) Size() int64 {
+func (s *Streamer) InputSize() int64 {
 	return atomic.LoadInt64(&s.size)
+}
+
+func Compress(payload io.Reader) io.Reader {
+	var closer io.ReadCloser
+	var ok bool
+	if closer, ok = payload.(io.ReadCloser); !ok {
+		closer = ioutil.NopCloser(payload)
+	}
+	zw := New()
+	zw.Reset(closer)
+
+	return zw
 }
 
 // run copies the file into a buffer that we stream back via our Read() call.

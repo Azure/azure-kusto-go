@@ -7,6 +7,7 @@ import (
 
 	"github.com/Azure/azure-kusto-go/kusto/data/errors"
 	"github.com/Azure/azure-kusto-go/kusto/ingest/internal/properties"
+	"github.com/cenkalti/backoff/v4"
 )
 
 type SourceScope uint
@@ -19,6 +20,7 @@ const (
 	FromBlob
 	QueuedClient ClientScope = 1 << iota
 	StreamingClient
+	ManagedClient
 )
 
 func (s SourceScope) String() string {
@@ -91,6 +93,57 @@ func (o option) Run(p *properties.All, clientType ClientScope, sourceType Source
 	return o.run(p)
 }
 
+// Database overrides the default database name.
+func Database(name string) FileOption {
+	return option{
+		run: func(p *properties.All) error {
+			p.Ingestion.DatabaseName = name
+			return nil
+		},
+		clientScopes: QueuedClient | StreamingClient | ManagedClient,
+		sourceScope:  FromFile | FromReader | FromBlob,
+		name:         "Database",
+	}
+}
+
+// Table overrides the default table name.
+func Table(name string) FileOption {
+	return option{
+		run: func(p *properties.All) error {
+			p.Ingestion.TableName = name
+			return nil
+		},
+		clientScopes: QueuedClient | StreamingClient | ManagedClient,
+		sourceScope:  FromFile | FromReader | FromBlob,
+		name:         "Table",
+	}
+}
+
+// DontCompress sets whether to compress the data.
+func DontCompress() FileOption {
+	return option{
+		run: func(p *properties.All) error {
+			p.Source.DontCompress = true
+			return nil
+		},
+		clientScopes: QueuedClient | StreamingClient | ManagedClient,
+		sourceScope:  FromFile | FromReader,
+		name:         "DontCompress",
+	}
+}
+
+func backOff(off *backoff.ExponentialBackOff) FileOption {
+	return option{
+		run: func(p *properties.All) error {
+			p.ManagedStreaming.Backoff = off
+			return nil
+		},
+		clientScopes: ManagedClient,
+		sourceScope:  FromFile | FromReader | FromBlob,
+		name:         "BackOff",
+	}
+}
+
 // FlushImmediately tells Kusto to flush on write.
 func FlushImmediately() FileOption {
 	return option{
@@ -98,7 +151,7 @@ func FlushImmediately() FileOption {
 			p.Ingestion.FlushImmediately = true
 			return nil
 		},
-		clientScopes: QueuedClient,
+		clientScopes: QueuedClient | ManagedClient,
 		sourceScope:  FromFile | FromReader | FromBlob,
 		name:         "FlushImmediately",
 	}
@@ -190,7 +243,7 @@ func IngestionMapping(mapping interface{}, mappingKind DataFormat) FileOption {
 
 			return nil
 		},
-		clientScopes: QueuedClient,
+		clientScopes: QueuedClient | ManagedClient,
 		sourceScope:  FromFile | FromReader | FromBlob,
 		name:         "IngestionMapping",
 	}
@@ -209,7 +262,7 @@ func IngestionMappingRef(refName string, mappingKind DataFormat) FileOption {
 			p.Ingestion.Additional.IngestionMappingType = mappingKind
 			return nil
 		},
-		clientScopes: QueuedClient | StreamingClient,
+		clientScopes: QueuedClient | StreamingClient | ManagedClient,
 		sourceScope:  FromFile | FromReader | FromBlob,
 		name:         "IngestionMappingRef",
 	}
@@ -222,7 +275,7 @@ func DeleteSource() FileOption {
 			p.Source.DeleteLocalSource = true
 			return nil
 		},
-		clientScopes: QueuedClient | StreamingClient,
+		clientScopes: QueuedClient | StreamingClient | ManagedClient,
 		sourceScope:  FromFile,
 		name:         "DeleteSource",
 	}
@@ -236,7 +289,7 @@ func IgnoreSizeLimit() FileOption {
 			return nil
 		},
 		sourceScope:  FromFile | FromReader | FromBlob,
-		clientScopes: QueuedClient,
+		clientScopes: QueuedClient | ManagedClient,
 		name:         "IgnoreSizeLimit",
 	}
 }
@@ -249,7 +302,7 @@ func Tags(tags []string) FileOption {
 			return nil
 		},
 		sourceScope:  FromFile | FromReader | FromBlob,
-		clientScopes: QueuedClient,
+		clientScopes: QueuedClient | ManagedClient,
 		name:         "Tags",
 	}
 }
@@ -264,7 +317,7 @@ func IfNotExists(ingestByTag string) FileOption {
 			return nil
 		},
 		sourceScope:  FromFile | FromReader | FromBlob,
-		clientScopes: QueuedClient,
+		clientScopes: QueuedClient | ManagedClient,
 		name:         "IfNotExists",
 	}
 }
@@ -280,7 +333,7 @@ func ReportResultToTable() FileOption {
 			return nil
 		},
 		sourceScope:  FromFile | FromReader | FromBlob,
-		clientScopes: QueuedClient,
+		clientScopes: QueuedClient | ManagedClient,
 		name:         "ReportResultToTable",
 	}
 }
@@ -294,7 +347,7 @@ func SetCreationTime(t time.Time) FileOption {
 			return nil
 		},
 		sourceScope:  FromFile | FromReader | FromBlob,
-		clientScopes: QueuedClient,
+		clientScopes: QueuedClient | ManagedClient,
 		name:         "SetCreationTime",
 	}
 }
@@ -350,7 +403,7 @@ func ValidationPolicy(policy ValPolicy) FileOption {
 			return nil
 		},
 		sourceScope:  FromFile | FromReader | FromBlob,
-		clientScopes: QueuedClient,
+		clientScopes: QueuedClient | ManagedClient,
 		name:         "ValidationPolicy",
 	}
 }
@@ -365,7 +418,7 @@ func FileFormat(et DataFormat) FileOption {
 			return nil
 		},
 		sourceScope:  FromFile | FromReader | FromBlob,
-		clientScopes: QueuedClient | StreamingClient,
+		clientScopes: QueuedClient | StreamingClient | ManagedClient,
 		name:         "FileFormat",
 	}
 }
@@ -378,7 +431,7 @@ func ClientRequestId(clientRequestId string) FileOption {
 			return nil
 		},
 		sourceScope:  FromFile | FromReader | FromBlob,
-		clientScopes: StreamingClient,
+		clientScopes: StreamingClient | ManagedClient,
 		name:         "ClientRequestId",
 	}
 }
