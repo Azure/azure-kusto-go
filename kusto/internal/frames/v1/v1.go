@@ -55,8 +55,9 @@ func (dt DataType) toColumn() (table.Column, error) {
 type DataTable struct {
 	TableName frames.TableKind
 	DataTypes DataTypes `json:"Columns"`
-	Rows      [][]interface{}
+	Rows      []interface{}
 	KustoRows []value.Values
+	RowErrors []errors.Error
 	Op        errors.Op
 }
 

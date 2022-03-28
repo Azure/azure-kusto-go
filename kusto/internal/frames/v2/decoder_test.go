@@ -10,7 +10,6 @@ import (
 	"github.com/Azure/azure-kusto-go/kusto/data/errors"
 	"github.com/Azure/azure-kusto-go/kusto/data/table"
 	"github.com/Azure/azure-kusto-go/kusto/data/value"
-	"github.com/Azure/azure-kusto-go/kusto/internal/frames"
 	"github.com/stretchr/testify/require"
 
 	"github.com/google/uuid"
@@ -154,7 +153,8 @@ func TestNormalDecode(t *testing.T) {
 					},
 				},
 			},
-			Op: errors.OpQuery,
+			RowErrors: nil,
+			Op:        errors.OpQuery,
 		},
 		DataTable{
 			Base:      Base{FrameType: "DataTable"},
@@ -202,7 +202,8 @@ func TestNormalDecode(t *testing.T) {
 					value.GUID{Value: uuid.MustParse("011e7e1b-3c8f-4e91-a04b-0fa5f7be6100"), Valid: true},
 				},
 			},
-			Op: errors.OpQuery,
+			RowErrors: nil,
+			Op:        errors.OpQuery,
 		},
 		DataSetCompletion{
 			Base:      Base{FrameType: "DataSetCompletion"},
@@ -261,7 +262,7 @@ func TestErrorDecode(t *testing.T) {
   },
 {
     "FrameType":"DataTable",
-    "TableId":2,
+    "TableId":1,
     "TableKind":"PrimaryResult",
     "TableName":"PrimaryResult",
     "Columns":[
@@ -316,7 +317,7 @@ func TestErrorDecode(t *testing.T) {
 
   {
     "FrameType":"DataTable",
-    "TableId":3,
+    "TableId":2,
     "TableKind":"QueryCompletionInformation",
     "TableName":"QueryCompletionInformation",
     "Columns":[
@@ -387,7 +388,64 @@ func TestErrorDecode(t *testing.T) {
 			},
 			Op: errors.OpQuery,
 		},
-		frames.Error{Msg: "Kind(KLimitsExceeded): Request is invalid and cannot be executed.;See https://docs.microsoft.com/en-us/azure/kusto/concepts/querylimits"},
+		DataTable{
+			Base:      Base{FrameType: "DataTable"},
+			TableID:   1,
+			TableKind: "PrimaryResult",
+			TableName: "PrimaryResult",
+			Columns: []table.Column{
+				{
+					Name: "x",
+					Type: "long",
+				},
+			},
+			KustoRows: []value.Values{
+				{value.Long{Value: 1, Valid: true}},
+				{value.Long{Value: 2, Valid: true}},
+				{value.Long{Value: 3, Valid: true}},
+				{value.Long{Value: 4, Valid: true}},
+				{value.Long{Value: 5, Valid: true}},
+			},
+			RowErrors: []errors.Error{
+				*errors.ES(errors.OpUnknown, errors.KLimitsExceeded, "Request is invalid and cannot be executed.;See https://docs.microsoft."+
+					"com/en-us/azure/kusto/concepts/querylimits"),
+			},
+			Op: errors.OpQuery,
+		},
+		DataTable{
+			Base:      Base{FrameType: "DataTable"},
+			TableID:   2,
+			TableKind: "QueryCompletionInformation",
+			TableName: "QueryCompletionInformation",
+			Columns: []table.Column{
+				{
+					Name: "Timestamp",
+					Type: "datetime",
+				},
+				{
+					Name: "ClientRequestId",
+					Type: "string",
+				},
+				{
+					Name: "ActivityId",
+					Type: "guid",
+				},
+			},
+			KustoRows: []value.Values{
+				{
+					value.DateTime{Value: timeMustParse(time.RFC3339Nano, "2019-08-27T04:14:55.302919Z"), Valid: true},
+					value.String{Value: "KPC.execute;752dd747-5f6a-45c6-9ee2-e6662530ecc3", Valid: true},
+					value.GUID{Value: uuid.MustParse("011e7e1b-3c8f-4e91-a04b-0fa5f7be6100"), Valid: true},
+				},
+			},
+			Op: errors.OpQuery,
+		},
+		DataSetCompletion{
+			Base:      Base{FrameType: "DataSetCompletion"},
+			HasErrors: false,
+			Cancelled: false,
+			Op:        errors.OpQuery,
+		},
 	}
 
 	dec := Decoder{}
