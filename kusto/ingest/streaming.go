@@ -2,31 +2,35 @@ package ingest
 
 import (
 	"context"
-	"fmt"
 	"io"
-	"io/ioutil"
 	"os"
 
-	"github.com/Azure/azure-kusto-go/kusto"
 	"github.com/Azure/azure-kusto-go/kusto/data/errors"
 	"github.com/Azure/azure-kusto-go/kusto/ingest/internal/conn"
-	"github.com/Azure/azure-kusto-go/kusto/ingest/internal/filesystem"
 	"github.com/Azure/azure-kusto-go/kusto/ingest/internal/gzip"
 	"github.com/Azure/azure-kusto-go/kusto/ingest/internal/properties"
+	"github.com/Azure/azure-kusto-go/kusto/ingest/internal/queued"
+	"github.com/google/uuid"
 )
+
+type streamIngestor interface {
+	StreamIngest(ctx context.Context, db, table string, payload io.Reader, format properties.DataFormat, mappingName string, clientRequestId string) error
+}
 
 // Streaming provides data ingestion from external sources into Kusto.
 type Streaming struct {
 	db         string
 	table      string
-	client     *kusto.Client
-	streamConn *conn.Conn
+	client     QueryClient
+	streamConn streamIngestor
 }
+
+var FileIsBlobErr = errors.ES(errors.OpIngestStream, errors.KClientArgs, "blobstore paths are not supported for streaming")
 
 // NewStreaming is the constructor for Streaming.
 // More information can be found here:
 // https://docs.microsoft.com/en-us/azure/kusto/management/create-ingestion-mapping-command
-func NewStreaming(client *kusto.Client, db, table string) (*Streaming, error) {
+func NewStreaming(client QueryClient, db, table string) (*Streaming, error) {
 	streamConn, err := conn.New(client.Endpoint(), client.Auth())
 	if err != nil {
 		return nil, err
@@ -45,29 +49,40 @@ func NewStreaming(client *kusto.Client, db, table string) (*Streaming, error) {
 // FromFile allows uploading a data file for Kusto from either a local path or a blobstore URI path.
 // This method is thread-safe.
 func (i *Streaming) FromFile(ctx context.Context, fPath string, options ...FileOption) (*Result, error) {
-	local, err := filesystem.IsLocalPath(fPath)
+	props := i.newProp()
+	file, err := prepFile(fPath, &props, options, StreamingClient)
+	if err != nil {
+		return nil, err
+	}
+
+	return streamImpl(i.streamConn, ctx, file, props)
+}
+
+func prepFile(fPath string, props *properties.All, options []FileOption, client ClientScope) (*os.File, error) {
+	local, err := queued.IsLocalPath(fPath)
 	if err != nil {
 		return nil, err
 	}
 
 	if !local {
-		return nil, errors.ES(errors.OpFileIngest, errors.KClientArgs, "blobstore paths are not supported for streaming")
+		return nil, FileIsBlobErr
 	}
-	props := i.newProp()
+
+	props.Source.OriginalSource = fPath
 
 	for _, option := range options {
-		err := option.Run(&props, StreamingClient, FromFile)
+		err := option.Run(props, client, FromFile)
 		if err != nil {
 			return nil, err
 		}
 	}
 
-	compression := filesystem.CompressionDiscovery(fPath)
+	compression := queued.CompressionDiscovery(fPath)
 	if compression != properties.CTNone {
 		props.Source.DontCompress = true
 	}
 
-	err = filesystem.CompleteFormatFromFileName(&props, fPath)
+	err = queued.CompleteFormatFromFileName(props, fPath)
 	if err != nil {
 		return nil, err
 	}
@@ -76,8 +91,7 @@ func (i *Streaming) FromFile(ctx context.Context, fPath string, options ...FileO
 	if err != nil {
 		return nil, err
 	}
-
-	return streamImpl(i.streamConn, ctx, file, props)
+	return file, nil
 }
 
 // FromReader allows uploading a data file for Kusto from an io.Reader. The content is uploaded to Blobstore and
@@ -93,29 +107,20 @@ func (i *Streaming) FromReader(ctx context.Context, reader io.Reader, options ..
 		}
 	}
 
-	if props.Ingestion.Additional.Format == DFUnknown {
-		// TODO - other SDKs default to CSV. Should we do this here for parity?
-		return nil, fmt.Errorf("must provide option FileFormat() when using FromReader()")
-	}
-
 	return streamImpl(i.streamConn, ctx, reader, props)
 }
 
-func streamImpl(c *conn.Conn, ctx context.Context, payload io.Reader, props properties.All) (*Result, error) {
+func streamImpl(c streamIngestor, ctx context.Context, payload io.Reader, props properties.All) (*Result, error) {
 	compress := !props.Source.DontCompress
 	if compress {
-		var closer io.ReadCloser
-		var ok bool
-		if closer, ok = payload.(io.ReadCloser); !ok {
-			closer = ioutil.NopCloser(payload)
-		}
-		zw := gzip.New()
-		zw.Reset(closer)
-
-		payload = zw
+		payload = gzip.Compress(payload)
 	}
 
-	err := c.Write(ctx, props.Ingestion.DatabaseName, props.Ingestion.TableName, payload, props.Ingestion.Additional.Format,
+	if props.Ingestion.Additional.Format == DFUnknown {
+		props.Ingestion.Additional.Format = CSV
+	}
+
+	err := c.StreamIngest(ctx, props.Ingestion.DatabaseName, props.Ingestion.TableName, payload, props.Ingestion.Additional.Format,
 		props.Ingestion.Additional.IngestionMappingRef,
 		props.Streaming.ClientRequestId)
 
@@ -124,6 +129,11 @@ func streamImpl(c *conn.Conn, ctx context.Context, payload io.Reader, props prop
 			return nil, e
 		}
 		return nil, errors.E(errors.OpIngestStream, errors.KClientArgs, err)
+	}
+
+	err = props.ApplyDeleteLocalSourceOption()
+	if err != nil {
+		return nil, err
 	}
 
 	result := newResult()
@@ -138,6 +148,9 @@ func (i *Streaming) newProp() properties.All {
 		Ingestion: properties.Ingestion{
 			DatabaseName: i.db,
 			TableName:    i.table,
+		},
+		Streaming: properties.Streaming{
+			ClientRequestId: "KGC.executeStreaming;" + uuid.New().String(),
 		},
 	}
 }

@@ -7,6 +7,8 @@ import (
 
 	"github.com/Azure/azure-kusto-go/kusto"
 	"github.com/Azure/azure-kusto-go/kusto/data/errors"
+	"github.com/stretchr/testify/assert"
+	"github.com/stretchr/testify/require"
 )
 
 type from int
@@ -23,13 +25,13 @@ func TestOptions(t *testing.T) {
 	client := kusto.NewMockClient()
 
 	queuedClient, err := New(client, "", "")
-	if err != nil {
-		t.Fatalf("unexpected error: %v", err)
-	}
+	require.NoError(t, err)
+
 	streamingClient, err := NewStreaming(client, "", "")
-	if err != nil {
-		t.Fatalf("unexpected error: %v", err)
-	}
+	require.NoError(t, err)
+
+	managedClient, err := NewManaged(client, "", "")
+	require.NoError(t, err)
 
 	var tests = []struct {
 		desc     string
@@ -42,6 +44,15 @@ func TestOptions(t *testing.T) {
 		// We expect the valid streaming to succeed on options validations, and then fail on http errors
 		{
 			desc:     "Valid for streaming ingestor",
+			option:   FileFormat(CSV),
+			ingestor: streamingClient,
+			from:     fromFile,
+			op:       errors.OpIngestStream,
+			kind:     errors.KHTTPError,
+		},
+		// We expect the valid managed streaming to succeed on options validations, and then fail on http errors
+		{
+			desc:     "Valid for managed streaming ingestor",
 			option:   FileFormat(CSV),
 			ingestor: streamingClient,
 			from:     fromFile,
@@ -97,10 +108,20 @@ func TestOptions(t *testing.T) {
 			op:       errors.OpIngestStream,
 			kind:     errors.KClientArgs,
 		},
+		{
+			desc:     "Invalid option for managed ingestor from reader",
+			option:   DeleteSource(),
+			ingestor: managedClient,
+			from:     fromReader,
+			op:       errors.OpFileIngest,
+			kind:     errors.KClientArgs,
+		},
 	}
 
 	for _, test := range tests {
+		test := test // capture
 		t.Run(test.desc, func(t *testing.T) {
+			t.Parallel()
 			ctx := context.Background()
 			var err error = nil
 			switch test.from {
@@ -112,14 +133,10 @@ func TestOptions(t *testing.T) {
 				_, err = test.ingestor.FromReader(ctx, bytes.NewReader([]byte{}), test.option)
 			}
 			if e, ok := err.(*errors.Error); ok {
-				if e.Op != test.op {
-					t.Errorf("%s: expected error op %s, got %s", test.desc, test.op, e.Op)
-				}
-				if e.Kind != test.kind {
-					t.Errorf("%s: expected error want %s, got %s", test.desc, test.kind, e.Kind)
-				}
+				assert.Equal(t, test.op, e.Op)
+				assert.Equal(t, test.kind, e.Kind)
 			} else {
-				t.Errorf("%s: expected error, got %v", test.desc, err)
+				assert.Fail(t, "Expected errors.Error, got %v", err)
 			}
 
 			t.Logf("Success - %s: %v", test.desc, err)
