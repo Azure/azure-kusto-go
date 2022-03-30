@@ -35,7 +35,7 @@ func Rows(columns table.Columns, interRows []interface{}, op errors.Op) ([]value
 
 	for _, rawRow := range interRows {
 		interRow, ok := rawRow.([]interface{})
-		if !ok {
+		if !ok && rawRow != nil {
 			errorRow, ok := rawRow.(map[string]interface{})
 			if !ok {
 				errorRows = append(errorRows, *errors.ES(op, errors.KInternal, "Unexpected row error: %v", rawRow))
