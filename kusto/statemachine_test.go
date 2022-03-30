@@ -23,10 +23,13 @@ func init() {
 
 func iterateRowsWithErrors(iter *RowIterator) (table.Rows, []*errors.Error, error) {
 	// Pulls the frames from the downstream RowIterator.
-	got := table.Rows{}
+	var got table.Rows = nil
 	var inlineErrors []*errors.Error
 	err := iter.Do2(func(r *table.Row, inlineError *errors.Error) error {
 		if r != nil {
+			if got == nil {
+				got = table.Rows{}
+			}
 			got = append(got, r)
 		} else {
 			inlineErrors = append(inlineErrors, inlineError)
@@ -36,12 +39,25 @@ func iterateRowsWithErrors(iter *RowIterator) (table.Rows, []*errors.Error, erro
 	return got, inlineErrors, err
 }
 
+func iterateRows(iter *RowIterator) (table.Rows, error) {
+	// Pulls the frames from the downstream RowIterator.
+	var got table.Rows = nil
+	err := iter.Do(func(r *table.Row) error {
+		if r != nil {
+			if got == nil {
+				got = table.Rows{}
+			}
+			got = append(got, r)
+		}
+		return nil
+	})
+	return got, err
+}
 func assertValues(t *testing.T, wantErr error, gotErr error, want table.Rows, got table.Rows, wantInlineErrors []*errors.Error,
 	gotInlineErrors []*errors.Error) {
 	if wantErr != nil {
 		assert.Error(t, gotErr)
 		assert.EqualValues(t, wantErr, gotErr)
-		return
 	} else {
 		assert.NoError(t, gotErr)
 	}
@@ -50,23 +66,55 @@ func assertValues(t *testing.T, wantErr error, gotErr error, want table.Rows, go
 	assert.Equal(t, wantInlineErrors, gotInlineErrors)
 }
 
+func streamStateMachine(stream []frames.Frame, createSM func(iter *RowIterator, toSM chan frames.Frame) stateMachine, recv func(iter *RowIterator)) {
+	// Sends the frames like the upstream provider.
+	toSM := make(chan frames.Frame)
+
+	sendCtx, sendCancel := context.WithCancel(context.Background())
+	sendDone := make(chan struct{})
+	defer func() {
+		sendCancel()
+		<-sendDone
+	}()
+	go func() {
+		defer close(sendDone)
+		defer close(toSM)
+		for _, fr := range stream {
+			select {
+			case <-sendCtx.Done():
+				return
+			case toSM <- fr:
+			}
+		}
+	}()
+	iterCtx, cancel := context.WithCancel(context.Background())
+	iter, gotColumns := newRowIterator(iterCtx, cancel, execResp{}, v2.DataSetHeader{}, errors.OpQuery)
+
+	sm := createSM(iter, toSM)
+
+	runSM(sm)
+	<-gotColumns
+
+	recv(iter)
+}
+
 func TestNonProgressive(t *testing.T) {
 	t.Parallel()
 
 	nowish := time.Now().UTC()
 
 	tests := []struct {
-		desc         string
-		ctx          context.Context
-		stream       []frames.Frame
-		err          error
-		want         table.Rows
-		nonPrimary   map[frames.TableKind]v2.DataTable
-		inlineErrors []*errors.Error
+		desc                    string
+		ctx                     func() context.Context
+		stream                  []frames.Frame
+		err                     error
+		want                    table.Rows
+		wantWithoutInlineErrors table.Rows
+		nonPrimary              map[frames.TableKind]v2.DataTable
+		inlineErrors            []*errors.Error
 	}{
 		{
 			desc:   "No completion frame error",
-			ctx:    context.Background(),
 			stream: []frames.Frame{},
 			err:    errors.ES(errors.OpUnknown, errors.KInternal, "non-progressive stream did not have DataSetCompletion frame"),
 		},
@@ -76,19 +124,17 @@ func TestNonProgressive(t *testing.T) {
 				ctx, cancel := context.WithCancel(context.Background())
 				cancel()
 				return ctx
-			}(),
+			},
 			stream: []frames.Frame{},
 			err:    goErr.New("context canceled"),
 		},
 		{
 			desc:   "No DataSetCompletion Frame",
-			ctx:    context.Background(),
 			stream: []frames.Frame{v2.DataTable{TableKind: frames.PrimaryResult}},
 			err:    errors.ES(errors.OpUnknown, errors.KInternal, "non-progressive stream did not have DataSetCompletion frame"),
 		},
 		{
 			desc: "Frame after DataSetCompletion",
-			ctx:  context.Background(),
 			stream: []frames.Frame{
 				v2.DataTable{TableKind: frames.PrimaryResult},
 				v2.DataSetCompletion{},
@@ -98,7 +144,6 @@ func TestNonProgressive(t *testing.T) {
 		},
 		{
 			desc: "The expected frame set",
-			ctx:  context.Background(),
 			stream: []frames.Frame{
 				v2.DataTable{
 					Base:      v2.Base{FrameType: frames.TypeDataTable},
@@ -191,7 +236,6 @@ func TestNonProgressive(t *testing.T) {
 		},
 		{
 			desc: "The expected frame set with inline errors",
-			ctx:  context.Background(),
 			stream: []frames.Frame{
 				v2.DataTable{
 					Base:      v2.Base{FrameType: frames.TypeDataTable},
@@ -208,6 +252,11 @@ func TestNonProgressive(t *testing.T) {
 							value.String{Value: "Visualization", Valid: true},
 							value.Dynamic{Value: []byte(`{"Visualization":null,"Title":null,"XColumn":null,"Series":null,"YColumns":null,"XTitle":null}`), Valid: true},
 						},
+					},
+					RowErrors: []errors.Error{
+						*errors.ES(errors.OpUnknown, errors.KLimitsExceeded, "Request is invalid and cannot be executed.;See https://docs.microsoft."+
+							"com/en-us/azure/kusto/concepts/querylimits"),
+						*errors.ES(errors.OpUnknown, errors.KLimitsExceeded, "Some other error"),
 					},
 				},
 				v2.DataTable{
@@ -298,39 +347,44 @@ func TestNonProgressive(t *testing.T) {
 		test := test // Capture
 		t.Run(test.desc, func(t *testing.T) {
 			t.Parallel()
-			wg := sync.WaitGroup{}
-			// Sends the frames like the upstream provider.
-			toSM := make(chan frames.Frame)
-			wg.Add(1)
-			go func() {
-				defer wg.Done()
-				defer close(toSM)
-				for _, fr := range test.stream {
-					toSM <- fr
+
+			if test.ctx == nil {
+				test.ctx = func() context.Context {
+					return context.Background()
 				}
-			}()
-
-			ctx, cancel := context.WithCancel(context.Background())
-			iter, gotColumns := newRowIterator(ctx, cancel, execResp{}, v2.DataSetHeader{}, errors.OpQuery)
-
-			sm := nonProgressiveSM{
-				iter: iter,
-				in:   toSM,
-				ctx:  test.ctx,
-				wg:   &sync.WaitGroup{},
 			}
 
-			runSM(&sm)
-			<-gotColumns
-
-			got, inlineErrors, err := iterateRowsWithErrors(sm.iter)
-			if err != nil {
-				return
+			createSm := func(iter *RowIterator, toSM chan frames.Frame) stateMachine {
+				return &nonProgressiveSM{
+					iter: iter,
+					in:   toSM,
+					ctx:  test.ctx(),
+					wg:   &sync.WaitGroup{},
+				}
 			}
 
-			wg.Wait()
+			streamStateMachine(test.stream, createSm, func(iter *RowIterator) {
+				got, inlineErrors, err := iterateRowsWithErrors(iter)
 
-			assertValues(t, test.err, err, test.want, got, test.inlineErrors, inlineErrors)
+				assertValues(t, test.err, err, test.want, got, test.inlineErrors, inlineErrors)
+			})
+
+			streamStateMachine(test.stream, createSm, func(iter *RowIterator) {
+				got, err := iterateRows(iter)
+
+				testErr := test.err
+				if testErr == nil && test.inlineErrors != nil && len(test.inlineErrors) > 0 {
+					testErr = test.inlineErrors[0]
+				}
+
+				want := test.want
+				if test.wantWithoutInlineErrors != nil {
+					want = test.wantWithoutInlineErrors
+				}
+
+				assertValues(t, testErr, err, want, got, nil, nil)
+			})
+
 		})
 	}
 }
@@ -343,17 +397,17 @@ func TestProgressive(t *testing.T) {
 	nowish := time.Now().UTC()
 
 	tests := []struct {
-		desc         string
-		ctx          context.Context
-		stream       []frames.Frame
-		err          error
-		want         table.Rows
-		nonPrimary   map[frames.TableKind]v2.DataTable
-		inlineErrors []*errors.Error
+		desc                    string
+		ctx                     func() context.Context
+		stream                  []frames.Frame
+		err                     error
+		want                    table.Rows
+		wantWithoutInlineErrors table.Rows
+		nonPrimary              map[frames.TableKind]v2.DataTable
+		inlineErrors            []*errors.Error
 	}{
 		{
 			desc:   "No completion frame error",
-			ctx:    context.Background(),
 			stream: []frames.Frame{},
 			err:    errors.ES(errors.OpUnknown, errors.KInternal, "received a table stream that did not finish before our input channel, this is usually a return size or time limit"),
 		},
@@ -363,19 +417,17 @@ func TestProgressive(t *testing.T) {
 				ctx, cancel := context.WithCancel(context.Background())
 				cancel()
 				return ctx
-			}(),
+			},
 			stream: []frames.Frame{},
 			err:    goErr.New("context canceled"),
 		},
 		{
 			desc:   "No frames.DataSetCompletion Frame",
-			ctx:    context.Background(),
 			stream: []frames.Frame{v2.DataTable{TableKind: frames.QueryProperties}},
 			err:    errors.ES(errors.OpUnknown, errors.KInternal, "received a table stream that did not finish before our input channel, this is usually a return size or time limit"),
 		},
 		{
 			desc: "dataTable was PrimaryResult",
-			ctx:  context.Background(),
 			stream: []frames.Frame{
 				v2.DataTable{TableKind: frames.PrimaryResult},
 				v2.DataSetCompletion{},
@@ -384,7 +436,6 @@ func TestProgressive(t *testing.T) {
 		},
 		{
 			desc: "Frame after frames.DataSetCompletion",
-			ctx:  context.Background(),
 			stream: []frames.Frame{
 				v2.DataTable{TableKind: frames.QueryProperties},
 				v2.DataSetCompletion{},
@@ -394,7 +445,6 @@ func TestProgressive(t *testing.T) {
 		},
 		{
 			desc: "TableFragment with no TableHeader",
-			ctx:  context.Background(),
 			stream: []frames.Frame{
 				v2.DataTable{TableKind: frames.QueryProperties},
 				v2.TableFragment{},
@@ -404,7 +454,6 @@ func TestProgressive(t *testing.T) {
 		{
 			desc: "Had a Primary DataTable",
 			err:  errors.ES(errors.OpUnknown, errors.KInternal, "progressive stream had dataTable with Kind == PrimaryResult"),
-			ctx:  context.Background(),
 			stream: []frames.Frame{
 				v2.DataTable{
 					Base:      v2.Base{FrameType: frames.TypeDataTable},
@@ -447,34 +496,6 @@ func TestProgressive(t *testing.T) {
 				},
 				v2.DataSetCompletion{},
 			},
-			want: table.Rows{
-				&table.Row{
-					ColumnTypes: table.Columns{
-						{Name: "Timestamp", Type: "datetime"},
-						{Name: "Name", Type: "string"},
-						{Name: "ID", Type: "long"},
-					},
-					Values: value.Values{
-						value.DateTime{Value: nowish, Valid: true},
-						value.String{Value: "Doak", Valid: true},
-						value.Long{Value: 10, Valid: true},
-					},
-					Op: errors.OpQuery,
-				},
-				&table.Row{
-					ColumnTypes: table.Columns{
-						{Name: "Timestamp", Type: "datetime"},
-						{Name: "Name", Type: "string"},
-						{Name: "ID", Type: "long"},
-					},
-					Values: value.Values{
-						value.DateTime{Value: nowish, Valid: true},
-						value.String{Value: "Dubovski", Valid: true},
-						value.Long{Value: 0, Valid: false},
-					},
-					Op: errors.OpQuery,
-				},
-			},
 			nonPrimary: map[frames.TableKind]v2.DataTable{
 				frames.QueryProperties: {
 					Base:      v2.Base{FrameType: frames.TypeDataTable},
@@ -497,7 +518,6 @@ func TestProgressive(t *testing.T) {
 		},
 		{
 			desc: "Expected Result",
-			ctx:  context.Background(),
 			stream: []frames.Frame{
 				v2.TableHeader{
 					Base:      v2.Base{FrameType: frames.TypeTableHeader},
@@ -616,7 +636,6 @@ func TestProgressive(t *testing.T) {
 		},
 		{
 			desc: "Expected Result with inline errors",
-			ctx:  context.Background(),
 			stream: []frames.Frame{
 				v2.TableHeader{
 					Base:      v2.Base{FrameType: frames.TypeTableHeader},
@@ -721,6 +740,21 @@ func TestProgressive(t *testing.T) {
 					Op: errors.OpQuery,
 				},
 			},
+			wantWithoutInlineErrors: table.Rows{
+				&table.Row{
+					ColumnTypes: table.Columns{
+						{Name: "Timestamp", Type: "datetime"},
+						{Name: "Name", Type: "string"},
+						{Name: "ID", Type: "long"},
+					},
+					Values: value.Values{
+						value.DateTime{Value: nowish, Valid: true},
+						value.String{Value: "Doak", Valid: true},
+						value.Long{Value: 10, Valid: true},
+					},
+					Op: errors.OpQuery,
+				},
+			},
 			nonPrimary: map[frames.TableKind]v2.DataTable{
 				frames.QueryProperties: {
 					Base:      v2.Base{FrameType: frames.TypeDataTable},
@@ -755,43 +789,42 @@ func TestProgressive(t *testing.T) {
 	for _, test := range tests {
 		test := test // Capture
 		t.Run(test.desc, func(t *testing.T) {
-			t.Parallel()
-			// Sends the frames like the upstream provider.
-			toSM := make(chan frames.Frame)
-			sendCtx, sendCancel := context.WithCancel(context.Background())
-			sendDone := make(chan struct{})
-			defer func() {
-				sendCancel()
-				<-sendDone
-			}()
-			go func() {
-				defer close(sendDone)
-				defer close(toSM)
-				for _, fr := range test.stream {
-					select {
-					case <-sendCtx.Done():
-						return
-					case toSM <- fr:
-					}
+			if test.ctx == nil {
+				test.ctx = func() context.Context {
+					return context.Background()
 				}
-			}()
-
-			ctx, cancel := context.WithCancel(context.Background())
-			iter, gotColumns := newRowIterator(ctx, cancel, execResp{}, v2.DataSetHeader{}, errors.OpQuery)
-
-			sm := progressiveSM{
-				iter: iter,
-				in:   toSM,
-				ctx:  test.ctx,
-				wg:   &sync.WaitGroup{},
 			}
 
-			runSM(&sm)
-			<-gotColumns
+			createSm := func(iter *RowIterator, toSM chan frames.Frame) stateMachine {
+				return &progressiveSM{
+					iter: iter,
+					in:   toSM,
+					ctx:  test.ctx(),
+					wg:   &sync.WaitGroup{},
+				}
+			}
 
-			got, inlineErrors, err := iterateRowsWithErrors(sm.iter)
+			streamStateMachine(test.stream, createSm, func(iter *RowIterator) {
+				got, inlineErrors, err := iterateRowsWithErrors(iter)
 
-			assertValues(t, test.err, err, test.want, got, test.inlineErrors, inlineErrors)
+				assertValues(t, test.err, err, test.want, got, test.inlineErrors, inlineErrors)
+			})
+
+			streamStateMachine(test.stream, createSm, func(iter *RowIterator) {
+				got, err := iterateRows(iter)
+
+				testErr := test.err
+				if testErr == nil && test.inlineErrors != nil && len(test.inlineErrors) > 0 {
+					testErr = test.inlineErrors[0]
+				}
+
+				want := test.want
+				if test.wantWithoutInlineErrors != nil {
+					want = test.wantWithoutInlineErrors
+				}
+
+				assertValues(t, testErr, err, want, got, nil, nil)
+			})
 		})
 	}
 }
@@ -802,16 +835,16 @@ func TestV1SM(t *testing.T) {
 	nowish := time.Now().UTC()
 
 	tests := []struct {
-		desc         string
-		ctx          context.Context
-		stream       []frames.Frame
-		err          error
-		want         table.Rows
-		inlineErrors []*errors.Error
+		desc                    string
+		ctx                     func() context.Context
+		stream                  []frames.Frame
+		err                     error
+		want                    table.Rows
+		wantWithoutInlineErrors table.Rows
+		inlineErrors            []*errors.Error
 	}{
 		{
 			desc:   "No DataTable frame error",
-			ctx:    context.Background(),
 			stream: []frames.Frame{},
 			err:    errors.ES(errors.OpUnknown, errors.KInternal, "received a table stream that did not finish before our input channel, this is usually a return size or time limit"),
 		},
@@ -821,13 +854,12 @@ func TestV1SM(t *testing.T) {
 				ctx, cancel := context.WithCancel(context.Background())
 				cancel()
 				return ctx
-			}(),
+			},
 			stream: []frames.Frame{},
 			err:    goErr.New("context canceled"),
 		},
 		{
 			desc: "Single Table",
-			ctx:  context.Background(),
 			stream: []frames.Frame{
 				v1.DataTable{
 					DataTypes: v1.DataTypes{
@@ -862,7 +894,6 @@ func TestV1SM(t *testing.T) {
 		},
 		{
 			desc: "Primary And QueryProperties",
-			ctx:  context.Background(),
 			stream: []frames.Frame{
 				v1.DataTable{
 					DataTypes: v1.DataTypes{
@@ -907,7 +938,6 @@ func TestV1SM(t *testing.T) {
 		},
 		{
 			desc: "Primary With TableOfContents",
-			ctx:  context.Background(),
 			stream: []frames.Frame{
 				v1.DataTable{
 					DataTypes: v1.DataTypes{
@@ -977,7 +1007,6 @@ func TestV1SM(t *testing.T) {
 		},
 		{
 			desc: "Multiple Primaries",
-			ctx:  context.Background(),
 			stream: []frames.Frame{
 				v1.DataTable{
 					DataTypes: v1.DataTypes{
@@ -1081,7 +1110,6 @@ func TestV1SM(t *testing.T) {
 		},
 		{
 			desc: "Multiple Primaries with errors",
-			ctx:  context.Background(),
 			stream: []frames.Frame{
 				v1.DataTable{
 					DataTypes: v1.DataTypes{
@@ -1190,6 +1218,21 @@ func TestV1SM(t *testing.T) {
 					Op: errors.OpQuery,
 				},
 			},
+			wantWithoutInlineErrors: table.Rows{
+				&table.Row{
+					ColumnTypes: table.Columns{
+						{Name: "Timestamp", Type: "datetime"},
+						{Name: "Name", Type: "string"},
+						{Name: "ID", Type: "long"},
+					},
+					Values: value.Values{
+						value.DateTime{Value: nowish, Valid: true},
+						value.String{Value: "Doak", Valid: true},
+						value.Long{Value: 10, Valid: true},
+					},
+					Op: errors.OpQuery,
+				},
+			},
 			inlineErrors: []*errors.Error{
 				errors.ES(errors.OpUnknown, errors.KLimitsExceeded, "Request is invalid and cannot be executed.;See https://docs.microsoft."+
 					"com/en-us/azure/kusto/concepts/querylimits"),
@@ -1203,42 +1246,43 @@ func TestV1SM(t *testing.T) {
 		test := test // Capture
 		t.Run(test.desc, func(t *testing.T) {
 			t.Parallel()
-			// Sends the frames like the upstream provider.
-			toSM := make(chan frames.Frame)
 
-			sendCtx, sendCancel := context.WithCancel(context.Background())
-			sendDone := make(chan struct{})
-			defer func() {
-				sendCancel()
-				<-sendDone
-			}()
-			go func() {
-				defer close(sendDone)
-				defer close(toSM)
-				for _, fr := range test.stream {
-					select {
-					case <-sendCtx.Done():
-						return
-					case toSM <- fr:
-					}
+			if test.ctx == nil {
+				test.ctx = func() context.Context {
+					return context.Background()
 				}
-			}()
-			ctx, cancel := context.WithCancel(context.Background())
-			iter, gotColumns := newRowIterator(ctx, cancel, execResp{}, v2.DataSetHeader{}, errors.OpQuery)
-
-			sm := v1SM{
-				iter: iter,
-				in:   toSM,
-				ctx:  test.ctx,
-				wg:   &sync.WaitGroup{},
 			}
 
-			runSM(&sm)
-			<-gotColumns
+			createSm := func(iter *RowIterator, toSM chan frames.Frame) stateMachine {
+				return &v1SM{
+					iter: iter,
+					in:   toSM,
+					ctx:  test.ctx(),
+					wg:   &sync.WaitGroup{},
+				}
+			}
+			streamStateMachine(test.stream, createSm, func(iter *RowIterator) {
+				got, inlineErrors, err := iterateRowsWithErrors(iter)
 
-			got, inlineErrors, err := iterateRowsWithErrors(sm.iter)
+				assertValues(t, test.err, err, test.want, got, test.inlineErrors, inlineErrors)
+			})
 
-			assertValues(t, test.err, err, test.want, got, test.inlineErrors, inlineErrors)
+			streamStateMachine(test.stream, createSm, func(iter *RowIterator) {
+				got, err := iterateRows(iter)
+
+				testErr := test.err
+				if testErr == nil && test.inlineErrors != nil && len(test.inlineErrors) > 0 {
+					testErr = test.inlineErrors[0]
+				}
+
+				want := test.want
+				if test.wantWithoutInlineErrors != nil {
+					want = test.wantWithoutInlineErrors
+				}
+
+				assertValues(t, testErr, err, want, got, nil, nil)
+			})
+
 		})
 	}
 }
