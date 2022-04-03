@@ -25,7 +25,7 @@ func iterateRowsWithErrors(iter *RowIterator) (table.Rows, []*errors.Error, erro
 	// Pulls the frames from the downstream RowIterator.
 	var got table.Rows = nil
 	var inlineErrors []*errors.Error
-	err := iter.Do2(func(r *table.Row, inlineError *errors.Error) error {
+	err := iter.DoOnRowOrError(func(r *table.Row, inlineError *errors.Error) error {
 		if r != nil {
 			if got == nil {
 				got = table.Rows{}

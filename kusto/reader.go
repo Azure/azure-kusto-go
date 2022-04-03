@@ -192,10 +192,10 @@ func (r *RowIterator) Mock(m *MockRows) error {
 	return nil
 }
 
+// Deprecated: Use DoOnRowOrError() instead for more robust error handling. In a future version, this will be removed, and NextRowOrError will replace it.
 // Do calls f for every row returned by the query. If f returns a non-nil error, iteration stops.
 // This method will fail on errors inline within the rows, even though they could potentially be recovered and more data might be available.
 // This behavior is to keep the interface compatible.
-// For more robust error handling, use Do2.
 func (r *RowIterator) Do(f func(r *table.Row) error) error {
 	for {
 		row, err := r.Next()
@@ -211,11 +211,12 @@ func (r *RowIterator) Do(f func(r *table.Row) error) error {
 	}
 }
 
-// Do2 calls f for every row returned by the query. If errors occur inline within the rows, they are passed to f.
+// DoOnRowOrError calls f for every row returned by the query. If errors occur inline within the rows, they are passed to f.
+// Other errors will stop the iteration and be returned.
 // If f returns a non-nil error, iteration stops.
-func (r *RowIterator) Do2(f func(r *table.Row, e *errors.Error) error) error {
+func (r *RowIterator) DoOnRowOrError(f func(r *table.Row, e *errors.Error) error) error {
 	for {
-		row, inlineErr, err := r.Next2()
+		row, inlineErr, err := r.NextRowOrError()
 		if err != nil {
 			if err == io.EOF {
 				return nil
@@ -235,13 +236,12 @@ func (r *RowIterator) Stop() {
 	return
 }
 
-// Next gets the next Row from the query. io.EOF is returned if there are no more entries in the output, or if a permanent error has occurred.
+// Deprecated: Use NextRowOrError() instead for more robust error handling. In a future version, this will be removed, and NextRowOrError will replace it.
+// Next gets the next Row from the query. io.EOF is returned if there are no more entries in the output.
 // This method will fail on errors inline within the rows, even though they could potentially be recovered and more data might be available.
-// This behavior is to keep the interface compatible.
-// For more robust error handling, use Next2.
-// Errors may be returned, but iteration should continue until io.EOF is returned.
+// Once Next() returns an error, all subsequent calls will return the same error.
 func (r *RowIterator) Next() (row *table.Row, finalError error) {
-	row, inlineErr, err := r.Next2()
+	row, inlineErr, err := r.NextRowOrError()
 	if err != nil {
 		return nil, err
 	}
@@ -252,12 +252,12 @@ func (r *RowIterator) Next() (row *table.Row, finalError error) {
 	return row, err
 }
 
-// NextRowOrError gets the next Row or service-side error from the query. 
+// NextRowOrError gets the next Row or service-side error from the query.
 // On partial success, inlineError will be set.
 // Once finalError returns non-nil, all subsequent calls will return the same error.
 // finalError will be set to io.EOF is when frame parsing completed with success or partial success (data + errors).
-// if finalError is not io.EOF, reading the frame has resulted in a failure state (no data is expected). 
-func (r *RowIterator) Next2() (row *table.Row, inlineError *errors.Error, finalError error) {
+// if finalError is not io.EOF, reading the frame has resulted in a failure state (no data is expected).
+func (r *RowIterator) NextRowOrError() (row *table.Row, inlineError *errors.Error, finalError error) {
 	if err := r.getError(); err != nil {
 		return nil, nil, err
 	}
