@@ -130,9 +130,6 @@ func (i *Ingestion) Local(ctx context.Context, from string, props properties.All
 		return err
 	}
 
-	// We always want to delete the blob we create when we ingest from a local file.
-	props.Ingestion.RetainBlobOnSuccess = false
-
 	if err := i.Blob(ctx, blobURL.String(), size, props); err != nil {
 		return err
 	}
@@ -202,9 +199,6 @@ func (i *Ingestion) Reader(ctx context.Context, reader io.Reader, props properti
 		size = gz.InputSize()
 	}
 
-	// We always want to delete the blob we create when we ingest from a local file.
-	props.Ingestion.RetainBlobOnSuccess = false
-
 	if err := i.Blob(ctx, blobURL.String(), size, props); err != nil {
 		return blobName, err
 	}
@@ -228,6 +222,8 @@ func (i *Ingestion) Blob(ctx context.Context, from string, fileSize int64, props
 	if fileSize != 0 {
 		props.Ingestion.RawDataSize = fileSize
 	}
+
+	props.Ingestion.RetainBlobOnSuccess = !props.Source.DeleteLocalSource
 
 	err = CompleteFormatFromFileName(&props, from)
 	if err != nil {
@@ -320,7 +316,7 @@ var nower = time.Now
 // error if there was one.
 func (i *Ingestion) localToBlob(ctx context.Context, from string, to azblob.ContainerURL, props *properties.All) (azblob.BlockBlobURL, int64, error) {
 	compression := CompressionDiscovery(from)
-	blobName := fmt.Sprintf("%s_%s_%s_%s", i.db, i.table, nower(), filepath.Base(from))
+	blobName := fmt.Sprintf("%s_%s_%s_%s_%s", i.db, i.table, nower(), filepath.Base(uuid.New().String()), filepath.Base(from))
 	if compression == properties.CTNone {
 		blobName = blobName + ".gz"
 	}
