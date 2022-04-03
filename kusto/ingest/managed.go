@@ -46,7 +46,7 @@ func NewManaged(client QueryClient, db, table string, options ...Option) (*Manag
 
 func (m *Managed) FromFile(ctx context.Context, fPath string, options ...FileOption) (*Result, error) {
 	props := m.newProp()
-	file, err := prepFile(fPath, &props, options, ManagedClient)
+	file, err := prepFileAndProps(fPath, &props, options, ManagedClient)
 
 	if err == FileIsBlobErr { // Non-local file - fallback to queued
 		return m.queued.fromFile(ctx, fPath, []FileOption{}, props)
