@@ -50,7 +50,7 @@ func NewStreaming(client QueryClient, db, table string) (*Streaming, error) {
 // This method is thread-safe.
 func (i *Streaming) FromFile(ctx context.Context, fPath string, options ...FileOption) (*Result, error) {
 	props := i.newProp()
-	file, err := prepFile(fPath, &props, options, StreamingClient)
+	file, err := prepFileAndProps(fPath, &props, options, StreamingClient)
 	if err != nil {
 		return nil, err
 	}
@@ -58,7 +58,7 @@ func (i *Streaming) FromFile(ctx context.Context, fPath string, options ...FileO
 	return streamImpl(i.streamConn, ctx, file, props)
 }
 
-func prepFile(fPath string, props *properties.All, options []FileOption, client ClientScope) (*os.File, error) {
+func prepFileAndProps(fPath string, props *properties.All, options []FileOption, client ClientScope) (*os.File, error) {
 	local, err := queued.IsLocalPath(fPath)
 	if err != nil {
 		return nil, err
