@@ -252,9 +252,11 @@ func (r *RowIterator) Next() (row *table.Row, finalError error) {
 	return row, err
 }
 
-// Next2 gets the next Row from the query. io.EOF is returned if there are no more entries in the output, or if a permanent error has occurred.
-// If an error within a table's rows occurs, inlineError will be set.
-// Errors may be returned, but iteration should continue until io.EOF is returned.
+// NextRowOrError gets the next Row or service-side error from the query. 
+// On partial success, inlineError will be set.
+// Once finalError returns non-nil, all subsequent calls will return the same error.
+// finalError will be set to io.EOF is when frame parsing completed with success or partial success (data + errors).
+// if finalError is not io.EOF, reading the frame has resulted in a failure state (no data is expected). 
 func (r *RowIterator) Next2() (row *table.Row, inlineError *errors.Error, finalError error) {
 	if err := r.getError(); err != nil {
 		return nil, nil, err
