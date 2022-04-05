@@ -9,7 +9,6 @@ import (
 	"encoding/json"
 	"fmt"
 	"math/big"
-	"regexp"
 	"sort"
 	"strings"
 	"sync"
@@ -67,8 +66,6 @@ type ParamType struct {
 	name string
 }
 
-var decRE = regexp.MustCompile(`^\d*\.\d+$`)
-
 func (p ParamType) validate() error {
 	if !p.Type.Valid() {
 		return fmt.Errorf("the .Type was not a valid value, must be one of the values in this package starting with CT<type name>, was %s", p.Type)
@@ -123,13 +120,18 @@ func (p ParamType) validate() error {
 	case types.Decimal:
 		switch v := p.Default.(type) {
 		case string:
-			if !decRE.MatchString(v) {
+			if !value.DecRE.MatchString(v) {
 				return fmt.Errorf("string representing decimal does not appear to be a decimal number, was %v", v)
 			}
 			return nil
 		case *big.Float:
 			if v == nil {
 				return fmt.Errorf("*big.Float type cannot be set to the nil value")
+			}
+			return nil
+		case *big.Int:
+			if v == nil {
+				return fmt.Errorf("*big.Int type cannot be set to the nil value")
 			}
 			return nil
 		}
@@ -463,6 +465,8 @@ func (q Parameters) validate(p Definitions) (Parameters, error) {
 			case string:
 				sval = v
 			case *big.Float:
+				sval = v.String()
+			case *big.Int:
 				sval = v.String()
 			default:
 				return q, fmt.Errorf("Parameters[%s](decimal) = %T, which is not a string or *big.Float", k, v)

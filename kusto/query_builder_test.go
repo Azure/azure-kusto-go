@@ -112,6 +112,14 @@ func TestParamType(t *testing.T) {
 			err: true,
 		},
 		{
+			desc: "Bad Default for types.Decimal - only decimal point",
+			param: ParamType{
+				Type:    types.Decimal,
+				Default: ".",
+			},
+			err: true,
+		},
+		{
 			desc: "Success Default for types.Bool",
 			param: ParamType{
 				Type:    types.Bool,
@@ -201,6 +209,33 @@ func TestParamType(t *testing.T) {
 				name:    "my_value",
 			},
 			wantStr: "my_value:decimal = 1.349",
+		},
+		{
+			desc: "Success no decimal point for types.Decimal",
+			param: ParamType{
+				Type:    types.Decimal,
+				Default: "1",
+				name:    "my_value",
+			},
+			wantStr: "my_value:decimal = 1",
+		},
+		{
+			desc: "Success elided left side for types.Decimal",
+			param: ParamType{
+				Type:    types.Decimal,
+				Default: ".1",
+				name:    "my_value",
+			},
+			wantStr: "my_value:decimal = .1",
+		},
+		{
+			desc: "Success elided right side for types.Decimal",
+			param: ParamType{
+				Type:    types.Decimal,
+				Default: "1.",
+				name:    "my_value",
+			},
+			wantStr: "my_value:decimal = 1.",
 		},
 	}
 
@@ -352,7 +387,7 @@ func TestParameters(t *testing.T) {
 			err:     true,
 		},
 		{
-			desc:    "Should be string representing decimal or *big.Float, isn't",
+			desc:    "Should be string representing decimal or *big.Float or *big.Int, isn't",
 			qParams: NewDefinitions().Must(map[string]ParamType{"key1": {Type: types.Decimal}}),
 			qValues: NewParameters().Must(map[string]interface{}{"key1": 1}),
 			err:     true,
@@ -406,10 +441,16 @@ func TestParameters(t *testing.T) {
 			want:    map[string]string{"key1": fmt.Sprintf("decimal(%s)", "1.3")},
 		},
 		{
-			desc:    "Success *big.Float",
+			desc:    "Success *big.Float for decimal",
 			qParams: NewDefinitions().Must(map[string]ParamType{"key1": {Type: types.Decimal}}),
 			qValues: NewParameters().Must(map[string]interface{}{"key1": big.NewFloat(3.2)}),
 			want:    map[string]string{"key1": fmt.Sprintf("decimal(%s)", big.NewFloat(3.2).String())},
+		},
+		{
+			desc:    "Success *big.Int for decimal",
+			qParams: NewDefinitions().Must(map[string]ParamType{"key1": {Type: types.Decimal}}),
+			qValues: NewParameters().Must(map[string]interface{}{"key1": big.NewInt(5)}),
+			want:    map[string]string{"key1": fmt.Sprintf("decimal(%s)", big.NewInt(5).String())},
 		},
 	}
 

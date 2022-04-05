@@ -557,16 +557,13 @@ func TestDecimal(t *testing.T) {
 		want Decimal
 	}{
 		{
-			desc: "cannot be an string representing an integer",
-			i:    "1",
-			err:  true,
-		},
-		{
 			desc: "cannot be a non string",
 			i:    3.0,
 			err:  true,
 		},
+		{i: "1", want: Decimal{Value: "1", Valid: true}},
 		{i: ".1", want: Decimal{Value: ".1", Valid: true}},
+		{i: "1.", want: Decimal{Value: "1.", Valid: true}},
 		{i: "0.1", want: Decimal{Value: "0.1", Valid: true}},
 		{i: "3.07", want: Decimal{Value: "3.07", Valid: true}},
 	}
