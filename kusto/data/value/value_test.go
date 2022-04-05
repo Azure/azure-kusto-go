@@ -2,14 +2,13 @@ package value
 
 import (
 	"encoding/json"
-	"fmt"
 	"math"
 	"strings"
 	"testing"
 	"time"
 
 	"github.com/google/uuid"
-	"github.com/kylelemons/godebug/pretty"
+	"github.com/stretchr/testify/assert"
 )
 
 func TestBool(t *testing.T) {
@@ -44,22 +43,21 @@ func TestBool(t *testing.T) {
 	}
 
 	for _, test := range tests {
-		got := Bool{}
-		err := got.Unmarshal(test.i)
-		switch {
-		case err == nil && test.err:
-			t.Errorf("TestBool(%s): err == nil, want err != nil", test.desc)
-			continue
-		case err != nil && !test.err:
-			t.Errorf("Testbool(%s): err == %s, want err == nil", test.desc, err)
-			continue
-		case err != nil:
-			continue
-		}
+		test := test // capture
+		t.Run(test.desc, func(t *testing.T) {
+			t.Parallel()
+			got := Bool{}
+			err := got.Unmarshal(test.i)
 
-		if diff := pretty.Compare(test.want, got); diff != "" {
-			t.Errorf("TestBool(%s): -want/+got:\n%s", test.desc, diff)
-		}
+			if test.err {
+				assert.Error(t, err)
+				return
+			}
+
+			assert.NoError(t, err)
+
+			assert.Equal(t, test.want, got)
+		})
 	}
 }
 
@@ -98,22 +96,21 @@ func TestDateTime(t *testing.T) {
 	}
 
 	for _, test := range tests {
-		got := DateTime{}
-		err := got.Unmarshal(test.i)
-		switch {
-		case err == nil && test.err:
-			t.Errorf("TestDateTime(%s): err == nil, want err != nil", test.desc)
-			continue
-		case err != nil && !test.err:
-			t.Errorf("TestDateTime(%s): err == %s, want err == nil", test.desc, err)
-			continue
-		case err != nil:
-			continue
-		}
+		test := test // capture
+		t.Run(test.desc, func(t *testing.T) {
+			t.Parallel()
+			got := DateTime{}
+			err := got.Unmarshal(test.i)
 
-		if diff := pretty.Compare(test.want, got); diff != "" {
-			t.Errorf("TestDateTime(%s): -want/+got:\n%s", test.desc, diff)
-		}
+			if test.err {
+				assert.Error(t, err)
+				return
+			}
+
+			assert.NoError(t, err)
+
+			assert.Equal(t, test.want, got)
+		})
 	}
 }
 
@@ -166,24 +163,21 @@ func TestDynamic(t *testing.T) {
 	}
 
 	for _, test := range tests {
-		got := Dynamic{}
-		err := got.Unmarshal(test.i)
-		switch {
-		case err == nil && test.err:
-			t.Errorf("TestDynamic(%s): err == nil, want err != nil", test.desc)
-			continue
-		case err != nil && !test.err:
-			t.Errorf("TestDynamic(%s): err == %s, want err == nil", test.desc, err)
-			continue
-		case err != nil:
-			continue
-		}
+		test := test // capture
+		t.Run(test.desc, func(t *testing.T) {
+			t.Parallel()
+			got := Dynamic{}
+			err := got.Unmarshal(test.i)
 
-		if diff := pretty.Compare(test.want, got); diff != "" {
-			t.Errorf("TestDynamic(%s): -want/+got:\n%s", test.desc, diff)
-			t.Errorf("want: %s", string(test.want.Value))
-			t.Errorf("got: %s", string(got.Value))
-		}
+			if test.err {
+				assert.Error(t, err)
+				return
+			}
+
+			assert.NoError(t, err)
+
+			assert.EqualValues(t, test.want, got)
+		})
 	}
 }
 
@@ -220,22 +214,21 @@ func TestGUID(t *testing.T) {
 	}
 
 	for _, test := range tests {
-		got := GUID{}
-		err := got.Unmarshal(test.i)
-		switch {
-		case err == nil && test.err:
-			t.Errorf("TestGUID(%s): err == nil, want err != nil", test.desc)
-			continue
-		case err != nil && !test.err:
-			t.Errorf("TestGUID(%s): err == %s, want err == nil", test.desc, err)
-			continue
-		case err != nil:
-			continue
-		}
+		test := test // capture
+		t.Run(test.desc, func(t *testing.T) {
+			t.Parallel()
+			got := GUID{}
+			err := got.Unmarshal(test.i)
 
-		if diff := pretty.Compare(test.want, got); diff != "" {
-			t.Errorf("TestGUID(%s): -want/+got:\n%s", test.desc, diff)
-		}
+			if test.err {
+				assert.Error(t, err)
+				return
+			}
+
+			assert.NoError(t, err)
+
+			assert.EqualValues(t, test.want, got)
+		})
 	}
 }
 
@@ -281,22 +274,21 @@ func TestInt(t *testing.T) {
 	}
 
 	for _, test := range tests {
-		got := Int{}
-		err := got.Unmarshal(test.i)
-		switch {
-		case err == nil && test.err:
-			t.Errorf("TestInt(%s): err == nil, want err != nil", test.desc)
-			continue
-		case err != nil && !test.err:
-			t.Errorf("TestInt(%s): err == %s, want err == nil", test.desc, err)
-			continue
-		case err != nil:
-			continue
-		}
+		test := test // capture
+		t.Run(test.desc, func(t *testing.T) {
+			t.Parallel()
+			got := Int{}
+			err := got.Unmarshal(test.i)
 
-		if diff := pretty.Compare(test.want, got); diff != "" {
-			t.Errorf("TestInt(%s): -want/+got:\n%s", test.desc, diff)
-		}
+			if test.err {
+				assert.Error(t, err)
+				return
+			}
+
+			assert.NoError(t, err)
+
+			assert.EqualValues(t, test.want, got)
+		})
 	}
 }
 
@@ -337,22 +329,21 @@ func TestLong(t *testing.T) {
 	}
 
 	for _, test := range tests {
-		got := Long{}
-		err := got.Unmarshal(test.i)
-		switch {
-		case err == nil && test.err:
-			t.Errorf("TestLong(%s): err == nil, want err != nil", test.desc)
-			continue
-		case err != nil && !test.err:
-			t.Errorf("TestLong(%s): err == %s, want err == nil", test.desc, err)
-			continue
-		case err != nil:
-			continue
-		}
+		test := test // capture
+		t.Run(test.desc, func(t *testing.T) {
+			t.Parallel()
+			got := Long{}
+			err := got.Unmarshal(test.i)
 
-		if diff := pretty.Compare(test.want, got); diff != "" {
-			t.Errorf("TestLong(%s): -want/+got:\n%s", test.desc, diff)
-		}
+			if test.err {
+				assert.Error(t, err)
+				return
+			}
+
+			assert.NoError(t, err)
+
+			assert.EqualValues(t, test.want, got)
+		})
 	}
 }
 
@@ -393,22 +384,21 @@ func TestReal(t *testing.T) {
 	}
 
 	for _, test := range tests {
-		got := Real{}
-		err := got.Unmarshal(test.i)
-		switch {
-		case err == nil && test.err:
-			t.Errorf("TestReal(%s): err == nil, want err != nil", test.desc)
-			continue
-		case err != nil && !test.err:
-			t.Errorf("TestReal(%s): err == %s, want err == nil", test.desc, err)
-			continue
-		case err != nil:
-			continue
-		}
+		test := test // capture
+		t.Run(test.desc, func(t *testing.T) {
+			t.Parallel()
+			got := Real{}
+			err := got.Unmarshal(test.i)
 
-		if diff := pretty.Compare(test.want, got); diff != "" {
-			t.Errorf("TestReal(%s): -want/+got:\n%s", test.desc, diff)
-		}
+			if test.err {
+				assert.Error(t, err)
+				return
+			}
+
+			assert.NoError(t, err)
+
+			assert.EqualValues(t, test.want, got)
+		})
 	}
 }
 
@@ -439,22 +429,21 @@ func TestString(t *testing.T) {
 	}
 
 	for _, test := range tests {
-		got := String{}
-		err := got.Unmarshal(test.i)
-		switch {
-		case err == nil && test.err:
-			t.Errorf("TestString(%s): err == nil, want err != nil", test.desc)
-			continue
-		case err != nil && !test.err:
-			t.Errorf("TestString(%s): err == %s, want err == nil", test.desc, err)
-			continue
-		case err != nil:
-			continue
-		}
+		test := test // capture
+		t.Run(test.desc, func(t *testing.T) {
+			t.Parallel()
+			got := String{}
+			err := got.Unmarshal(test.i)
 
-		if diff := pretty.Compare(test.want, got); diff != "" {
-			t.Errorf("TestString(%s): -want/+got:\n%s", test.desc, diff)
-		}
+			if test.err {
+				assert.Error(t, err)
+				return
+			}
+
+			assert.NoError(t, err)
+
+			assert.EqualValues(t, test.want, got)
+		})
 	}
 }
 
@@ -505,35 +494,29 @@ func TestTimespan(t *testing.T) {
 	}
 
 	for _, test := range tests {
-		if test.desc == "" {
-			test.desc = fmt.Sprintf("Conversion of %s", test.i)
-		}
+		test := test // capture
+		t.Run(test.desc, func(t *testing.T) {
+			t.Parallel()
+			got := Timespan{}
+			err := got.Unmarshal(test.i)
 
-		got := Timespan{}
-		err := got.Unmarshal(test.i)
-		switch {
-		case err == nil && test.err:
-			t.Errorf("TestTimespan(%s): err == nil, want err != nil", test.desc)
-			continue
-		case err != nil && !test.err:
-			t.Errorf("TestTimespan(%s): err == %s, want err == nil", test.desc, err)
-			continue
-		case err != nil:
-			continue
-		}
-
-		if test.want != got {
-			t.Errorf("TestTimespan(%s): got %v, want %v", test.desc, got, test.want)
-		}
-
-		strGot := got.Marshal()
-		if test.i == nil || !got.Valid {
-			if strGot != "00:00:00" {
-				t.Errorf("TestTimespan(%s): Marshal(): got %v, want %v", test.desc, strGot, "00:00:00")
+			if test.err {
+				assert.Error(t, err)
+				return
 			}
-		} else if removeLeadingZeros(strGot) != removeLeadingZeros(test.i.(string)) {
-			t.Errorf("TestTimespan(%s): Marshal(): got %v, want %v", test.desc, strGot, test.i)
-		}
+
+			assert.NoError(t, err)
+
+			assert.EqualValues(t, test.want, got)
+
+			strGot := got.Marshal()
+
+			if test.i == nil || !got.Valid {
+				assert.Equal(t, "00:00:00", strGot)
+				return
+			}
+			assert.EqualValues(t, removeLeadingZeros(test.i.(string)), removeLeadingZeros(strGot))
+		})
 	}
 }
 
@@ -561,34 +544,28 @@ func TestDecimal(t *testing.T) {
 			i:    3.0,
 			err:  true,
 		},
-		{i: "1", want: Decimal{Value: "1", Valid: true}},
-		{i: ".1", want: Decimal{Value: ".1", Valid: true}},
-		{i: "1.", want: Decimal{Value: "1.", Valid: true}},
-		{i: "0.1", want: Decimal{Value: "0.1", Valid: true}},
-		{i: "3.07", want: Decimal{Value: "3.07", Valid: true}},
+		{desc: "Conversion of '1',", i: "1", want: Decimal{Value: "1", Valid: true}},
+		{desc: "Conversion of '.1',", i: ".1", want: Decimal{Value: ".1", Valid: true}},
+		{desc: "Conversion of '1.',", i: "1.", want: Decimal{Value: "1.", Valid: true}},
+		{desc: "Conversion of '0.1',", i: "0.1", want: Decimal{Value: "0.1", Valid: true}},
+		{desc: "Conversion of '3.07',", i: "3.07", want: Decimal{Value: "3.07", Valid: true}},
 	}
 
 	for _, test := range tests {
-		if test.desc == "" {
-			test.desc = fmt.Sprintf("Conversion of %s", test.i)
-		}
+		test := test // capture
+		t.Run(test.desc, func(t *testing.T) {
+			t.Parallel()
+			got := Decimal{}
+			err := got.Unmarshal(test.i)
 
-		got := Decimal{}
-		err := got.Unmarshal(test.i)
-		switch {
-		case err == nil && test.err:
-			t.Errorf("TestDecimal(%s): err == nil, want err != nil", test.desc)
-			continue
-		case err != nil && !test.err:
-			t.Errorf("TestDecimal(%s): err == %s, want err == nil", test.desc, err)
-			continue
-		case err != nil:
-			continue
-		}
+			if test.err {
+				assert.Error(t, err)
+				return
+			}
 
-		if test.want != got {
-			t.Errorf("TestDecimal(%s)internal string: got %v, want %v", test.desc, got, test.want)
-		}
+			assert.NoError(t, err)
+			assert.EqualValues(t, test.want, got)
+		})
 	}
 }
 

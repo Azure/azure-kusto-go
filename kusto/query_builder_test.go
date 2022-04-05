@@ -7,9 +7,8 @@ import (
 	"time"
 
 	"github.com/Azure/azure-kusto-go/kusto/data/types"
-
 	"github.com/google/uuid"
-	"github.com/kylelemons/godebug/pretty"
+	"github.com/stretchr/testify/assert"
 )
 
 func TestParamType(t *testing.T) {
@@ -116,6 +115,22 @@ func TestParamType(t *testing.T) {
 			param: ParamType{
 				Type:    types.Decimal,
 				Default: ".",
+			},
+			err: true,
+		},
+		{
+			desc: "Bad Default for types.Decimal - nil big.Float",
+			param: ParamType{
+				Type:    types.Decimal,
+				Default: (*big.Float)(nil),
+			},
+			err: true,
+		},
+		{
+			desc: "Bad Default for types.Decimal - nil big.Int",
+			param: ParamType{
+				Type:    types.Decimal,
+				Default: (*big.Int)(nil),
 			},
 			err: true,
 		},
@@ -296,32 +311,32 @@ func TestDefinitions(t *testing.T) {
 	}
 
 	for _, test := range tests {
-		params := NewDefinitions()
-		var err error
+		test := test // capture
+		t.Run(test.desc, func(t *testing.T) {
+			t.Parallel()
+			params := NewDefinitions()
+			var err error
 
-		params, err = params.With(test.with)
+			params, err = params.With(test.with)
 
-		switch {
-		case err == nil && test.err:
-			t.Errorf("TestParameters(%s): got err == nil, want err != nil", test.desc)
-			continue
-		case err != nil && !test.err:
-			t.Errorf("TestParameters(%s): got err == %s, want err != nil", test.desc, err)
-			continue
-		case err != nil:
-			continue
-		}
+			if test.err {
+				assert.Error(t, err)
+				return
+			}
 
-		if test.wantStr != params.String() {
-			t.Errorf("TestParameters(%s): got %q, want %q", test.desc, params.String(), test.wantStr)
-		}
+			assert.NoError(t, err)
 
-		clone := params.clone()
-		clone.With(map[string]ParamType{"hellyeah": {Type: types.Bool}})
+			assert.Equal(t, test.wantStr, params.String())
 
-		if _, ok := params.m["hellyeah"]; ok {
-			t.Errorf("TestParameters(%s): clone modification modified original", test.desc)
-		}
+			clone := params.clone()
+			_, err = clone.With(map[string]ParamType{"hellyeah": {Type: types.Bool}})
+			assert.NoError(t, err)
+
+			if _, ok := params.m["hellyeah"]; ok {
+				assert.Fail(t, "clone modification modified original")
+			}
+		})
+
 	}
 }
 
@@ -455,28 +470,25 @@ func TestParameters(t *testing.T) {
 	}
 
 	for _, test := range tests {
-		got, err := test.qValues.toParameters(test.qParams)
-		switch {
-		case err == nil && test.err:
-			t.Errorf("TestQueryValues(%s): got err == nil, want err != nil", test.desc)
-			continue
-		case err != nil && !test.err:
-			t.Errorf("TestQueryValues(%s): got err == %s, want err != nil", test.desc, err)
-			continue
-		case err != nil:
-			continue
-		}
+		test := test // capture
+		t.Run(test.desc, func(t *testing.T) {
+			t.Parallel()
+			got, err := test.qValues.toParameters(test.qParams)
+			if test.err {
+				assert.Error(t, err)
+				return
+			}
 
-		if diff := pretty.Compare(test.want, got); diff != "" {
-			t.Errorf("TestQueryValues(%s):-want/+got:\n%s", test.desc, diff)
-		}
+			assert.NoError(t, err)
+
+			assert.EqualValues(t, test.want, got)
+		})
+
 	}
 }
 
 func TestStmt(t *testing.T) {
 	t.Parallel()
-
-	stmt := NewStmt("|query")
 
 	tests := []struct {
 		desc         string
@@ -540,47 +552,42 @@ func TestStmt(t *testing.T) {
 	}
 
 	for _, test := range tests {
-		var qpErr, vErr error
-		if !test.params.IsZero() || test.paramsZeroOk {
-			stmt, qpErr = stmt.WithDefinitions(test.params)
-			switch {
-			case qpErr == nil && test.qpErr:
-				t.Errorf("TestStmt(%s): got err == nil, want err != nil", test.desc)
-				continue
-			case qpErr != nil && !test.qpErr:
-				t.Errorf("TestStmt(%s): got err == %s, want err != nil", test.desc, qpErr)
-				continue
-			case qpErr != nil:
-				continue
+		test := test // capture
+		t.Run(test.desc, func(t *testing.T) {
+			t.Parallel()
+			stmt := NewStmt("|query")
+
+			var qpErr, vErr error
+			if !test.params.IsZero() || test.paramsZeroOk {
+				stmt, qpErr = stmt.WithDefinitions(test.params)
+
+				if test.qpErr {
+					assert.Error(t, qpErr)
+					return
+				}
+
+				assert.NoError(t, qpErr)
 			}
-		}
 
-		if !test.values.IsZero() || test.valuesZeroOk {
-			stmt, vErr = stmt.WithParameters(test.values)
-			switch {
-			case vErr == nil && test.vErr:
-				t.Errorf("TestStmt(%s): got err == nil, want err != nil", test.desc)
-				continue
-			case vErr != nil && !test.vErr:
-				t.Errorf("TestStmt(%s): got err == %s, want err != nil", test.desc, vErr)
-				continue
-			case vErr != nil:
-				continue
+			if !test.values.IsZero() || test.valuesZeroOk {
+				stmt, vErr = stmt.WithParameters(test.values)
+				if test.vErr {
+					assert.Error(t, vErr)
+					return
+				}
+
+				assert.NoError(t, vErr)
 			}
-		}
 
-		gotStr := stmt.String()
+			gotStr := stmt.String()
 
-		wantStr := buildQueryStr(test.wantStr, test.params)
+			wantStr := buildQueryStr(test.wantStr, test.params)
 
-		if gotStr != wantStr {
-			t.Errorf("TestStmt(%s): String(): got %q, want %q", test.desc, gotStr, wantStr)
-			continue
-		}
+			assert.Equal(t, wantStr, gotStr)
 
-		if diff := pretty.Compare(test.wantValues, stmt.params.outM); diff != "" {
-			t.Errorf("TestStmt(%s): Values: -want/+got:\n%s", test.desc, diff)
-		}
+			assert.EqualValues(t, test.wantValues, stmt.params.outM)
+		})
+
 	}
 }
 
