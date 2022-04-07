@@ -14,8 +14,8 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
-	"io"
 	"io/ioutil"
+	"net/http"
 	"runtime"
 	"strings"
 )
@@ -217,17 +217,14 @@ func ES(o Op, k Kind, s string, args ...interface{}) *Error {
 }
 
 // HTTP constructs an *Error from an *http.Response and a prefix to the error message.
-func HTTP(o Op, status string, body io.ReadCloser, prefix string) *Error {
-	bodyBytes, err := ioutil.ReadAll(body)
-	if err != nil {
-		bodyBytes = []byte(fmt.Sprintf("Failed to read body: %v", err))
-	}
+func HTTP(o Op, resp *http.Response, prefix string) *Error {
+	b, _ := ioutil.ReadAll(resp.Body) // Error doesn't matter, because there is nothing to do if it errors.
 
 	e := &Error{
 		Op:         o,
 		Kind:       KHTTPError,
-		restErrMsg: bodyBytes,
-		Err:        fmt.Errorf("%s(%s):\n%s", prefix, status, string(bodyBytes)),
+		restErrMsg: b,
+		Err:        fmt.Errorf("%s(%s):\n%s", prefix, resp.Status, string(b)),
 	}
 	e.UnmarshalREST()
 	return e

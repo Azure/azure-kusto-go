@@ -17,7 +17,6 @@ import (
 	"github.com/Azure/azure-kusto-go/kusto"
 	"github.com/Azure/azure-kusto-go/kusto/data/errors"
 	"github.com/Azure/azure-kusto-go/kusto/ingest/internal/properties"
-	"github.com/Azure/azure-kusto-go/kusto/internal/response"
 	"github.com/Azure/azure-kusto-go/kusto/internal/version"
 	"github.com/Azure/go-autorest/autorest"
 	"github.com/google/uuid"
@@ -163,11 +162,7 @@ func (c *Conn) StreamIngest(ctx context.Context, db, table string, payload io.Re
 	}
 
 	if resp.StatusCode != 200 {
-		body, err := response.TranslateBody(resp, writeOp)
-		if err != nil {
-			return err
-		}
-		return errors.HTTP(writeOp, resp.Status, body, "streaming ingest issue")
+		return errors.HTTP(writeOp, resp, "streaming ingest issue")
 	}
 	return nil
 }

@@ -15,11 +15,9 @@ import (
 	"time"
 
 	"github.com/Azure/azure-kusto-go/kusto"
-	"github.com/Azure/azure-kusto-go/kusto/data/errors"
 	"github.com/Azure/azure-kusto-go/kusto/ingest/internal/properties"
 	"github.com/google/uuid"
-	"github.com/stretchr/testify/assert"
-	"github.com/stretchr/testify/require"
+	"github.com/kylelemons/godebug/pretty"
 )
 
 type fakeStreamService struct {
@@ -51,7 +49,7 @@ func newFakeStreamService() *fakeStreamService {
 	return fs
 }
 
-func (f *fakeStreamService) handleStream(res http.ResponseWriter, r *http.Request) {
+func (f *fakeStreamService) handleStream(_ http.ResponseWriter, r *http.Request) {
 	f.req = r
 
 	zr, err := gzip.NewReader(r.Body)
@@ -68,35 +66,6 @@ func (f *fakeStreamService) handleStream(res http.ResponseWriter, r *http.Reques
 		log.Fatal(err)
 	}
 	f.out = buf.Bytes()
-
-	if strings.Contains(r.URL.Path, "httpError") {
-
-		data := []byte(`{"error":{"code":"BadRequest","message":"Bad Request"}}`)
-		res.Header().Set("Content-Type", "application/json")
-
-		if strings.Contains(r.URL.Path, "gzip") {
-			res.Header().Set("Content-Encoding", "gzip")
-			res.WriteHeader(400)
-
-			zw := gzip.NewWriter(res)
-			if _, err := zw.Write(data); err != nil {
-				log.Fatal(err)
-			}
-			if err := zw.Close(); err != nil {
-				log.Fatal(err)
-			}
-		} else {
-			res.WriteHeader(400)
-			_, err := res.Write(data)
-			if err != nil {
-				log.Fatal(err)
-			}
-		}
-
-		return
-	}
-
-	res.WriteHeader(200)
 }
 
 func (f *fakeStreamService) start() error {
@@ -115,9 +84,7 @@ func TestStream(t *testing.T) {
 		desc        string
 		payload     fakeContent
 		mappingName string
-		err         error
-		httpError   bool
-		gzip        bool
+		err         bool
 	}{
 		{
 			desc:        "AVRO without mappingName",
@@ -134,88 +101,81 @@ func TestStream(t *testing.T) {
 			payload:     fakeContent{Name: "Doak", ID: 25},
 			mappingName: "jsonMap",
 		},
-		{
-			desc:        "HTTP error",
-			payload:     fakeContent{Name: "Doak", ID: 25},
-			mappingName: "jsonMap",
-			err:         fmt.Errorf("streaming ingest issue(400 Bad Request):\n{\"error\":{\"code\":\"BadRequest\",\"message\":\"Bad Request\"}}"),
-			httpError:   true,
-			gzip:        false,
-		},
-		{
-			desc:        "HTTP error gzipped",
-			payload:     fakeContent{Name: "Doak", ID: 25},
-			mappingName: "jsonMap",
-			err:         fmt.Errorf("streaming ingest issue(400 Bad Request):\n{\"error\":{\"code\":\"BadRequest\",\"message\":\"Bad Request\"}}"),
-			httpError:   true,
-			gzip:        true,
-		},
 	}
+
+	server := newFakeStreamService()
+	go func() {
+		err := server.start()
+		if err != nil {
+			t.Errorf("failed to start server: %v", err)
+			return
+		}
+	}()
+	time.Sleep(10 * time.Millisecond)
+
+	fmt.Println(server.port)
+	conn, err := newWithoutValidation(fmt.Sprintf("http://127.0.0.1:%d", server.port), kusto.Authorization{})
+	if err != nil {
+		panic(err)
+	}
+	conn.inTest = true
+
 	for _, test := range tests {
-		test := test // capture
-		t.Run(test.desc, func(t *testing.T) {
-			server := newFakeStreamService()
-			go func() {
-				err := server.start()
-				if err != nil {
-					t.Errorf("failed to start server: %v", err)
-					return
-				}
-			}()
-			time.Sleep(10 * time.Millisecond)
-
-			fmt.Println(server.port)
-			conn, err := newWithoutValidation(fmt.Sprintf("http://127.0.0.1:%d", server.port), kusto.Authorization{})
-			if err != nil {
-				panic(err)
-			}
-			conn.inTest = true
-
+		func() {
 			ctx, cancel := context.WithTimeout(context.Background(), 3*time.Second)
 			defer cancel()
 
 			b, err := json.Marshal(test.payload)
-			require.NoError(t, err)
+			if err != nil {
+				panic(err)
+			}
 
 			var payload bytes.Buffer
 			zw := gzip.NewWriter(&payload)
 			_, err = zw.Write(b)
-			require.NoError(t, err)
-
-			err = zw.Close()
-			require.NoError(t, err)
-
-			db := "database"
-			if test.httpError {
-				db = "httpError"
-			}
-			if test.gzip {
-				db += ".gzip"
+			if err != nil {
+				panic(err)
 			}
 
-			err = conn.StreamIngest(ctx, db, "table", &payload, properties.JSON, test.mappingName, "")
+			if err := zw.Close(); err != nil {
+				panic(err)
+			}
 
-			if test.err != nil {
-				assert.Equal(t, test.err, err.(*errors.Error).Err)
+			err = conn.StreamIngest(ctx, "database", "table", &payload, properties.JSON, test.mappingName, "")
+
+			switch {
+			case err == nil && test.err:
+				t.Errorf("TestStream(%s): got err == nil, want err != nil", test.desc)
 				return
-			} else {
-				assert.NoError(t, err)
+			case err != nil && !test.err:
+				t.Errorf("TestStream(%s): got err == %s, want err == nil", test.desc, err)
+				return
+			case err != nil:
+				return
 			}
 
-			assert.EqualValues(t, "application/json; charset=utf-8", server.req.Header.Get("Content-Type"))
-			assert.EqualValues(t, "Json", server.req.URL.Query().Get("streamFormat"))
-			assert.EqualValues(t, test.mappingName, server.req.URL.Query().Get("mappingName"))
+			switch {
+			case server.req.Header.Get("Content-Type") != "application/json; charset=utf-8":
+				t.Fatalf("TestStream(%s): Content-Type: got %s, want %s", test.desc, server.req.Header.Get("Content-Type"), "application/json; charset=utf-8")
+			case server.req.URL.Query().Get("streamFormat") != "Json":
+				t.Fatalf("TestStream(%s): Query Variable(streamFormat): got %s, want json", test.desc, server.req.URL.Query().Get("streamFormat"))
+			case server.req.URL.Query().Get("mappingName") != test.mappingName:
+				t.Fatalf("TestStream(%s): Query Variable(mappingName): got %s, want %s", test.desc, server.req.URL.Query().Get("mappingName"), test.mappingName)
+			}
 
-			assert.True(t, strings.HasPrefix(server.req.Header.Get("x-ms-client-request-id"), "KGC.execute;"))
-
-			_, err = uuid.Parse(strings.TrimPrefix(server.req.Header.Get("x-ms-client-request-id"), "KGC.execute;"))
-			assert.NoError(t, err)
+			if !strings.HasPrefix(server.req.Header.Get("x-ms-client-request-id"), "KGC.execute;") {
+				t.Fatalf("TestStream(%s): x-ms-client-request-id(%s): was not expected format", test.desc, server.req.Header.Get("x-ms-client-request-id"))
+			}
+			uuid.MustParse(strings.TrimPrefix(server.req.Header.Get("x-ms-client-request-id"), "KGC.execute;"))
 
 			got := fakeContent{}
-			err = json.Unmarshal(server.out, &got)
-			assert.NoError(t, err)
+			if err := json.Unmarshal(server.out, &got); err != nil {
+				t.Fatalf("TestStream(%s): could not unmarshal data sent to server: %s", test.desc, err)
+			}
 
-			assert.EqualValues(t, test.payload, got)
-		})
+			if diff := pretty.Compare(test.payload, got); diff != "" {
+				t.Fatalf("TestStream(%s) -want/+got:\n%s", test.desc, diff)
+			}
+		}()
 	}
 }
