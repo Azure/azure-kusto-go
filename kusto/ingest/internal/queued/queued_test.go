@@ -13,6 +13,7 @@ import (
 
 	"github.com/Azure/azure-kusto-go/kusto/data/errors"
 	"github.com/Azure/azure-kusto-go/kusto/ingest/internal/properties"
+	"github.com/stretchr/testify/assert"
 
 	"github.com/Azure/azure-sdk-for-go/sdk/storage/azblob"
 )
@@ -41,10 +42,13 @@ func TestFormatDiscovery(t *testing.T) {
 	}
 
 	for _, test := range tests {
-		got := properties.DataFormatDiscovery(test.input)
-		if got != test.want {
-			t.Errorf("TestFormatDiscovery(%s): got %q, want %q", test.input, got, test.want)
-		}
+		test := test // capture
+		t.Run(test.input, func(t *testing.T) {
+			t.Parallel()
+
+			got := properties.DataFormatDiscovery(test.input)
+			assert.Equal(t, test.want, got)
+		})
 	}
 }
 
@@ -63,11 +67,15 @@ func TestCompressionDiscovery(t *testing.T) {
 	}
 
 	for _, test := range tests {
-		got := CompressionDiscovery(test.input)
-		if got != test.want {
-			t.Errorf("TestCompressionDiscoveryy(%s): got %q, want %q", test.input, got, test.want)
-		}
+		test := test // capture
+		t.Run(test.input, func(t *testing.T) {
+			t.Parallel()
+
+			got := CompressionDiscovery(test.input)
+			assert.Equal(t, test.want, got)
+		})
 	}
+
 }
 
 type fakeBlobstore struct {
@@ -106,9 +114,9 @@ func TestLocalToBlob(t *testing.T) {
 	if err != nil {
 		panic(err)
 	}
-	defer func(name string) {
-		_ = os.Remove(name)
-	}(f.Name())
+	t.Cleanup(func() {
+		_ = os.Remove(f.Name())
+	})
 	_, _ = f.Write([]byte(content))
 	_ = f.Close()
 
@@ -116,9 +124,9 @@ func TestLocalToBlob(t *testing.T) {
 	if err != nil {
 		panic(err)
 	}
-	defer func(name string) {
-		_ = os.Remove(name)
-	}(fgzip.Name())
+	t.Cleanup(func() {
+		_ = os.Remove(fgzip.Name())
+	})
 
 	zw := gzip.NewWriter(fgzip)
 
@@ -240,9 +248,9 @@ func fakeStat(name string) (os.FileInfo, error) {
 
 func TestIsLocalPath(t *testing.T) {
 	statFunc = fakeStat
-	defer func() {
+	t.Cleanup(func() {
 		statFunc = os.Stat
-	}()
+	})
 
 	tests := []struct {
 		desc string
@@ -278,19 +286,20 @@ func TestIsLocalPath(t *testing.T) {
 	}
 
 	for _, test := range tests {
-		got, err := IsLocalPath(test.path)
-		switch {
-		case err == nil && test.err:
-			t.Errorf("TestIsLocalPath(%s): got err == nil, want err != nil", test.desc)
-			continue
-		case err != nil && !test.err:
-			t.Errorf("TestIsLocalPath(%s): got err == %s, want err == nil", test.desc, err)
-			continue
-		case err == nil:
-			continue
-		}
-		if got != test.want {
-			t.Errorf("TestIsLocalPath(%s): got %v, want %v", test.desc, got, test.want)
-		}
+		test := test // capture
+		t.Run(test.desc, func(t *testing.T) {
+			t.Parallel()
+
+			got, err := IsLocalPath(test.path)
+
+			if test.err {
+				assert.Error(t, err)
+				return
+			}
+
+			assert.NoError(t, err)
+
+			assert.Equal(t, test.want, got)
+		})
 	}
 }
