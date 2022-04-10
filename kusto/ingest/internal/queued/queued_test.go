@@ -7,14 +7,14 @@ import (
 	"fmt"
 	"io"
 	"io/ioutil"
-	"net/url"
+	"net/http"
 	"os"
 	"testing"
 
 	"github.com/Azure/azure-kusto-go/kusto/data/errors"
 	"github.com/Azure/azure-kusto-go/kusto/ingest/internal/properties"
 
-	"github.com/Azure/azure-storage-blob-go/azblob"
+	"github.com/Azure/azure-sdk-for-go/sdk/storage/azblob"
 )
 
 func TestFormatDiscovery(t *testing.T) {
@@ -75,15 +75,16 @@ type fakeBlobstore struct {
 	shouldErr bool
 }
 
-func (f *fakeBlobstore) uploadBlobStream(_ context.Context, reader io.Reader, _ azblob.BlockBlobURL, _ azblob.UploadStreamToBlockBlobOptions) (azblob.CommonResponse, error) {
+func (f *fakeBlobstore) uploadBlobStream(_ context.Context, reader io.Reader, _ azblob.BlockBlobClient,
+	_ azblob.UploadStreamToBlockBlobOptions) (azblob.BlockBlobCommitBlockListResponse, error) {
 	if f.shouldErr {
-		return nil, fmt.Errorf("error")
+		return azblob.BlockBlobCommitBlockListResponse{}, fmt.Errorf("error")
 	}
 	_, err := io.Copy(f.out, reader)
-	return nil, err
+	return azblob.BlockBlobCommitBlockListResponse{}, err
 }
 
-func (f *fakeBlobstore) uploadBlobFile(_ context.Context, fi *os.File, _ azblob.BlockBlobURL, _ azblob.UploadToBlockBlobOptions) (azblob.CommonResponse, error) {
+func (f *fakeBlobstore) uploadBlobFile(_ context.Context, fi *os.File, _ azblob.BlockBlobClient, _ azblob.HighLevelUploadToBlockBlobOption) (*http.Response, error) {
 	if f.shouldErr {
 		return nil, fmt.Errorf("error")
 	}
@@ -95,11 +96,11 @@ func TestLocalToBlob(t *testing.T) {
 	t.Parallel()
 
 	content := "hello world"
-	u, err := url.Parse("https://account.windows.net")
+	u := "https://account.windows.net"
+	to, err := azblob.NewContainerClientWithNoCredential(u, nil)
 	if err != nil {
 		panic(err)
 	}
-	to := azblob.NewContainerURL(*u, nil)
 
 	f, err := os.OpenFile("test_file", os.O_CREATE+os.O_RDWR, 0770)
 	if err != nil {
