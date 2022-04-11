@@ -42,9 +42,10 @@ type DataTable struct {
 	TableName frames.TableKind
 	// Columns is a list of column names and their Kusto storage types.
 	Columns table.Columns
-	// Rows contains the the table data that was fetched.
-	Rows      [][]interface{}
+	// Rows contains the table data that was fetched, along with errors.
+	Rows      []interface{}
 	KustoRows []value.Values
+	RowErrors []errors.Error
 
 	Op errors.Op `json:"-"`
 }
@@ -58,17 +59,18 @@ func (d *DataTable) UnmarshalRaw(raw json.RawMessage) error {
 	}()
 
 	if err := json.Unmarshal(raw, d); err != nil {
-		if oe := rawToOneAPIErr(raw, d.Op); oe != nil {
+		if oe := RawToOneAPIErr(raw, d.Op); oe != nil {
 			return oe
 		}
 		return err
 	}
 
-	v, err := unmarshal.Rows(d.Columns, d.Rows)
+	v, rowErrors, err := unmarshal.Rows(d.Columns, d.Rows, d.Op)
 	if err != nil {
 		return err
 	}
 	d.KustoRows = v
+	d.RowErrors = rowErrors
 	return nil
 }
 
@@ -131,8 +133,9 @@ type TableFragment struct {
 	// TableFragment type is the type of TFDataAppend or TFDataReplace.
 	TableFragmentType string
 	// Rows contains the the table data th[at was fetched.
-	Rows      [][]interface{}
+	Rows      []interface{}
 	KustoRows []value.Values
+	RowErrors []errors.Error
 
 	Columns table.Columns `json:"-"` // Needed for decoding values.
 
@@ -151,17 +154,18 @@ func (t *TableFragment) UnmarshalRaw(raw json.RawMessage) error {
 	}()
 
 	if err := json.Unmarshal(raw, t); err != nil {
-		if oe := rawToOneAPIErr(raw, t.Op); oe != nil {
+		if oe := RawToOneAPIErr(raw, t.Op); oe != nil {
 			return oe
 		}
 		return err
 	}
 
-	v, err := unmarshal.Rows(t.Columns, t.Rows)
+	v, rowErrors, err := unmarshal.Rows(t.Columns, t.Rows, t.Op)
 	if err != nil {
 		return err
 	}
 	t.KustoRows = v
+	t.RowErrors = rowErrors
 
 	return nil
 }
@@ -205,8 +209,8 @@ func (t *TableCompletion) UnmarshalRaw(raw json.RawMessage) error {
 	return json.Unmarshal(raw, &t)
 }
 
-// rawToOneAPIErr returns a OneAPI error if it is buried where the "Row" should be. Otherwise it returns nil.
-func rawToOneAPIErr(raw json.RawMessage, op errors.Op) error {
+// RawToOneAPIErr returns a OneAPI error if it is buried where the "Row" should be. Otherwise it returns nil.
+func RawToOneAPIErr(raw json.RawMessage, op errors.Op) error {
 	m := map[string]interface{}{}
 
 	if err := json.Unmarshal(raw, &m); err != nil {
@@ -214,8 +218,9 @@ func rawToOneAPIErr(raw json.RawMessage, op errors.Op) error {
 	}
 
 	if oe, ok := m[frames.FieldRows]; ok {
-		if err := errors.OneToErr(oe.(map[string]interface{}), op); err != nil {
-			return err
+		entireErr, ok := oe.(map[string]interface{})
+		if ok {
+			return errors.OneToErr(entireErr, op)
 		}
 	}
 	return nil
