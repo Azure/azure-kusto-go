@@ -57,13 +57,25 @@ func assertValues(t *testing.T, wantErr error, gotErr error, want table.Rows, go
 	gotInlineErrors []*errors.Error) {
 	if wantErr != nil {
 		assert.Error(t, gotErr)
-		assert.EqualValues(t, wantErr, gotErr)
+		assert.EqualValues(t, wantErr, gotErr, "wantErr: %v, gotErr: %v", wantErr, gotErr)
 	} else {
 		assert.NoError(t, gotErr)
 	}
 
 	assert.Equal(t, want, got)
 	assert.Equal(t, wantInlineErrors, gotInlineErrors)
+}
+
+func checkNonPrimary(t *testing.T, want map[frames.TableKind]v2.DataTable, iter *RowIterator) {
+	if want != nil {
+		assert.EqualValues(t, want, iter.nonPrimary)
+		primary, err := iter.GetNonPrimary(frames.QueryProperties, frames.ExtendedProperties)
+		assert.NoError(t, err)
+		assert.EqualValues(t, want[frames.QueryProperties], primary)
+		extendedProperties, err := iter.GetExtendedProperties()
+		assert.NoError(t, err)
+		assert.EqualValues(t, want[frames.QueryProperties], extendedProperties)
+	}
 }
 
 func streamStateMachine(stream []frames.Frame, createSM func(iter *RowIterator, toSM chan frames.Frame) stateMachine, recv func(iter *RowIterator)) {
@@ -333,6 +345,11 @@ func TestNonProgressive(t *testing.T) {
 							value.Dynamic{Value: []byte(`{"Visualization":null,"Title":null,"XColumn":null,"Series":null,"YColumns":null,"XTitle":null}`), Valid: true},
 						},
 					},
+					RowErrors: []errors.Error{
+						*errors.ES(errors.OpUnknown, errors.KLimitsExceeded, "Request is invalid and cannot be executed.;See https://docs.microsoft."+
+							"com/en-us/azure/kusto/concepts/querylimits"),
+						*errors.ES(errors.OpUnknown, errors.KLimitsExceeded, "Some other error"),
+					},
 				},
 			},
 			inlineErrors: []*errors.Error{
@@ -367,6 +384,8 @@ func TestNonProgressive(t *testing.T) {
 				got, inlineErrors, err := iterateRowsWithErrors(iter)
 
 				assertValues(t, test.err, err, test.want, got, test.inlineErrors, inlineErrors)
+
+				checkNonPrimary(t, test.nonPrimary, iter)
 			})
 
 			streamStateMachine(test.stream, createSm, func(iter *RowIterator) {
@@ -383,6 +402,8 @@ func TestNonProgressive(t *testing.T) {
 				}
 
 				assertValues(t, testErr, err, want, got, nil, nil)
+
+				checkNonPrimary(t, test.nonPrimary, iter)
 			})
 
 		})
@@ -808,6 +829,8 @@ func TestProgressive(t *testing.T) {
 				got, inlineErrors, err := iterateRowsWithErrors(iter)
 
 				assertValues(t, test.err, err, test.want, got, test.inlineErrors, inlineErrors)
+
+				checkNonPrimary(t, test.nonPrimary, iter)
 			})
 
 			streamStateMachine(test.stream, createSm, func(iter *RowIterator) {
@@ -824,6 +847,8 @@ func TestProgressive(t *testing.T) {
 				}
 
 				assertValues(t, testErr, err, want, got, nil, nil)
+
+				checkNonPrimary(t, test.nonPrimary, iter)
 			})
 		})
 	}

@@ -329,7 +329,7 @@ func (r *RowIterator) GetNonPrimary(tableKind, tableName frames.TableKind) (v2.D
 
 // GetExtendedProperties will return the extended properties' table from the iterator, if it exists.
 // Returns io.ErrUnexpectedEOF if not found. May not have all tables until RowIterator has reached io.EOF.
-func (r *RowIterator) GetExtendedProperties(tableKind, tableName frames.TableKind) (v2.DataTable, error) {
+func (r *RowIterator) GetExtendedProperties() (v2.DataTable, error) {
 	return r.GetNonPrimary(frames.QueryProperties, frames.ExtendedProperties)
 }
 
