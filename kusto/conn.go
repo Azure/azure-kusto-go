@@ -5,8 +5,6 @@ package kusto
 
 import (
 	"bytes"
-	"compress/flate"
-	"compress/gzip"
 	"context"
 	"encoding/json"
 	"fmt"
@@ -21,6 +19,7 @@ import (
 	"github.com/Azure/azure-kusto-go/kusto/internal/frames"
 	v1 "github.com/Azure/azure-kusto-go/kusto/internal/frames/v1"
 	v2 "github.com/Azure/azure-kusto-go/kusto/internal/frames/v2"
+	"github.com/Azure/azure-kusto-go/kusto/internal/response"
 	"github.com/Azure/azure-kusto-go/kusto/internal/version"
 
 	"github.com/Azure/go-autorest/autorest"
@@ -179,23 +178,13 @@ func (c *conn) execute(ctx context.Context, execType int, db string, query Stmt,
 		return execResp{}, errors.E(op, errors.KHTTPError, fmt.Errorf("with query %q: %w", query.String(), err))
 	}
 
-	if resp.StatusCode != 200 {
-		return execResp{}, errors.HTTP(op, resp, fmt.Sprintf("error from Kusto endpoint for query %q: ", query.String()))
+	body, err := response.TranslateBody(resp, op)
+	if err != nil {
+		return execResp{}, err
 	}
 
-	body := resp.Body
-	switch enc := strings.ToLower(resp.Header.Get("Content-Encoding")); enc {
-	case "":
-		// Do nothing
-	case "gzip":
-		body, err = gzip.NewReader(resp.Body)
-		if err != nil {
-			return execResp{}, errors.E(op, errors.KInternal, fmt.Errorf("gzip reader error: %w", err))
-		}
-	case "deflate":
-		body = flate.NewReader(resp.Body)
-	default:
-		return execResp{}, errors.ES(op, errors.KInternal, "Content-Encoding was unrecognized: %s", enc)
+	if resp.StatusCode != 200 {
+		return execResp{}, errors.HTTP(op, resp.Status, body, fmt.Sprintf("error from Kusto endpoint for query %q: ", query.String()))
 	}
 
 	var dec frames.Decoder

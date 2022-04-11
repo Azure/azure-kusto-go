@@ -10,6 +10,7 @@ import (
 	"strings"
 	"testing"
 	"time"
+	"unicode"
 
 	"github.com/Azure/azure-kusto-go/kusto"
 	"github.com/Azure/azure-kusto-go/kusto/data/errors"
@@ -1334,6 +1335,23 @@ func TestStreamingIngestion(t *testing.T) {
 	}
 }
 
+func TestError(t *testing.T) {
+	t.Parallel()
+	client, err := kusto.New(testConfig.Endpoint, testConfig.Authorizer)
+	require.NoError(t, err)
+
+	_, err = client.Query(context.Background(), testConfig.Database, pCountStmt.MustParameters(
+		kusto.NewParameters().Must(kusto.QueryValues{"tableName": uuid.New().String()}),
+	))
+
+	kustoError, ok := err.(*errors.Error)
+	assert.True(t, ok)
+	assert.Equal(t, errors.OpQuery, kustoError.Op)
+	assert.Equal(t, errors.KHTTPError, kustoError.Kind)
+	assert.True(t, strings.Contains(kustoError.Error(), "Failed to resolve table expression"))
+	assert.True(t, isASCII(kustoError.Error()))
+}
+
 func assertErrorsMatch(t *testing.T, got, want error) bool {
 	if ingest.IsStatusRecord(got) {
 		if want == nil || !ingest.IsStatusRecord(want) {
@@ -1598,4 +1616,13 @@ func waitForIngest(t *testing.T, ctx context.Context, client *kusto.Client, data
 	}
 
 	return err
+}
+
+func isASCII(s string) bool {
+	for _, c := range s {
+		if c > unicode.MaxASCII {
+			return false
+		}
+	}
+	return true
 }
