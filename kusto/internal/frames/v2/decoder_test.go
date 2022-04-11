@@ -2,7 +2,6 @@ package v2
 
 import (
 	"context"
-	"encoding/json"
 	"io/ioutil"
 	"strings"
 	"testing"
@@ -11,9 +10,9 @@ import (
 	"github.com/Azure/azure-kusto-go/kusto/data/errors"
 	"github.com/Azure/azure-kusto-go/kusto/data/table"
 	"github.com/Azure/azure-kusto-go/kusto/data/value"
+	"github.com/stretchr/testify/require"
 
 	"github.com/google/uuid"
-	"github.com/kylelemons/godebug/pretty"
 )
 
 func TestNormalDecode(t *testing.T) {
@@ -22,188 +21,439 @@ func TestNormalDecode(t *testing.T) {
 	ctx := context.Background()
 
 	jsonStr := `[
-		{
-			"FrameType":"dataSetHeader",
-			"IsProgressive":false,
-			"Version":"v2.0"
-		},
-		{  
-			"FrameType":"DataTable",
-			"TableId":0,
-			"TableKind":"QueryProperties",
-			"TableName":"@ExtendedProperties",
-			"Columns":[  
-			   {  
-				  "ColumnName":"TableId",
-				  "ColumnType":"int"
-			   },
-			   {  
-				  "ColumnName":"Key",
-				  "ColumnType":"string"
-			   },
-			   {  
-				  "ColumnName":"Value",
-				  "ColumnType":"dynamic"
-			   }
-			],
-			"Rows":[  
-			   [  
-				  1,
-				  "Visualization",
-				  "{\"Visualization\":null,\"Title\":null,\"XColumn\":null,\"Series\":null,\"YColumns\":null,\"AnomalyColumns\":null,\"XTitle\":null,\"YTitle\":null,\"XAxis\":null,\"YAxis\":null,\"Legend\":null,\"YSplit\":null,\"Accumulate\":false,\"IsQuerySorted\":false,\"Kind\":null,\"Ymin\":\"NaN\",\"Ymax\":\"NaN\"}"
-			   ]
-			]
-		 },
-		 {  
-			"FrameType":"DataTable",
-			"TableId":1,
-			"TableKind":"QueryCompletionInformation",
-			"TableName":"QueryCompletionInformation",
-			"Columns":[  
-			   {  
-				  "ColumnName":"Timestamp",
-				  "ColumnType":"datetime"
-			   },
-			   {  
-				  "ColumnName":"ClientRequestId",
-				  "ColumnType":"string"
-			   },
-			   {  
-				  "ColumnName":"ActivityId",
-				  "ColumnType":"guid"
-			   }
-			],
-			"Rows":[  
-			   [  
-				  "2019-08-27T04:14:55.302919Z",
-				  "KPC.execute;752dd747-5f6a-45c6-9ee2-e6662530ecc3",
-				  "011e7e1b-3c8f-4e91-a04b-0fa5f7be6100"
-			   ]
-			]
-		},
-		{
-			"FrameType":"DataSetCompletion",
-			"HasErrors":false,
-			"Cancelled":false
-		}
-	]
+  {
+    "FrameType":"dataSetHeader",
+    "IsProgressive":false,
+    "Version":"v2.0"
+  },
+  {
+    "FrameType":"DataTable",
+    "TableId":0,
+    "TableKind":"QueryProperties",
+    "TableName":"@ExtendedProperties",
+    "Columns":[
+      {
+        "ColumnName":"TableId",
+        "ColumnType":"int"
+      },
+      {
+        "ColumnName":"Key",
+        "ColumnType":"string"
+      },
+      {
+        "ColumnName":"Value",
+        "ColumnType":"dynamic"
+      }
+    ],
+    "Rows":[
+      [
+        1,
+        "Visualization",
+        "{\"Visualization\":null,\"Title\":null,\"XColumn\":null,\"Series\":null,\"YColumns\":null,\"AnomalyColumns\":null,\"XTitle\":null,\"YTitle\":null,\"XAxis\":null,\"YAxis\":null,\"Legend\":null,\"YSplit\":null,\"Accumulate\":false,\"IsQuerySorted\":false,\"Kind\":null,\"Ymin\":\"NaN\",\"Ymax\":\"NaN\"}"
+      ]
+    ]
+  },
+  {
+    "FrameType":"DataTable",
+    "TableId":1,
+    "TableKind":"PrimaryResult",
+    "TableName":"PrimaryResult",
+    "Columns":[
+      {
+        "ColumnName":"x",
+        "ColumnType":"long"
+      }
+    ],
+    "Rows":[
+      [
+        1
+      ],
+      [
+        2
+      ],
+      [
+        3
+      ],
+      [
+        4
+      ],
+      [
+        5
+      ]
+    ]
+  },
+  {
+    "FrameType":"DataTable",
+    "TableId":2,
+    "TableKind":"QueryCompletionInformation",
+    "TableName":"QueryCompletionInformation",
+    "Columns":[
+      {
+        "ColumnName":"Timestamp",
+        "ColumnType":"datetime"
+      },
+      {
+        "ColumnName":"ClientRequestId",
+        "ColumnType":"string"
+      },
+      {
+        "ColumnName":"ActivityId",
+        "ColumnType":"guid"
+      }
+    ],
+    "Rows":[
+      [
+        "2019-08-27T04:14:55.302919Z",
+        "KPC.execute;752dd747-5f6a-45c6-9ee2-e6662530ecc3",
+        "011e7e1b-3c8f-4e91-a04b-0fa5f7be6100"
+      ]
+    ]
+  },
+  {
+    "FrameType":"DataSetCompletion",
+    "HasErrors":false,
+    "Cancelled":false
+  }
+]
 	`
 
-	frame1Want := DataSetHeader{
-		Base:          Base{FrameType: "dataSetHeader"},
-		IsProgressive: false,
-		Version:       "v2.0",
-		Op:            errors.OpQuery,
-	}
-
-	frame2Want := DataTable{
-		Base:      Base{FrameType: "DataTable"},
-		TableID:   0,
-		TableKind: "QueryProperties",
-		TableName: "@ExtendedProperties",
-		Columns: []table.Column{
-			{
-				Name: "TableId",
-				Type: "int",
-			},
-			{
-				Name: "Key",
-				Type: "string",
-			},
-			{
-				Name: "Value",
-				Type: "dynamic",
-			},
+	wantFrames := []interface{}{
+		DataSetHeader{
+			Base:          Base{FrameType: "dataSetHeader"},
+			IsProgressive: false,
+			Version:       "v2.0",
+			Op:            errors.OpQuery,
 		},
-		KustoRows: []value.Values{
-			{
-				value.Int{Value: 1, Valid: true},
-				value.String{Value: "Visualization", Valid: true},
-				value.Dynamic{
-					Value: []byte("{\"Visualization\":null,\"Title\":null,\"XColumn\":null,\"Series\":null,\"YColumns\":null,\"AnomalyColumns\":null,\"XTitle\":null,\"YTitle\":null,\"XAxis\":null,\"YAxis\":null,\"Legend\":null,\"YSplit\":null,\"Accumulate\":false,\"IsQuerySorted\":false,\"Kind\":null,\"Ymin\":\"NaN\",\"Ymax\":\"NaN\"}"),
-					Valid: true,
+		DataTable{
+			Base:      Base{FrameType: "DataTable"},
+			TableID:   0,
+			TableKind: "QueryProperties",
+			TableName: "@ExtendedProperties",
+			Columns: []table.Column{
+				{
+					Name: "TableId",
+					Type: "int",
+				},
+				{
+					Name: "Key",
+					Type: "string",
+				},
+				{
+					Name: "Value",
+					Type: "dynamic",
 				},
 			},
+			KustoRows: []value.Values{
+				{
+					value.Int{Value: 1, Valid: true},
+					value.String{Value: "Visualization", Valid: true},
+					value.Dynamic{
+						Value: []byte("{\"Visualization\":null,\"Title\":null,\"XColumn\":null,\"Series\":null,\"YColumns\":null,\"AnomalyColumns\":null,\"XTitle\":null,\"YTitle\":null,\"XAxis\":null,\"YAxis\":null,\"Legend\":null,\"YSplit\":null,\"Accumulate\":false,\"IsQuerySorted\":false,\"Kind\":null,\"Ymin\":\"NaN\",\"Ymax\":\"NaN\"}"),
+						Valid: true,
+					},
+				},
+			},
+			RowErrors: nil,
+			Op:        errors.OpQuery,
 		},
-		Op: errors.OpQuery,
-	}
-
-	frame3Want := DataTable{
-		Base:      Base{FrameType: "DataTable"},
-		TableID:   1,
-		TableKind: "QueryCompletionInformation",
-		TableName: "QueryCompletionInformation",
-		Columns: []table.Column{
-			{
-				Name: "Timestamp",
-				Type: "datetime",
+		DataTable{
+			Base:      Base{FrameType: "DataTable"},
+			TableID:   1,
+			TableKind: "PrimaryResult",
+			TableName: "PrimaryResult",
+			Columns: []table.Column{
+				{
+					Name: "x",
+					Type: "long",
+				},
 			},
-			{
-				Name: "ClientRequestId",
-				Type: "string",
+			KustoRows: []value.Values{
+				{value.Long{Value: 1, Valid: true}},
+				{value.Long{Value: 2, Valid: true}},
+				{value.Long{Value: 3, Valid: true}},
+				{value.Long{Value: 4, Valid: true}},
+				{value.Long{Value: 5, Valid: true}},
 			},
-			{
-				Name: "ActivityId",
-				Type: "guid",
-			},
+			Op: errors.OpQuery,
 		},
-		KustoRows: []value.Values{
-			{
-				value.DateTime{Value: timeMustParse(time.RFC3339Nano, "2019-08-27T04:14:55.302919Z"), Valid: true},
-				value.String{Value: "KPC.execute;752dd747-5f6a-45c6-9ee2-e6662530ecc3", Valid: true},
-				value.GUID{Value: uuid.MustParse("011e7e1b-3c8f-4e91-a04b-0fa5f7be6100"), Valid: true},
+		DataTable{
+			Base:      Base{FrameType: "DataTable"},
+			TableID:   2,
+			TableKind: "QueryCompletionInformation",
+			TableName: "QueryCompletionInformation",
+			Columns: []table.Column{
+				{
+					Name: "Timestamp",
+					Type: "datetime",
+				},
+				{
+					Name: "ClientRequestId",
+					Type: "string",
+				},
+				{
+					Name: "ActivityId",
+					Type: "guid",
+				},
 			},
+			KustoRows: []value.Values{
+				{
+					value.DateTime{Value: timeMustParse(time.RFC3339Nano, "2019-08-27T04:14:55.302919Z"), Valid: true},
+					value.String{Value: "KPC.execute;752dd747-5f6a-45c6-9ee2-e6662530ecc3", Valid: true},
+					value.GUID{Value: uuid.MustParse("011e7e1b-3c8f-4e91-a04b-0fa5f7be6100"), Valid: true},
+				},
+			},
+			RowErrors: nil,
+			Op:        errors.OpQuery,
 		},
-		Op: errors.OpQuery,
-	}
-
-	frame4Want := DataSetCompletion{
-		Base:      Base{FrameType: "DataSetCompletion"},
-		HasErrors: false,
-		Cancelled: false,
-		Op:        errors.OpQuery,
+		DataSetCompletion{
+			Base:      Base{FrameType: "DataSetCompletion"},
+			HasErrors: false,
+			Cancelled: false,
+			Op:        errors.OpQuery,
+		},
 	}
 
 	dec := Decoder{}
 	ch := dec.Decode(ctx, ioutil.NopCloser(strings.NewReader(jsonStr)), errors.OpQuery)
 
-	fr := <-ch
-	frame1Got, ok := fr.(DataSetHeader)
-	if !ok {
-		t.Fatalf("TestNormalDecode: first frame was not a DataSetHeader, was %T: %s", fr, fr)
+	for _, want := range wantFrames {
+		got := <-ch
+		require.EqualValues(t, want, got)
+	}
+}
+
+func TestErrorDecode(t *testing.T) {
+	t.Parallel()
+
+	ctx := context.Background()
+
+	jsonStr := `[
+  {
+    "FrameType":"dataSetHeader",
+    "IsProgressive":false,
+    "Version":"v2.0"
+  },
+  {
+    "FrameType":"DataTable",
+    "TableId":0,
+    "TableKind":"QueryProperties",
+    "TableName":"@ExtendedProperties",
+    "Columns":[
+      {
+        "ColumnName":"TableId",
+        "ColumnType":"int"
+      },
+      {
+        "ColumnName":"Key",
+        "ColumnType":"string"
+      },
+      {
+        "ColumnName":"Value",
+        "ColumnType":"dynamic"
+      }
+    ],
+    "Rows":[
+      [
+        1,
+        "Visualization",
+        "{\"Visualization\":null,\"Title\":null,\"XColumn\":null,\"Series\":null,\"YColumns\":null,\"AnomalyColumns\":null,\"XTitle\":null,\"YTitle\":null,\"XAxis\":null,\"YAxis\":null,\"Legend\":null,\"YSplit\":null,\"Accumulate\":false,\"IsQuerySorted\":false,\"Kind\":null,\"Ymin\":\"NaN\",\"Ymax\":\"NaN\"}"
+      ]
+    ]
+  },
+{
+    "FrameType":"DataTable",
+    "TableId":1,
+    "TableKind":"PrimaryResult",
+    "TableName":"PrimaryResult",
+    "Columns":[
+      {
+        "ColumnName":"x",
+        "ColumnType":"long"
+      }
+    ],
+    "Rows":[
+      [
+        1
+      ],
+      [
+        2
+      ],
+      [
+        3
+      ],
+      [
+        4
+      ],
+      [
+        5
+      ],
+	{
+		"OneApiErrors": [{
+			"error": {
+				"code": "LimitsExceeded",
+				"message": "Request is invalid and cannot be executed.",
+				"@type": "Kusto.Data.Exceptions.KustoServicePartialQueryFailureLimitsExceededException",
+				"@message": "Query execution has exceeded the allowed limits (80DA0003): .",
+				"@context": {
+					"timestamp": "2018-12-10T15:10:48.8352222Z",
+					"machineName": "RD0003FFBEDEB9",
+					"processName": "Kusto.Azure.Svc",
+					"processId": 4328,
+					"threadId": 7284,
+					"appDomainName": "RdRuntime",
+					"clientRequestd": "KPC.execute;d3a43e37-0d7f-47a9-b6cd-a889b2aee3d3",
+					"activityId": "a57ec272-8846-49e6-b458-460b841ed47d",
+					"subActivityId": "a57ec272-8846-49e6-b458-460b841ed47d",
+					"activityType": "PO-OWIN-CallContext",
+					"parentActivityId": "a57ec272-8846-49e6-b458-460b841ed47d",
+					"activityStack": "(Activity stack: CRID=KPC.execute;d3a43e37-0d7f-47a9-b6cd-a889b2aee3d3 ARID=a57ec272-8846-49e6-b458-460b841ed47d > PO-OWIN-CallContext/a57ec272-8846-49e6-b458-460b841ed47d)"
+				},
+				"@permanent": false
+			}
+		}]
+	}
+    ]
+  },
+
+  {
+    "FrameType":"DataTable",
+    "TableId":2,
+    "TableKind":"QueryCompletionInformation",
+    "TableName":"QueryCompletionInformation",
+    "Columns":[
+      {
+        "ColumnName":"Timestamp",
+        "ColumnType":"datetime"
+      },
+      {
+        "ColumnName":"ClientRequestId",
+        "ColumnType":"string"
+      },
+      {
+        "ColumnName":"ActivityId",
+        "ColumnType":"guid"
+      }
+    ],
+    "Rows":[
+      [
+        "2019-08-27T04:14:55.302919Z",
+        "KPC.execute;752dd747-5f6a-45c6-9ee2-e6662530ecc3",
+        "011e7e1b-3c8f-4e91-a04b-0fa5f7be6100"
+      ]
+    ]
+  },
+  {
+    "FrameType":"DataSetCompletion",
+    "HasErrors":false,
+    "Cancelled":false
+  }
+]
+	`
+
+	wantFrames := []interface{}{
+		DataSetHeader{
+			Base:          Base{FrameType: "dataSetHeader"},
+			IsProgressive: false,
+			Version:       "v2.0",
+			Op:            errors.OpQuery,
+		},
+		DataTable{
+			Base:      Base{FrameType: "DataTable"},
+			TableID:   0,
+			TableKind: "QueryProperties",
+			TableName: "@ExtendedProperties",
+			Columns: []table.Column{
+				{
+					Name: "TableId",
+					Type: "int",
+				},
+				{
+					Name: "Key",
+					Type: "string",
+				},
+				{
+					Name: "Value",
+					Type: "dynamic",
+				},
+			},
+			KustoRows: []value.Values{
+				{
+					value.Int{Value: 1, Valid: true},
+					value.String{Value: "Visualization", Valid: true},
+					value.Dynamic{
+						Value: []byte("{\"Visualization\":null,\"Title\":null,\"XColumn\":null,\"Series\":null,\"YColumns\":null,\"AnomalyColumns\":null,\"XTitle\":null,\"YTitle\":null,\"XAxis\":null,\"YAxis\":null,\"Legend\":null,\"YSplit\":null,\"Accumulate\":false,\"IsQuerySorted\":false,\"Kind\":null,\"Ymin\":\"NaN\",\"Ymax\":\"NaN\"}"),
+						Valid: true,
+					},
+				},
+			},
+			Op: errors.OpQuery,
+		},
+		DataTable{
+			Base:      Base{FrameType: "DataTable"},
+			TableID:   1,
+			TableKind: "PrimaryResult",
+			TableName: "PrimaryResult",
+			Columns: []table.Column{
+				{
+					Name: "x",
+					Type: "long",
+				},
+			},
+			KustoRows: []value.Values{
+				{value.Long{Value: 1, Valid: true}},
+				{value.Long{Value: 2, Valid: true}},
+				{value.Long{Value: 3, Valid: true}},
+				{value.Long{Value: 4, Valid: true}},
+				{value.Long{Value: 5, Valid: true}},
+			},
+			RowErrors: []errors.Error{
+				*errors.ES(errors.OpUnknown, errors.KLimitsExceeded, "Request is invalid and cannot be executed.;See https://docs.microsoft."+
+					"com/en-us/azure/kusto/concepts/querylimits"),
+			},
+			Op: errors.OpQuery,
+		},
+		DataTable{
+			Base:      Base{FrameType: "DataTable"},
+			TableID:   2,
+			TableKind: "QueryCompletionInformation",
+			TableName: "QueryCompletionInformation",
+			Columns: []table.Column{
+				{
+					Name: "Timestamp",
+					Type: "datetime",
+				},
+				{
+					Name: "ClientRequestId",
+					Type: "string",
+				},
+				{
+					Name: "ActivityId",
+					Type: "guid",
+				},
+			},
+			KustoRows: []value.Values{
+				{
+					value.DateTime{Value: timeMustParse(time.RFC3339Nano, "2019-08-27T04:14:55.302919Z"), Valid: true},
+					value.String{Value: "KPC.execute;752dd747-5f6a-45c6-9ee2-e6662530ecc3", Valid: true},
+					value.GUID{Value: uuid.MustParse("011e7e1b-3c8f-4e91-a04b-0fa5f7be6100"), Valid: true},
+				},
+			},
+			Op: errors.OpQuery,
+		},
+		DataSetCompletion{
+			Base:      Base{FrameType: "DataSetCompletion"},
+			HasErrors: false,
+			Cancelled: false,
+			Op:        errors.OpQuery,
+		},
 	}
 
-	if diff := pretty.Compare(frame1Want, frame1Got); diff != "" {
-		t.Fatalf("TestNormalDecode: first frame: -want/+got:\n%s", diff)
-	}
+	dec := Decoder{}
+	ch := dec.Decode(ctx, ioutil.NopCloser(strings.NewReader(jsonStr)), errors.OpQuery)
 
-	fr = <-ch
-	frame2Got, ok := fr.(DataTable)
-	if !ok {
-		t.Fatalf("TestNormalDecode: second frame was not a DataTable, was %T: %s", fr, fr)
-	}
-
-	if diff := pretty.Compare(frame2Want, frame2Got); diff != "" {
-		t.Fatalf("TestNormalDecode: second frame: -want/+got:\n%s", diff)
-	}
-
-	fr = <-ch
-	frame3Got, ok := fr.(DataTable)
-	if !ok {
-		t.Fatalf("TestNormalDecode: third frame was not a DataTable, was %T: %s", fr, fr)
-	}
-
-	if diff := pretty.Compare(frame3Want, frame3Got); diff != "" {
-		t.Fatalf("TestNormalDecode: third frame: -want/+got:\n%s", diff)
-	}
-
-	fr = <-ch
-	frame4Got, ok := fr.(DataSetCompletion)
-	if !ok {
-		t.Fatalf("TestNormalDecode: fourth frame was not a DataSetCompletion, was %T: %s", fr, fr)
-	}
-	if diff := pretty.Compare(frame4Want, frame4Got); diff != "" {
-		t.Fatalf("TestNormalDecode: fourth frame: -want/+got:\n%s", diff)
+	for _, want := range wantFrames {
+		got := <-ch
+		require.EqualValues(t, want, got)
 	}
 }
 
@@ -213,30 +463,4 @@ func timeMustParse(layout string, p string) time.Time {
 		panic(err)
 	}
 	return t
-}
-
-func mustMapInter(i interface{}) map[string]interface{} {
-	if v, ok := i.(map[string]interface{}); ok {
-		return v
-	}
-
-	var b []byte
-	var err error
-	switch v := i.(type) {
-	case string:
-		b = []byte(v)
-	case []byte:
-		b = v
-	default:
-		b, err = json.Marshal(i)
-		if err != nil {
-			panic(err)
-		}
-	}
-
-	m := map[string]interface{}{}
-	if err := json.Unmarshal(b, &m); err != nil {
-		panic(err)
-	}
-	return m
 }

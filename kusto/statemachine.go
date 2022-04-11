@@ -93,7 +93,7 @@ func (d *nonProgressiveSM) process() (sf stateFn, err error) {
 				select {
 				case <-d.ctx.Done():
 					return nil, d.ctx.Err()
-				case d.iter.inRows <- send{inRows: table.KustoRows, wg: d.wg}:
+				case d.iter.inRows <- send{inRows: table.KustoRows, inRowErrors: table.RowErrors, wg: d.wg}:
 				}
 			default:
 				select {
@@ -174,7 +174,7 @@ func (p *progressiveSM) nextFrame() (stateFn, error) {
 		return nil, p.ctx.Err()
 	case fr, ok := <-p.in:
 		if !ok {
-			return nil, errors.ES(p.op, errors.KInternal, "received a table stream that did not finish before our input channel, this is usally a return size or time limit")
+			return nil, errors.ES(p.op, errors.KInternal, "received a table stream that did not finish before our input channel, this is usually a return size or time limit")
 		}
 
 		p.currentFrame = fr
@@ -236,7 +236,7 @@ func (p *progressiveSM) dataSetCompletion() (stateFn, error) {
 			p.wg.Wait()
 			return nil, nil
 		}
-		return nil, errors.ES(p.op, errors.KInternal, "recieved a dataSetCompletion frame and then a %T frame", frame)
+		return nil, errors.ES(p.op, errors.KInternal, "received a dataSetCompletion frame and then a %T frame", frame)
 	}
 }
 
@@ -273,7 +273,7 @@ func (p *progressiveSM) fragment() (stateFn, error) {
 		select {
 		case <-p.ctx.Done():
 			return nil, p.ctx.Err()
-		case p.iter.inRows <- send{inRows: table.KustoRows, inTableFragmentType: table.TableFragmentType, wg: p.wg}:
+		case p.iter.inRows <- send{inRows: table.KustoRows, inRowErrors: table.RowErrors, inTableFragmentType: table.TableFragmentType, wg: p.wg}:
 		}
 	} else {
 		p.nonPrimary.Rows = append(p.nonPrimary.Rows, p.currentFrame.(v2.TableFragment).Rows...)
@@ -369,7 +369,7 @@ func (p *v1SM) nextFrame() (stateFn, error) {
 }
 func (p *v1SM) done() (stateFn, error) {
 	if !p.receivedDT {
-		return nil, errors.ES(p.op, errors.KInternal, "received a table stream that did not finish before our input channel, this is usally a return size or time limit")
+		return nil, errors.ES(p.op, errors.KInternal, "received a table stream that did not finish before our input channel, this is usually a return size or time limit")
 	}
 	p.wg.Wait()
 
@@ -420,7 +420,7 @@ func (p *v1SM) dataTable() (stateFn, error) {
 	select {
 	case <-p.ctx.Done():
 		return nil, p.ctx.Err()
-	case p.iter.inRows <- send{inRows: currentTable.KustoRows, wg: p.wg}:
+	case p.iter.inRows <- send{inRows: currentTable.KustoRows, inRowErrors: currentTable.RowErrors, wg: p.wg}:
 		p.receivedDT = true
 	}
 
