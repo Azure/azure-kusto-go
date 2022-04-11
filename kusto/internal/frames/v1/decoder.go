@@ -121,7 +121,7 @@ func (d *Decoder) processTables(ctx context.Context, ch chan frames.Frame) error
 			return err
 		}
 
-		dt.KustoRows, err = unmarshal.Rows(columns, dt.Rows)
+		dt.KustoRows, dt.RowErrors, err = unmarshal.Rows(columns, dt.Rows, d.op)
 		if err != nil {
 			return err
 		}

@@ -4,6 +4,7 @@ import (
 	"testing"
 	"time"
 
+	"github.com/Azure/azure-kusto-go/kusto/data/errors"
 	"github.com/Azure/azure-kusto-go/kusto/data/table"
 	"github.com/Azure/azure-kusto-go/kusto/data/types"
 	"github.com/Azure/azure-kusto-go/kusto/data/value"
@@ -49,7 +50,7 @@ func TestUnmarshalRows(t *testing.T) {
 	}
 
 	for _, test := range tests {
-		rows, err := Rows(table.Columns{table.Column{Name: "store", Type: test.columnType}}, [][]interface{}{{test.value}})
+		rows, _, err := Rows(table.Columns{table.Column{Name: "store", Type: test.columnType}}, []interface{}{[]interface{}{test.value}}, errors.OpUnknown)
 		if err != nil {
 			t.Errorf("TestUnmarshalRows(%v): got err == %s, want err == nil", test.value, err)
 			continue
