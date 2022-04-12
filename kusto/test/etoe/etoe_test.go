@@ -1597,7 +1597,9 @@ func waitForIngest(t *testing.T, ctx context.Context, client *kusto.Client, data
 
 			got = gotInit()
 			err = iter.DoOnRowOrError(func(row *table.Row, e *errors.Error) error {
-				require.NoError(t, e)
+				if e != nil {
+					require.NoError(t, e)
+				}
 				return doer(row, got)
 			})
 			if !assert.NoError(t, err) {
