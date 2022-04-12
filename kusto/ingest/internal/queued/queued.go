@@ -114,7 +114,7 @@ func New(db, table string, mgr *resources.Manager, options ...Option) (*Ingestio
 
 // Local ingests a local file into Kusto.
 func (i *Ingestion) Local(ctx context.Context, from string, props properties.All) error {
-	to, err := i.upstreamContainer()
+	container, err := i.upstreamContainer()
 	if err != nil {
 		return err
 	}
@@ -130,7 +130,7 @@ func (i *Ingestion) Local(ctx context.Context, from string, props properties.All
 		return errors.ES(errors.OpFileIngest, errors.KBlobstore, "no Kusto queue resources are defined, there is no queue to upload to").SetNoRetry()
 	}
 
-	blobURL, size, err := i.localToBlob(ctx, from, to, &props)
+	blobURL, size, err := i.localToBlob(ctx, from, container, &props)
 	if err != nil {
 		return err
 	}
@@ -321,7 +321,7 @@ var nower = time.Now
 
 // localToBlob copies from a local to to an Azure Blobstore blob. It returns the URL of the Blob, the local file info and an
 // error if there was one.
-func (i *Ingestion) localToBlob(ctx context.Context, from string, to azblob.ContainerClient, props *properties.All) (string, int64, error) {
+func (i *Ingestion) localToBlob(ctx context.Context, from string, container azblob.ContainerClient, props *properties.All) (string, int64, error) {
 	compression := CompressionDiscovery(from)
 	blobName := fmt.Sprintf("%s_%s_%s_%s_%s", i.db, i.table, nower(), filepath.Base(uuid.New().String()), filepath.Base(from))
 	if compression == properties.CTNone {
@@ -329,7 +329,7 @@ func (i *Ingestion) localToBlob(ctx context.Context, from string, to azblob.Cont
 	}
 
 	// Here's how to upload a blob.
-	blobClient := to.NewBlockBlobClient(blobName)
+	blobClient := container.NewBlockBlobClient(blobName)
 
 	file, err := os.Open(from)
 	if err != nil {
