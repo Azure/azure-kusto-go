@@ -314,18 +314,29 @@ func (r *RowIterator) Progressive() bool {
 	return r.progressive
 }
 
-// getNonPrimary will return a non-primary dataTable if it exists from the last query. The non-primary table kinds
-// are defined as constants starting with TK<name>.
+// GetNonPrimary will return a non-primary dataTable if it exists from the last query. The non-primary table and common names are defined under the frames.TableKind enum.
 // Returns io.ErrUnexpectedEOF if not found. May not have all tables until RowIterator has reached io.EOF.
-func (r *RowIterator) getNonPrimary(ctx context.Context, tableKind, tableName frames.TableKind) (v2.DataTable, error) {
+func (r *RowIterator) GetNonPrimary(tableKind, tableName frames.TableKind) (v2.DataTable, error) {
 	r.mu.Lock()
 	defer r.mu.Unlock()
-	for _, table := range r.nonPrimary {
-		if table.TableKind == tableKind && table.TableName == tableName {
-			return table, nil
+	for _, npTable := range r.nonPrimary {
+		if npTable.TableKind == tableKind && npTable.TableName == tableName {
+			return npTable, nil
 		}
 	}
 	return v2.DataTable{}, io.ErrUnexpectedEOF
+}
+
+// GetExtendedProperties will return the extended properties' table from the iterator, if it exists.
+// Returns io.ErrUnexpectedEOF if not found. May not have all tables until RowIterator has reached io.EOF.
+func (r *RowIterator) GetExtendedProperties() (v2.DataTable, error) {
+	return r.GetNonPrimary(frames.QueryProperties, frames.ExtendedProperties)
+}
+
+// GetQueryCompletionInformation will return the query completion information table from the iterator, if it exists.
+// Returns io.ErrUnexpectedEOF if not found. May not have all tables until RowIterator has reached io.EOF.
+func (r *RowIterator) GetQueryCompletionInformation() (v2.DataTable, error) {
+	return r.GetNonPrimary(frames.QueryCompletionInformation, frames.QueryCompletionInformation)
 }
 
 func isTest() bool {
