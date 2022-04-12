@@ -1618,11 +1618,9 @@ func waitForIngest(t *testing.T, ctx context.Context, client *kusto.Client, data
 			}
 
 			assert.Equal(t, frames.QueryProperties, properties.TableKind)
-			assert.Equal(t, value.Values{
-				value.Int{Value: 1, Valid: true},
-				value.String{Value: "Visualization", Valid: true},
-				value.Dynamic{Value: []byte(`{"Visualization":null,"Title":null,"XColumn":null,"Series":null,"YColumns":null,"XTitle":null}`), Valid: true},
-			}, properties.KustoRows[0])
+			assert.Equal(t, "TableId", properties.Columns[0].Name)
+			assert.Equal(t, "Key", properties.Columns[1].Name)
+			assert.Equal(t, "Value", properties.Columns[2].Name)
 
 			completion, err := iter.GetQueryCompletionInformation()
 			if !assert.NoError(t, err) {
