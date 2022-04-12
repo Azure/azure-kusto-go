@@ -354,11 +354,13 @@ func TestNonProgressive(t *testing.T) {
 				}
 			}
 
+			ctx := test.ctx()
+
 			createSm := func(iter *RowIterator, toSM chan frames.Frame) stateMachine {
 				return &nonProgressiveSM{
 					iter: iter,
 					in:   toSM,
-					ctx:  test.ctx(),
+					ctx:  ctx,
 					wg:   &sync.WaitGroup{},
 				}
 			}
@@ -795,11 +797,13 @@ func TestProgressive(t *testing.T) {
 				}
 			}
 
+			ctx := test.ctx()
+
 			createSm := func(iter *RowIterator, toSM chan frames.Frame) stateMachine {
 				return &progressiveSM{
 					iter: iter,
 					in:   toSM,
-					ctx:  test.ctx(),
+					ctx:  ctx,
 					wg:   &sync.WaitGroup{},
 				}
 			}
@@ -1253,11 +1257,13 @@ func TestV1SM(t *testing.T) {
 				}
 			}
 
+			ctx := test.ctx()
+
 			createSm := func(iter *RowIterator, toSM chan frames.Frame) stateMachine {
 				return &v1SM{
 					iter: iter,
 					in:   toSM,
-					ctx:  test.ctx(),
+					ctx:  ctx,
 					wg:   &sync.WaitGroup{},
 				}
 			}
