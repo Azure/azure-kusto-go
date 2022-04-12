@@ -333,6 +333,12 @@ func (r *RowIterator) GetExtendedProperties() (v2.DataTable, error) {
 	return r.GetNonPrimary(frames.QueryProperties, frames.ExtendedProperties)
 }
 
+// GetQueryCompletionInformation will return the query completion information table from the iterator, if it exists.
+// Returns io.ErrUnexpectedEOF if not found. May not have all tables until RowIterator has reached io.EOF.
+func (r *RowIterator) GetQueryCompletionInformation() (v2.DataTable, error) {
+	return r.GetNonPrimary(frames.QueryCompletionInformation, frames.QueryCompletionInformation)
+}
+
 func isTest() bool {
 	if flag.Lookup("test.v") == nil {
 		return false

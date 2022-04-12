@@ -18,6 +18,7 @@ import (
 	"github.com/Azure/azure-kusto-go/kusto/data/types"
 	"github.com/Azure/azure-kusto-go/kusto/data/value"
 	"github.com/Azure/azure-kusto-go/kusto/ingest"
+	"github.com/Azure/azure-kusto-go/kusto/internal/frames"
 	"github.com/Azure/azure-kusto-go/kusto/unsafe"
 	"github.com/google/uuid"
 	"github.com/stretchr/testify/assert"
@@ -1595,11 +1596,12 @@ func waitForIngest(t *testing.T, ctx context.Context, client *kusto.Client, data
 			defer iter.Stop()
 
 			got = gotInit()
-			err = iter.Do(func(row *table.Row) error {
+			err = iter.DoOnRowOrError(func(row *table.Row, e *errors.Error) error {
+				require.NoError(t, e)
 				return doer(row, got)
 			})
-			if err != nil {
-				return false, fmt.Errorf("had iter.Do() error: %s", err)
+			if !assert.NoError(t, err) {
+				return false, err
 			}
 
 			if !assert.ObjectsAreEqualValues(want, got) {
@@ -1608,7 +1610,29 @@ func waitForIngest(t *testing.T, ctx context.Context, client *kusto.Client, data
 				return true, nil
 			}
 
-			return false, nil
+			properties, err := iter.GetExtendedProperties()
+			if !assert.NoError(t, err) {
+				return false, err
+			}
+
+			assert.Equal(t, frames.QueryProperties, properties.TableKind)
+			assert.Equal(t, value.Values{
+				value.Int{Value: 1, Valid: true},
+				value.String{Value: "Visualization", Valid: true},
+				value.Dynamic{Value: []byte(`{"Visualization":null,"Title":null,"XColumn":null,"Series":null,"YColumns":null,"XTitle":null}`), Valid: true},
+			}, properties.KustoRows[0])
+
+			completion, err := iter.GetQueryCompletionInformation()
+			if !assert.NoError(t, err) {
+				return false, err
+			}
+
+			assert.Equal(t, frames.QueryCompletionInformation, completion.TableKind)
+			assert.Equal(t, "Timestamp", completion.Columns[0].Name)
+			assert.Equal(t, "ClientRequestId", completion.Columns[1].Name)
+			assert.Equal(t, "ActivityId", completion.Columns[2].Name)
+
+			return false, err
 		}()
 	}
 	if failed {
