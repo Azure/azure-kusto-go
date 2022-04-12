@@ -6,6 +6,40 @@
 This is a data plane SDK (it is for interacting with Azure Data Explorer service). For the control plane (resource administration), go [here](https://github.com/Azure/azure-sdk-for-go/tree/master/services/kusto/mgmt)
 
 ## What's New
+### Version 0.6.0
+#### Deprecations 
+* `Ingestion.Stream` has been deprecated in favor of dedicated streaming clients - `ingest.Streaming` and `ingest.Managed`.
+This API was very limited - it required you to create a queued ingestion client, it only accepted a byte array, and had no customization options.
+* `RowIterator.Next` and `RowIterator.Do` are now deprecated and replaced by `RowIterator.NextRowOrError` and `RowIterator.DoOnRowOrError`. 
+In previous versions, when encountering an error in-line with the results (also known as partial success), the SDK panicked. Now `RowIterator.Next` and `RowIterator.Do` will return the first error they encounter, including in-line errors or partials successes and finish. 
+This means that there could be extra data that will be skipped when using these APIs. Fixed #81 
+
+#### Addtional Ingest Clients
+* `ingest.Streaming` and `ingest.Managed` were added to the SDK. Their interface is identical to `ingest.Ingestion` (in fact - they all share an interface `Ingestor`), and are created via `ingest.NewStreaming` and `ingest.NewManaged` respectively.
+`ingest.Streaming` uses [streaming ingestion](https://docs.microsoft.com/en-us/azure/data-explorer/ingest-data-streaming?tabs=azure-portal%2Ccsharp) to ingest data to kusto. It supports ingesting from a file or a `Reader`, but not a blob.
+`ingest.Managed` is a managed streaming ingest client. It will try to use streaming ingest, but on transient failures and other conditions will fall back to queued ingestion.
+
+#### New APIs for querying
+
+* As mentioned before, RowIterator.Next` and `RowIterator.Do` are now deprecated and replaced by `RowIterator.NextRowOrError` and `RowIterator.DoOnRowOrError`.  The new APIs will act the same as the old, with the following changes:
+`RowIterator.NextRowOrError` will return an additional `inlineError` value, when it's non-nil it indicates an inline error. After encountering it, the iteration doesn't end and you should continue consuming the iterator.
+`RowIterator.DoOnRowOrError` requires an additional parameter of type `*errors.Error`, which indicates an inline error. It can be ignored or handled, but while returning nil the iteration will continue.
+
+#### Addtional Features
+* Support extracting non-primary tables from a `RowIterator` using the following methods - `GetNonPrimary`, `GetExtendedProperties` and `GetQueryCompletionInformation`. Fixed #85 
+* Expose `TableFragmentType` via a Replace flag by @w1ndy in https://github.com/Azure/azure-kusto-go/pull/74
+* Refactor value converters and implement `ExtractValues` for `Row` by @w1ndy in https://github.com/Azure/azure-kusto-go/pull/75
+* Better Dynamic converter by @w1ndy in https://github.com/Azure/azure-kusto-go/pull/78
+* Support more forms of decimal type, and accept input of big.Int for it. Fixed #86 
+
+#### Fixes
+* Add support for gzipped errors,. Fixed #84
+* Moved from the old deprecated azblob to the new supported one. This should solve some issues in uploading blobs, specifically memory leaks.
+
+#### Internal Improvements
+* Added go-fmt gate check by @AsafMah in https://github.com/Azure/azure-kusto-go/pull/77
+* Parallelized tests and made them more robust
+
 ### Version 0.5.2
 #### Fixes
 * **Critical bug** - When ingesting to multiple clusters all data is sent to one cluster.
