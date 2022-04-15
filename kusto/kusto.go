@@ -2,6 +2,7 @@ package kusto
 
 import (
 	"context"
+	"net/http"
 	"net/url"
 	"reflect"
 	"strings"
@@ -106,6 +107,7 @@ func (a *Authorization) Validate(endpoint string) error {
 // Client is a client to a Kusto instance.
 type Client struct {
 	conn, ingestConn queryer
+	httpClient       *http.Client
 	endpoint         string
 	auth             Authorization
 	mu               sync.Mutex
@@ -114,8 +116,10 @@ type Client struct {
 // Option is an optional argument type for New().
 type Option func(c *Client)
 
-// New returns a new Client. endpoint is the Kusto endpoint to use, example: https://somename.westus.kusto.windows.net .
-func New(endpoint string, auth Authorization, options ...Option) (*Client, error) {
+// NewWithCustomHttp returns a new kusto client with a customized httpClient.
+//
+// endpoint is the Kusto endpoint to use, example: https://somename.westus.kusto.windows.net .
+func NewWithCustomHttp(endpoint string, auth Authorization, httpClient *http.Client, options ...Option) (*Client, error) {
 	u, err := url.Parse(endpoint)
 	if err != nil {
 		return nil, errors.ES(errors.OpServConn, errors.KClientArgs, "could not parse the endpoint(%s): %s", endpoint, err).SetNoRetry()
@@ -129,7 +133,7 @@ func New(endpoint string, auth Authorization, options ...Option) (*Client, error
 		)
 	}
 
-	client := &Client{auth: auth, endpoint: endpoint}
+	client := &Client{auth: auth, endpoint: endpoint, httpClient: httpClient}
 	for _, o := range options {
 		o(client)
 	}
@@ -138,13 +142,18 @@ func New(endpoint string, auth Authorization, options ...Option) (*Client, error
 		return nil, err
 	}
 
-	conn, err := newConn(endpoint, auth)
+	conn, err := newConn(endpoint, auth, httpClient)
 	if err != nil {
 		return nil, err
 	}
 	client.conn = conn
 
 	return client, nil
+}
+
+// New returns a new Client. endpoint is the Kusto endpoint to use, example: https://somename.westus.kusto.windows.net .
+func New(endpoint string, auth Authorization, options ...Option) (*Client, error) {
+	return NewWithCustomHttp(endpoint, auth, &http.Client{}, options...)
 }
 
 // QueryOption is an option type for a call to Query().
@@ -379,7 +388,7 @@ func (c *Client) getConn(callType callType, options connOptions) (queryer, error
 			if err := auth.Validate(u.String()); err != nil {
 				return nil, err
 			}
-			iconn, err := newConn(u.String(), auth)
+			iconn, err := newConn(u.String(), auth, c.httpClient)
 			if err != nil {
 				return nil, err
 			}

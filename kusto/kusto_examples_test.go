@@ -4,6 +4,8 @@ import (
 	"context"
 	"fmt"
 	"io"
+	"net/http"
+	"net/url"
 	"sync"
 	"time"
 
@@ -143,6 +145,26 @@ func ExampleAuthorization_config() {
 	}
 }
 
+func ExampleCustomHttpClient() {
+	// Create an authorizer with your Azure ClientID, Secret and TenantID.
+	authorizer := Authorization{
+		Config: auth.NewClientCredentialsConfig("clientID", "clientSecret", "tenantID"),
+	}
+	httpClient := &http.Client{}
+	url, err := url.Parse("squid-proxy.corp.mycompany.com:2323")
+	if err != nil {
+		panic(err.Error())
+	}
+
+	httpClient.Transport = &http.Transport{Proxy: http.ProxyURL(url)}
+
+	// Normally here you take a client.
+	_, err = NewWithCustomHttp("endpoint", authorizer, httpClient)
+	if err != nil {
+		panic(err.Error())
+	}
+}
+
 func ExampleAuthorization_msi() {
 	// Create an authorizer with an Azure MSI (managed identities).
 	msi := auth.NewMSIConfig()
@@ -156,6 +178,7 @@ func ExampleAuthorization_msi() {
 	if err != nil {
 		panic("add error handling")
 	}
+
 }
 
 func ExampleClient_Query_rows() {
