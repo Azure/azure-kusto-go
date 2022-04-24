@@ -125,6 +125,10 @@ type FsMock struct {
 	OnBlob   func(ctx context.Context, from string, fileSize int64, props properties.All) error
 }
 
+func (f FsMock) Close() error {
+	return nil
+}
+
 func (f FsMock) Local(ctx context.Context, from string, props properties.All) error {
 	if f.OnLocal != nil {
 		return f.OnLocal(ctx, from, props)

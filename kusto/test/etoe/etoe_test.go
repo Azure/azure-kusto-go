@@ -110,6 +110,10 @@ func TestQueries(t *testing.T) {
 		panic(err)
 	}
 
+	t.Cleanup(func() {
+		require.NoError(t, client.Close())
+	})
+
 	pCountStmt := kusto.NewStmt("table(tableName) | count").MustDefinitions(
 		kusto.NewDefinitions().Must(
 			kusto.ParamTypes{
@@ -403,6 +407,10 @@ func TestFileIngestion(t *testing.T) {
 		panic(err)
 	}
 
+	t.Cleanup(func() {
+		require.NoError(t, client.Close())
+	})
+
 	queuedTable := "goe2e_queued_file_logs"
 	streamingTable := "goe2e_streaming_file_logs"
 	managedTable := "goe2e_managed_streaming_file_logs"
@@ -411,16 +419,27 @@ func TestFileIngestion(t *testing.T) {
 	if err != nil {
 		panic(err)
 	}
+	t.Cleanup(func() {
+		require.NoError(t, queuedIngestor.Close())
+	})
 
 	streamingIngestor, err := ingest.NewStreaming(client, testConfig.Database, streamingTable)
 	if err != nil {
 		panic(err)
 	}
 
+	t.Cleanup(func() {
+		require.NoError(t, streamingIngestor.Close())
+	})
+
 	managedIngestor, err := ingest.NewManaged(client, testConfig.Database, managedTable)
 	if err != nil {
 		panic(err)
 	}
+
+	t.Cleanup(func() {
+		require.NoError(t, managedIngestor.Close())
+	})
 
 	mockRows := createMockLogRows()
 
@@ -760,18 +779,36 @@ func TestReaderIngestion(t *testing.T) {
 		panic(err)
 	}
 
+	t.Cleanup(func() {
+		require.NoError(t, client.Close())
+	})
+
 	queuedIngestor, err := ingest.New(client, testConfig.Database, queuedTable)
 	if err != nil {
 		panic(err)
 	}
+
+	t.Cleanup(func() {
+		require.NoError(t, queuedIngestor.Close())
+	})
+
 	streamingIngestor, err := ingest.NewStreaming(client, testConfig.Database, streamingTable)
 	if err != nil {
 		panic(err)
 	}
+
+	t.Cleanup(func() {
+		require.NoError(t, streamingIngestor.Close())
+	})
+
 	managedIngestor, err := ingest.NewManaged(client, testConfig.Database, managedTable)
 	if err != nil {
 		panic(err)
 	}
+
+	t.Cleanup(func() {
+		require.NoError(t, managedIngestor.Close())
+	})
 
 	mockRows := createMockLogRows()
 
@@ -1073,10 +1110,18 @@ func TestMultipleClusters(t *testing.T) {
 		panic(err)
 	}
 
+	t.Cleanup(func() {
+		require.NoError(t, client.Close())
+	})
+
 	secondaryClient, err := kusto.New(testConfig.SecondaryEndpoint, testConfig.Authorizer)
 	if err != nil {
 		panic(err)
 	}
+
+	t.Cleanup(func() {
+		require.NoError(t, secondaryClient.Close())
+	})
 
 	queuedTable := "goe2e_queued_multiple_logs"
 	secondaryQueuedTable := "goe2e_secondary_queued_multiple_logs"
@@ -1087,19 +1132,35 @@ func TestMultipleClusters(t *testing.T) {
 	if err != nil {
 		panic(err)
 	}
+	t.Cleanup(func() {
+		require.NoError(t, queuedIngestor.Close())
+	})
+
 	streamingIngestor, err := ingest.NewStreaming(client, testConfig.Database, streamingTable)
 	if err != nil {
 		panic(err)
 	}
 
+	t.Cleanup(func() {
+		require.NoError(t, streamingIngestor.Close())
+	})
+
 	secondaryQueuedIngestor, err := ingest.New(secondaryClient, testConfig.SecondaryDatabase, queuedTable)
 	if err != nil {
 		panic(err)
 	}
+
+	t.Cleanup(func() {
+		require.NoError(t, secondaryQueuedIngestor.Close())
+	})
+
 	secondaryStreamingIngestor, err := ingest.NewStreaming(secondaryClient, testConfig.SecondaryDatabase, streamingTable)
 	if err != nil {
 		panic(err)
 	}
+	t.Cleanup(func() {
+		require.NoError(t, secondaryStreamingIngestor.Close())
+	})
 
 	tests := []struct {
 		// desc describes the test.
@@ -1242,6 +1303,10 @@ func TestStreamingIngestion(t *testing.T) {
 		panic(err)
 	}
 
+	t.Cleanup(func() {
+		require.NoError(t, client.Close())
+	})
+
 	tableName := fmt.Sprintf("goe2e_streaming_datatypes_%d", time.Now().Unix())
 	err = createIngestionTable(t, client, tableName, false)
 	if err != nil {
@@ -1303,6 +1368,10 @@ func TestStreamingIngestion(t *testing.T) {
 			defer cancel()
 
 			ingestor, err := ingest.New(client, testConfig.Database, tableName)
+			t.Cleanup(func() {
+				require.NoError(t, ingestor.Close())
+			})
+
 			if err != nil {
 				panic(err)
 			}
@@ -1340,6 +1409,10 @@ func TestError(t *testing.T) {
 	t.Parallel()
 	client, err := kusto.New(testConfig.Endpoint, testConfig.Authorizer)
 	require.NoError(t, err)
+
+	t.Cleanup(func() {
+		require.NoError(t, client.Close())
+	})
 
 	_, err = client.Query(context.Background(), testConfig.Database, pCountStmt.MustParameters(
 		kusto.NewParameters().Must(kusto.QueryValues{"tableName": uuid.New().String()}),

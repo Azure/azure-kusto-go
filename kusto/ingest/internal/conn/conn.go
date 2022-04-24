@@ -179,3 +179,8 @@ func copyHeaders(header http.Header) http.Header {
 	}
 	return headers
 }
+
+func (c *Conn) Close() error {
+	close(c.headersPool)
+	return nil
+}

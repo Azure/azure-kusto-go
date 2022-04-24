@@ -8,6 +8,7 @@ import (
 	"context"
 	"encoding/json"
 	"fmt"
+	"io"
 	"io/ioutil"
 	"net/http"
 	"net/url"
@@ -200,4 +201,12 @@ func (c *conn) execute(ctx context.Context, execType int, db string, query Stmt,
 	frameCh := dec.Decode(ctx, body, op)
 
 	return execResp{reqHeader: header, respHeader: resp.Header, frameCh: frameCh}, nil
+}
+
+func (c *conn) Close() error {
+	if closer, ok := c.auth.(io.Closer); ok {
+		return closer.Close()
+	}
+
+	return nil
 }

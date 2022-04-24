@@ -15,6 +15,7 @@ import (
 )
 
 type Ingestor interface {
+	io.Closer
 	FromFile(ctx context.Context, fPath string, options ...FileOption) (*Result, error)
 	FromReader(ctx context.Context, reader io.Reader, options ...FileOption) (*Result, error)
 }
@@ -239,4 +240,19 @@ func (i *Ingestion) newProp() properties.All {
 			TableName:    i.table,
 		},
 	}
+}
+
+func (i *Ingestion) Close() error {
+	i.mgr.Close()
+	var err error
+	err = i.fs.Close()
+	if i.streamConn != nil {
+		err2 := i.streamConn.Close()
+		if err == nil {
+			err = err2
+		} else {
+			err = fmt.Errorf("combined error: %v %v", err, err2)
+		}
+	}
+	return err
 }

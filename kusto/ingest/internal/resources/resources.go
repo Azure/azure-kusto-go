@@ -154,7 +154,9 @@ func New(client mgmter) (*Manager, error) {
 
 // Close closes the manager. This stops any token refreshes.
 func (m *Manager) Close() {
-	close(m.done)
+	if _, ok := <-m.done; !ok {
+		close(m.done)
+	}
 }
 
 func (m *Manager) renewResources() {

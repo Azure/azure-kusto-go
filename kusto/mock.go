@@ -135,6 +135,10 @@ func (m *MockRows) Error(err error) error {
 type mockConn struct {
 }
 
+func (m mockConn) Close() error {
+	return nil
+}
+
 func (m mockConn) query(_ context.Context, _ string, _ Stmt, _ *queryOptions) (execResp, error) {
 	return execResp{}, nil
 }
