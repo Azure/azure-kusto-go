@@ -55,9 +55,9 @@ func newConn(endpoint string, auth Authorization) (*conn, error) {
 
 	c := &conn{
 		auth:        auth.Authorizer,
-		endMgmt:     &url.URL{Scheme: "https", Host: u.Hostname(), Path: "/v1/rest/mgmt"},
-		endQuery:    &url.URL{Scheme: "https", Host: u.Hostname(), Path: "/v2/rest/query"},
-		streamQuery: &url.URL{Scheme: "https", Host: u.Hostname(), Path: "/v1/rest/ingest/"},
+		endMgmt:     &url.URL{Scheme: "https", Host: u.Host, Path: "/v1/rest/mgmt"},
+		endQuery:    &url.URL{Scheme: "https", Host: u.Host, Path: "/v2/rest/query"},
+		streamQuery: &url.URL{Scheme: "https", Host: u.Host, Path: "/v1/rest/ingest/"},
 		client:      &http.Client{},
 	}
 
