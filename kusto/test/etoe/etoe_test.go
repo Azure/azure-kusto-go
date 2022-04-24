@@ -111,7 +111,9 @@ func TestQueries(t *testing.T) {
 	}
 
 	t.Cleanup(func() {
+		t.Log("Closing client")
 		require.NoError(t, client.Close())
+		t.Log("Closed client")
 	})
 
 	pCountStmt := kusto.NewStmt("table(tableName) | count").MustDefinitions(
@@ -408,7 +410,9 @@ func TestFileIngestion(t *testing.T) {
 	}
 
 	t.Cleanup(func() {
+		t.Log("Closing client")
 		require.NoError(t, client.Close())
+		t.Log("Closed client")
 	})
 
 	queuedTable := "goe2e_queued_file_logs"
@@ -420,7 +424,9 @@ func TestFileIngestion(t *testing.T) {
 		panic(err)
 	}
 	t.Cleanup(func() {
+		t.Log("Closing queuedIngestor")
 		require.NoError(t, queuedIngestor.Close())
+		t.Log("Closed queuedIngestor")
 	})
 
 	streamingIngestor, err := ingest.NewStreaming(client, testConfig.Database, streamingTable)
@@ -429,7 +435,9 @@ func TestFileIngestion(t *testing.T) {
 	}
 
 	t.Cleanup(func() {
+		t.Log("Closing streamingIngestor")
 		require.NoError(t, streamingIngestor.Close())
+		t.Log("Closed streamingIngestor")
 	})
 
 	managedIngestor, err := ingest.NewManaged(client, testConfig.Database, managedTable)
@@ -438,7 +446,9 @@ func TestFileIngestion(t *testing.T) {
 	}
 
 	t.Cleanup(func() {
+		t.Log("Closing managedIngestor")
 		require.NoError(t, managedIngestor.Close())
+		t.Log("Closed managedIngestor")
 	})
 
 	mockRows := createMockLogRows()
@@ -780,7 +790,9 @@ func TestReaderIngestion(t *testing.T) {
 	}
 
 	t.Cleanup(func() {
+		t.Log("Closing client")
 		require.NoError(t, client.Close())
+		t.Log("Closed client")
 	})
 
 	queuedIngestor, err := ingest.New(client, testConfig.Database, queuedTable)
@@ -789,7 +801,9 @@ func TestReaderIngestion(t *testing.T) {
 	}
 
 	t.Cleanup(func() {
+		t.Log("Closing queuedIngestor")
 		require.NoError(t, queuedIngestor.Close())
+		t.Log("Closed queuedIngestor")
 	})
 
 	streamingIngestor, err := ingest.NewStreaming(client, testConfig.Database, streamingTable)
@@ -798,7 +812,9 @@ func TestReaderIngestion(t *testing.T) {
 	}
 
 	t.Cleanup(func() {
+		t.Log("Closing streamingIngestor")
 		require.NoError(t, streamingIngestor.Close())
+		t.Log("Closed streamingIngestor")
 	})
 
 	managedIngestor, err := ingest.NewManaged(client, testConfig.Database, managedTable)
@@ -807,7 +823,9 @@ func TestReaderIngestion(t *testing.T) {
 	}
 
 	t.Cleanup(func() {
+		t.Log("Closing managedIngestor")
 		require.NoError(t, managedIngestor.Close())
+		t.Log("Closed managedIngestor")
 	})
 
 	mockRows := createMockLogRows()
@@ -1111,7 +1129,9 @@ func TestMultipleClusters(t *testing.T) {
 	}
 
 	t.Cleanup(func() {
+		t.Log("Closing client")
 		require.NoError(t, client.Close())
+		t.Log("Closed client")
 	})
 
 	secondaryClient, err := kusto.New(testConfig.SecondaryEndpoint, testConfig.Authorizer)
@@ -1120,7 +1140,9 @@ func TestMultipleClusters(t *testing.T) {
 	}
 
 	t.Cleanup(func() {
+		t.Log("Closing secondaryClient")
 		require.NoError(t, secondaryClient.Close())
+		t.Log("Closed secondaryClient")
 	})
 
 	queuedTable := "goe2e_queued_multiple_logs"
@@ -1133,7 +1155,9 @@ func TestMultipleClusters(t *testing.T) {
 		panic(err)
 	}
 	t.Cleanup(func() {
+		t.Log("Closing queuedIngestor")
 		require.NoError(t, queuedIngestor.Close())
+		t.Log("Closed queuedIngestor")
 	})
 
 	streamingIngestor, err := ingest.NewStreaming(client, testConfig.Database, streamingTable)
@@ -1142,7 +1166,9 @@ func TestMultipleClusters(t *testing.T) {
 	}
 
 	t.Cleanup(func() {
+		t.Log("Closing streamingIngestor")
 		require.NoError(t, streamingIngestor.Close())
+		t.Log("Closed streamingIngestor")
 	})
 
 	secondaryQueuedIngestor, err := ingest.New(secondaryClient, testConfig.SecondaryDatabase, queuedTable)
@@ -1151,7 +1177,9 @@ func TestMultipleClusters(t *testing.T) {
 	}
 
 	t.Cleanup(func() {
+		t.Log("Closing secondaryQueuedIngestor")
 		require.NoError(t, secondaryQueuedIngestor.Close())
+		t.Log("Closed secondaryQueuedIngestor")
 	})
 
 	secondaryStreamingIngestor, err := ingest.NewStreaming(secondaryClient, testConfig.SecondaryDatabase, streamingTable)
@@ -1159,7 +1187,9 @@ func TestMultipleClusters(t *testing.T) {
 		panic(err)
 	}
 	t.Cleanup(func() {
+		t.Log("Closing secondaryStreamingIngestor")
 		require.NoError(t, secondaryStreamingIngestor.Close())
+		t.Log("Closed secondaryStreamingIngestor")
 	})
 
 	tests := []struct {
@@ -1304,7 +1334,9 @@ func TestStreamingIngestion(t *testing.T) {
 	}
 
 	t.Cleanup(func() {
+		t.Log("Closing client")
 		require.NoError(t, client.Close())
+		t.Log("Closed client")
 	})
 
 	tableName := fmt.Sprintf("goe2e_streaming_datatypes_%d", time.Now().Unix())
@@ -1369,7 +1401,9 @@ func TestStreamingIngestion(t *testing.T) {
 
 			ingestor, err := ingest.New(client, testConfig.Database, tableName)
 			t.Cleanup(func() {
+				t.Log("Closing ingestor")
 				require.NoError(t, ingestor.Close())
+				t.Log("Closed ingestor")
 			})
 
 			if err != nil {
@@ -1411,7 +1445,9 @@ func TestError(t *testing.T) {
 	require.NoError(t, err)
 
 	t.Cleanup(func() {
+		t.Log("Closing client")
 		require.NoError(t, client.Close())
+		t.Log("Closed client")
 	})
 
 	_, err = client.Query(context.Background(), testConfig.Database, pCountStmt.MustParameters(

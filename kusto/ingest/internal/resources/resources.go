@@ -154,8 +154,14 @@ func New(client mgmter) (*Manager, error) {
 
 // Close closes the manager. This stops any token refreshes.
 func (m *Manager) Close() {
-	if _, ok := <-m.done; !ok {
-		close(m.done)
+	for {
+		select {
+		case <-m.done:
+			return
+		default:
+			close(m.done)
+			return
+		}
 	}
 }
 
