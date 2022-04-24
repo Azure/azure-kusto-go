@@ -427,3 +427,7 @@ func (*Client) contextSetup(ctx context.Context, mgmtCall bool) (context.Context
 	ctx, cancel := context.WithTimeout(ctx, 4*time.Minute)
 	return ctx, cancel, nil
 }
+
+func (c *Client) HttpClient() *http.Client {
+	return c.http
+}

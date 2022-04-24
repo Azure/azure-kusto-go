@@ -44,7 +44,7 @@ type Conn struct {
 }
 
 // New returns a new Conn object.
-func New(endpoint string, auth kusto.Authorization) (*Conn, error) {
+func New(endpoint string, auth kusto.Authorization, client *http.Client) (*Conn, error) {
 	if !validURL.MatchString(endpoint) {
 		return nil, errors.ES(
 			errors.OpServConn,
@@ -56,10 +56,10 @@ func New(endpoint string, auth kusto.Authorization) (*Conn, error) {
 		return nil, err
 	}
 
-	return newWithoutValidation(endpoint, auth)
+	return newWithoutValidation(endpoint, auth, client)
 }
 
-func newWithoutValidation(endpoint string, auth kusto.Authorization) (*Conn, error) {
+func newWithoutValidation(endpoint string, auth kusto.Authorization, client *http.Client) (*Conn, error) {
 	headers := http.Header{}
 	headers.Add("Accept", "application/json")
 	headers.Add("Accept-Encoding", "gzip,deflate")
@@ -81,7 +81,7 @@ func newWithoutValidation(endpoint string, auth kusto.Authorization) (*Conn, err
 		baseURL:     &url.URL{Scheme: u.Scheme, Host: u.Host, Path: "/v1/rest/ingest/"},
 		reqHeaders:  headers,
 		headersPool: make(chan http.Header, 100),
-		client:      &http.Client{},
+		client:      client,
 	}
 
 	// Fills a pool of headers to alleviate header copying timing at request time.

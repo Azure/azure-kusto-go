@@ -2,6 +2,7 @@ package ingest
 
 import (
 	"context"
+	"net/http"
 	"testing"
 
 	"github.com/Azure/azure-kusto-go/kusto"
@@ -15,6 +16,10 @@ type mockClient struct {
 	endpoint string
 	auth     kusto.Authorization
 	onMgmt   func(ctx context.Context, db string, query kusto.Stmt, options ...kusto.MgmtOption) (*kusto.RowIterator, error)
+}
+
+func (m mockClient) HttpClient() *http.Client {
+	return &http.Client{}
 }
 
 func (m mockClient) Auth() kusto.Authorization {

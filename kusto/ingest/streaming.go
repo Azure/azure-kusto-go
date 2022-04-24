@@ -31,7 +31,7 @@ var FileIsBlobErr = errors.ES(errors.OpIngestStream, errors.KClientArgs, "blobst
 // More information can be found here:
 // https://docs.microsoft.com/en-us/azure/kusto/management/create-ingestion-mapping-command
 func NewStreaming(client QueryClient, db, table string) (*Streaming, error) {
-	streamConn, err := conn.New(client.Endpoint(), client.Auth())
+	streamConn, err := conn.New(client.Endpoint(), client.Auth(), client.HttpClient())
 	if err != nil {
 		return nil, err
 	}
