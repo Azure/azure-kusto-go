@@ -29,11 +29,16 @@ func ExampleIngestion_FromFile() {
 	if err != nil {
 		// Do something
 	}
+	// Be sure to close the client when you're done. (Error handling omitted for brevity.)
+	defer client.Close()
 
 	ingestor, err := ingest.New(client, "database", "table")
 	if err != nil {
 		// Do something
 	}
+	// Closing the ingestor will not close the client (since the client may be used separately),
+	//but it is still important to close the ingestor when you're done.
+	defer ingestor.Close()
 
 	// Setup a maximum time for completion to be 10 minutes.
 	ctx, cancel := context.WithTimeout(context.Background(), 10*time.Minute)
