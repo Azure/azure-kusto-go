@@ -195,7 +195,6 @@ func (c *Conn) Close() error {
 			return nil
 		default:
 			close(c.done)
-			close(c.headersPool)
 			return nil
 		}
 	}
