@@ -194,8 +194,8 @@ func (c *Conn) Close() error {
 		case <-c.done:
 			return nil
 		default:
-			close(c.headersPool)
 			close(c.done)
+			close(c.headersPool)
 			return nil
 		}
 	}
