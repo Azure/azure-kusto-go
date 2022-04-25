@@ -83,6 +83,7 @@ func newWithoutValidation(endpoint string, auth kusto.Authorization) (*Conn, err
 		reqHeaders:  headers,
 		headersPool: make(chan http.Header, 100),
 		client:      &http.Client{},
+		done:        make(chan struct{}),
 	}
 
 	// Fills a pool of headers to alleviate header copying timing at request time.
