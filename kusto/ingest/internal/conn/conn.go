@@ -39,6 +39,7 @@ type Conn struct {
 	reqHeaders  http.Header
 	headersPool chan http.Header
 	client      *http.Client
+	done        chan struct{}
 
 	inTest bool
 }
@@ -113,7 +114,13 @@ func (c *Conn) StreamIngest(ctx context.Context, db, table string, payload io.Re
 
 	headers := <-c.headersPool
 	go func() {
-		c.headersPool <- copyHeaders(c.reqHeaders)
+		header := copyHeaders(c.reqHeaders)
+		select {
+		case <-c.done:
+			return
+		case c.headersPool <- header:
+			return
+		}
 	}()
 
 	if clientRequestId != "" {
@@ -181,6 +188,14 @@ func copyHeaders(header http.Header) http.Header {
 }
 
 func (c *Conn) Close() error {
-	close(c.headersPool)
-	return nil
+	for {
+		select {
+		case <-c.done:
+			return nil
+		default:
+			close(c.headersPool)
+			close(c.done)
+			return nil
+		}
+	}
 }
