@@ -156,6 +156,6 @@ func (i *Streaming) newProp() properties.All {
 	}
 }
 
-func (s Streaming) Close() error {
-	return s.streamConn.Close()
+func (i *Streaming) Close() error {
+	return i.streamConn.Close()
 }
