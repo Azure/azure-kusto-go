@@ -184,7 +184,7 @@ func (c *conn) execute(ctx context.Context, execType int, db string, query Stmt,
 	}
 
 	if resp.StatusCode != http.StatusOK {
-		return execResp{}, errors.HTTP(op, resp.StatusCode, body, fmt.Sprintf("error from Kusto endpoint for query %q: ", query.String()))
+		return execResp{}, errors.HTTP(op, resp.Status, resp.StatusCode, body, fmt.Sprintf("error from Kusto endpoint for query %q: ", query.String()))
 	}
 
 	var dec frames.Decoder

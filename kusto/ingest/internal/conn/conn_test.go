@@ -196,7 +196,7 @@ func TestStream(t *testing.T) {
 			err = conn.StreamIngest(ctx, db, "table", &payload, properties.JSON, test.mappingName, "")
 
 			if test.err != nil {
-				assert.Equal(t, test.err, err.(*errors.Error).Err)
+				assert.Equal(t, test.err, err.(*errors.HttpError).Err)
 				return
 			} else {
 				assert.NoError(t, err)
