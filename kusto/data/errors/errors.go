@@ -16,7 +16,9 @@ import (
 	"fmt"
 	"io"
 	"io/ioutil"
+	"net/http"
 	"runtime"
+	"strconv"
 	"strings"
 )
 
@@ -72,6 +74,11 @@ type Error struct {
 	permanent  bool
 
 	inner *Error
+}
+
+type HttpError struct {
+	err        Error
+	StatusCode int
 }
 
 // UnmarshalREST will unmarshal an error message from the server if the message is in
@@ -233,6 +240,15 @@ func HTTP(o Op, status string, body io.ReadCloser, prefix string) *Error {
 	return e
 }
 
+func HTTPErrorCode(o Op, status int, body io.ReadCloser, prefix string) *HttpError {
+	err := HTTP(o, strconv.Itoa(status), body, prefix)
+	httpError := &HttpError{
+		StatusCode: status,
+		err:        *err,
+	}
+	return httpError
+}
+
 // e constructs an Error. You may pass in an Op, Kind, string or error.  This will strip an *Error if you
 // pass if of its Kind and Op and put it in here. It will wrap a non-*Error implementation of error.
 // If you want to wrap the *Error in an *Error, use W().
@@ -364,4 +380,12 @@ func oneToErr(m map[string]interface{}, err *Error, op Op) *Error {
 	W(ES(op, kind, msg), err)
 
 	return err
+}
+
+func (e *HttpError) IsThrottled() bool {
+	return e != nil && (e.StatusCode == http.StatusTooManyRequests)
+}
+
+func (e *HttpError) Error() string {
+	return e.err.Error()
 }
