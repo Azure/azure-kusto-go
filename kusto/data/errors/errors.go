@@ -18,7 +18,6 @@ import (
 	"io/ioutil"
 	"net/http"
 	"runtime"
-	"strconv"
 	"strings"
 )
 
@@ -77,7 +76,7 @@ type Error struct {
 }
 
 type HttpError struct {
-	err        Error
+	Err        Error
 	StatusCode int
 }
 
@@ -224,7 +223,7 @@ func ES(o Op, k Kind, s string, args ...interface{}) *Error {
 }
 
 // HTTP constructs an *Error from an *http.Response and a prefix to the error message.
-func HTTP(o Op, status string, body io.ReadCloser, prefix string) *Error {
+func HTTP(o Op, status int, body io.ReadCloser, prefix string) *HttpError {
 	bodyBytes, err := ioutil.ReadAll(body)
 	if err != nil {
 		bodyBytes = []byte(fmt.Sprintf("Failed to read body: %v", err))
@@ -234,17 +233,13 @@ func HTTP(o Op, status string, body io.ReadCloser, prefix string) *Error {
 		Op:         o,
 		Kind:       KHTTPError,
 		restErrMsg: bodyBytes,
-		Err:        fmt.Errorf("%s(%s):\n%s", prefix, status, string(bodyBytes)),
+		Err:        fmt.Errorf("%s(%d):\n%s", prefix, status, string(bodyBytes)),
 	}
 	e.UnmarshalREST()
-	return e
-}
 
-func HTTPErrorCode(o Op, status int, body io.ReadCloser, prefix string) *HttpError {
-	err := HTTP(o, strconv.Itoa(status), body, prefix)
 	httpError := &HttpError{
+		Err:        *e,
 		StatusCode: status,
-		err:        *err,
 	}
 	return httpError
 }
@@ -387,5 +382,5 @@ func (e *HttpError) IsThrottled() bool {
 }
 
 func (e *HttpError) Error() string {
-	return e.err.Error()
+	return e.Err.Error()
 }

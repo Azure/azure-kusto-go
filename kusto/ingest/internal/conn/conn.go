@@ -167,7 +167,7 @@ func (c *Conn) StreamIngest(ctx context.Context, db, table string, payload io.Re
 		if err != nil {
 			return err
 		}
-		return errors.HTTP(writeOp, resp.Status, body, "streaming ingest issue")
+		return errors.HTTP(writeOp, resp.StatusCode, body, "streaming ingest issue")
 	}
 	return nil
 }
