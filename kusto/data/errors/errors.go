@@ -18,7 +18,6 @@ import (
 	"io/ioutil"
 	"net/http"
 	"runtime"
-	"strconv"
 	"strings"
 )
 
@@ -76,8 +75,10 @@ type Error struct {
 	inner *Error
 }
 
+type KustoError = Error
+
 type HttpError struct {
-	err        Error
+	KustoError
 	StatusCode int
 }
 
@@ -224,29 +225,23 @@ func ES(o Op, k Kind, s string, args ...interface{}) *Error {
 }
 
 // HTTP constructs an *Error from an *http.Response and a prefix to the error message.
-func HTTP(o Op, status string, body io.ReadCloser, prefix string) *Error {
+func HTTP(o Op, status string, statusCode int, body io.ReadCloser, prefix string) *HttpError {
 	bodyBytes, err := ioutil.ReadAll(body)
 	if err != nil {
 		bodyBytes = []byte(fmt.Sprintf("Failed to read body: %v", err))
 	}
-
-	e := &Error{
-		Op:         o,
-		Kind:       KHTTPError,
-		restErrMsg: bodyBytes,
-		Err:        fmt.Errorf("%s(%s):\n%s", prefix, status, string(bodyBytes)),
+	e := HttpError{
+		KustoError: KustoError{
+			Op:         o,
+			Kind:       KHTTPError,
+			restErrMsg: bodyBytes,
+			Err:        fmt.Errorf("%s(%s):\n%s", prefix, status, string(bodyBytes)),
+		},
+		StatusCode: statusCode,
 	}
+
 	e.UnmarshalREST()
-	return e
-}
-
-func HTTPErrorCode(o Op, status int, body io.ReadCloser, prefix string) *HttpError {
-	err := HTTP(o, strconv.Itoa(status), body, prefix)
-	httpError := &HttpError{
-		StatusCode: status,
-		err:        *err,
-	}
-	return httpError
+	return &e
 }
 
 // e constructs an Error. You may pass in an Op, Kind, string or error.  This will strip an *Error if you
@@ -387,5 +382,22 @@ func (e *HttpError) IsThrottled() bool {
 }
 
 func (e *HttpError) Error() string {
-	return e.err.Error()
+	return e.KustoError.Error()
+}
+
+func (e *HttpError) Unwrap() error {
+	if e == nil {
+		return nil
+	}
+	return e.KustoError.Unwrap()
+}
+
+func GetKustoError(err error) (*Error, bool) {
+	if err, ok := err.(*Error); ok {
+		return err, true
+	}
+	if err, ok := err.(*HttpError); ok {
+		return &err.KustoError, true
+	}
+	return nil, false
 }

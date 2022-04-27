@@ -125,7 +125,7 @@ func streamImpl(c streamIngestor, ctx context.Context, payload io.Reader, props 
 		props.Streaming.ClientRequestId)
 
 	if err != nil {
-		if e, ok := err.(*errors.Error); ok {
+		if e, ok := errors.GetKustoError(err); ok {
 			return nil, e
 		}
 		return nil, errors.E(errors.OpIngestStream, errors.KClientArgs, err)
