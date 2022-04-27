@@ -183,7 +183,11 @@ func (c *conn) execute(ctx context.Context, execType int, db string, query Stmt,
 		return execResp{}, err
 	}
 
-	if resp.StatusCode != 200 {
+	if resp.StatusCode == http.StatusTooManyRequests {
+		return execResp{}, errors.HTTPErrorCode(op, resp.StatusCode, body, fmt.Sprintf("request got throttled for query %q: ", query.String()))
+	}
+
+	if resp.StatusCode != http.StatusOK {
 		return execResp{}, errors.HTTP(op, resp.Status, body, fmt.Sprintf("error from Kusto endpoint for query %q: ", query.String()))
 	}
 
