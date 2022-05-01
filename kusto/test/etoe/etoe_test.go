@@ -1345,7 +1345,7 @@ func TestError(t *testing.T) {
 		kusto.NewParameters().Must(kusto.QueryValues{"tableName": uuid.New().String()}),
 	))
 
-	kustoError, ok := err.(*errors.Error)
+	kustoError, ok := errors.GetKustoError(err)
 	assert.True(t, ok)
 	assert.Equal(t, errors.OpQuery, kustoError.Op)
 	assert.Equal(t, errors.KHTTPError, kustoError.Kind)
