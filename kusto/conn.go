@@ -42,8 +42,8 @@ type conn struct {
 	client                         *http.Client
 }
 
-// newConn returns a new conn object.
-func newConn(endpoint string, auth Authorization) (*conn, error) {
+// newConn returns a new conn object with an injected http.Client
+func newConn(endpoint string, auth Authorization, client *http.Client) (*conn, error) {
 	if !validURL.MatchString(endpoint) {
 		return nil, errors.ES(errors.OpServConn, errors.KClientArgs, "endpoint is not valid(%s), should be https://<cluster name>.*", endpoint).SetNoRetry()
 	}
@@ -58,7 +58,7 @@ func newConn(endpoint string, auth Authorization) (*conn, error) {
 		endMgmt:     &url.URL{Scheme: "https", Host: u.Host, Path: "/v1/rest/mgmt"},
 		endQuery:    &url.URL{Scheme: "https", Host: u.Host, Path: "/v2/rest/query"},
 		streamQuery: &url.URL{Scheme: "https", Host: u.Host, Path: "/v1/rest/ingest/"},
-		client:      &http.Client{},
+		client:      client,
 	}
 
 	return c, nil

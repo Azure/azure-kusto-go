@@ -4,6 +4,7 @@ import (
 	"context"
 	"fmt"
 	"io"
+	"net/http"
 	"reflect"
 	"sync"
 
@@ -157,5 +158,6 @@ func NewMockClient() *Client {
 		endpoint:   "https://sdkse2etest.eastus.kusto.windows.net",
 		auth:       Authorization{Authorizer: autorest.NewBasicAuthorizer("", "")},
 		mu:         sync.Mutex{},
+		http:       &http.Client{},
 	}
 }
