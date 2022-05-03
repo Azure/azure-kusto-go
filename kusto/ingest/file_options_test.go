@@ -132,7 +132,7 @@ func TestOptions(t *testing.T) {
 			case fromReader:
 				_, err = test.ingestor.FromReader(ctx, bytes.NewReader([]byte{}), test.option)
 			}
-			if e, ok := err.(*errors.Error); ok {
+			if e, ok := errors.GetKustoError(err); ok {
 				assert.Equal(t, test.op, e.Op)
 				assert.Equal(t, test.kind, e.Kind)
 			} else {

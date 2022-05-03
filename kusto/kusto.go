@@ -2,6 +2,7 @@ package kusto
 
 import (
 	"context"
+	"net/http"
 	"fmt"
 	"io"
 	"net/url"
@@ -112,6 +113,7 @@ type Client struct {
 	endpoint         string
 	auth             Authorization
 	mu               sync.Mutex
+	http             *http.Client
 }
 
 // Option is an optional argument type for New().
@@ -141,13 +143,23 @@ func New(endpoint string, auth Authorization, options ...Option) (*Client, error
 		return nil, err
 	}
 
-	conn, err := newConn(endpoint, auth)
+	if client.http == nil {
+		client.http = &http.Client{}
+	}
+
+	conn, err := newConn(endpoint, auth, client.http)
 	if err != nil {
 		return nil, err
 	}
 	client.conn = conn
 
 	return client, nil
+}
+
+func WithHttpClient(client *http.Client) Option {
+	return func(c *Client) {
+		c.http = client
+	}
 }
 
 // QueryOption is an option type for a call to Query().
@@ -382,7 +394,7 @@ func (c *Client) getConn(callType callType, options connOptions) (queryer, error
 			if err := auth.Validate(u.String()); err != nil {
 				return nil, err
 			}
-			iconn, err := newConn(u.String(), auth)
+			iconn, err := newConn(u.String(), auth, c.http)
 			if err != nil {
 				return nil, err
 			}
@@ -417,6 +429,10 @@ func (*Client) contextSetup(ctx context.Context, mgmtCall bool) (context.Context
 	}
 	ctx, cancel := context.WithTimeout(ctx, 4*time.Minute)
 	return ctx, cancel, nil
+}
+
+func (c *Client) HttpClient() *http.Client {
+	return c.http
 }
 
 func (c *Client) Close() error {

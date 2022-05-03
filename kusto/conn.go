@@ -43,8 +43,8 @@ type conn struct {
 	client                         *http.Client
 }
 
-// newConn returns a new conn object.
-func newConn(endpoint string, auth Authorization) (*conn, error) {
+// newConn returns a new conn object with an injected http.Client
+func newConn(endpoint string, auth Authorization, client *http.Client) (*conn, error) {
 	if !validURL.MatchString(endpoint) {
 		return nil, errors.ES(errors.OpServConn, errors.KClientArgs, "endpoint is not valid(%s), should be https://<cluster name>.*", endpoint).SetNoRetry()
 	}
@@ -56,10 +56,10 @@ func newConn(endpoint string, auth Authorization) (*conn, error) {
 
 	c := &conn{
 		auth:        auth.Authorizer,
-		endMgmt:     &url.URL{Scheme: "https", Host: u.Hostname(), Path: "/v1/rest/mgmt"},
-		endQuery:    &url.URL{Scheme: "https", Host: u.Hostname(), Path: "/v2/rest/query"},
-		streamQuery: &url.URL{Scheme: "https", Host: u.Hostname(), Path: "/v1/rest/ingest/"},
-		client:      &http.Client{},
+		endMgmt:     &url.URL{Scheme: "https", Host: u.Host, Path: "/v1/rest/mgmt"},
+		endQuery:    &url.URL{Scheme: "https", Host: u.Host, Path: "/v2/rest/query"},
+		streamQuery: &url.URL{Scheme: "https", Host: u.Host, Path: "/v1/rest/ingest/"},
+		client:      client,
 	}
 
 	return c, nil
@@ -184,8 +184,8 @@ func (c *conn) execute(ctx context.Context, execType int, db string, query Stmt,
 		return execResp{}, err
 	}
 
-	if resp.StatusCode != 200 {
-		return execResp{}, errors.HTTP(op, resp.Status, body, fmt.Sprintf("error from Kusto endpoint for query %q: ", query.String()))
+	if resp.StatusCode != http.StatusOK {
+		return execResp{}, errors.HTTP(op, resp.Status, resp.StatusCode, body, fmt.Sprintf("error from Kusto endpoint for query %q: ", query.String()))
 	}
 
 	var dec frames.Decoder

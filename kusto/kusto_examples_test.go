@@ -4,6 +4,8 @@ import (
 	"context"
 	"fmt"
 	"io"
+	"net/http"
+	"net/url"
 	"sync"
 	"time"
 
@@ -316,4 +318,24 @@ func ExampleClient_Query_struct() {
 	}()
 
 	wg.Wait()
+}
+
+func ExampleCustomHttpClient() {
+	// Create an authorizer with your Azure ClientID, Secret and TenantID.
+	authorizer := Authorization{
+		Config: auth.NewClientCredentialsConfig("clientID", "clientSecret", "tenantID"),
+	}
+	httpClient := &http.Client{}
+	url, err := url.Parse("squid-proxy.corp.mycompany.com:2323")
+	if err != nil {
+		panic(err.Error())
+	}
+
+	httpClient.Transport = &http.Transport{Proxy: http.ProxyURL(url)}
+
+	// Normally here you take a client.
+	_, err = New("endpoint", authorizer, WithHttpClient(httpClient))
+	if err != nil {
+		panic(err.Error())
+	}
 }
