@@ -2,9 +2,9 @@ package kusto
 
 import (
 	"context"
-	"net/http"
 	"fmt"
 	"io"
+	"net/http"
 	"net/url"
 	"reflect"
 	"strings"
