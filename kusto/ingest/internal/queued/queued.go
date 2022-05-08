@@ -39,6 +39,7 @@ const (
 
 // Queued provides methods for taking data from various sources and ingesting it into Kusto using queued ingestion.
 type Queued interface {
+	io.Closer
 	Local(ctx context.Context, from string, props properties.All) error
 	Reader(ctx context.Context, reader io.Reader, props properties.All) (string, error)
 	Blob(ctx context.Context, from string, fileSize int64, props properties.All) error
@@ -435,4 +436,10 @@ func IsLocalPath(s string) (bool, error) {
 	}
 
 	return true, nil
+}
+
+func (i *Ingestion) Close() error {
+	i.mgr.Close()
+	i.transferManager.Close()
+	return nil
 }

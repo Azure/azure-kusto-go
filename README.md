@@ -78,6 +78,8 @@ client, err := kusto.New(endpoint, authorizer)
 if err != nil {
 	panic("add error handling")
 }
+// Be sure to close the client when you're done. (Error handling omitted for brevity.)
+defer client.Close()
 ```
 endpoint represents the Kusto endpoint. This will resemble: "https://<instance>.<region>.kusto.windows.net".
 
@@ -174,6 +176,8 @@ in, err := ingest.New(kustoClient, "database", "table")
 if err != nil {
 	panic("add error handling")
 }
+// Be sure to close the ingestor when you're done. (Error handling omitted for brevity.)
+defer in.Close()
 ```
 
 #### From a File

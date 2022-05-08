@@ -35,6 +35,9 @@ func Example_simple() {
 		panic("add error handling")
 	}
 
+	// Be sure to close the client when you're done. (Error handling omitted for brevity.)
+	defer client.Close()
+
 	ctx := context.Background()
 
 	// Query our database table "systemNodes" for the CollectionTimes and the NodeIds.
@@ -107,6 +110,8 @@ func Example_complex() {
 	if err != nil {
 		panic("add error handling")
 	}
+	// Be sure to close the client when you're done. (Error handling omitted for brevity.)
+	defer client.Close()
 
 	ctx := context.Background()
 
@@ -169,6 +174,8 @@ func ExampleClient_Query_rows() {
 	if err != nil {
 		panic("add error handling")
 	}
+	// Be sure to close the client when you're done. (Error handling omitted for brevity.)
+	defer client.Close()
 
 	ctx := context.Background()
 
@@ -212,6 +219,8 @@ func ExampleClient_Query_do() {
 	if err != nil {
 		panic("add error handling")
 	}
+	// Be sure to close the client when you're done. (Error handling omitted for brevity.)
+	defer client.Close()
 
 	ctx := context.Background()
 
@@ -265,6 +274,8 @@ func ExampleClient_Query_struct() {
 	if err != nil {
 		panic("add error handling")
 	}
+	// Be sure to close the client when you're done. (Error handling omitted for brevity.)
+	defer client.Close()
 
 	ctx := context.Background()
 

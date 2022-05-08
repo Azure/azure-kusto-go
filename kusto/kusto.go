@@ -2,6 +2,7 @@ package kusto
 
 import (
 	"context"
+	"io"
 	"net/http"
 	"net/url"
 	"reflect"
@@ -19,6 +20,7 @@ import (
 
 // queryer provides for getting a stream of Kusto frames. Exists to allow fake Kusto streams in tests.
 type queryer interface {
+	io.Closer
 	query(ctx context.Context, db string, query Stmt, options *queryOptions) (execResp, error)
 	mgmt(ctx context.Context, db string, query Stmt, options *mgmtOptions) (execResp, error)
 }
@@ -430,4 +432,20 @@ func (*Client) contextSetup(ctx context.Context, mgmtCall bool) (context.Context
 
 func (c *Client) HttpClient() *http.Client {
 	return c.http
+}
+
+func (c *Client) Close() error {
+	var err error
+	if c.conn != nil {
+		err = c.conn.Close()
+	}
+	if c.ingestConn != nil {
+		err2 := c.ingestConn.Close()
+		if err == nil {
+			err = err2
+		} else {
+			err = errors.GetCombinedError(err, err2)
+		}
+	}
+	return err
 }

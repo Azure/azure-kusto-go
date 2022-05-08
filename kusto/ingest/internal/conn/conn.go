@@ -39,6 +39,7 @@ type Conn struct {
 	reqHeaders  http.Header
 	headersPool chan http.Header
 	client      *http.Client
+	done        chan struct{}
 
 	inTest bool
 }
@@ -82,6 +83,7 @@ func newWithoutValidation(endpoint string, auth kusto.Authorization, client *htt
 		reqHeaders:  headers,
 		headersPool: make(chan http.Header, 100),
 		client:      client,
+		done:        make(chan struct{}),
 	}
 
 	// Fills a pool of headers to alleviate header copying timing at request time.
@@ -113,7 +115,13 @@ func (c *Conn) StreamIngest(ctx context.Context, db, table string, payload io.Re
 
 	headers := <-c.headersPool
 	go func() {
-		c.headersPool <- copyHeaders(c.reqHeaders)
+		header := copyHeaders(c.reqHeaders)
+		select {
+		case <-c.done:
+			return
+		case c.headersPool <- header:
+			return
+		}
 	}()
 
 	if clientRequestId != "" {
@@ -178,4 +186,14 @@ func copyHeaders(header http.Header) http.Header {
 		headers[k] = v
 	}
 	return headers
+}
+
+func (c *Conn) Close() error {
+	select {
+	case <-c.done:
+		return nil
+	default:
+		close(c.done)
+		return nil
+	}
 }

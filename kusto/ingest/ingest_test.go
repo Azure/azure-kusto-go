@@ -22,6 +22,10 @@ func (m mockClient) HttpClient() *http.Client {
 	return &http.Client{}
 }
 
+func (m mockClient) Close() error {
+	return nil
+}
+
 func (m mockClient) Auth() kusto.Authorization {
 	return m.auth
 }

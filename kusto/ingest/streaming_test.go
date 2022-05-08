@@ -27,6 +27,10 @@ type fakeStreamIngestor struct {
 	onStreamIngest streamIngestFunc
 }
 
+func (f fakeStreamIngestor) Close() error {
+	return nil
+}
+
 func (f fakeStreamIngestor) StreamIngest(ctx context.Context, db, table string, payload io.Reader, format properties.DataFormat, mappingName string, clientRequestId string) error {
 	return f.onStreamIngest(ctx, db, table, payload, format, mappingName, clientRequestId)
 }

@@ -14,6 +14,7 @@ import (
 )
 
 type streamIngestor interface {
+	io.Closer
 	StreamIngest(ctx context.Context, db, table string, payload io.Reader, format properties.DataFormat, mappingName string, clientRequestId string) error
 }
 
@@ -153,4 +154,8 @@ func (i *Streaming) newProp() properties.All {
 			ClientRequestId: "KGC.executeStreaming;" + uuid.New().String(),
 		},
 	}
+}
+
+func (i *Streaming) Close() error {
+	return i.streamConn.Close()
 }
