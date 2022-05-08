@@ -2,8 +2,8 @@ package ingest
 
 import (
 	"context"
-	"net/http"
 	"io"
+	"net/http"
 
 	"github.com/Azure/azure-kusto-go/kusto"
 )
