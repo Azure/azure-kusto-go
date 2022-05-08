@@ -7,6 +7,7 @@ import (
 	"io"
 	"sync"
 
+	"github.com/Azure/azure-kusto-go/kusto/data/errors"
 	"github.com/Azure/azure-kusto-go/kusto/ingest/internal/conn"
 	"github.com/Azure/azure-kusto-go/kusto/ingest/internal/properties"
 	"github.com/Azure/azure-kusto-go/kusto/ingest/internal/queued"
@@ -251,7 +252,7 @@ func (i *Ingestion) Close() error {
 		if err == nil {
 			err = err2
 		} else {
-			err = fmt.Errorf("combined error: %v %v", err, err2)
+			err = errors.GetCombinedError(err, err2)
 		}
 	}
 	return err

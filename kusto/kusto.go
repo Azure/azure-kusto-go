@@ -2,7 +2,6 @@ package kusto
 
 import (
 	"context"
-	"fmt"
 	"io"
 	"net/http"
 	"net/url"
@@ -445,7 +444,7 @@ func (c *Client) Close() error {
 		if err == nil {
 			err = err2
 		} else {
-			err = fmt.Errorf("combined error: %v %v", err, err2)
+			err = errors.GetCombinedError(err, err2)
 		}
 	}
 	return err

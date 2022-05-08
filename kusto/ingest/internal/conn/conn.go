@@ -189,13 +189,11 @@ func copyHeaders(header http.Header) http.Header {
 }
 
 func (c *Conn) Close() error {
-	for {
-		select {
-		case <-c.done:
-			return nil
-		default:
-			close(c.done)
-			return nil
-		}
+	select {
+	case <-c.done:
+		return nil
+	default:
+		close(c.done)
+		return nil
 	}
 }

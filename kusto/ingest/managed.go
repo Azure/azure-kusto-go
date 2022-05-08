@@ -154,7 +154,7 @@ func (m *Managed) Close() error {
 	if err == nil {
 		err = err2
 	} else {
-		err = fmt.Errorf("combined error: %v %v", err, err2)
+		err = errors.GetCombinedError(err, err2)
 	}
 	return nil
 }

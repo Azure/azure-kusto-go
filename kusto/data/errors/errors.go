@@ -401,3 +401,19 @@ func GetKustoError(err error) (*Error, bool) {
 	}
 	return nil, false
 }
+
+type CombinedError struct {
+	Errors []error
+}
+
+func (c CombinedError) Error() string {
+	result := ""
+	for _, err := range c.Errors {
+		result += fmt.Sprintf("'%s';", err.Error())
+	}
+	return result
+}
+
+func GetCombinedError(errs ...error) *CombinedError {
+	return &CombinedError{Errors: errs}
+}
