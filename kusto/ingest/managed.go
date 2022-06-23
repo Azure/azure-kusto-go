@@ -156,5 +156,5 @@ func (m *Managed) Close() error {
 	} else {
 		err = errors.GetCombinedError(err, err2)
 	}
-	return nil
+	return err
 }
