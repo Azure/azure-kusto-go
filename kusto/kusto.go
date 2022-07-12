@@ -2,6 +2,7 @@ package kusto
 
 import (
 	"context"
+	"fmt"
 	"io"
 	"net/http"
 	"net/url"
@@ -13,6 +14,7 @@ import (
 	"github.com/Azure/azure-kusto-go/kusto/data/errors"
 	"github.com/Azure/azure-kusto-go/kusto/internal/frames"
 	v2 "github.com/Azure/azure-kusto-go/kusto/internal/frames/v2"
+	"github.com/Azure/azure-sdk-for-go/sdk/azcore"
 
 	"github.com/Azure/go-autorest/autorest"
 	"github.com/Azure/go-autorest/autorest/azure/auth"
@@ -36,13 +38,17 @@ type Authorization struct {
 	// Config provides the authorizer's config that can create the authorizer. We recommending setting
 	// this instead of Authorizer, as we will automatically set the Resource ID with the endpoint passed.
 	Config auth.AuthorizerConfig
+	//
+	TokenCredential azcore.TokenCredential
 }
 
 // Validate validates the Authorization object against the endpoint an preps it for use.
 // For internal use only.
 func (a *Authorization) Validate(endpoint string) error {
 	const rescField = "Resource"
-
+	if a.TokenCredential != nil {
+		return nil
+	}
 	if strings.Contains(strings.ToLower(endpoint), ".azuresynapse") {
 		endpoint = "https://kusto.kusto.windows.net"
 	}
@@ -120,6 +126,7 @@ type Option func(c *Client)
 
 // New returns a new Client. endpoint is the Kusto endpoint to use, example: https://somename.westus.kusto.windows.net .
 func New(endpoint string, auth Authorization, options ...Option) (*Client, error) {
+	fmt.Println("Running with local changes")
 	u, err := url.Parse(endpoint)
 	if err != nil {
 		return nil, errors.ES(errors.OpServConn, errors.KClientArgs, "could not parse the endpoint(%s): %s", endpoint, err).SetNoRetry()

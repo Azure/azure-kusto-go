@@ -22,6 +22,8 @@ import (
 	v2 "github.com/Azure/azure-kusto-go/kusto/internal/frames/v2"
 	"github.com/Azure/azure-kusto-go/kusto/internal/response"
 	"github.com/Azure/azure-kusto-go/kusto/internal/version"
+	"github.com/Azure/azure-sdk-for-go/sdk/azcore"
+	"github.com/Azure/azure-sdk-for-go/sdk/azcore/policy"
 
 	"github.com/Azure/go-autorest/autorest"
 	"github.com/google/uuid"
@@ -39,12 +41,14 @@ var bufferPool = sync.Pool{
 type conn struct {
 	endpoint                       string
 	auth                           autorest.Authorizer
+	tokenCred                      azcore.TokenCredential
 	endMgmt, endQuery, streamQuery *url.URL
 	client                         *http.Client
 }
 
 // newConn returns a new conn object with an injected http.Client
 func newConn(endpoint string, auth Authorization, client *http.Client) (*conn, error) {
+	c := &conn{}
 	if !validURL.MatchString(endpoint) {
 		return nil, errors.ES(errors.OpServConn, errors.KClientArgs, "endpoint is not valid(%s), should be https://<cluster name>.*", endpoint).SetNoRetry()
 	}
@@ -54,12 +58,15 @@ func newConn(endpoint string, auth Authorization, client *http.Client) (*conn, e
 		return nil, errors.ES(errors.OpServConn, errors.KClientArgs, "could not parse the endpoint(%s): %s", endpoint, err).SetNoRetry()
 	}
 
-	c := &conn{
-		auth:        auth.Authorizer,
-		endMgmt:     &url.URL{Scheme: "https", Host: u.Host, Path: "/v1/rest/mgmt"},
-		endQuery:    &url.URL{Scheme: "https", Host: u.Host, Path: "/v2/rest/query"},
-		streamQuery: &url.URL{Scheme: "https", Host: u.Host, Path: "/v1/rest/ingest/"},
-		client:      client,
+	c.endMgmt = &url.URL{Scheme: "https", Host: u.Host, Path: "/v1/rest/mgmt"}
+	c.endQuery = &url.URL{Scheme: "https", Host: u.Host, Path: "/v2/rest/query"}
+	c.streamQuery = &url.URL{Scheme: "https", Host: u.Host, Path: "/v1/rest/ingest/"}
+	c.client = client
+
+	if auth.TokenCredential != nil {
+		c.tokenCred = auth.TokenCredential
+	} else {
+		c.auth = auth.Authorizer
 	}
 
 	return c, nil
@@ -137,6 +144,19 @@ func (c *conn) execute(ctx context.Context, execType int, db string, query Stmt,
 	buff.Reset()
 	defer bufferPool.Put(buff)
 
+	// Test
+	token, err2 := c.tokenCred.GetToken(ctx, policy.TokenRequestOptions{Scopes: []string{"https://otelkusto1.southeastasia.dev.kusto.windows.net/.default"}})
+	fmt.Println("Here is the token :", token.Token)
+	if err2 != nil {
+		fmt.Println("Error while getting token", err2)
+	}
+
+	accessToken := token.Token
+	//tokenExpiry := token.ExpiresOn
+
+	header.Add("Authorization", fmt.Sprintf("Bearer %s", accessToken))
+
+	//********
 	switch execType {
 	case execQuery, execMgmt:
 		var err error
@@ -167,12 +187,14 @@ func (c *conn) execute(ctx context.Context, execType int, db string, query Stmt,
 	}
 
 	var err error
-	prep := c.auth.WithAuthorization()
-	req, err = prep(autorest.CreatePreparer()).Prepare(req)
-	if err != nil {
-		return execResp{}, errors.E(op, errors.KInternal, err)
-	}
+	if c.auth != nil {
 
+		prep := c.auth.WithAuthorization()
+		req, err = prep(autorest.CreatePreparer()).Prepare(req)
+		if err != nil {
+			return execResp{}, errors.E(op, errors.KInternal, err)
+		}
+	}
 	resp, err := c.client.Do(req.WithContext(ctx))
 	if err != nil {
 		// TODO(jdoak): We need a http error unwrap function that pulls out an *errors.Error.
