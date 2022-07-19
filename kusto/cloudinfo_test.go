@@ -34,7 +34,7 @@ func TestRetrieveCloudInfoMetadataError(t *testing.T) {
 	assert.NotNil(t, err)
 	assert.Nil(t, actualCloudInfo)
 	errorMessage := err.Error()
-	assert.EqualValues(t, fmt.Sprintf("retrieved error code %d when querying endpoint %s", http.StatusInternalServerError, server.URL), errorMessage)
+	assert.EqualValues(t, fmt.Sprintf("retrieved error code %d when querying endpoint %s/%s", http.StatusInternalServerError, server.URL, metadataEndpoint), errorMessage)
 }
 
 func TestRetrieveCloudInfoMetadataNotFound(t *testing.T) {

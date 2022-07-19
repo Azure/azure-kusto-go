@@ -57,7 +57,7 @@ func RetrieveCloudInfoMetadata(kustoUrl string) (*cloudInfo, error) {
 		//init the map here
 		cloudInfoCache = make(map[string]*cloudInfo)
 	}
-	var errorToThrow error
+	var errorToReturn error
 	doOnce.Do(func() {
 		fullMetadataEndpoint := fmt.Sprintf("%s/%s", strings.TrimRight(kustoUrl, "/"), metadataEndpoint)
 		metadataResponse, err := http.Get(fullMetadataEndpoint)
@@ -66,7 +66,7 @@ func RetrieveCloudInfoMetadata(kustoUrl string) (*cloudInfo, error) {
 
 		if err != nil {
 			// TODO how do we log
-			errorToThrow = err
+			errorToReturn = err
 		}
 		// metadata retrieval was successful
 		if metadataResponse.StatusCode == 200 {
@@ -75,7 +75,7 @@ func RetrieveCloudInfoMetadata(kustoUrl string) (*cloudInfo, error) {
 			jsonBytes, resError := ioutil.ReadAll(metadataResponse.Body)
 			if resError != nil {
 				// TODO how do we log
-				errorToThrow = err
+				errorToReturn = err
 			} else if len(jsonBytes) == 0 {
 				// Call succeeded but no body
 				cloudInfoCache[kustoUrl] = defaultCloudInfo
@@ -108,11 +108,11 @@ func RetrieveCloudInfoMetadata(kustoUrl string) (*cloudInfo, error) {
 			cloudInfoCache[kustoUrl] = defaultCloudInfo
 		} else {
 			// Some other HTTP error code here
-			errorToThrow = fmt.Errorf("retrieved error code %d when querying endpoint %s", metadataResponse.StatusCode, fullMetadataEndpoint)
+			errorToReturn = fmt.Errorf("retrieved error code %d when querying endpoint %s", metadataResponse.StatusCode, fullMetadataEndpoint)
 		}
 	})
-	if errorToThrow != nil {
-		return nil, errorToThrow
+	if errorToReturn != nil {
+		return nil, errorToReturn
 	}
 	// this should be set in the map by now
 	return cloudInfoCache[kustoUrl], nil
