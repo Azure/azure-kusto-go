@@ -2,7 +2,6 @@ package kusto
 
 import (
 	"context"
-	"fmt"
 	"io"
 	"net/http"
 	"net/url"
@@ -14,7 +13,6 @@ import (
 	"github.com/Azure/azure-kusto-go/kusto/data/errors"
 	"github.com/Azure/azure-kusto-go/kusto/internal/frames"
 	v2 "github.com/Azure/azure-kusto-go/kusto/internal/frames/v2"
-	"github.com/Azure/azure-sdk-for-go/sdk/azcore"
 
 	"github.com/Azure/go-autorest/autorest"
 	"github.com/Azure/go-autorest/autorest/azure/auth"
@@ -39,14 +37,14 @@ type Authorization struct {
 	// this instead of Authorizer, as we will automatically set the Resource ID with the endpoint passed.
 	Config auth.AuthorizerConfig
 	//
-	TokenCredential azcore.TokenCredential
+	tokenProvider *tokenProvider
 }
 
 // Validate validates the Authorization object against the endpoint an preps it for use.
 // For internal use only.
 func (a *Authorization) Validate(endpoint string) error {
 	const rescField = "Resource"
-	if a.TokenCredential != nil {
+	if a.tokenProvider != nil {
 		return nil
 	}
 	if strings.Contains(strings.ToLower(endpoint), ".azuresynapse") {
@@ -125,8 +123,15 @@ type Client struct {
 type Option func(c *Client)
 
 // New returns a new Client. endpoint is the Kusto endpoint to use, example: https://somename.westus.kusto.windows.net .
-func New(endpoint string, auth Authorization, options ...Option) (*Client, error) {
-	fmt.Println("Running with local changes")
+func New(kcsb *ConnectionStringBuilder, options ...Option) (*Client, error) {
+	tkp, err := kcsb.getTokenProvider()
+	if err != nil {
+		return nil, err
+	}
+	auth := &Authorization{
+		tokenProvider: tkp,
+	}
+	endpoint := kcsb.clusterUri
 	u, err := url.Parse(endpoint)
 	if err != nil {
 		return nil, errors.ES(errors.OpServConn, errors.KClientArgs, "could not parse the endpoint(%s): %s", endpoint, err).SetNoRetry()
@@ -140,7 +145,7 @@ func New(endpoint string, auth Authorization, options ...Option) (*Client, error
 		)
 	}
 
-	client := &Client{auth: auth, endpoint: endpoint}
+	client := &Client{auth: *auth, endpoint: endpoint}
 	for _, o := range options {
 		o(client)
 	}
@@ -153,7 +158,7 @@ func New(endpoint string, auth Authorization, options ...Option) (*Client, error
 		client.http = &http.Client{}
 	}
 
-	conn, err := newConn(endpoint, auth, client.http)
+	conn, err := newConn(endpoint, *auth, client.http)
 	if err != nil {
 		return nil, err
 	}
@@ -161,6 +166,19 @@ func New(endpoint string, auth Authorization, options ...Option) (*Client, error
 
 	return client, nil
 }
+
+// func NewClient(kcsb *ConnectionStringBuilder) (*Client, error) {
+// 	tkp, err := kcsb.getTokenProvider()
+// 	if err != nil {
+// 		return nil, err
+// 	}
+// 	auth := &Authorization{
+// 		tokenProvider: tkp,
+// 	}
+
+// 	return New(kcsb.clusterUrl, *auth)
+
+// }
 
 func WithHttpClient(client *http.Client) Option {
 	return func(c *Client) {

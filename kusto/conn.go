@@ -22,7 +22,6 @@ import (
 	v2 "github.com/Azure/azure-kusto-go/kusto/internal/frames/v2"
 	"github.com/Azure/azure-kusto-go/kusto/internal/response"
 	"github.com/Azure/azure-kusto-go/kusto/internal/version"
-	"github.com/Azure/azure-sdk-for-go/sdk/azcore"
 	"github.com/Azure/azure-sdk-for-go/sdk/azcore/policy"
 
 	"github.com/Azure/go-autorest/autorest"
@@ -41,7 +40,7 @@ var bufferPool = sync.Pool{
 type conn struct {
 	endpoint                       string
 	auth                           autorest.Authorizer
-	tokenCred                      azcore.TokenCredential
+	tokenProvider                  tokenProvider
 	endMgmt, endQuery, streamQuery *url.URL
 	client                         *http.Client
 }
@@ -63,8 +62,8 @@ func newConn(endpoint string, auth Authorization, client *http.Client) (*conn, e
 	c.streamQuery = &url.URL{Scheme: "https", Host: u.Host, Path: "/v1/rest/ingest/"}
 	c.client = client
 
-	if auth.TokenCredential != nil {
-		c.tokenCred = auth.TokenCredential
+	if auth.tokenProvider != nil {
+		c.tokenProvider = *auth.tokenProvider
 	} else {
 		c.auth = auth.Authorizer
 	}
@@ -144,19 +143,6 @@ func (c *conn) execute(ctx context.Context, execType int, db string, query Stmt,
 	buff.Reset()
 	defer bufferPool.Put(buff)
 
-	// Test
-	token, err2 := c.tokenCred.GetToken(ctx, policy.TokenRequestOptions{Scopes: []string{"https://otelkusto1.southeastasia.dev.kusto.windows.net/.default"}})
-	fmt.Println("Here is the token :", token.Token)
-	if err2 != nil {
-		fmt.Println("Error while getting token", err2)
-	}
-
-	accessToken := token.Token
-	//tokenExpiry := token.ExpiresOn
-
-	header.Add("Authorization", fmt.Sprintf("Bearer %s", accessToken))
-
-	//********
 	switch execType {
 	case execQuery, execMgmt:
 		var err error
@@ -178,6 +164,15 @@ func (c *conn) execute(ctx context.Context, execType int, db string, query Stmt,
 	default:
 		return execResp{}, errors.ES(op, errors.KInternal, "internal error: did not understand the type of execType: %d", execType)
 	}
+
+	token, err2 := c.tokenProvider.getToken(ctx, policy.TokenRequestOptions{Scopes: c.tokenProvider.scopes})
+	if err2 != nil {
+		return execResp{}, errors.ES(op, errors.KInternal, "Error while getting token", err2)
+	}
+
+	accessToken := token.Token
+
+	header.Add("Authorization", fmt.Sprintf("Bearer %s", accessToken))
 
 	req := &http.Request{
 		Method: http.MethodPost,
