@@ -71,11 +71,10 @@ func init() {
 			SecondaryEndpoint: os.Getenv("SECONDARY_ENGINE_CONNECTION_STRING"),
 			Database:          os.Getenv("TEST_DATABASE"),
 			SecondaryDatabase: os.Getenv("SECONDARY_DATABASE"),
-			ClientID:          os.Getenv("APP_ID"),
-			ClientSecret:      os.Getenv("APP_KEY"),
-			TenantID:          os.Getenv("AUTH_ID"),
+			ClientID:          os.Getenv("AZURE_CLIENT_ID"),
+			ClientSecret:      os.Getenv("AZURE_CLIENT_SECRET"),
+			TenantID:          os.Getenv("AZURE_TENANT_ID"),
 		}
-
 		if testConfig.Endpoint == "" {
 			fmt.Println("Skipping E2E Tests - No json config and no test environment")
 			return

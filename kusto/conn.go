@@ -167,7 +167,7 @@ func (c *conn) execute(ctx context.Context, execType int, db string, query Stmt,
 
 	token, err2 := c.tokenProvider.getToken(ctx, policy.TokenRequestOptions{Scopes: c.tokenProvider.scopes})
 	if err2 != nil {
-		return execResp{}, errors.ES(op, errors.KInternal, "Error while getting token", err2)
+		return execResp{}, errors.ES(op, errors.KInternal, "Error while getting token : %s", err2)
 	}
 
 	accessToken := token.Token

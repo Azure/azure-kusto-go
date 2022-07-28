@@ -26,11 +26,8 @@ func Example_simple() {
 		CollectionTime time.Time
 	}
 
-	authorizer := Authorization{
-		Config: auth.NewClientCredentialsConfig("clientID", "clientSecret", "tenantID"),
-	}
-
-	client, err := New("endpoint", authorizer)
+	kcsb, _ := BuildConnectionStringWithAadApplicationCredentials("endpoint", "clientID", "clientSecret", "tenantID")
+	client, err := New(kcsb)
 	if err != nil {
 		panic("add error handling")
 	}
@@ -104,9 +101,9 @@ func Example_complex() {
 		CollectionTime time.Time
 	}
 
-	authorizer := Authorization{Config: auth.NewClientCredentialsConfig("clientID", "clientSecret", "tenantID")}
+	kcsb, _ := BuildConnectionStringWithAadApplicationCredentials("endpoint", "clientID", "clientSecret", "tenantID")
 
-	client, err := New("endpoint", authorizer)
+	client, err := New(kcsb)
 	if err != nil {
 		panic("add error handling")
 	}
@@ -138,39 +135,31 @@ func Example_complex() {
 }
 
 func ExampleAuthorization_config() {
-	// Create an authorizer with your Azure ClientID, Secret and TenantID.
-	authorizer := Authorization{
-		Config: auth.NewClientCredentialsConfig("clientID", "clientSecret", "tenantID"),
-	}
+	kcsb, _ := BuildConnectionStringWithAadApplicationCredentials("endpoint", "clientID", "clientSecret", "tenantID")
 
 	// Normally here you take a client.
-	_, err := New("endpoint", authorizer)
+	_, err := New(kcsb)
 	if err != nil {
 		panic("add error handling")
 	}
 }
 
 func ExampleAuthorization_msi() {
-	// Create an authorizer with an Azure MSI (managed identities).
-	msi := auth.NewMSIConfig()
 
-	authorizer := Authorization{
-		Config: msi,
-	}
+	kcsb, _ := BuildConnectionStringWithManagedIdentity("endpoint", auth.NewMSIConfig().Resource)
 
 	// Normally here you take a client.
-	_, err := New("endpoint", authorizer)
+	_, err := New(kcsb)
 	if err != nil {
 		panic("add error handling")
 	}
 }
 
 func ExampleClient_Query_rows() {
-	authorizer := Authorization{
-		Config: auth.NewClientCredentialsConfig("clientID", "clientSecret", "tenantID"),
-	}
 
-	client, err := New("endpoint", authorizer)
+	kcsb, _ := BuildConnectionStringWithAadApplicationCredentials("endpoint", "clientID", "clientSecret", "tenantID")
+
+	client, err := New(kcsb)
 	if err != nil {
 		panic("add error handling")
 	}
@@ -211,11 +200,9 @@ func ExampleClient_Query_do() {
 	// This is similar to our (Row) example. In this one though, we use the RowIterator.Do() method instead of
 	// manually iterating over the row. This makes for shorter code while maintaining readability.
 
-	authorizer := Authorization{
-		Config: auth.NewClientCredentialsConfig("clientID", "clientSecret", "tenantID"),
-	}
+	kcsb, _ := BuildConnectionStringWithAadApplicationCredentials("endpoint", "clientID", "clientSecret", "tenantID")
 
-	client, err := New("endpoint", authorizer)
+	client, err := New(kcsb)
 	if err != nil {
 		panic("add error handling")
 	}
@@ -266,11 +253,9 @@ func ExampleClient_Query_struct() {
 		err error
 	}
 
-	authorizer := Authorization{
-		Config: auth.NewClientCredentialsConfig("clientID", "clientSecret", "tenantID"),
-	}
+	kcsb, _ := BuildConnectionStringWithAadApplicationCredentials("endpoint", "clientID", "clientSecret", "tenantID")
 
-	client, err := New("endpoint", authorizer)
+	client, err := New(kcsb)
 	if err != nil {
 		panic("add error handling")
 	}
@@ -321,10 +306,9 @@ func ExampleClient_Query_struct() {
 }
 
 func ExampleCustomHttpClient() {
-	// Create an authorizer with your Azure ClientID, Secret and TenantID.
-	authorizer := Authorization{
-		Config: auth.NewClientCredentialsConfig("clientID", "clientSecret", "tenantID"),
-	}
+	// Create a connection string builder with your Azure ClientID, Secret and TenantID.
+	kcsb, _ := BuildConnectionStringWithAadApplicationCredentials("endpoint", "clientID", "clientSecret", "tenantID")
+
 	httpClient := &http.Client{}
 	url, err := url.Parse("squid-proxy.corp.mycompany.com:2323")
 	if err != nil {
@@ -334,7 +318,7 @@ func ExampleCustomHttpClient() {
 	httpClient.Transport = &http.Transport{Proxy: http.ProxyURL(url)}
 
 	// Normally here you take a client.
-	_, err = New("endpoint", authorizer, WithHttpClient(httpClient))
+	_, err = New(kcsb, WithHttpClient(httpClient))
 	if err != nil {
 		panic(err.Error())
 	}
