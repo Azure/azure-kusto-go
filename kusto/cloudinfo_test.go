@@ -104,7 +104,7 @@ func TestGetMetadata(t *testing.T) {
 	for _, test := range tests {
 		s.code = test.code
 		s.payload = []byte(test.payload)
-		res, err := GetMetadata(ctx, s.urlStr()+"/"+test.name)
+		res, err := GetMetadata(ctx, s.urlStr()+"/"+test.name) // Adding test name to the path make sure multiple URL's can be cached
 		switch {
 		case err != nil && !test.err:
 			t.Errorf("TestGetMetadata(%s): got err == %s, want err == nil", test.desc, err)
