@@ -1,20 +1,22 @@
 package kusto
 
 import (
+	"context"
 	"encoding/json"
 	"fmt"
 	"io/ioutil"
 	"net/http"
+	"net/url"
 	"os"
-	"strings"
 	"sync"
+	"time"
 )
 
 // abstraction to query metadata and use this information for providing all
 // information needed for connection string builder to provide all the requisite information
 
 const (
-	metadataEndpoint              = "v1/rest/auth/metadata"
+	metadataPath                  = "v1/rest/auth/metadata"
 	defaultAuthEnvVarName         = "AadAuthorityUri"
 	defaultKustoClientAppId       = "db662dc1-0cfe-4e1c-a843-19a68e65be58"
 	defaultPublicLoginUrl         = "https://login.microsoftonline.com"
@@ -25,97 +27,88 @@ const (
 )
 
 // retrieved metadata
-type cloudInfo struct {
-	loginEndpoint          string
-	loginMfaRequired       bool
-	kustoClientAppId       string
-	kustoClientRedirectUri string
-	kustoServiceResourceId string
-	firstPartyAuthorityUrl string
+type metaResp struct {
+	AzureAD CloudInfo
 }
 
-var doOnce sync.Once
-var defaultCloudInfo = &cloudInfo{
-	loginEndpoint:          getEnvOrDefault(defaultAuthEnvVarName, defaultPublicLoginUrl),
-	loginMfaRequired:       false,
-	kustoClientAppId:       defaultKustoClientAppId,
-	kustoClientRedirectUri: defaultRedirectUri,
-	kustoServiceResourceId: defaultKustoServiceResourceId,
-	firstPartyAuthorityUrl: defaultFirstPartyAuthorityUrl,
+type CloudInfo struct {
+	LoginEndpoint          string `json:"LoginEndpoint"`
+	LoginMfaRequired       bool   `json:"LoginMfaRequired"`
+	KustoClientAppID       string `json:"KustoClientAppId"`
+	KustoClientRedirectURI string `json:"KustoClientRedirectUri"`
+	KustoServiceResourceID string `json:"KustoServiceResourceId"`
+	FirstPartyAuthorityURL string `json:"FirstPartyAuthorityUrl"`
+}
+
+var defaultCloudInfo = CloudInfo{
+	LoginEndpoint:          getEnvOrDefault(defaultAuthEnvVarName, defaultPublicLoginUrl),
+	LoginMfaRequired:       false,
+	KustoClientAppID:       defaultKustoClientAppId,
+	KustoClientRedirectURI: defaultRedirectUri,
+	KustoServiceResourceID: defaultKustoServiceResourceId,
+	FirstPartyAuthorityURL: defaultFirstPartyAuthorityUrl,
 }
 
 // cache to query it once per instance
-var cloudInfoCache map[string]*cloudInfo
+var cloudInfoCache = map[string]CloudInfo{}
+var lock = &sync.Mutex{}
 
-func RetrieveCloudInfoMetadata(kustoUrl string) (*cloudInfo, error) {
-	if cloudInfoCache != nil {
-		cachedCloudInfo, isExisting := cloudInfoCache[kustoUrl]
-		if isExisting {
-			return cachedCloudInfo, nil
-		}
-	} else {
-		//init the map here
-		cloudInfoCache = make(map[string]*cloudInfo)
+func GetMetadata(ctx context.Context, kustoURL string) (CloudInfo, error) {
+	// retrieve &return if exists
+	cachedCloudInfo, ok := cloudInfoCache[kustoURL]
+	if ok {
+		return cachedCloudInfo, nil
 	}
-	var errorToThrow error
-	doOnce.Do(func() {
-		fullMetadataEndpoint := fmt.Sprintf("%s/%s", strings.TrimRight(kustoUrl, "/"), metadataEndpoint)
-		metadataResponse, err := http.Get(fullMetadataEndpoint)
+	// there is no value for that URL that was picked.
+	lock.Lock()
+	defer lock.Unlock()
+	u, err := url.Parse(kustoURL)
+	if err != nil {
+		return CloudInfo{}, err
+	}
+	u.Path = metadataPath
+	// TODO should we make this timeout configurable.
+	metadataClient := http.Client{Timeout: time.Duration(5) * time.Second}
+	req, err := http.NewRequest("GET", u.String(), nil)
 
-		var metadataMap map[string]map[string]interface{}
+	if err != nil {
+		return CloudInfo{}, err
+	}
 
-		if err != nil {
-			// TODO how do we log
-			errorToThrow = err
-		}
-		// metadata retrieval was successful
-		if metadataResponse.StatusCode == 200 {
-			// close once read
-			defer metadataResponse.Body.Close()
-			jsonBytes, resError := ioutil.ReadAll(metadataResponse.Body)
-			if resError != nil {
-				// TODO how do we log
-				errorToThrow = err
-			} else if len(jsonBytes) == 0 {
-				// Call succeeded but no body
-				cloudInfoCache[kustoUrl] = defaultCloudInfo
-			} else {
-				// there is a body , then parse it
-				json.Unmarshal(jsonBytes, &metadataMap)
-				// there is both dSTS key and the AzureAD key information.
-				nestedMap := metadataMap[azureADKey]
-				if len(nestedMap) == 0 {
-					// The call was a success , but no response was returned
-					// TODO warn logging here
-					cloudInfoCache[kustoUrl] = defaultCloudInfo
-				}
-				cloudInfoRetrieved := &cloudInfo{
-					loginEndpoint:          nestedMap["LoginEndpoint"].(string),
-					loginMfaRequired:       nestedMap["LoginMfaRequired"].(bool),
-					kustoClientAppId:       nestedMap["KustoClientAppId"].(string),
-					kustoClientRedirectUri: nestedMap["KustoClientRedirectUri"].(string),
-					kustoServiceResourceId: nestedMap["KustoServiceResourceId"].(string),
-					firstPartyAuthorityUrl: nestedMap["FirstPartyAuthorityUrl"].(string),
-				}
-				// Add this into the cache
-				cloudInfoCache[kustoUrl] = cloudInfoRetrieved
-			}
+	resp, err := metadataClient.Do(req)
 
-		} else if metadataResponse.StatusCode == 404 {
-			// the URL is not reachable , fallback to default
-			// For now as long not all proxies implement the metadata endpoint, if no endpoint exists return public cloud data
-			// TODO warn logging here
-			cloudInfoCache[kustoUrl] = defaultCloudInfo
-		} else {
-			// Some other HTTP error code here
-			errorToThrow = fmt.Errorf("retrieved error code %d when querying endpoint %s", metadataResponse.StatusCode, fullMetadataEndpoint)
-		}
-	})
-	if errorToThrow != nil {
-		return nil, errorToThrow
+	if err != nil {
+		return CloudInfo{}, err
+	}
+
+	// Handle internal server error as a special case and return as an error (to be consistent with other SDK's)
+	if resp.StatusCode >= http.StatusInternalServerError {
+		return CloudInfo{}, fmt.Errorf("error %s when querying endpoint %s", resp.Status, u.String())
+	}
+
+	//  return fmt.Errorf("error %s when querying endpoint %s", metadataResponse.StatusCode, fullMetadataEndpoint)
+
+	defer resp.Body.Close()
+
+	b, err := ioutil.ReadAll(resp.Body)
+	if err != nil {
+		return CloudInfo{}, err
+	}
+
+	// Covers scenarios of 200/OK with no body or a 404 where there is no body
+	if len(b) == 0 {
+		cloudInfoCache[kustoURL] = defaultCloudInfo
+		return defaultCloudInfo, nil
+	}
+
+	md := metaResp{}
+
+	if err := json.Unmarshal(b, &md); err != nil {
+		return CloudInfo{}, err
 	}
 	// this should be set in the map by now
-	return cloudInfoCache[kustoUrl], nil
+	cloudInfoCache[kustoURL] = md.AzureAD
+	return md.AzureAD, nil
 }
 
 func getEnvOrDefault(key, fallback string) string {
