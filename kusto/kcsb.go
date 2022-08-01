@@ -61,6 +61,7 @@ func BuildConnectionStringWithCert(clusterURI string, tenentID string, certifica
 	kcsb.applicationCertificates = certs
 	kcsb.applicationCertThumbprint = key
 	fetchedCI, _ := RetrieveCloudInfoMetadata(clusterURI)
+	kcsb.tenentID = tenentID
 	kcsb.cloudInfo = *fetchedCI
 	return kcsb, nil
 }
@@ -120,9 +121,7 @@ func BuildConnectionStringWithUsernamePassword(clusterURI string, tenentID strin
 	return kcsb, nil
 }
 
-/****
-	Method to be used for generating TokenCredential
-****/
+// Method to be used for generating TokenCredential
 func (kcsb *ConnectionStringBuilder) getTokenProvider() (*tokenProvider, error) {
 	if isEmpty(kcsb.clusterURI) {
 		return nil, errors.New("Error : Cluster URL not set.")
