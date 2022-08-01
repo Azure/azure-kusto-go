@@ -1,7 +1,9 @@
 package kusto
 
 import (
+	"context"
 	"fmt"
+	"log"
 	"net/http"
 	"net/http/httptest"
 	"testing"
@@ -9,85 +11,112 @@ import (
 	"github.com/stretchr/testify/assert"
 )
 
-func TestRetrieveCloudInfoMetadataSuccessMultipleUrls(t *testing.T) {
+type server struct {
+	code    int
+	payload []byte
+	http    *httptest.Server
+}
+
+func newTestServ() *server {
+	s := &server{}
+	s.http = httptest.NewServer(s)
+	return s
+}
+
+func (s *server) ServeHTTP(w http.ResponseWriter, r *http.Request) {
+	defer log.Println("server exited")
+	w.WriteHeader(s.code)
+	if s.code == 200 {
+		w.Write(s.payload)
+	}
+}
+
+func (s *server) urlStr() string {
+	return s.http.URL
+}
+
+func (s *server) close() {
+	s.http.Close()
+}
+
+func TestGetMetadata(t *testing.T) {
+	s := newTestServ()
+	defer s.close()
 	var tests = []struct {
-		name              string
-		responsePayload   string
-		expectedCloudInfo *cloudInfo
+		name    string
+		payload string
+		code    int
+		err     bool
+		desc    string
+		want    CloudInfo
+		errwant string
 	}{
 		{
-			name:            "test_login_endpoint_1",
-			responsePayload: `{"AzureAD": {"LoginEndpoint": "https://login.microsoftonline.com","LoginMfaRequired": false,"KustoClientAppId": "db662dc1-0cfe-4e1c-a843-19a68e65be58","KustoClientRedirectUri": "https://microsoft/kustoclient","KustoServiceResourceId": "https://kusto.dev.kusto.windows.net","FirstPartyAuthorityUrl": "https://login.microsoftonline.com/f8cdef31-a31e-4b4a-93e4-5f571e91255a"  },  "dSTS": {"CloudEndpointSuffix": "windows.net","DstsRealm": "realm://dsts.core.windows.net","DstsInstance": "prod-dsts.dsts.core.windows.net","KustoDnsHostName": "kusto.windows.net","ServiceName": "kusto"}}`,
-			expectedCloudInfo: &cloudInfo{
-				loginEndpoint:          "https://login.microsoftonline.com",
-				loginMfaRequired:       false,
-				kustoClientAppId:       "db662dc1-0cfe-4e1c-a843-19a68e65be58",
-				kustoClientRedirectUri: "https://microsoft/kustoclient",
-				kustoServiceResourceId: "https://kusto.dev.kusto.windows.net",
-				firstPartyAuthorityUrl: "https://login.microsoftonline.com/f8cdef31-a31e-4b4a-93e4-5f571e91255a",
+			name:    "test_cloud_info_success_1",
+			code:    200,
+			err:     false,
+			desc:    "Success login endpoint for url-1",
+			payload: `{"AzureAD": {"LoginEndpoint": "https://login.microsoftonline.com","LoginMfaRequired": false,"KustoClientAppId": "db662dc1-0cfe-4e1c-a843-19a68e65be58","KustoClientRedirectUri": "https://microsoft/kustoclient","KustoServiceResourceId": "https://kusto.dev.kusto.windows.net","FirstPartyAuthorityUrl": "https://login.microsoftonline.com/f8cdef31-a31e-4b4a-93e4-5f571e91255a"  },  "dSTS": {"CloudEndpointSuffix": "windows.net","DstsRealm": "realm://dsts.core.windows.net","DstsInstance": "prod-dsts.dsts.core.windows.net","KustoDnsHostName": "kusto.windows.net","ServiceName": "kusto"}}`,
+			want: CloudInfo{
+				LoginEndpoint:          "https://login.microsoftonline.com",
+				LoginMfaRequired:       false,
+				KustoClientAppID:       "db662dc1-0cfe-4e1c-a843-19a68e65be58",
+				KustoClientRedirectURI: "https://microsoft/kustoclient",
+				KustoServiceResourceID: "https://kusto.dev.kusto.windows.net",
+				FirstPartyAuthorityURL: "https://login.microsoftonline.com/f8cdef31-a31e-4b4a-93e4-5f571e91255a",
 			},
 		},
 		{
-			name:            "test_login_endpoint_2",
-			responsePayload: `{"AzureAD": {"LoginEndpoint": "https://login2.microsoftonline.com","LoginMfaRequired": true,"KustoClientAppId": "db662dc1-0cfe-4e1c-a843-19a68e65bxxx","KustoClientRedirectUri": "https://microsoft/kustoclient","KustoServiceResourceId": "https://kusto.dev.kusto.windows.net","FirstPartyAuthorityUrl": "https://login.microsoftonline.com/f8cdef31-a31e-4b4a-93e4-5f571e912xxx"  },  "dSTS": {"CloudEndpointSuffix": "windows.net","DstsRealm": "realm://dsts.core.windows.net","DstsInstance": "prod-dsts.dsts.core.windows.net","KustoDnsHostName": "kusto.windows.net","ServiceName": "kusto"}}`,
-			expectedCloudInfo: &cloudInfo{
-				loginEndpoint:          "https://login2.microsoftonline.com",
-				loginMfaRequired:       true,
-				kustoClientAppId:       "db662dc1-0cfe-4e1c-a843-19a68e65bxxx",
-				kustoClientRedirectUri: "https://microsoft/kustoclient",
-				kustoServiceResourceId: "https://kusto.dev.kusto.windows.net",
-				firstPartyAuthorityUrl: "https://login.microsoftonline.com/f8cdef31-a31e-4b4a-93e4-5f571e912xxx",
+			name:    "test_cloud_info_success_2",
+			code:    200,
+			err:     false,
+			desc:    "Success login endpoint for url-2",
+			payload: `{"AzureAD": {"LoginEndpoint": "https://login2.microsoftonline.com","LoginMfaRequired": true,"KustoClientAppId": "db662dc1-0cfe-4e1c-a843-19a68e65bxxx","KustoClientRedirectUri": "https://microsoft/kustoclient","KustoServiceResourceId": "https://kusto.dev.kusto.windows.net","FirstPartyAuthorityUrl": "https://login.microsoftonline.com/f8cdef31-a31e-4b4a-93e4-5f571e912xxx"  },  "dSTS": {"CloudEndpointSuffix": "windows.net","DstsRealm": "realm://dsts.core.windows.net","DstsInstance": "prod-dsts.dsts.core.windows.net","KustoDnsHostName": "kusto.windows.net","ServiceName": "kusto"}}`,
+			want: CloudInfo{
+				LoginEndpoint:          "https://login2.microsoftonline.com",
+				LoginMfaRequired:       true,
+				KustoClientAppID:       "db662dc1-0cfe-4e1c-a843-19a68e65bxxx",
+				KustoClientRedirectURI: "https://microsoft/kustoclient",
+				KustoServiceResourceID: "https://kusto.dev.kusto.windows.net",
+				FirstPartyAuthorityURL: "https://login.microsoftonline.com/f8cdef31-a31e-4b4a-93e4-5f571e912xxx",
 			},
 		},
+		{
+			name:    "test_cloud_info_not_found",
+			code:    404,
+			err:     false,
+			desc:    "Not found",
+			payload: "",
+			want:    defaultCloudInfo,
+		},
+		{
+			name:    "test_cloud_info_internal_error",
+			code:    500,
+			err:     true,
+			desc:    "Internal server error",
+			payload: "",
+			want:    CloudInfo{},
+			errwant: fmt.Sprintf("error 500 Internal Server Error when querying endpoint %s/%s", s.urlStr(), metadataPath),
+		},
 	}
-	for _, tt := range tests {
-		t.Run(tt.name, func(t *testing.T) {
-			server := runServer(http.StatusOK, tt.responsePayload, true)
-			actualCloudInfo, err := RetrieveCloudInfoMetadata(server.URL)
-			assert.Nil(t, err)
-			assert.Equal(t, tt.expectedCloudInfo, actualCloudInfo)
-			server.Close()
-		})
-	}
-}
 
-func TestRetrieveCloudInfoMetadataError(t *testing.T) {
-	responsePayload := ``
-	server := runServer(http.StatusInternalServerError, responsePayload, false)
-	actualCloudInfo, err := RetrieveCloudInfoMetadata(server.URL)
-	server.Close()
-	assert.NotNil(t, err)
-	assert.Nil(t, actualCloudInfo)
-	errorMessage := err.Error()
-	assert.EqualValues(t, fmt.Sprintf("retrieved error code %d when querying endpoint %s/%s", http.StatusInternalServerError, server.URL, metadataEndpoint), errorMessage)
-}
-
-func TestRetrieveCloudInfoMetadataNotFound(t *testing.T) {
-	server := runServer(http.StatusNotFound, ``, false)
-	actualCloudInfo, err := RetrieveCloudInfoMetadata(server.URL)
-	server.Close()
-	assert.Nil(t, err)
-	assert.Equal(t, defaultCloudInfo, actualCloudInfo)
-}
-
-func TestRetrieveCloudInfoMetadataSuccessNoBody(t *testing.T) {
-	server := runServer(http.StatusOK, ``, true)
-	actualCloudInfo, err := RetrieveCloudInfoMetadata(server.URL)
-	server.Close()
-	assert.Nil(t, err)
-	assert.Equal(t, defaultCloudInfo, actualCloudInfo)
-}
-
-func runServer(statusCode int, payload string, isSuccess bool) *httptest.Server {
-	// Start a local HTTP server
-	server := httptest.NewServer(http.HandlerFunc(func(rw http.ResponseWriter, _ *http.Request) {
-		// Test request parameters
-		// Send response to be tested
-		rw.WriteHeader(statusCode)
-		if isSuccess {
-			rw.Write([]byte(payload))
+	ctx := context.Background()
+	for _, test := range tests {
+		s.code = test.code
+		s.payload = []byte(test.payload)
+		res, err := GetMetadata(ctx, s.urlStr()+"/"+test.name)
+		switch {
+		case err != nil && !test.err:
+			t.Errorf("TestGetMetadata(%s): got err == %s, want err == nil", test.desc, err)
+			continue
+		case err == nil && test.err:
+			t.Errorf("TestGetMetadata(%s): got err == nil, want err != nil", test.desc)
+			continue
 		}
-	}))
-	return server
-	// Close the server when test finishes
+		if test.err {
+			assert.NotNil(t, err)
+			assert.Equal(t, test.errwant, err.Error())
+		}
+		assert.Equal(t, test.want, res)
+	}
 }
