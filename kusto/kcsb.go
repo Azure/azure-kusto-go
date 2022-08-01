@@ -1,6 +1,7 @@
 package kusto
 
 import (
+	"context"
 	"crypto"
 	"crypto/x509"
 	"errors"
@@ -28,7 +29,7 @@ type ConnectionStringBuilder struct {
 	managedID                     string
 	azCliAuth                     bool
 	azCliTenentID                 string
-	cloudInfo                     cloudInfo
+	cloudInfo                     CloudInfo
 }
 
 const (
@@ -41,8 +42,8 @@ const (
 See more: https://pkg.go.dev/github.com/Azure/azure-sdk-for-go/sdk/azidentity#EnvironmentCredential */
 func BuildConnectionStringWithEnv(clusterURI string) (*ConnectionStringBuilder, error) {
 	kcsb := &ConnectionStringBuilder{}
-	fetchedCI, _ := RetrieveCloudInfoMetadata(clusterURI)
-	kcsb.cloudInfo = *fetchedCI
+	fetchedCI, _ := GetMetadata(context.Background(), clusterURI)
+	kcsb.cloudInfo = fetchedCI
 	kcsb.clusterURI = clusterURI
 	kcsb.envAuth = true
 	return kcsb, nil
@@ -60,17 +61,17 @@ func BuildConnectionStringWithCert(clusterURI string, tenentID string, certifica
 	}
 	kcsb.applicationCertificates = certs
 	kcsb.applicationCertThumbprint = key
-	fetchedCI, _ := RetrieveCloudInfoMetadata(clusterURI)
+	fetchedCI, _ := GetMetadata(context.Background(), clusterURI)
 	kcsb.tenentID = tenentID
-	kcsb.cloudInfo = *fetchedCI
+	kcsb.cloudInfo = fetchedCI
 	return kcsb, nil
 }
 
 /*Build connection string builder to authenticate with the provided access token*/
 func BuildConnectionStringWithAccessToken(clusterURI string, at string) (*ConnectionStringBuilder, error) {
 	kcsb := &ConnectionStringBuilder{}
-	fetchedCI, _ := RetrieveCloudInfoMetadata(clusterURI)
-	kcsb.cloudInfo = *fetchedCI
+	fetchedCI, _ := GetMetadata(context.Background(), clusterURI)
+	kcsb.cloudInfo = fetchedCI
 	kcsb.clusterURI = clusterURI
 	kcsb.applicationToken = at
 	return kcsb, nil
@@ -80,8 +81,8 @@ func BuildConnectionStringWithAccessToken(clusterURI string, at string) (*Connec
 The value may be the identity's client ID or resource ID */
 func BuildConnectionStringWithManagedIdentity(clusterURI string, managedID string) (*ConnectionStringBuilder, error) {
 	kcsb := &ConnectionStringBuilder{}
-	fetchedCI, _ := RetrieveCloudInfoMetadata(clusterURI)
-	kcsb.cloudInfo = *fetchedCI
+	fetchedCI, _ := GetMetadata(context.Background(), clusterURI)
+	kcsb.cloudInfo = fetchedCI
 	kcsb.manageIdentityAuth = true
 	kcsb.managedID = managedID
 	return kcsb, nil
@@ -90,8 +91,8 @@ func BuildConnectionStringWithManagedIdentity(clusterURI string, managedID strin
 //Build connection string builder for AZ Cli authentication type, takes tenentID as input, Defaults to the CLI's default tenant
 func BuildConnectionStringWithAzCli(clusterURI string, tenentID string) (*ConnectionStringBuilder, error) {
 	kcsb := &ConnectionStringBuilder{}
-	fetchedCI, _ := RetrieveCloudInfoMetadata(clusterURI)
-	kcsb.cloudInfo = *fetchedCI
+	fetchedCI, _ := GetMetadata(context.Background(), clusterURI)
+	kcsb.cloudInfo = fetchedCI
 	kcsb.clusterURI = clusterURI
 	kcsb.azCliAuth = true
 	kcsb.azCliTenentID = tenentID
@@ -101,8 +102,8 @@ func BuildConnectionStringWithAzCli(clusterURI string, tenentID string) (*Connec
 //Build connection string builder for AAD Application Credentials
 func BuildConnectionStringWithAadApplicationCredentials(clusterURI string, tenentID string, appClientID string, cSec string) (*ConnectionStringBuilder, error) {
 	kcsb := &ConnectionStringBuilder{}
-	fetchedCI, _ := RetrieveCloudInfoMetadata(clusterURI)
-	kcsb.cloudInfo = *fetchedCI
+	fetchedCI, _ := GetMetadata(context.Background(), clusterURI)
+	kcsb.cloudInfo = fetchedCI
 	kcsb.clusterURI = clusterURI
 	kcsb.applicationClientID = appClientID
 	kcsb.tenentID = tenentID
@@ -112,8 +113,8 @@ func BuildConnectionStringWithAadApplicationCredentials(clusterURI string, tenen
 
 func BuildConnectionStringWithUsernamePassword(clusterURI string, tenentID string, clientID string, username string, password string) (*ConnectionStringBuilder, error) {
 	kcsb := &ConnectionStringBuilder{}
-	fetchedCI, _ := RetrieveCloudInfoMetadata(clusterURI)
-	kcsb.cloudInfo = *fetchedCI
+	fetchedCI, _ := GetMetadata(context.Background(), clusterURI)
+	kcsb.cloudInfo = fetchedCI
 	kcsb.tenentID = tenentID
 	kcsb.clientID = clientID
 	kcsb.aadUserID = username
@@ -128,10 +129,10 @@ func (kcsb *ConnectionStringBuilder) getTokenProvider() (*tokenProvider, error) 
 	}
 	tkp := &tokenProvider{}
 
-	resourceUri := kcsb.cloudInfo.kustoServiceResourceId
+	resourceUri := kcsb.cloudInfo.KustoServiceResourceID
 
 	//Update resource URI if MFA enabled
-	if kcsb.cloudInfo.loginMfaRequired {
+	if kcsb.cloudInfo.LoginMfaRequired {
 		resourceUri = strings.Replace(resourceUri, ".kusto.", ".kustomfa.", 1)
 	}
 	tkp.scopes = []string{resourceUri + "/.default"}
