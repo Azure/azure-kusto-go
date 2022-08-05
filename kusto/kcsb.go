@@ -13,23 +13,20 @@ import (
 )
 
 type ConnectionStringBuilder struct {
-	clusterURI                    string
-	envAuth                       bool
-	tenentID                      string
-	clientID                      string
-	clientSecret                  string
-	aadUserID                     string
-	password                      string
-	applicationClientID           string
-	applicationCertificates       []*x509.Certificate
-	applicationCertThumbprint     crypto.PrivateKey
-	publicApplicationCeritificate string
-	applicationToken              string
-	manageIdentityAuth            bool
-	managedID                     string
-	azCliAuth                     bool
-	azCliTenentID                 string
-	cloudInfo                     CloudInfo
+	clusterURI                string
+	envAuth                   bool
+	tenentID                  string
+	clientSecret              string
+	aadUserID                 string
+	password                  string
+	applicationClientID       string
+	applicationCertificates   []*x509.Certificate
+	applicationCertThumbprint crypto.PrivateKey
+	applicationToken          string
+	manageIdentityAuth        bool
+	managedID                 string
+	azCliAuth                 bool
+	cloudInfo                 CloudInfo
 }
 
 const (
@@ -52,7 +49,7 @@ func BuildConnectionStringWithEnv(clusterURI string) (*ConnectionStringBuilder, 
 //TODO: Need a thorough implementation check.
 /*Build connection string to authenticate a service principal with a certificate. Take clusterURI, tenentID, certificate as byte array and password to
 decrypt the certificate. Pass nil for password if the private key isn't encrypted.*/
-func BuildConnectionStringWithCert(clusterURI string, tenentID string, certificate []byte, password string) (*ConnectionStringBuilder, error) {
+func BuildConnectionStringWithCert(clusterURI string, tenentID string, clientID string, certificate []byte, password string) (*ConnectionStringBuilder, error) {
 	kcsb := &ConnectionStringBuilder{}
 
 	certs, key, err := azidentity.ParseCertificates(certificate, []byte(password))
@@ -63,6 +60,7 @@ func BuildConnectionStringWithCert(clusterURI string, tenentID string, certifica
 	kcsb.applicationCertThumbprint = key
 	fetchedCI, _ := GetMetadata(context.Background(), clusterURI)
 	kcsb.tenentID = tenentID
+	kcsb.applicationClientID = clientID
 	kcsb.cloudInfo = fetchedCI
 	return kcsb, nil
 }
@@ -82,6 +80,7 @@ The value may be the identity's client ID or resource ID */
 func BuildConnectionStringWithManagedIdentity(clusterURI string, managedID string) (*ConnectionStringBuilder, error) {
 	kcsb := &ConnectionStringBuilder{}
 	fetchedCI, _ := GetMetadata(context.Background(), clusterURI)
+	kcsb.clusterURI = clusterURI
 	kcsb.cloudInfo = fetchedCI
 	kcsb.manageIdentityAuth = true
 	kcsb.managedID = managedID
@@ -94,8 +93,8 @@ func BuildConnectionStringWithAzCli(clusterURI string, tenentID string) (*Connec
 	fetchedCI, _ := GetMetadata(context.Background(), clusterURI)
 	kcsb.cloudInfo = fetchedCI
 	kcsb.clusterURI = clusterURI
+	kcsb.tenentID = tenentID
 	kcsb.azCliAuth = true
-	kcsb.azCliTenentID = tenentID
 	return kcsb, nil
 }
 
@@ -114,9 +113,10 @@ func BuildConnectionStringWithAadApplicationCredentials(clusterURI string, tenen
 func BuildConnectionStringWithUsernamePassword(clusterURI string, tenentID string, clientID string, username string, password string) (*ConnectionStringBuilder, error) {
 	kcsb := &ConnectionStringBuilder{}
 	fetchedCI, _ := GetMetadata(context.Background(), clusterURI)
+	kcsb.clusterURI = clusterURI
 	kcsb.cloudInfo = fetchedCI
 	kcsb.tenentID = tenentID
-	kcsb.clientID = clientID
+	kcsb.applicationClientID = clientID
 	kcsb.aadUserID = username
 	kcsb.password = password
 	return kcsb, nil
@@ -165,7 +165,15 @@ func (kcsb *ConnectionStringBuilder) getTokenProvider() (*tokenProvider, error) 
 			}
 			tkp.tokenCredential = certCred
 			return tkp, nil
+		} else if !isEmpty(kcsb.aadUserID) && !isEmpty(kcsb.password) {
+			uspCred, err := azidentity.NewUsernamePasswordCredential(kcsb.tenentID, kcsb.applicationClientID, kcsb.aadUserID, kcsb.password, nil)
+			if err != nil {
+				return nil, fmt.Errorf("Error : Could not able to retrieve client credentiels using Username and password : %s", err)
+			}
+			tkp.tokenCredential = uspCred
+			return tkp, nil
 		}
+
 	} else if !isEmpty(kcsb.applicationToken) {
 		tkp.accessToken = kcsb.applicationToken
 		return tkp, nil
@@ -182,22 +190,14 @@ func (kcsb *ConnectionStringBuilder) getTokenProvider() (*tokenProvider, error) 
 		return tkp, nil
 	} else if kcsb.azCliAuth {
 		azCliOptions := &azidentity.AzureCLICredentialOptions{}
-		if !isEmpty(kcsb.azCliTenentID) {
-			azCliOptions.TenantID = kcsb.azCliTenentID
+		if kcsb.azCliAuth {
+			azCliOptions.TenantID = kcsb.tenentID
 		}
 		azCliCred, err := azidentity.NewAzureCLICredential(azCliOptions)
 		if err != nil {
 			return nil, fmt.Errorf("Error : Could not able to retrieve client credentiels using Azure CLI : %s", err)
 		}
 		tkp.tokenCredential = azCliCred
-		return tkp, nil
-
-	} else if !isEmpty(kcsb.aadUserID) && !isEmpty(kcsb.password) {
-		uspCred, err := azidentity.NewUsernamePasswordCredential(kcsb.tenentID, kcsb.clientID, kcsb.aadUserID, kcsb.password, nil)
-		if err != nil {
-			return nil, fmt.Errorf("Error : Could not able to retrieve client credentiels using Username and password : %s", err)
-		}
-		tkp.tokenCredential = uspCred
 		return tkp, nil
 	}
 

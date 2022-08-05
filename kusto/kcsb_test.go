@@ -9,10 +9,11 @@ import (
 func TestBuildConnectionStringWithEnv(t *testing.T) {
 	ecsb := &ConnectionStringBuilder{}
 	ecsb.clusterURI = "endpoint"
+	ecsb.envAuth = true
 	csb, err := BuildConnectionStringWithEnv("endpoint")
 	assert.Nil(t, err)
 	assert.NotNil(t, csb)
-	assert.Equal(t, csb, ecsb)
+	assert.Equal(t, ecsb, csb)
 }
 
 func TestBuildConnectionStringWithAccessToken(t *testing.T) {
@@ -22,7 +23,7 @@ func TestBuildConnectionStringWithAccessToken(t *testing.T) {
 	csb, err := BuildConnectionStringWithAccessToken("endpoint", "dummytoken")
 	assert.Nil(t, err)
 	assert.NotNil(t, csb)
-	assert.Equal(t, csb, ecsb)
+	assert.Equal(t, ecsb, csb)
 }
 
 func TestBuildConnectionStringWithMangedIdentity(t *testing.T) {
@@ -33,7 +34,7 @@ func TestBuildConnectionStringWithMangedIdentity(t *testing.T) {
 	csb, err := BuildConnectionStringWithManagedIdentity("endpoint", "resourceID")
 	assert.Nil(t, err)
 	assert.NotNil(t, csb)
-	assert.Equal(t, csb, ecsb)
+	assert.Equal(t, ecsb, csb)
 }
 
 func TestBuildConnectionStringWithAzCli(t *testing.T) {
@@ -44,30 +45,30 @@ func TestBuildConnectionStringWithAzCli(t *testing.T) {
 	csb, err := BuildConnectionStringWithAzCli("endpoint", "tenentID")
 	assert.Nil(t, err)
 	assert.NotNil(t, csb)
-	assert.Equal(t, csb, ecsb)
+	assert.Equal(t, ecsb, csb)
 }
 
 func TestBuildConnectionStringWithAadApplicationCredentials(t *testing.T) {
 	ecsb := &ConnectionStringBuilder{}
 	ecsb.clusterURI = "endpoint"
 	ecsb.tenentID = "tenentID"
-	ecsb.clientID = "appClientID"
+	ecsb.applicationClientID = "appClientID"
 	ecsb.clientSecret = "clientSecret"
 	csb, err := BuildConnectionStringWithAadApplicationCredentials("endpoint", "tenentID", "appClientID", "clientSecret")
 	assert.Nil(t, err)
 	assert.NotNil(t, csb)
-	assert.Equal(t, csb, ecsb)
+	assert.Equal(t, ecsb, csb)
 }
 
 func TestBuildConnectionStringWithUsernamePassword(t *testing.T) {
 	ecsb := &ConnectionStringBuilder{}
 	ecsb.clusterURI = "endpoint"
 	ecsb.tenentID = "tenentID"
-	ecsb.clientID = "clientID"
+	ecsb.applicationClientID = "clientID"
 	ecsb.aadUserID = "username"
 	ecsb.password = "password"
 	csb, err := BuildConnectionStringWithUsernamePassword("endpoint", "tenentID", "clientID", "username", "password")
 	assert.Nil(t, err)
 	assert.NotNil(t, csb)
-	assert.Equal(t, csb, ecsb)
+	assert.Equal(t, ecsb, csb)
 }
