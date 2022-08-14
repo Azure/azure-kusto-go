@@ -32,7 +32,12 @@ func TestIngestionStatus(t *testing.T) {
 	ctx, cancel := context.WithTimeout(context.Background(), 1*time.Minute)
 	defer cancel()
 
-	kcsb, _ := kusto.BuildConnectionStringWithAadApplicationCredentials(testConfig.Endpoint, testConfig.TenantID, testConfig.ClientID, testConfig.ClientSecret)
+	kcsb, _ := kusto.GetBuilder().
+		WithClusterURI(testConfig.Endpoint).
+		WithTenantId(testConfig.TenantID).
+		WithClientId(testConfig.ClientID).
+		WithClientSec(testConfig.ClientSecret).
+		Build()
 	client, err := kusto.New(kcsb)
 	require.NoError(t, err)
 
@@ -196,7 +201,12 @@ func TestIngestionStatus(t *testing.T) {
 		ctx, cancel := context.WithTimeout(context.Background(), 1*time.Minute)
 		defer cancel()
 
-		kcsb, _ := kusto.BuildConnectionStringWithAadApplicationCredentials(testConfig.Endpoint, testConfig.TenantID, testConfig.ClientID, testConfig.ClientSecret)
+		kcsb, _ := kusto.GetBuilder().
+			WithClusterURI(testConfig.Endpoint).
+			WithTenantId(testConfig.TenantID).
+			WithClientId(testConfig.ClientID).
+			WithClientSec(testConfig.ClientSecret).
+			Build()
 		client, err := kusto.New(kcsb)
 		require.NoError(t, err)
 

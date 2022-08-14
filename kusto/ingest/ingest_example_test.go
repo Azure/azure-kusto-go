@@ -11,7 +11,11 @@ import (
 func ExampleIngestion_FromFile() {
 	var err error
 
-	kcsb, _ := kusto.BuildConnectionStringWithAadApplicationCredentials("endpoint", "clientID", "clientSecret", "tenantID")
+	kcsb, _ := kusto.GetBuilder().
+		WithClusterURI("endpoint").
+		WithTenantId("tenantID").
+		WithClientId("clientID").WithClientSec("clientSecret").
+		Build()
 
 	client, err := kusto.New(kcsb)
 	if err != nil {

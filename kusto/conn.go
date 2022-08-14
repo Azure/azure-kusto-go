@@ -22,7 +22,6 @@ import (
 	v2 "github.com/Azure/azure-kusto-go/kusto/internal/frames/v2"
 	"github.com/Azure/azure-kusto-go/kusto/internal/response"
 	"github.com/Azure/azure-kusto-go/kusto/internal/version"
-	"github.com/Azure/azure-sdk-for-go/sdk/azcore/policy"
 
 	"github.com/Azure/go-autorest/autorest"
 	"github.com/google/uuid"
@@ -40,14 +39,13 @@ var bufferPool = sync.Pool{
 type conn struct {
 	endpoint                       string
 	auth                           autorest.Authorizer
-	tokenProvider                  tokenProvider
+	tokenProvider                  TokenProvider
 	endMgmt, endQuery, streamQuery *url.URL
 	client                         *http.Client
 }
 
 // newConn returns a new conn object with an injected http.Client
 func newConn(endpoint string, auth Authorization, client *http.Client) (*conn, error) {
-	c := &conn{}
 	if !validURL.MatchString(endpoint) {
 		return nil, errors.ES(errors.OpServConn, errors.KClientArgs, "endpoint is not valid(%s), should be https://<cluster name>.*", endpoint).SetNoRetry()
 	}
@@ -57,13 +55,15 @@ func newConn(endpoint string, auth Authorization, client *http.Client) (*conn, e
 		return nil, errors.ES(errors.OpServConn, errors.KClientArgs, "could not parse the endpoint(%s): %s", endpoint, err).SetNoRetry()
 	}
 
-	c.endMgmt = &url.URL{Scheme: "https", Host: u.Host, Path: "/v1/rest/mgmt"}
-	c.endQuery = &url.URL{Scheme: "https", Host: u.Host, Path: "/v2/rest/query"}
-	c.streamQuery = &url.URL{Scheme: "https", Host: u.Host, Path: "/v1/rest/ingest/"}
-	c.client = client
+	c := &conn{
+		endMgmt:     &url.URL{Scheme: "https", Host: u.Host, Path: "/v1/rest/mgmt"},
+		endQuery:    &url.URL{Scheme: "https", Host: u.Host, Path: "/v2/rest/query"},
+		streamQuery: &url.URL{Scheme: "https", Host: u.Host, Path: "/v1/rest/ingest/"},
+		client:      client,
+	}
+	if auth.tokenProvider != (TokenProvider{}) {
+		c.tokenProvider = auth.tokenProvider
 
-	if auth.tokenProvider != nil {
-		c.tokenProvider = *auth.tokenProvider
 	} else {
 		c.auth = auth.Authorizer
 	}
@@ -165,15 +165,10 @@ func (c *conn) execute(ctx context.Context, execType int, db string, query Stmt,
 		return execResp{}, errors.ES(op, errors.KInternal, "internal error: did not understand the type of execType: %d", execType)
 	}
 
-	token, err2 := c.tokenProvider.getToken(ctx, policy.TokenRequestOptions{Scopes: c.tokenProvider.scopes})
-	if err2 != nil {
-		return execResp{}, errors.ES(op, errors.KInternal, "Error while getting token : %s", err2)
+	if c.tokenProvider != (TokenProvider{}) {
+		token := c.tokenProvider.getToken()
+		header.Add("Authorization", fmt.Sprintf("Bearer %s", token.Token))
 	}
-
-	accessToken := token.Token
-
-	header.Add("Authorization", fmt.Sprintf("Bearer %s", accessToken))
-
 	req := &http.Request{
 		Method: http.MethodPost,
 		URL:    endpoint,

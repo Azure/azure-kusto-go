@@ -2,206 +2,214 @@ package kusto
 
 import (
 	"context"
-	"crypto"
-	"crypto/x509"
 	"errors"
 	"fmt"
-	"os"
 	"strings"
 
+	"github.com/Azure/azure-sdk-for-go/sdk/azcore"
+	"github.com/Azure/azure-sdk-for-go/sdk/azcore/policy"
 	"github.com/Azure/azure-sdk-for-go/sdk/azidentity"
 )
 
 type ConnectionStringBuilder struct {
-	clusterURI                string
-	envAuth                   bool
-	tenentID                  string
-	clientSecret              string
-	aadUserID                 string
-	password                  string
-	applicationClientID       string
-	applicationCertificates   []*x509.Certificate
-	applicationCertThumbprint crypto.PrivateKey
-	applicationToken          string
-	manageIdentityAuth        bool
-	managedID                 string
-	azCliAuth                 bool
-	cloudInfo                 CloudInfo
+	clusterURI  string
+	authType    string
+	resourceURI string
+	authParams  map[string]interface{}
+	cloudInfo   CloudInfo
 }
 
+// environmental variables
 const (
-	tenentIdEnvVariable     = "AZURE_TENANT_ID"
+	tenantIdEnvVariable     = "AZURE_TENANT_ID"
 	clientIdEnvVariable     = "AZURE_CLIENT_ID"
 	clientSecretEnvVariable = "AZURE_CLIENT_SECRET"
 )
 
-/*Build connection string builder to authenticate using the environment variables.
-See more: https://pkg.go.dev/github.com/Azure/azure-sdk-for-go/sdk/azidentity#EnvironmentCredential */
-func BuildConnectionStringWithEnv(clusterURI string) (*ConnectionStringBuilder, error) {
-	kcsb := &ConnectionStringBuilder{}
-	fetchedCI, _ := GetMetadata(context.Background(), clusterURI)
-	kcsb.cloudInfo = fetchedCI
-	kcsb.clusterURI = clusterURI
-	kcsb.envAuth = true
-	return kcsb, nil
-}
+// params mapping
+const (
+	tenantIDStr      string = "TenantID"
+	clientIDStr      string = "ClientID"
+	clientSecretStr  string = "ClientSecret"
+	appCertStr       string = "ApplicationCertificates"
+	appCertKeyStr    string = "ApplicationCertificateKey"
+	usernameStr      string = "Username"
+	userPasswordStr  string = "UserPassword"
+	appTokenStr      string = "ApplicationToken"
+	clientOptionsStr string = "ClientOptions"
+	sendCertChainStr string = "SendCertificateChain"
+	managedIDStr     string = "ManagedIdentityID"
+)
 
-//TODO: Need a thorough implementation check.
-/*Build connection string to authenticate a service principal with a certificate. Take clusterURI, tenentID, certificate as byte array and password to
-decrypt the certificate. Pass nil for password if the private key isn't encrypted.*/
-func BuildConnectionStringWithCert(clusterURI string, tenentID string, clientID string, certificate []byte, password string) (*ConnectionStringBuilder, error) {
-	kcsb := &ConnectionStringBuilder{}
-
-	certs, key, err := azidentity.ParseCertificates(certificate, []byte(password))
-	if err != nil {
-		fmt.Println("Error : x509 certificate parsing error ", err)
-	}
-	kcsb.applicationCertificates = certs
-	kcsb.applicationCertThumbprint = key
-	fetchedCI, _ := GetMetadata(context.Background(), clusterURI)
-	kcsb.tenentID = tenentID
-	kcsb.applicationClientID = clientID
-	kcsb.cloudInfo = fetchedCI
-	return kcsb, nil
-}
-
-/*Build connection string builder to authenticate with the provided access token*/
-func BuildConnectionStringWithAccessToken(clusterURI string, at string) (*ConnectionStringBuilder, error) {
-	kcsb := &ConnectionStringBuilder{}
-	fetchedCI, _ := GetMetadata(context.Background(), clusterURI)
-	kcsb.cloudInfo = fetchedCI
-	kcsb.clusterURI = clusterURI
-	kcsb.applicationToken = at
-	return kcsb, nil
-}
-
-/* Build connection string builder to authenticate an Azure managed identity in any hosting environment supporting managed identities..
-The value may be the identity's client ID or resource ID */
-func BuildConnectionStringWithManagedIdentity(clusterURI string, managedID string) (*ConnectionStringBuilder, error) {
-	kcsb := &ConnectionStringBuilder{}
-	fetchedCI, _ := GetMetadata(context.Background(), clusterURI)
-	kcsb.clusterURI = clusterURI
-	kcsb.cloudInfo = fetchedCI
-	kcsb.manageIdentityAuth = true
-	kcsb.managedID = managedID
-	return kcsb, nil
-}
-
-//Build connection string builder for AZ Cli authentication type, takes tenentID as input, Defaults to the CLI's default tenant
-func BuildConnectionStringWithAzCli(clusterURI string, tenentID string) (*ConnectionStringBuilder, error) {
-	kcsb := &ConnectionStringBuilder{}
-	fetchedCI, _ := GetMetadata(context.Background(), clusterURI)
-	kcsb.cloudInfo = fetchedCI
-	kcsb.clusterURI = clusterURI
-	kcsb.tenentID = tenentID
-	kcsb.azCliAuth = true
-	return kcsb, nil
-}
-
-//Build connection string builder for AAD Application Credentials
-func BuildConnectionStringWithAadApplicationCredentials(clusterURI string, tenentID string, appClientID string, cSec string) (*ConnectionStringBuilder, error) {
-	kcsb := &ConnectionStringBuilder{}
-	fetchedCI, _ := GetMetadata(context.Background(), clusterURI)
-	kcsb.cloudInfo = fetchedCI
-	kcsb.clusterURI = clusterURI
-	kcsb.applicationClientID = appClientID
-	kcsb.tenentID = tenentID
-	kcsb.clientSecret = cSec
-	return kcsb, nil
-}
-
-func BuildConnectionStringWithUsernamePassword(clusterURI string, tenentID string, clientID string, username string, password string) (*ConnectionStringBuilder, error) {
-	kcsb := &ConnectionStringBuilder{}
-	fetchedCI, _ := GetMetadata(context.Background(), clusterURI)
-	kcsb.clusterURI = clusterURI
-	kcsb.cloudInfo = fetchedCI
-	kcsb.tenentID = tenentID
-	kcsb.applicationClientID = clientID
-	kcsb.aadUserID = username
-	kcsb.password = password
-	return kcsb, nil
-}
+// authtype mapping
+const (
+	envAuth        string = "EnvironmentVars"
+	azCliAuth      string = "AzCLI"
+	managedIDAuth  string = "ManagedIdentity"
+	clientCredAuth string = "ClientCredentials"
+	appCertAuth    string = "ApplicationCetrifiate"
+	unamePassAuth  string = "UsernamePassword"
+	appTokenAuth   string = "ApplicationToken"
+)
 
 // Method to be used for generating TokenCredential
-func (kcsb *ConnectionStringBuilder) getTokenProvider() (*tokenProvider, error) {
-	if isEmpty(kcsb.clusterURI) {
-		return nil, errors.New("Error : Cluster URL not set.")
-	}
-	tkp := &tokenProvider{}
+func (kcsb *ConnectionStringBuilder) getTokenProvider(ctx context.Context) (*TokenProvider, error) {
+	tkp := &TokenProvider{}
 
-	resourceUri := kcsb.cloudInfo.KustoServiceResourceID
+	scopes := []string{fmt.Sprintf("%s/.default", kcsb.resourceURI)}
 
-	//Update resource URI if MFA enabled
-	if kcsb.cloudInfo.LoginMfaRequired {
-		resourceUri = strings.Replace(resourceUri, ".kusto.", ".kustomfa.", 1)
-	}
-	tkp.scopes = []string{resourceUri + "/.default"}
+	clientOptions, clopsok := (kcsb.authParams[clientOptionsStr]).(azcore.ClientOptions)
 
-	if kcsb.envAuth {
-		envCred, err := azidentity.NewEnvironmentCredential(nil)
-		if err != nil {
-			return nil, fmt.Errorf("Error : Could not able to retrieve client credentiels using Azure CLI: %s", err)
-		}
-		tkp.tokenCredential = envCred
-		return tkp, nil
+	switch kcsb.authType {
+	case clientCredAuth:
+		{
 
-	} else if !isEmpty(kcsb.applicationClientID) {
+			tenantID, tnok := kcsb.authParams[tenantIDStr]
+			clientId, clok := kcsb.authParams[clientIDStr]
+			clientSec, csok := kcsb.authParams[clientSecretStr]
 
-		clientSecret := os.Getenv(clientSecretEnvVariable)
-		if isEmpty(clientSecret) {
-			clientSecret = kcsb.clientSecret
-		}
-		if !isEmpty(clientSecret) {
-			ccred, err := azidentity.NewClientSecretCredential(kcsb.tenentID, kcsb.applicationClientID, clientSecret, nil)
-			if err != nil {
-				return nil, errors.New("Error : Could not able to retrieve client credentiels")
+			if !(tnok && clok && csok) {
+				return nil, errors.New("Error : Couldn't get token provider due to insufficient parameters")
 			}
-			tkp.tokenCredential = ccred
-			return tkp, nil
-		} else if len(kcsb.applicationCertificates) != 0 {
-			certCred, err := azidentity.NewClientCertificateCredential(kcsb.tenentID, kcsb.applicationClientID, kcsb.applicationCertificates, kcsb.applicationCertThumbprint, nil)
+
+			ccred, err := azidentity.NewClientSecretCredential(tenantID.(string), clientId.(string), clientSec.(string), nil)
 			if err != nil {
-				return nil, fmt.Errorf("Error : Could not able to retrieve client credentiels using Certificate: %s", err)
+				return nil, fmt.Errorf("Error : Couldn't get client credentiels. Error: %s", err)
 			}
-			tkp.tokenCredential = certCred
+			tkp.accessToken, err = ccred.GetToken(ctx, policy.TokenRequestOptions{Scopes: scopes})
+			if err != nil {
+				return nil, fmt.Errorf("Error while getting token using ClientSecretCredential: %s", err)
+			}
 			return tkp, nil
-		} else if !isEmpty(kcsb.aadUserID) && !isEmpty(kcsb.password) {
-			uspCred, err := azidentity.NewUsernamePasswordCredential(kcsb.tenentID, kcsb.applicationClientID, kcsb.aadUserID, kcsb.password, nil)
+		}
+	case appCertAuth:
+		{
+			tenantID, tnok := kcsb.authParams[tenantIDStr]
+			clientId, clok := kcsb.authParams[clientIDStr]
+			certificate, crtok := kcsb.authParams[appCertStr]
+			pvtkey, pkok := kcsb.authParams[appCertKeyStr]
+			sndCrtChain, sccok := kcsb.authParams[sendCertChainStr]
+			var pvtkeyStr string
+
+			if !(tnok && clok && crtok) {
+				return nil, errors.New("Error : Couldn't get token provider due to insufficient parameters")
+			}
+			if pkok {
+				pvtkeyStr = pvtkey.(string)
+			} else {
+				pvtkeyStr = ""
+			}
+
+			certs, thumprintKey, err := azidentity.ParseCertificates([]byte((certificate).(string)), []byte(pvtkeyStr))
+			if err != nil {
+				return nil, err
+			}
+
+			cccOpts := &azidentity.ClientCertificateCredentialOptions{}
+			if sccok {
+				cccOpts.SendCertificateChain = sndCrtChain.(bool)
+			}
+			if clopsok {
+				cccOpts.ClientOptions = clientOptions
+			}
+
+			certCred, err := azidentity.NewClientCertificateCredential(tenantID.(string), clientId.(string), certs, thumprintKey, cccOpts)
+			if err != nil {
+				return nil, fmt.Errorf("Error : Couldn't retrieve client credentiels using Application Certificate: %s", err)
+			}
+			tkp.accessToken, err = certCred.GetToken(ctx, policy.TokenRequestOptions{Scopes: scopes})
+			if err != nil {
+				return nil, fmt.Errorf("Error while getting token using ClientCertificateCredential: %s", err)
+			}
+			return tkp, nil
+
+		}
+	case unamePassAuth:
+		{
+			tenantID, tnok := kcsb.authParams[tenantIDStr]
+			clientId, clok := kcsb.authParams[clientIDStr]
+			uname, unok := kcsb.authParams[usernameStr]
+			upass, upok := kcsb.authParams[userPasswordStr]
+
+			if !(tnok && clok && unok && upok) {
+				return nil, errors.New("Error : Couldn't get token provider due to insufficient parameters")
+			}
+
+			uspCred, err := azidentity.NewUsernamePasswordCredential(tenantID.(string), clientId.(string), uname.(string), upass.(string), nil)
 			if err != nil {
 				return nil, fmt.Errorf("Error : Could not able to retrieve client credentiels using Username and password : %s", err)
 			}
-			tkp.tokenCredential = uspCred
+			tkp.accessToken, err = uspCred.GetToken(ctx, policy.TokenRequestOptions{Scopes: scopes})
+			if err != nil {
+				return nil, fmt.Errorf("Error while getting token using UserNamePasswordCredential : %s", err)
+			}
+			return tkp, nil
+
+		}
+	case appTokenAuth:
+		{
+			atoken, tok := kcsb.authParams[appTokenStr]
+			if !(tok) {
+				return nil, errors.New("Error : Couldn't get token provider due to insufficient parameters")
+			}
+			act := azcore.AccessToken{}
+			act.Token = atoken.(string)
+			tkp.accessToken = act
 			return tkp, nil
 		}
+	case managedIDAuth:
+		{
+			miOptions := &azidentity.ManagedIdentityCredentialOptions{}
 
-	} else if !isEmpty(kcsb.applicationToken) {
-		tkp.accessToken = kcsb.applicationToken
-		return tkp, nil
-	} else if kcsb.manageIdentityAuth {
-		miOptions := &azidentity.ManagedIdentityCredentialOptions{}
-		if !isEmpty(kcsb.managedID) {
-			miOptions.ID = azidentity.ClientID(kcsb.managedID)
+			managedID, midok := kcsb.authParams[managedIDStr]
+			if midok {
+				miOptions.ID = azidentity.ClientID(managedID.(string))
+			}
+
+			miC, err := azidentity.NewManagedIdentityCredential(miOptions)
+			if err != nil {
+				return nil, fmt.Errorf("Error : Could not able to retrieve client credentiels using Managed Identity: %s", err)
+			}
+			tkp.accessToken, err = miC.GetToken(ctx, policy.TokenRequestOptions{Scopes: scopes})
+			if err != nil {
+				return nil, fmt.Errorf("Error while getting token using MangedIdentityCredential: %s", err)
+			}
+			return tkp, nil
+
 		}
-		miC, err := azidentity.NewManagedIdentityCredential(miOptions)
-		if err != nil {
-			return nil, fmt.Errorf("Error : Could not able to retrieve client credentiels using Managed Identity: %s", err)
+	default:
+		{
+			//environmental variables based auth
+			envOpts := &azidentity.EnvironmentCredentialOptions{}
+			if clopsok {
+				envOpts.ClientOptions = clientOptions
+			}
+			envCred, err := azidentity.NewEnvironmentCredential(envOpts)
+			if err != nil {
+				//TODO: no need to return error at this step. Should we log?
+			}
+
+			azCliOptions := &azidentity.AzureCLICredentialOptions{}
+			tenantID, ok := kcsb.authParams[tenantIDStr]
+			if ok {
+				azCliOptions.TenantID = (tenantID).(string)
+			}
+			azCliCred, err := azidentity.NewAzureCLICredential(azCliOptions)
+			if err != nil {
+				//TODO: no need to return error at this step. Should we log?
+			}
+
+			chainedCred, err := azidentity.NewChainedTokenCredential([]azcore.TokenCredential{azCliCred, envCred}, &azidentity.ChainedTokenCredentialOptions{RetrySources: true})
+			if err != nil {
+				return nil, fmt.Errorf("Error : Couldn't retrieve client credentiels| Error: %s", err)
+			}
+			tkp.accessToken, err = chainedCred.GetToken(ctx, policy.TokenRequestOptions{Scopes: scopes})
+			if err != nil {
+				return nil, fmt.Errorf("Error while getting token using chained token credential: %s", err)
+			}
+			return tkp, nil
 		}
-		tkp.tokenCredential = miC
-		return tkp, nil
-	} else if kcsb.azCliAuth {
-		azCliOptions := &azidentity.AzureCLICredentialOptions{}
-		if kcsb.azCliAuth {
-			azCliOptions.TenantID = kcsb.tenentID
-		}
-		azCliCred, err := azidentity.NewAzureCLICredential(azCliOptions)
-		if err != nil {
-			return nil, fmt.Errorf("Error : Could not able to retrieve client credentiels using Azure CLI : %s", err)
-		}
-		tkp.tokenCredential = azCliCred
-		return tkp, nil
 	}
-
-	return nil, errors.New("Error : Authtype Not supported")
 }
 
 func isEmpty(str string) bool {

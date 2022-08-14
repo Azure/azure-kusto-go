@@ -26,7 +26,12 @@ func Example_simple() {
 		CollectionTime time.Time
 	}
 
-	kcsb, _ := BuildConnectionStringWithAadApplicationCredentials("endpoint", "clientID", "clientSecret", "tenantID")
+	kcsb, _ := GetBuilder().
+		WithClusterURI("endpoint").
+		WithTenantId("tenantID").
+		WithClientId("clientID").
+		WithClientSec("clientSecret").
+		Build()
 	client, err := New(kcsb)
 	if err != nil {
 		panic("add error handling")
@@ -101,7 +106,12 @@ func Example_complex() {
 		CollectionTime time.Time
 	}
 
-	kcsb, _ := BuildConnectionStringWithAadApplicationCredentials("endpoint", "clientID", "clientSecret", "tenantID")
+	kcsb, _ := GetBuilder().
+		WithClusterURI("endpoint").
+		WithTenantId("tenantID").
+		WithClientId("clientID").
+		WithClientSec("clientSecret").
+		Build()
 
 	client, err := New(kcsb)
 	if err != nil {
@@ -135,7 +145,12 @@ func Example_complex() {
 }
 
 func ExampleAuthorization_config() {
-	kcsb, _ := BuildConnectionStringWithAadApplicationCredentials("endpoint", "clientID", "clientSecret", "tenantID")
+	kcsb, _ := GetBuilder().
+		WithClusterURI("endpoint").
+		WithTenantId("tenantID").
+		WithClientId("clientID").
+		WithClientSec("clientSecret").
+		Build()
 
 	// Normally here you take a client.
 	_, err := New(kcsb)
@@ -146,7 +161,8 @@ func ExampleAuthorization_config() {
 
 func ExampleAuthorization_msi() {
 
-	kcsb, _ := BuildConnectionStringWithManagedIdentity("endpoint", auth.NewMSIConfig().Resource)
+	kcsb, _ := GetBuilder().WithClusterURI("endpoint").WithManagedID(auth.NewMSIConfig().Resource).Build()
+	//BuildConnectionStringWithManagedIdentity("endpoint", auth.NewMSIConfig().Resource)
 
 	// Normally here you take a client.
 	_, err := New(kcsb)
@@ -157,7 +173,12 @@ func ExampleAuthorization_msi() {
 
 func ExampleClient_Query_rows() {
 
-	kcsb, _ := BuildConnectionStringWithAadApplicationCredentials("endpoint", "clientID", "clientSecret", "tenantID")
+	kcsb, _ := GetBuilder().
+		WithClusterURI("endpoint").
+		WithTenantId("tenantID").
+		WithClientId("clientID").
+		WithClientSec("clientSecret").
+		Build()
 
 	client, err := New(kcsb)
 	if err != nil {
@@ -200,7 +221,12 @@ func ExampleClient_Query_do() {
 	// This is similar to our (Row) example. In this one though, we use the RowIterator.Do() method instead of
 	// manually iterating over the row. This makes for shorter code while maintaining readability.
 
-	kcsb, _ := BuildConnectionStringWithAadApplicationCredentials("endpoint", "clientID", "clientSecret", "tenantID")
+	kcsb, _ := GetBuilder().
+		WithClusterURI("endpoint").
+		WithTenantId("tenantID").
+		WithClientId("clientID").
+		WithClientSec("clientSecret").
+		Build()
 
 	client, err := New(kcsb)
 	if err != nil {
@@ -253,7 +279,12 @@ func ExampleClient_Query_struct() {
 		err error
 	}
 
-	kcsb, _ := BuildConnectionStringWithAadApplicationCredentials("endpoint", "clientID", "clientSecret", "tenantID")
+	kcsb, _ := GetBuilder().
+		WithClusterURI("endpoint").
+		WithTenantId("tenantID").
+		WithClientId("clientID").
+		WithClientSec("clientSecret").
+		Build()
 
 	client, err := New(kcsb)
 	if err != nil {
@@ -307,7 +338,12 @@ func ExampleClient_Query_struct() {
 
 func ExampleCustomHttpClient() {
 	// Create a connection string builder with your Azure ClientID, Secret and TenantID.
-	kcsb, _ := BuildConnectionStringWithAadApplicationCredentials("endpoint", "clientID", "clientSecret", "tenantID")
+	kcsb, _ := GetBuilder().
+		WithClusterURI("endpoint").
+		WithTenantId("tenantID").
+		WithClientId("clientID").
+		WithClientSec("clientSecret").
+		Build()
 
 	httpClient := &http.Client{}
 	url, err := url.Parse("squid-proxy.corp.mycompany.com:2323")

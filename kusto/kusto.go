@@ -36,15 +36,15 @@ type Authorization struct {
 	// Config provides the authorizer's config that can create the authorizer. We recommending setting
 	// this instead of Authorizer, as we will automatically set the Resource ID with the endpoint passed.
 	Config auth.AuthorizerConfig
-	//
-	tokenProvider *tokenProvider
+	// Token provider that can be used to get the access token.
+	tokenProvider TokenProvider
 }
 
 // Validate validates the Authorization object against the endpoint an preps it for use.
 // For internal use only.
 func (a *Authorization) Validate(endpoint string) error {
 	const rescField = "Resource"
-	if a.tokenProvider != nil {
+	if a.tokenProvider != (TokenProvider{}) {
 		return nil
 	}
 	if strings.Contains(strings.ToLower(endpoint), ".azuresynapse") {
@@ -124,12 +124,12 @@ type Option func(c *Client)
 
 // New returns a new Client. endpoint is the Kusto endpoint to use, example: https://somename.westus.kusto.windows.net .
 func New(kcsb *ConnectionStringBuilder, options ...Option) (*Client, error) {
-	tkp, err := kcsb.getTokenProvider()
+	tkp, err := kcsb.getTokenProvider(context.Background())
 	if err != nil {
 		return nil, err
 	}
 	auth := &Authorization{
-		tokenProvider: tkp,
+		tokenProvider: *tkp,
 	}
 	endpoint := kcsb.clusterURI
 	u, err := url.Parse(endpoint)
@@ -166,19 +166,6 @@ func New(kcsb *ConnectionStringBuilder, options ...Option) (*Client, error) {
 
 	return client, nil
 }
-
-// func NewClient(kcsb *ConnectionStringBuilder) (*Client, error) {
-// 	tkp, err := kcsb.getTokenProvider()
-// 	if err != nil {
-// 		return nil, err
-// 	}
-// 	auth := &Authorization{
-// 		tokenProvider: tkp,
-// 	}
-
-// 	return New(kcsb.clusterUrl, *auth)
-
-// }
 
 func WithHttpClient(client *http.Client) Option {
 	return func(c *Client) {
