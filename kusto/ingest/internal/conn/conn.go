@@ -19,7 +19,6 @@ import (
 	"github.com/Azure/azure-kusto-go/kusto/ingest/internal/properties"
 	"github.com/Azure/azure-kusto-go/kusto/internal/response"
 	"github.com/Azure/azure-kusto-go/kusto/internal/version"
-	"github.com/Azure/go-autorest/autorest"
 	"github.com/google/uuid"
 )
 
@@ -53,7 +52,7 @@ func New(endpoint string, auth kusto.Authorization, client *http.Client) (*Conn,
 			"endpoint is not valid(%s) for Kusto streaming ingestion", endpoint,
 		).SetNoRetry()
 	}
-	if err := auth.Validate(endpoint); err != nil {
+	if err := auth.Validate(); err != nil {
 		return nil, err
 	}
 
@@ -154,15 +153,6 @@ func (c *Conn) StreamIngest(ctx context.Context, db, table string, payload io.Re
 		URL:    u,
 		Header: headers,
 		Body:   closeablePayload,
-	}
-
-	if !c.inTest {
-		var err error
-		prep := c.auth.Authorizer.WithAuthorization()
-		req, err = prep(autorest.CreatePreparer()).Prepare(req)
-		if err != nil {
-			return errors.E(writeOp, errors.KInternal, err)
-		}
 	}
 
 	resp, err := c.client.Do(req.WithContext(ctx))

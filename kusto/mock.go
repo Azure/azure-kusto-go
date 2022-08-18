@@ -13,7 +13,6 @@ import (
 	"github.com/Azure/azure-kusto-go/kusto/data/value"
 	"github.com/Azure/azure-kusto-go/kusto/internal/frames"
 	v1 "github.com/Azure/azure-kusto-go/kusto/internal/frames/v1"
-	"github.com/Azure/go-autorest/autorest"
 )
 
 type columnData struct {
@@ -156,11 +155,14 @@ func (m mockConn) mgmt(_ context.Context, _ string, _ Stmt, _ *mgmtOptions) (exe
 }
 
 func NewMockClient() *Client {
+	kcsb, _ := GetBuilder().WithClusterURI("endpoint").Build()
+	tkp, _ := kcsb.getTokenProvider(context.Background())
+
 	return &Client{
 		conn:       mockConn{},
 		ingestConn: mockConn{},
 		endpoint:   "https://sdkse2etest.eastus.kusto.windows.net",
-		auth:       Authorization{Authorizer: autorest.NewBasicAuthorizer("", "")},
+		auth:       Authorization{tokenProvider: *tkp},
 		mu:         sync.Mutex{},
 		http:       &http.Client{},
 	}

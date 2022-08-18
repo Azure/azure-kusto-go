@@ -8,7 +8,6 @@ import (
 	"context"
 	"encoding/json"
 	"fmt"
-	"io"
 	"io/ioutil"
 	"net/http"
 	"net/url"
@@ -22,8 +21,8 @@ import (
 	v2 "github.com/Azure/azure-kusto-go/kusto/internal/frames/v2"
 	"github.com/Azure/azure-kusto-go/kusto/internal/response"
 	"github.com/Azure/azure-kusto-go/kusto/internal/version"
+	"github.com/Azure/azure-sdk-for-go/sdk/azcore/policy"
 
-	"github.com/Azure/go-autorest/autorest"
 	"github.com/google/uuid"
 )
 
@@ -38,8 +37,7 @@ var bufferPool = sync.Pool{
 // conn provides connectivity to a Kusto instance.
 type conn struct {
 	endpoint                       string
-	auth                           autorest.Authorizer
-	tokenProvider                  TokenProvider
+	tokenProvider                  tokenProvider
 	endMgmt, endQuery, streamQuery *url.URL
 	client                         *http.Client
 }
@@ -56,16 +54,11 @@ func newConn(endpoint string, auth Authorization, client *http.Client) (*conn, e
 	}
 
 	c := &conn{
-		endMgmt:     &url.URL{Scheme: "https", Host: u.Host, Path: "/v1/rest/mgmt"},
-		endQuery:    &url.URL{Scheme: "https", Host: u.Host, Path: "/v2/rest/query"},
-		streamQuery: &url.URL{Scheme: "https", Host: u.Host, Path: "/v1/rest/ingest/"},
-		client:      client,
-	}
-	if auth.tokenProvider != (TokenProvider{}) {
-		c.tokenProvider = auth.tokenProvider
-
-	} else {
-		c.auth = auth.Authorizer
+		tokenProvider: auth.tokenProvider,
+		endMgmt:       &url.URL{Scheme: "https", Host: u.Host, Path: "/v1/rest/mgmt"},
+		endQuery:      &url.URL{Scheme: "https", Host: u.Host, Path: "/v2/rest/query"},
+		streamQuery:   &url.URL{Scheme: "https", Host: u.Host, Path: "/v1/rest/ingest/"},
+		client:        client,
 	}
 
 	return c, nil
@@ -165,10 +158,12 @@ func (c *conn) execute(ctx context.Context, execType int, db string, query Stmt,
 		return execResp{}, errors.ES(op, errors.KInternal, "internal error: did not understand the type of execType: %d", execType)
 	}
 
-	if c.tokenProvider != (TokenProvider{}) {
-		token := c.tokenProvider.getToken()
-		header.Add("Authorization", fmt.Sprintf("Bearer %s", token.Token))
+	token, tkerr := c.tokenProvider.getToken(ctx, policy.TokenRequestOptions{Scopes: c.tokenProvider.scopes})
+	if tkerr != nil {
+		return execResp{}, errors.ES(op, errors.KInternal, "Error while getting token : %s", tkerr)
 	}
+	header.Add("Authorization", fmt.Sprintf("Bearer %s", token.Token))
+
 	req := &http.Request{
 		Method: http.MethodPost,
 		URL:    endpoint,
@@ -177,14 +172,7 @@ func (c *conn) execute(ctx context.Context, execType int, db string, query Stmt,
 	}
 
 	var err error
-	if c.auth != nil {
 
-		prep := c.auth.WithAuthorization()
-		req, err = prep(autorest.CreatePreparer()).Prepare(req)
-		if err != nil {
-			return execResp{}, errors.E(op, errors.KInternal, err)
-		}
-	}
 	resp, err := c.client.Do(req.WithContext(ctx))
 	if err != nil {
 		// TODO(jdoak): We need a http error unwrap function that pulls out an *errors.Error.
@@ -216,9 +204,9 @@ func (c *conn) execute(ctx context.Context, execType int, db string, query Stmt,
 }
 
 func (c *conn) Close() error {
-	if closer, ok := c.auth.(io.Closer); ok {
+	/*if closer, ok := c.auth.(io.Closer); ok {
 		return closer.Close()
-	}
+	}*/
 
 	return nil
 }

@@ -11,14 +11,13 @@ import (
 func TestGetTokenProviderHappy(t *testing.T) {
 	tests := []struct {
 		name string
-		kcsb ConnectionStringBuilder
+		kcsb connectionStringBuilder
 	}{
 		{
 			name: "test_tokenprovider_cred",
-			kcsb: ConnectionStringBuilder{
-				authType:    clientCredAuth,
-				clusterURI:  "endpoint",
-				resourceURI: "resId",
+			kcsb: connectionStringBuilder{
+				authType:   clientCredAuth,
+				clusterURI: "endpoint",
 				authParams: map[string]interface{}{
 					tenantIDStr:      "tenantID",
 					clientIDStr:      "clientID",
@@ -28,10 +27,9 @@ func TestGetTokenProviderHappy(t *testing.T) {
 			},
 		}, {
 			name: "test_tokenprovider_usernamepasswordauth",
-			kcsb: ConnectionStringBuilder{
-				authType:    unamePassAuth,
-				clusterURI:  "endpoint",
-				resourceURI: "resId",
+			kcsb: connectionStringBuilder{
+				authType:   unamePassAuth,
+				clusterURI: "endpoint",
 				authParams: map[string]interface{}{
 					tenantIDStr:     "tenantID",
 					clientIDStr:     "clientID",
@@ -41,10 +39,9 @@ func TestGetTokenProviderHappy(t *testing.T) {
 			},
 		}, {
 			name: "test_tokenprovider_usernamepasswordauth",
-			kcsb: ConnectionStringBuilder{
-				authType:    appTokenAuth,
-				clusterURI:  "endpoint",
-				resourceURI: "resId",
+			kcsb: connectionStringBuilder{
+				authType:   appTokenAuth,
+				clusterURI: "endpoint",
 				authParams: map[string]interface{}{
 					appTokenStr:      "dummytokenstring",
 					clientOptionsStr: azcore.ClientOptions{},
@@ -52,10 +49,9 @@ func TestGetTokenProviderHappy(t *testing.T) {
 			},
 		}, {
 			name: "test_tokenprovider_managedidauth",
-			kcsb: ConnectionStringBuilder{
-				authType:    managedIDAuth,
-				clusterURI:  "endpoint",
-				resourceURI: "resId",
+			kcsb: connectionStringBuilder{
+				authType:   managedIDAuth,
+				clusterURI: "endpoint",
 				authParams: map[string]interface{}{
 					managedIDStr:     "managedid",
 					clientOptionsStr: azcore.ClientOptions{},
@@ -63,18 +59,16 @@ func TestGetTokenProviderHappy(t *testing.T) {
 			},
 		}, {
 			name: "test_tokenprovider_managedidauth2",
-			kcsb: ConnectionStringBuilder{
-				authType:    managedIDAuth,
-				clusterURI:  "endpoint",
-				resourceURI: "resId",
-				authParams:  map[string]interface{}{},
+			kcsb: connectionStringBuilder{
+				authType:   managedIDAuth,
+				clusterURI: "endpoint",
+				authParams: map[string]interface{}{},
 			},
 		}, {
 			name: "test_tokenprovider_default",
-			kcsb: ConnectionStringBuilder{
-				authType:    "random",
-				clusterURI:  "endpoint",
-				resourceURI: "resId",
+			kcsb: connectionStringBuilder{
+				authType:   "random",
+				clusterURI: "endpoint",
 				authParams: map[string]interface{}{
 					tenantIDStr: "",
 					clientIDStr: "clientID",
@@ -94,24 +88,22 @@ func TestGetTokenProviderHappy(t *testing.T) {
 func TestGetTokenProviderErr(t *testing.T) {
 	tests := []struct {
 		name string
-		kcsb ConnectionStringBuilder
+		kcsb connectionStringBuilder
 	}{
 		{
 			name: "test_tokenprovider_cred_err",
-			kcsb: ConnectionStringBuilder{
-				authType:    clientCredAuth,
-				clusterURI:  "endpoint",
-				resourceURI: "resId",
+			kcsb: connectionStringBuilder{
+				authType:   clientCredAuth,
+				clusterURI: "endpoint",
 				authParams: map[string]interface{}{
 					tenantIDStr: "tenantID",
 				},
 			},
 		}, {
 			name: "test_tokenprovider_usernamepasswordauth_err",
-			kcsb: ConnectionStringBuilder{
-				authType:    unamePassAuth,
-				clusterURI:  "endpoint",
-				resourceURI: "resId",
+			kcsb: connectionStringBuilder{
+				authType:   unamePassAuth,
+				clusterURI: "endpoint",
 				authParams: map[string]interface{}{
 					tenantIDStr: "tenentId",
 					clientIDStr: "clientID",
@@ -120,10 +112,9 @@ func TestGetTokenProviderErr(t *testing.T) {
 			},
 		}, {
 			name: "test_tokenprovider_usernamepasswordauth_err",
-			kcsb: ConnectionStringBuilder{
-				authType:    appTokenAuth,
-				clusterURI:  "endpoint",
-				resourceURI: "resId",
+			kcsb: connectionStringBuilder{
+				authType:   appTokenAuth,
+				clusterURI: "endpoint",
 				authParams: map[string]interface{}{
 					clientOptionsStr: azcore.ClientOptions{},
 				},

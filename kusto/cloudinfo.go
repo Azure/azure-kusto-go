@@ -53,19 +53,20 @@ var defaultCloudInfo = CloudInfo{
 var cloudInfoCache = map[string]CloudInfo{}
 var lock = &sync.Mutex{}
 
-func GetMetadata(ctx context.Context, kustoURL string) (CloudInfo, error) {
+func GetMetadata(ctx context.Context, kustoUri string) (CloudInfo, error) {
 	// retrieve &return if exists
-	cachedCloudInfo, ok := cloudInfoCache[kustoURL]
+	cachedCloudInfo, ok := cloudInfoCache[kustoUri]
 	if ok {
 		return cachedCloudInfo, nil
 	}
 	// there is no value for that URL that was picked.
 	lock.Lock()
 	defer lock.Unlock()
-	u, err := url.Parse(kustoURL)
+	u, err := url.Parse(kustoUri)
 	if err != nil {
 		return CloudInfo{}, err
 	}
+
 	u.Path = metadataPath
 	// TODO should we make this timeout configurable.
 	metadataClient := http.Client{Timeout: time.Duration(5) * time.Second}
@@ -97,7 +98,7 @@ func GetMetadata(ctx context.Context, kustoURL string) (CloudInfo, error) {
 
 	// Covers scenarios of 200/OK with no body or a 404 where there is no body
 	if len(b) == 0 {
-		cloudInfoCache[kustoURL] = defaultCloudInfo
+		cloudInfoCache[kustoUri] = defaultCloudInfo
 		return defaultCloudInfo, nil
 	}
 
@@ -107,7 +108,7 @@ func GetMetadata(ctx context.Context, kustoURL string) (CloudInfo, error) {
 		return CloudInfo{}, err
 	}
 	// this should be set in the map by now
-	cloudInfoCache[kustoURL] = md.AzureAD
+	cloudInfoCache[kustoUri] = md.AzureAD
 	return md.AzureAD, nil
 }
 

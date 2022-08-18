@@ -5,25 +5,24 @@ import (
 	"fmt"
 	"os"
 	"reflect"
-	"strings"
 
 	"github.com/Azure/azure-sdk-for-go/sdk/azcore"
 )
 
 type builderParams struct {
-	clusterURI              string
-	tenantID                string
-	clientSecret            string
-	aadUserID               string
-	username                string
-	userPassword            string
-	applicationClientID     string
-	applicationCertificates []byte
-	sendCertificateChain    bool
-	privateKey              string
-	applicationToken        string
-	managedID               string
-	clientOptions           azcore.ClientOptions
+	clusterURI             string
+	tenantID               string
+	clientSecret           string
+	aadUserID              string
+	username               string
+	userPassword           string
+	applicationClientID    string
+	applicationCertificate []byte
+	sendCertificateChain   bool
+	privateKey             string
+	applicationToken       string
+	managedID              string
+	clientOptions          azcore.ClientOptions
 }
 
 func GetBuilder() *builderParams {
@@ -64,7 +63,7 @@ func (bp *builderParams) WithUserPassword(password string) *builderParams {
 // header of each token request's JWT. This is required for Subject Name/Issuer (SNI) authentication.
 // Defaults to False.
 func (bp *builderParams) WithAppCertificates(certificates []byte, privateKey string, sendCertChain bool) *builderParams {
-	bp.applicationCertificates = certificates
+	bp.applicationCertificate = certificates
 	bp.privateKey = privateKey
 	bp.sendCertificateChain = sendCertChain
 	return bp
@@ -85,8 +84,15 @@ func (bp *builderParams) WithClientOptions(options azcore.ClientOptions) *builde
 	return bp
 }
 
-func (bp *builderParams) Build() (*ConnectionStringBuilder, error) {
-	kcsb := &ConnectionStringBuilder{}
+func (bp *builderParams) Build() (*connectionStringBuilder, error) {
+	kcsb := &connectionStringBuilder{}
+
+	if !isEmpty(bp.applicationToken) {
+		kcsb.authParams[appTokenStr] = bp.applicationToken
+		kcsb.authType = appTokenAuth
+		return kcsb, nil
+	}
+
 	if isEmpty(bp.clusterURI) {
 		return nil, fmt.Errorf("Error : Cluster URL not set")
 	}
@@ -103,13 +109,6 @@ func (bp *builderParams) Build() (*ConnectionStringBuilder, error) {
 	if !reflect.DeepEqual(bp.clientOptions, azcore.ClientOptions{}) {
 		kcsb.authParams[clientOptionsStr] = bp.clientOptions
 	}
-
-	//Update resource URI if MFA enabled
-	resourceURI := fetchedCI.KustoServiceResourceID
-	if fetchedCI.LoginMfaRequired {
-		resourceURI = strings.Replace(resourceURI, ".kusto.", ".kustomfa.", 1)
-	}
-	kcsb.resourceURI = resourceURI
 
 	if !isEmpty(bp.applicationClientID) {
 		clientSecret := os.Getenv(clientSecretEnvVariable)
@@ -132,8 +131,8 @@ func (bp *builderParams) Build() (*ConnectionStringBuilder, error) {
 			kcsb.authParams[clientSecretStr] = clientSecret
 			kcsb.authType = clientCredAuth
 			return kcsb, nil
-		} else if len(bp.applicationCertificates) != 0 {
-			kcsb.authParams[appCertStr] = bp.applicationCertificates
+		} else if len(bp.applicationCertificate) != 0 {
+			kcsb.authParams[appCertStr] = bp.applicationCertificate
 			kcsb.authParams[appCertKeyStr] = bp.privateKey
 			kcsb.authParams[sendCertChainStr] = bp.sendCertificateChain
 			kcsb.authType = appCertAuth
@@ -144,10 +143,6 @@ func (bp *builderParams) Build() (*ConnectionStringBuilder, error) {
 			kcsb.authType = unamePassAuth
 			return kcsb, nil
 		}
-	} else if !isEmpty(bp.applicationToken) {
-		kcsb.authParams[appTokenStr] = bp.applicationToken
-		kcsb.authType = appTokenAuth
-		return kcsb, nil
 	} else if !isEmpty(bp.managedID) {
 		kcsb.authParams[managedIDStr] = bp.managedID
 		kcsb.authType = managedIDAuth

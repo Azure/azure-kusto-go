@@ -7,9 +7,6 @@ import (
 	"os"
 	"path/filepath"
 	"runtime"
-
-	"github.com/Azure/azure-kusto-go/kusto"
-	"github.com/Azure/go-autorest/autorest/azure/auth"
 )
 
 // Config represents a config.json file that must be in the directory and hold information to do the integration tests.
@@ -28,8 +25,6 @@ type Config struct {
 	ClientSecret string
 	// TenantID is the tenant on which the principal exists
 	TenantID string
-	// Authorizer generates bearer tokens on behalf of the principal
-	Authorizer kusto.Authorization
 }
 
 func (c *Config) validate() error {
@@ -84,18 +79,6 @@ func init() {
 	if err := testConfig.validate(); err != nil {
 		fmt.Println(err)
 		return
-	}
-
-	if testConfig.ClientID == "" {
-		azAuthorizer, err := auth.NewAuthorizerFromCLIWithResource(testConfig.Endpoint)
-		if err != nil {
-			fmt.Println("Failed to acquire auth token from az-cli" + err.Error())
-			return
-		}
-
-		testConfig.Authorizer = kusto.Authorization{Authorizer: azAuthorizer}
-	} else {
-		testConfig.Authorizer = kusto.Authorization{Config: auth.NewClientCredentialsConfig(testConfig.ClientID, testConfig.ClientSecret, testConfig.TenantID)}
 	}
 
 	skipETOE = false
