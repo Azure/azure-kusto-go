@@ -97,6 +97,35 @@ func TestGetMetadata(t *testing.T) {
 			payload: "",
 			want:    CloudInfo{},
 			errwant: fmt.Sprintf("error 500 Internal Server Error when querying endpoint %s/%s", s.urlStr(), metadataPath),
+		}, {
+			name:    "test_cloud_info_missing_key",
+			code:    200,
+			err:     false,
+			desc:    "Success login endpoint for url-1",
+			payload: `{"AzureAD": {"LoginMfaRequired": false,"KustoClientAppId": "db662dc1-0cfe-4e1c-a843-19a68e65be58","KustoClientRedirectUri": "https://microsoft/kustoclient","KustoServiceResourceId": "https://kusto.dev.kusto.windows.net","FirstPartyAuthorityUrl": "https://login.microsoftonline.com/f8cdef31-a31e-4b4a-93e4-5f571e91255a"  },  "dSTS": {"CloudEndpointSuffix": "windows.net","DstsRealm": "realm://dsts.core.windows.net","DstsInstance": "prod-dsts.dsts.core.windows.net","KustoDnsHostName": "kusto.windows.net","ServiceName": "kusto"}}`,
+			want: CloudInfo{
+				LoginEndpoint:          "",
+				LoginMfaRequired:       false,
+				KustoClientAppID:       "db662dc1-0cfe-4e1c-a843-19a68e65be58",
+				KustoClientRedirectURI: "https://microsoft/kustoclient",
+				KustoServiceResourceID: "https://kusto.dev.kusto.windows.net",
+				FirstPartyAuthorityURL: "https://login.microsoftonline.com/f8cdef31-a31e-4b4a-93e4-5f571e91255a",
+			},
+		},
+		{
+			name:    "test_cloud_info_extra_key",
+			code:    200,
+			err:     false,
+			desc:    "Success login endpoint for url-1",
+			payload: `{"AzureAD": {"SomeExtraKey":"dummyvalue","LoginEndpoint": "https://login.microsoftonline.com","LoginMfaRequired": false,"KustoClientAppId": "db662dc1-0cfe-4e1c-a843-19a68e65be58","KustoClientRedirectUri": "https://microsoft/kustoclient","KustoServiceResourceId": "https://kusto.dev.kusto.windows.net","FirstPartyAuthorityUrl": "https://login.microsoftonline.com/f8cdef31-a31e-4b4a-93e4-5f571e91255a"  },  "dSTS": {"CloudEndpointSuffix": "windows.net","DstsRealm": "realm://dsts.core.windows.net","DstsInstance": "prod-dsts.dsts.core.windows.net","KustoDnsHostName": "kusto.windows.net","ServiceName": "kusto"}}`,
+			want: CloudInfo{
+				LoginEndpoint:          "https://login.microsoftonline.com",
+				LoginMfaRequired:       false,
+				KustoClientAppID:       "db662dc1-0cfe-4e1c-a843-19a68e65be58",
+				KustoClientRedirectURI: "https://microsoft/kustoclient",
+				KustoServiceResourceID: "https://kusto.dev.kusto.windows.net",
+				FirstPartyAuthorityURL: "https://login.microsoftonline.com/f8cdef31-a31e-4b4a-93e4-5f571e91255a",
+			},
 		},
 	}
 
