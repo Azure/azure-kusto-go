@@ -39,13 +39,26 @@ type Ingestion struct {
 }
 
 // Option is an optional argument to New().
-type Option func(s *Ingestion)
+type Option func(s Ingestor)
 
 // WithStaticBuffer configures the ingest client to upload data to Kusto using a set of one or more static memory buffers with a fixed size.
+// Only valid for the queued client.
 func WithStaticBuffer(bufferSize int, maxBuffers int) Option {
-	return func(s *Ingestion) {
-		s.bufferSize = bufferSize
-		s.maxBuffers = maxBuffers
+	return func(s Ingestor) {
+		switch s.(type) {
+		case *Ingestion:
+			s.(*Ingestion).bufferSize = bufferSize
+			s.(*Ingestion).maxBuffers = maxBuffers
+		}
+	}
+}
+
+func WithHeaderPoolSize(size int) Option {
+	return func(s Ingestor) {
+		switch s.(type) {
+		case *Streaming:
+			s.(*Streaming).headerPoolSize = size
+		}
 	}
 }
 
@@ -226,7 +239,7 @@ func (i *Ingestion) getStreamConn() (*conn.Conn, error) {
 		return i.streamConn, nil
 	}
 
-	sc, err := conn.New(i.client.Endpoint(), i.client.Auth(), i.client.HttpClient())
+	sc, err := conn.New(i.client.Endpoint(), i.client.Auth(), i.client.HttpClient(), conn.DefaultHeaderPoolSize)
 	if err != nil {
 		return nil, err
 	}

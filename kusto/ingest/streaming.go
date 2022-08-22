@@ -20,10 +20,11 @@ type streamIngestor interface {
 
 // Streaming provides data ingestion from external sources into Kusto.
 type Streaming struct {
-	db         string
-	table      string
-	client     QueryClient
-	streamConn streamIngestor
+	db             string
+	table          string
+	client         QueryClient
+	streamConn     streamIngestor
+	headerPoolSize int
 }
 
 var FileIsBlobErr = errors.ES(errors.OpIngestStream, errors.KClientArgs, "blobstore paths are not supported for streaming")
@@ -31,18 +32,26 @@ var FileIsBlobErr = errors.ES(errors.OpIngestStream, errors.KClientArgs, "blobst
 // NewStreaming is the constructor for Streaming.
 // More information can be found here:
 // https://docs.microsoft.com/en-us/azure/kusto/management/create-ingestion-mapping-command
-func NewStreaming(client QueryClient, db, table string) (*Streaming, error) {
-	streamConn, err := conn.New(client.Endpoint(), client.Auth(), client.HttpClient())
+func NewStreaming(client QueryClient, db, table string, options ...Option) (*Streaming, error) {
+
+	i := &Streaming{
+		db:             db,
+		table:          table,
+		client:         client,
+		streamConn:     nil,
+		headerPoolSize: conn.DefaultHeaderPoolSize,
+	}
+
+	for _, option := range options {
+		option(i)
+	}
+
+	streamConn, err := conn.New(client.Endpoint(), client.Auth(), client.HttpClient(), i.headerPoolSize)
 	if err != nil {
 		return nil, err
 	}
 
-	i := &Streaming{
-		db:         db,
-		table:      table,
-		client:     client,
-		streamConn: streamConn,
-	}
+	i.streamConn = streamConn
 
 	return i, nil
 }

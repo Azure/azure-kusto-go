@@ -6,7 +6,6 @@ import (
 	"context"
 	"fmt"
 	"io"
-	"io/ioutil"
 	"net/http"
 	"net/url"
 	"path"
@@ -23,6 +22,8 @@ import (
 	"github.com/google/uuid"
 )
 
+const DefaultHeaderPoolSize = 100
+
 var validURL = regexp.MustCompile(`https://([a-zA-Z0-9_-]+\.){1,2}.*\??`)
 
 // BuffPool provides a pool of *bytes.Buffer objects.
@@ -37,7 +38,7 @@ type Conn struct {
 	auth        kusto.Authorization
 	baseURL     *url.URL
 	reqHeaders  http.Header
-	headersPool chan http.Header
+	headersPool sync.Pool
 	client      *http.Client
 	done        chan struct{}
 
@@ -45,7 +46,7 @@ type Conn struct {
 }
 
 // New returns a new Conn object.
-func New(endpoint string, auth kusto.Authorization, client *http.Client) (*Conn, error) {
+func New(endpoint string, auth kusto.Authorization, client *http.Client, headerPoolSize int) (*Conn, error) {
 	if !validURL.MatchString(endpoint) {
 		return nil, errors.ES(
 			errors.OpServConn,
@@ -57,10 +58,10 @@ func New(endpoint string, auth kusto.Authorization, client *http.Client) (*Conn,
 		return nil, err
 	}
 
-	return newWithoutValidation(endpoint, auth, client)
+	return newWithoutValidation(endpoint, auth, client, headerPoolSize)
 }
 
-func newWithoutValidation(endpoint string, auth kusto.Authorization, client *http.Client) (*Conn, error) {
+func newWithoutValidation(endpoint string, auth kusto.Authorization, client *http.Client, headerPoolSize int) (*Conn, error) {
 	headers := http.Header{}
 	headers.Add("Accept", "application/json")
 	headers.Add("Accept-Encoding", "gzip,deflate")
@@ -78,19 +79,22 @@ func newWithoutValidation(endpoint string, auth kusto.Authorization, client *htt
 	}
 
 	c := &Conn{
-		auth:        auth,
-		baseURL:     &url.URL{Scheme: u.Scheme, Host: u.Host, Path: "/v1/rest/ingest/"},
-		reqHeaders:  headers,
-		headersPool: make(chan http.Header, 100),
-		client:      client,
-		done:        make(chan struct{}),
+		auth:       auth,
+		baseURL:    &url.URL{Scheme: u.Scheme, Host: u.Host, Path: "/v1/rest/ingest/"},
+		reqHeaders: headers,
+		headersPool: sync.Pool{
+			New: func() interface{} {
+				return copyHeaders(headers)
+			},
+		},
+		client: client,
+		done:   make(chan struct{}),
 	}
 
 	// Fills a pool of headers to alleviate header copying timing at request time.
 	// These are automatically renewed by spun off goroutines when a header is pulled.
-	// TODO(jdoak): Decide if a sync.Pool would be better. In 1.13 they aren't triggering GC nearly as much.
-	for i := 0; i < 100; i++ {
-		c.headersPool <- copyHeaders(headers)
+	for i := 0; i < headerPoolSize; i++ {
+		c.headersPool.Put(copyHeaders(c.reqHeaders))
 	}
 
 	return c, nil
@@ -113,15 +117,9 @@ func (c *Conn) StreamIngest(ctx context.Context, db, table string, payload io.Re
 		format = properties.CSV
 	}
 
-	headers := <-c.headersPool
+	headers := c.headersPool.Get().(http.Header)
 	go func() {
-		header := copyHeaders(c.reqHeaders)
-		select {
-		case <-c.done:
-			return
-		case c.headersPool <- header:
-			return
-		}
+		c.headersPool.Put(copyHeaders(c.reqHeaders))
 	}()
 
 	if clientRequestId != "" {
@@ -146,7 +144,7 @@ func (c *Conn) StreamIngest(ctx context.Context, db, table string, payload io.Re
 	var closeablePayload io.ReadCloser
 	var ok bool
 	if closeablePayload, ok = payload.(io.ReadCloser); !ok {
-		closeablePayload = ioutil.NopCloser(payload)
+		closeablePayload = io.NopCloser(payload)
 	}
 
 	req := &http.Request{
