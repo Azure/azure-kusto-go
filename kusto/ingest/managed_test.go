@@ -6,7 +6,6 @@ import (
 	goErrors "errors"
 	"fmt"
 	"io"
-	"io/ioutil"
 	"strings"
 	"testing"
 	"time"
@@ -68,7 +67,7 @@ func TestManaged(t *testing.T) {
 				clientRequestId string) error {
 				assert.Equal(t, "defaultDb", db)
 				assert.Equal(t, "defaultTable", table)
-				payloadBytes, err := ioutil.ReadAll(payload)
+				payloadBytes, err := io.ReadAll(payload)
 				assert.NoError(t, err)
 				assert.Equal(t, compressedBytes, payloadBytes)
 				assert.Equal(t, properties.CSV, format)
@@ -92,7 +91,7 @@ func TestManaged(t *testing.T) {
 				clientRequestId string) error {
 				assert.Equal(t, "otherDb", db)
 				assert.Equal(t, "otherTable", table)
-				payloadBytes, err := ioutil.ReadAll(payload)
+				payloadBytes, err := io.ReadAll(payload)
 				assert.NoError(t, err)
 				assert.Equal(t, compressedBytes, payloadBytes)
 				assert.Equal(t, properties.CSV, format)
@@ -100,7 +99,7 @@ func TestManaged(t *testing.T) {
 				parts := strings.Split(clientRequestId, ";")
 				assert.Equal(t, "KGC.executeManagedStreamingIngest", parts[0])
 				_, err = uuid.Parse(parts[1])
-				return nil
+				return err
 			},
 			onMgmt:          failIfQueuedCalled,
 			expectedCounter: 1,
@@ -114,7 +113,7 @@ func TestManaged(t *testing.T) {
 				clientRequestId string) error {
 				assert.Equal(t, "defaultDb", db)
 				assert.Equal(t, "defaultTable", table)
-				payloadBytes, err := ioutil.ReadAll(payload)
+				payloadBytes, err := io.ReadAll(payload)
 				assert.NoError(t, err)
 				assert.Equal(t, compressedBytes, payloadBytes)
 				assert.Equal(t, properties.JSON, format)
@@ -122,7 +121,7 @@ func TestManaged(t *testing.T) {
 				parts := strings.Split(clientRequestId, ";")
 				assert.Equal(t, "KGC.executeManagedStreamingIngest", parts[0])
 				_, err = uuid.Parse(parts[1])
-				return nil
+				return err
 			},
 			onMgmt:          failIfQueuedCalled,
 			expectedCounter: 1,
@@ -137,7 +136,7 @@ func TestManaged(t *testing.T) {
 				clientRequestId string) error {
 				assert.Equal(t, "defaultDb", db)
 				assert.Equal(t, "defaultTable", table)
-				payloadBytes, err := ioutil.ReadAll(payload)
+				payloadBytes, err := io.ReadAll(payload)
 				assert.NoError(t, err)
 				assert.Equal(t, compressedBytes, payloadBytes)
 				assert.Equal(t, properties.CSV, format)
@@ -155,7 +154,7 @@ func TestManaged(t *testing.T) {
 				clientRequestId string) error {
 				assert.Equal(t, "defaultDb", db)
 				assert.Equal(t, "defaultTable", table)
-				payloadBytes, err := ioutil.ReadAll(payload)
+				payloadBytes, err := io.ReadAll(payload)
 				assert.NoError(t, err)
 				assert.Equal(t, compressedBytes, payloadBytes)
 				assert.Equal(t, properties.CSV, format)
@@ -177,7 +176,7 @@ func TestManaged(t *testing.T) {
 				clientRequestId string) error {
 				assert.Equal(t, "defaultDb", db)
 				assert.Equal(t, "defaultTable", table)
-				payloadBytes, err := ioutil.ReadAll(payload)
+				payloadBytes, err := io.ReadAll(payload)
 				assert.NoError(t, err)
 				assert.Equal(t, compressedBytes, payloadBytes)
 				assert.Equal(t, properties.CSV, format)
@@ -199,7 +198,7 @@ func TestManaged(t *testing.T) {
 				clientRequestId string) error {
 				assert.Equal(t, "defaultDb", db)
 				assert.Equal(t, "defaultTable", table)
-				payloadBytes, err := ioutil.ReadAll(payload)
+				payloadBytes, err := io.ReadAll(payload)
 				assert.NoError(t, err)
 				assert.Equal(t, compressedBytes, payloadBytes)
 				assert.Equal(t, properties.CSV, format)
@@ -223,7 +222,7 @@ func TestManaged(t *testing.T) {
 				clientRequestId string) error {
 				assert.Equal(t, "defaultDb", db)
 				assert.Equal(t, "defaultTable", table)
-				payloadBytes, err := ioutil.ReadAll(payload)
+				payloadBytes, err := io.ReadAll(payload)
 				assert.NoError(t, err)
 				assert.Equal(t, compressedBytes, payloadBytes)
 				assert.Equal(t, properties.CSV, format)
@@ -250,7 +249,7 @@ func TestManaged(t *testing.T) {
 				counter++
 				assert.Equal(t, "defaultDb", props.Ingestion.DatabaseName)
 				assert.Equal(t, "defaultTable", props.Ingestion.TableName)
-				all, err := ioutil.ReadAll(reader)
+				all, err := io.ReadAll(reader)
 				assert.NoError(t, err)
 				assert.Equal(t, compressedBytes, all)
 				return "", nil
@@ -283,7 +282,7 @@ func TestManaged(t *testing.T) {
 				counter++
 				assert.Equal(t, "defaultDb", props.Ingestion.DatabaseName)
 				assert.Equal(t, "defaultTable", props.Ingestion.TableName)
-				all, err := ioutil.ReadAll(reader)
+				all, err := io.ReadAll(reader)
 				assert.NoError(t, err)
 				assert.Equal(t, bigData, all)
 				return "", nil
@@ -433,13 +432,13 @@ func TestManaged(t *testing.T) {
 }
 
 func initFile(t *testing.T, reader *bytes.Reader) ([]byte, []byte) {
-	data, err := ioutil.ReadAll(reader)
+	data, err := io.ReadAll(reader)
 
 	require.NoError(t, err)
 
 	compressedBuffer := gzip.New()
 	compressedBuffer.Reset(io.NopCloser(bytes.NewReader(data)))
-	compressedBytes, err := ioutil.ReadAll(compressedBuffer)
+	compressedBytes, err := io.ReadAll(compressedBuffer)
 	require.NoError(t, err)
 
 	seek, err := reader.Seek(0, io.SeekStart)

@@ -3,7 +3,6 @@ package etoe
 import (
 	"encoding/json"
 	"fmt"
-	"io/ioutil"
 	"os"
 	"path/filepath"
 	"runtime"
@@ -57,7 +56,7 @@ func init() {
 	}
 
 	p := filepath.Join(filepath.Dir(filename), "config.json")
-	b, err := ioutil.ReadFile(p)
+	b, err := os.ReadFile(p)
 
 	if err == nil {
 		if err := json.Unmarshal(b, &testConfig); err != nil {

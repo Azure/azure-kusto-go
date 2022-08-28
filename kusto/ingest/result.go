@@ -16,7 +16,6 @@ type Result struct {
 	record        statusRecord
 	tableClient   *status.TableClient
 	reportToTable bool
-	reportToQueue bool
 }
 
 // newResult creates an initial ingestion status record.

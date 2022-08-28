@@ -124,7 +124,7 @@ func TestQueries(t *testing.T) {
 		),
 	)
 
-	allDataTypesTable := fmt.Sprintf("goe2e_all_data_types")
+	allDataTypesTable := "goe2e_all_data_types"
 	require.NoError(t, createIngestionTable(t, client, allDataTypesTable, true))
 
 	tests := []struct {
@@ -386,7 +386,7 @@ func TestQueries(t *testing.T) {
 			defer iter.Stop()
 
 			var got = test.gotInit()
-			err = iter.Do(func(row *table.Row) error {
+			err = iter.Do(func(row *table.Row) error { //nolint:staticcheck // It is deprecated, but we want to test it.
 				return test.doer(row, got)
 			})
 
@@ -1410,7 +1410,7 @@ func TestStreamingIngestion(t *testing.T) {
 				panic(err)
 			}
 
-			err = ingestor.Stream(
+			err = ingestor.Stream( //nolint:staticcheck // It is deprecated, but we want to test it.
 				context.Background(),
 				test.segment,
 				ingest.JSON,

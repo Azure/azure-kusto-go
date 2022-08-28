@@ -142,7 +142,7 @@ func TestRow(t *testing.T) {
 			case value.Values:
 				err = m.Row(v)
 			case error:
-				m.Error(v)
+				_ = m.Error(v)
 			default:
 				panic("unsupported type")
 			}
