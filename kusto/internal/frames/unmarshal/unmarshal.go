@@ -19,7 +19,7 @@ var rowsPool = sync.Pool{
 
 // GetRows is used to pull values that can be used to decode Rows into out of a pool.
 func GetRows() []interface{} {
-	return rowsPool.Get().([]interface{})
+	return *rowsPool.Get().(*[]interface{})
 }
 
 // PutRows is used to put values that were used to decode Rows into a pool.
