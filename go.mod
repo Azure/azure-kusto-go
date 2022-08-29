@@ -1,6 +1,6 @@
 module github.com/Azure/azure-kusto-go
 
-go 1.18
+go 1.19
 
 require (
 	github.com/Azure/azure-sdk-for-go v61.2.0+incompatible
