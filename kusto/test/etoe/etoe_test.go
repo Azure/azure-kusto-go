@@ -345,6 +345,29 @@ func TestQueries(t *testing.T) {
 			},
 		},
 		{
+			desc: "Query: Use many options",
+			stmt: pCountStmt.MustParameters(
+				kusto.NewParameters().Must(kusto.QueryValues{"tableName": allDataTypesTable}),
+			),
+			options: []kusto.QueryOption{kusto.QueryNow(time.Now()), kusto.NoRequestTimeout(), kusto.NoTruncation(), kusto.RequestAppName("bd1e472c-a8e4-4c6e-859d-c86d72253197"),
+				kusto.RequestDescription("9bff424f-711d-48b8-9a6e-d3a618748334")},
+			qcall: client.Query,
+			doer: func(row *table.Row, update interface{}) error {
+				rec := CountResult{}
+				if err := row.ToStruct(&rec); err != nil {
+					return err
+				}
+				recs := update.(*[]CountResult)
+				*recs = append(*recs, rec)
+				return nil
+			},
+			gotInit: func() interface{} {
+				v := []CountResult{}
+				return &v
+			},
+			want: &[]CountResult{{Count: 1}},
+		},
+		{
 			desc: "Query: get json",
 			stmt: pCountStmt.MustParameters(
 				kusto.NewParameters().Must(kusto.QueryValues{"tableName": allDataTypesTable}),
@@ -417,7 +440,7 @@ func TestQueries(t *testing.T) {
 			defer iter.Stop()
 
 			var got = test.gotInit()
-			err = iter.Do(func(row *table.Row) error {
+			err = iter.DoOnRowOrError(func(row *table.Row, e *errors.Error) error {
 				return test.doer(row, got)
 			})
 
