@@ -7,6 +7,7 @@ import (
 	"io"
 	"math/rand"
 	"os"
+	"regexp"
 	"strings"
 	"testing"
 	"time"
@@ -95,6 +96,8 @@ type queryFunc func(ctx context.Context, db string, query kusto.Stmt, options ..
 
 type mgmtFunc func(ctx context.Context, db string, query kusto.Stmt, options ...kusto.MgmtOption) (*kusto.RowIterator, error)
 
+type queryJsonFunc func(ctx context.Context, db string, query kusto.Stmt, options ...kusto.QueryOption) (string, error)
+
 func TestQueries(t *testing.T) {
 	t.Parallel()
 
@@ -138,6 +141,7 @@ func TestQueries(t *testing.T) {
 		teardown func() error
 		qcall    queryFunc
 		mcall    mgmtFunc
+		qjcall   queryJsonFunc
 		options  interface{} // either []kusto.QueryOption or []kusto.MgmtOption
 		// doer is called from within the function passed to RowIterator.Do(). It allows us to collect the data we receive.
 		doer func(row *table.Row, update interface{}) error
@@ -362,6 +366,14 @@ func TestQueries(t *testing.T) {
 				return &v
 			},
 			want: &[]CountResult{{Count: 1}},
+    },
+    {
+			desc: "Query: get json",
+			stmt: pCountStmt.MustParameters(
+				kusto.NewParameters().Must(kusto.QueryValues{"tableName": allDataTypesTable}),
+			),
+			qjcall: client.QueryToJson,
+			want:   "[{\"FrameType\":\"DataSetHeader\",\"IsProgressive\":true,\"Version\":\"v2.0\"},{\"FrameType\":\"DataTable\",\"TableId\":0,\"TableKind\":\"QueryProperties\",\"TableName\":\"@ExtendedProperties\",\"Columns\":[{\"ColumnName\":\"TableId\",\"ColumnType\":\"int\"},{\"ColumnName\":\"Key\",\"ColumnType\":\"string\"},{\"ColumnName\":\"Value\",\"ColumnType\":\"dynamic\"}],\"Rows\":[[1,\"Visualization\",\"{\\\"Visualization\\\":null,\\\"Title\\\":null,\\\"XColumn\\\":null,\\\"Series\\\":null,\\\"YColumns\\\":null,\\\"AnomalyColumns\\\":null,\\\"XTitle\\\":null,\\\"YTitle\\\":null,\\\"XAxis\\\":null,\\\"YAxis\\\":null,\\\"Legend\\\":null,\\\"YSplit\\\":null,\\\"Accumulate\\\":false,\\\"IsQuerySorted\\\":false,\\\"Kind\\\":null,\\\"Ymin\\\":\\\"NaN\\\",\\\"Ymax\\\":\\\"NaN\\\",\\\"Xmin\\\":null,\\\"Xmax\\\":null}\"]]},{\"FrameType\":\"TableHeader\",\"TableId\":1,\"TableKind\":\"PrimaryResult\",\"TableName\":\"PrimaryResult\",\"Columns\":[{\"ColumnName\":\"Count\",\"ColumnType\":\"long\"}]},{\"FrameType\":\"TableFragment\",\"TableFragmentType\":\"DataAppend\",\"TableId\":1,\"Rows\":[[1]]},{\"FrameType\":\"TableProgress\",\"TableId\":1,\"TableProgress\"<TIME>},{\"FrameType\":\"TableCompletion\",\"TableId\":1,\"RowCount\":1},{\"FrameType\":\"DataTable\",\"TableId\":2,\"TableKind\":\"QueryCompletionInformation\",\"TableName\":\"QueryCompletionInformation\",\"Columns\":[{\"ColumnName\":\"Timestamp\",\"ColumnType\":\"datetime\"},{\"ColumnName\":\"ClientRequestId\",\"ColumnType\":\"string\"},{\"ColumnName\":\"ActivityId\",\"ColumnType\":\"guid\"},{\"ColumnName\":\"SubActivityId\",\"ColumnType\":\"guid\"},{\"ColumnName\":\"ParentActivityId\",\"ColumnType\":\"guid\"},{\"ColumnName\":\"Level\",\"ColumnType\":\"int\"},{\"ColumnName\":\"LevelName\",\"ColumnType\":\"string\"},{\"ColumnName\":\"StatusCode\",\"ColumnType\":\"int\"},{\"ColumnName\":\"StatusCodeName\",\"ColumnType\":\"string\"},{\"ColumnName\":\"EventType\",\"ColumnType\":\"int\"},{\"ColumnName\":\"EventTypeName\",\"ColumnType\":\"string\"},{\"ColumnName\":\"Payload\",\"ColumnType\":\"string\"}],\"Rows\":[[\"<TIME>\",\"KGC.execute;<GUID>\",\"<GUID>\",\"<GUID>\",\"<GUID>\",4,\"Info\",0,\"S_OK (0)\",4,\"QueryInfo\",\"{\\\"Count\\\":1,\\\"Text\\\":\\\"Query completed successfully\\\"}\"],[\"<TIME>\",\"KGC.execute;<GUID>\",\"<GUID>\",\"<GUID>\",\"<GUID>\",4,\"Info\",0,\"S_OK (0)\",5,\"WorkloadGroup\",\"{\\\"Count\\\":1,\\\"Text\\\":\\\"default\\\"}\"],[\"<TIME>\",\"KGC.execute;<GUID>\",\"<GUID>\",\"<GUID>\",\"<GUID>\",6,\"Stats\",0,\"S_OK (0)\",0,\"QueryResourceConsumption\",\"{\\\"ExecutionTime\\\"<TIME>,\\\"resource_usage\\\":{\\\"cache\\\":{\\\"memory\\\":{\\\"hits\\\":0,\\\"misses\\\":0,\\\"total\\\":0},\\\"disk\\\":{\\\"hits\\\":0,\\\"misses\\\":0,\\\"total\\\":0},\\\"shards\\\":{\\\"hot\\\":{\\\"hitbytes\\\":0,\\\"missbytes\\\":0,\\\"retrievebytes\\\":0},\\\"cold\\\":{\\\"hitbytes\\\":0,\\\"missbytes\\\":0,\\\"retrievebytes\\\":0},\\\"bypassbytes\\\":0}},\\\"cpu\\\":{\\\"user\\\":\\\"00:00:00\\\",\\\"kernel\\\":\\\"00:00:00\\\",\\\"total cpu\\\":\\\"00:00:00\\\"},\\\"memory\\\":{\\\"peak_per_node\\\":524384},\\\"network\\\":{\\\"inter_cluster_total_bytes\\\":664,\\\"cross_cluster_total_bytes\\\":0}},\\\"input_dataset_statistics\\\":{\\\"extents\\\":{\\\"total\\\":0,\\\"scanned\\\":0,\\\"scanned_min_datetime\\\":\\\"<TIME>\\\",\\\"scanned_max_datetime\\\":\\\"<TIME>\\\"},\\\"rows\\\":{\\\"total\\\":0,\\\"scanned\\\":0},\\\"rowstores\\\":{\\\"scanned_rows\\\":0,\\\"scanned_values_size\\\":0},\\\"shards\\\":{\\\"queries_generic\\\":0,\\\"queries_specialized\\\":0}},\\\"dataset_statistics\\\":[{\\\"table_row_count\\\":1,\\\"table_size\\\":9}],\\\"cross_cluster_resource_usage\\\":{}}\"]]},{\"FrameType\":\"DataSetCompletion\",\"HasErrors\":false,\"Cancelled\":false}]",
 		},
 	}
 
@@ -402,6 +414,25 @@ func TestQueries(t *testing.T) {
 				iter, err = test.mcall(context.Background(), testConfig.Database, test.stmt, options...)
 
 				require.Nilf(t, err, "TestQueries(%s): had test.mcall error: %s", test.desc, err)
+
+			case test.qjcall != nil:
+				var options []kusto.QueryOption
+				if test.options != nil {
+					options = test.options.([]kusto.QueryOption)
+				}
+				json, err := test.qjcall(context.Background(), testConfig.Database, test.stmt, options...)
+				require.Nilf(t, err, "TestQueries(%s): had test.qjcall error: %s", test.desc, err)
+
+				// replace guids with <GUID>
+				guidRegex := regexp.MustCompile("(\\w+-){4}\\w+")
+				json = guidRegex.ReplaceAllString(json, "<GUID>")
+
+				timeRegex := regexp.MustCompile("([0:]+\\.(\\d)+)|([\\d\\-]+T[\\d\\-.:]+Z)")
+				json = timeRegex.ReplaceAllString(json, "<TIME>")
+
+				require.Equal(t, test.want, json)
+				return
+
 			default:
 				require.Fail(t, "test setup failure")
 			}
