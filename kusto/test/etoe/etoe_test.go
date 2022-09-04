@@ -366,8 +366,8 @@ func TestQueries(t *testing.T) {
 				return &v
 			},
 			want: &[]CountResult{{Count: 1}},
-    },
-    {
+		},
+		{
 			desc: "Query: get json",
 			stmt: pCountStmt.MustParameters(
 				kusto.NewParameters().Must(kusto.QueryValues{"tableName": allDataTypesTable}),
