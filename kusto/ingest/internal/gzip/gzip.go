@@ -5,7 +5,6 @@ package gzip
 import (
 	"compress/gzip"
 	"io"
-	"io/ioutil"
 	"sync"
 	"sync/atomic"
 )
@@ -51,7 +50,7 @@ func Compress(payload io.Reader) io.Reader {
 	var closer io.ReadCloser
 	var ok bool
 	if closer, ok = payload.(io.ReadCloser); !ok {
-		closer = ioutil.NopCloser(payload)
+		closer = io.NopCloser(payload)
 	}
 	zw := New()
 	zw.Reset(closer)

@@ -6,7 +6,6 @@ import (
 	"context"
 	"fmt"
 	"io"
-	"io/ioutil"
 	"net/http"
 	"os"
 	"testing"
@@ -136,7 +135,7 @@ func TestLocalToBlob(t *testing.T) {
 	}
 	_ = zw.Close()
 
-	_, err = ioutil.ReadFile(f.Name())
+	_, err = os.ReadFile(f.Name())
 	if err != nil {
 		panic(err)
 	}

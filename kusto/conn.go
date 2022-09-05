@@ -9,7 +9,6 @@ import (
 	"encoding/json"
 	"fmt"
 	"io"
-	"io/ioutil"
 	"net/http"
 	"net/url"
 	"regexp"
@@ -37,7 +36,6 @@ var bufferPool = sync.Pool{
 
 // conn provides connectivity to a Kusto instance.
 type conn struct {
-	endpoint                       string
 	auth                           autorest.Authorizer
 	endMgmt, endQuery, streamQuery *url.URL
 	client                         *http.Client
@@ -116,9 +114,8 @@ func (c *conn) queryToJson(ctx context.Context, db string, query Stmt, options *
 }
 
 const (
-	execUnknown = 0
-	execQuery   = 1
-	execMgmt    = 2
+	execQuery = 1
+	execMgmt  = 2
 )
 
 type execResp struct {
@@ -194,7 +191,7 @@ func (c *conn) doRequest(ctx context.Context, execType int, db string, query Stm
 		Method: http.MethodPost,
 		URL:    endpoint,
 		Header: header,
-		Body:   ioutil.NopCloser(buff),
+		Body:   io.NopCloser(buff),
 	}
 
 	var err error

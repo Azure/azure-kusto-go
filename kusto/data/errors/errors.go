@@ -15,7 +15,6 @@ import (
 	"errors"
 	"fmt"
 	"io"
-	"io/ioutil"
 	"net/http"
 	"runtime"
 	"strings"
@@ -115,10 +114,6 @@ func (e *Error) UnmarshalREST() map[string]interface{} {
 func (e *Error) SetNoRetry() *Error {
 	e.permanent = true
 	return e
-}
-
-func (e *Error) isZero() bool {
-	return e == nil || (e.Op == OpUnknown && e.Kind == KOther && e.Err == nil)
 }
 
 // Unwrap implements "interface {Unwrap() error}" as defined internally by the go stdlib errors package.
@@ -226,7 +221,7 @@ func ES(o Op, k Kind, s string, args ...interface{}) *Error {
 
 // HTTP constructs an *Error from an *http.Response and a prefix to the error message.
 func HTTP(o Op, status string, statusCode int, body io.ReadCloser, prefix string) *HttpError {
-	bodyBytes, err := ioutil.ReadAll(body)
+	bodyBytes, err := io.ReadAll(body)
 	if err != nil {
 		bodyBytes = []byte(fmt.Sprintf("Failed to read body: %v", err))
 	}
@@ -263,8 +258,8 @@ func e(args ...interface{}) *Error {
 			e.Kind = arg
 		case *Error:
 			// Make a copy
-			copy := *arg
-			e.Err = copy.Err
+			argCopy := *arg
+			e.Err = argCopy.Err
 		case error:
 			e.Err = arg
 		default:
@@ -372,7 +367,7 @@ func oneToErr(m map[string]interface{}, err *Error, op Op) *Error {
 		return ES(op, kind, msg)
 	}
 
-	W(ES(op, kind, msg), err)
+	err = W(ES(op, kind, msg), err)
 
 	return err
 }

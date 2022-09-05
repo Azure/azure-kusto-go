@@ -97,7 +97,6 @@ func (d *Decoder) findStringToken(s string) error {
 			}
 		}
 	}
-	panic("unreachable")
 }
 
 func (d *Decoder) processTables(ctx context.Context, ch chan frames.Frame) error {

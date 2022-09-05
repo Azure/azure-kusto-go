@@ -248,12 +248,12 @@ func (r statusRecord) Error() string {
 }
 
 func getTimeFromInterface(x interface{}) (time.Time, error) {
-	switch x.(type) {
+	switch x := x.(type) {
 	case string:
-		return time.Parse(time.RFC3339Nano, x.(string))
+		return time.Parse(time.RFC3339Nano, x)
 
 	case time.Time:
-		return x.(time.Time), nil
+		return x, nil
 
 	default:
 		return time.Now(), fmt.Errorf("getTimeFromInterface: Unexpected format %T", x)
@@ -267,12 +267,12 @@ func getGoogleUUIDFromInterface(data map[string]interface{}, key string) uuid.UU
 		return uuid.Nil
 	}
 
-	switch x.(type) {
+	switch x := x.(type) {
 	case uuid.UUID:
-		return x.(uuid.UUID)
+		return x
 
 	case string:
-		uid, err := uuid.Parse(x.(string))
+		uid, err := uuid.Parse(x)
 		if err != nil {
 			return uuid.Nil
 		}
@@ -280,7 +280,7 @@ func getGoogleUUIDFromInterface(data map[string]interface{}, key string) uuid.UU
 		return uid
 
 	case storageuid.UUID:
-		uid, err := uuid.ParseBytes(x.(storageuid.UUID).Bytes())
+		uid, err := uuid.ParseBytes(x.Bytes())
 		if err != nil {
 			return uuid.Nil
 		}
