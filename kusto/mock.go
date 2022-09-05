@@ -155,7 +155,8 @@ func (m mockConn) mgmt(_ context.Context, _ string, _ Stmt, _ *mgmtOptions) (exe
 }
 
 func NewMockClient() *Client {
-	kcsb, _ := GetBuilder().WithClusterURI("endpoint").Build()
+
+	kcsb := GetConnectionStringBuilder("endpoint")
 	tkp, _ := kcsb.getTokenProvider(context.Background())
 
 	return &Client{

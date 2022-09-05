@@ -51,7 +51,7 @@ type Client struct {
 type Option func(c *Client)
 
 // New returns a new Client. endpoint is the Kusto endpoint to use, example: https://somename.westus.kusto.windows.net .
-func New(kcsb *connectionStringBuilder, options ...Option) (*Client, error) {
+func New(kcsb connectionStringBuilder, options ...Option) (*Client, error) {
 	tkp, err := kcsb.getTokenProvider(context.Background())
 	if err != nil {
 		return nil, err
@@ -59,7 +59,7 @@ func New(kcsb *connectionStringBuilder, options ...Option) (*Client, error) {
 	auth := &Authorization{
 		tokenProvider: *tkp,
 	}
-	endpoint := kcsb.clusterURI
+	endpoint := kcsb.DataSource
 	u, err := url.Parse(endpoint)
 	if err != nil {
 		return nil, errors.ES(errors.OpServConn, errors.KClientArgs, "could not parse the endpoint(%s): %s", endpoint, err).SetNoRetry()
