@@ -6,6 +6,17 @@
 This is a data plane SDK (it is for interacting with Azure Data Explorer service). For the control plane (resource administration), go [here](https://github.com/Azure/azure-sdk-for-go/tree/master/services/kusto/mgmt)
 
 ## What's New
+### Version 0.8.0
+* Add all missing client request properties, and the ability to use custom ones using `CustomQueryOption`
+* Add the option to not parse the response when querying, but to receieve the json directly - `QueryToJson`
+* Various lint fixes and code improvements
+
+### Version 0.7.0
+* Make clients closeable
+* Support port in http host
+* Add retry mechanism for throttled requests
+* Added custom http options for all clients
+
 ### Version 0.6.0
 #### Deprecations 
 * `Ingestion.Stream` has been deprecated in favor of dedicated streaming clients - `ingest.Streaming` and `ingest.Managed`.
