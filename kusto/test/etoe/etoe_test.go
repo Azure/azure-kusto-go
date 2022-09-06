@@ -350,7 +350,8 @@ func TestQueries(t *testing.T) {
 				kusto.NewParameters().Must(kusto.QueryValues{"tableName": allDataTypesTable}),
 			),
 			options: []kusto.QueryOption{kusto.QueryNow(time.Now()), kusto.NoRequestTimeout(), kusto.NoTruncation(), kusto.RequestAppName("bd1e472c-a8e4-4c6e-859d-c86d72253197"),
-				kusto.RequestDescription("9bff424f-711d-48b8-9a6e-d3a618748334")},
+				kusto.RequestDescription("9bff424f-711d-48b8-9a6e-d3a618748334"), kusto.ApplicationNameForTracing("aaa"), kusto.UserNameForTracing("bbb"),
+				kusto.CustomQueryOption("additional", "additional")},
 			qcall: client.Query,
 			doer: func(row *table.Row, update interface{}) error {
 				rec := CountResult{}

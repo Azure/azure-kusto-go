@@ -160,18 +160,12 @@ func (c *conn) doRequest(ctx context.Context, execType int, db string, query Stm
 	header.Add("Content-Type", "application/json; charset=utf-8")
 	header.Add("x-ms-client-request-id", "KGC.execute;"+uuid.New().String())
 
-	if s, ok := properties.Options[RequestAppNameValue]; ok {
-		s, ok := s.(string)
-		if ok && s != "" {
-			header.Add("x-ms-app", s)
-		}
+	if properties.ApplicationNameForTracing != "" {
+		header.Add("x-ms-app", properties.ApplicationNameForTracing)
 	}
 
-	if s, ok := properties.Options[RequestUserValue]; ok {
-		s, ok := s.(string)
-		if ok && s != "" {
-			header.Add("x-ms-user", s)
-		}
+	if properties.UserNameForTracing != "" {
+		header.Add("x-ms-user", properties.UserNameForTracing)
 	}
 
 	var endpoint *url.URL

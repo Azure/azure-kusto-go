@@ -14,8 +14,10 @@ import (
 // For more information please look at: https://docs.microsoft.com/en-us/azure/kusto/api/netfx/request-properties
 // Not all of the documented options are implemented.
 type requestProperties struct {
-	Options    map[string]interface{}
-	Parameters map[string]string
+	Options                   map[string]interface{}
+	Parameters                map[string]string
+	ApplicationNameForTracing string
+	UserNameForTracing        string
 }
 
 type queryOptions struct {
@@ -73,6 +75,20 @@ const TruncationMaxRecordsValue = "truncation_max_records"
 const TruncationMaxSizeValue = "truncation_max_size"
 const ValidatePermissionsValue = "validate_permissions"
 
+func ApplicationNameForTracing(appName string) QueryOption {
+	return func(q *queryOptions) error {
+		q.requestProperties.ApplicationNameForTracing = appName
+		return nil
+	}
+}
+
+func UserNameForTracing(userName string) QueryOption {
+	return func(q *queryOptions) error {
+		q.requestProperties.UserNameForTracing = userName
+		return nil
+	}
+}
+
 // NoRequestTimeout enables setting the request timeout to its maximum value.
 func NoRequestTimeout() QueryOption {
 	return func(q *queryOptions) error {
@@ -112,7 +128,7 @@ func queryServerTimeout(d time.Duration) QueryOption {
 
 // CustomQueryOption exists to allow a QueryOption that is not defined in the Go SDK, as all options
 // are not defined. Please Note: you should always use the type safe options provided below when available.
-// Also note that Kusto does not error on non-existent paramater names or bad values, it simply doesn't
+// Also note that Kusto does not error on non-existent parameter names or bad values, it simply doesn't
 // work as expected.
 func CustomQueryOption(paramName string, i interface{}) QueryOption {
 	return func(q *queryOptions) error {
@@ -428,6 +444,7 @@ func QueryConsistency(c string) QueryOption {
 }
 
 // RequestAppName Request application name to be used in the reporting (e.g. show queries).
+// Does not set the `Application` property in `.show queries`, see `ApplicationNameForTracing` for that.
 func RequestAppName(s string) QueryOption {
 	return func(q *queryOptions) error {
 		q.requestProperties.Options[RequestAppNameValue] = s
@@ -500,6 +517,7 @@ func RequestSandboxedExecutionDisabled() QueryOption {
 }
 
 // RequestUser Request user to be used in the reporting (e.g. show queries).
+// Does not set the `User` property in `.show queries`, see `UserNameForTracing` for that.
 func RequestUser(s string) QueryOption {
 	return func(q *queryOptions) error {
 		q.requestProperties.Options[RequestUserValue] = s
