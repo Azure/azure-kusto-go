@@ -34,7 +34,7 @@ func TestGetConnectionStringBuilder(t *testing.T) {
 			connectionString: "https://help.kusto.windows.net/Samples;aad user id=1234;password=****;application key=1234;application client id=1234;application key=0987;application certificate=avsefsfbsrgbrb; authority id=123456;application token=token;user token=usertoken; msi_auth=true;ManagedServiceIdentity=123456; azcli=true;interactivelogin=false; domainhint=www.google.com",
 			want: connectionStringBuilder{
 				DataSource:                       "https://help.kusto.windows.net/Samples",
-				AADUserID:                        "1234",
+				AadUserID:                        "1234",
 				Password:                         "****",
 				UserToken:                        "usertoken",
 				ApplicationClientId:              "1234",
@@ -74,7 +74,7 @@ func TestGetConnectionStringBuilder(t *testing.T) {
 func TestWithAadUserPassAuth(t *testing.T) {
 	want := connectionStringBuilder{
 		DataSource:  "endpoint",
-		AADUserID:   "userid",
+		AadUserID:   "userid",
 		Password:    "password",
 		AuthorityId: "authorityID",
 	}
@@ -131,7 +131,7 @@ func TestGetTokenProviderHappy(t *testing.T) {
 				DataSource:          s.urlStr() + "/test_tokenprovider_usernamepasswordauth",
 				AuthorityId:         "tenantID",
 				ApplicationClientId: "clientID",
-				AADUserID:           "ussername",
+				AadUserID:           "ussername",
 				Password:            "userpass",
 			},
 		}, {
@@ -158,7 +158,7 @@ func TestGetTokenProviderHappy(t *testing.T) {
 				DataSource:             s.urlStr() + "/test_tokenprovider_managedsi",
 				ManagedServiceIdentity: "managedid",
 				MSIAuthentication:      true,
-				ClientOptions:          &azcore.ClientOptions{},
+				clientOptions:          &azcore.ClientOptions{},
 			},
 		}, {
 			name: "test_tokenprovider_managedidauth2",
