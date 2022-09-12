@@ -1,7 +1,6 @@
 package kusto
 
 import (
-	"context"
 	"os"
 	"testing"
 
@@ -184,7 +183,7 @@ func TestGetTokenProviderHappy(t *testing.T) {
 		kscb := test.kcsb
 		s.code = 200
 		s.payload = []byte(payload)
-		got, err := kscb.getTokenProvider(context.Background())
+		got, err := kscb.getTokenProvider()
 		assert.Nil(t, err)
 		assert.NotNil(t, got)
 	}
@@ -219,7 +218,7 @@ func TestGetTokenProviderErr(t *testing.T) {
 		s.code = 200
 		s.payload = []byte(payload)
 
-		got, err := kscb.getTokenProvider(context.Background())
+		got, err := kscb.getTokenProvider()
 		assert.Nil(t, got)
 		assert.NotNil(t, err)
 		assert.EqualValues(t, test.wantErr, err.Error())

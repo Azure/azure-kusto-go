@@ -11,7 +11,7 @@ import (
 func ExampleIngestion_FromFile() {
 	var err error
 
-	kcsb := kusto.GetConnectionStringBuilder(`endpoint;tenantid=tenantID;appclientid=clientID;appkey=clientSecret`)
+	kcsb := kusto.GetConnectionStringBuilder(`endpoint`).WithAadAppKey("clientID", "clientSecret", "tenentID")
 
 	client, err := kusto.New(kcsb)
 	if err != nil {

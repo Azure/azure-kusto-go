@@ -10,22 +10,22 @@ import (
 )
 
 type connectionStringBuilder struct {
-	DataSource                       string `json:"DataSource"`
-	AADUserID                        string `json:"AADUserID"`
-	Password                         string `json:"Password"`
-	UserToken                        string `json:"UserToken"`
-	ApplicationClientId              string `json:"ApplicationClientId"`
-	ApplicationKey                   string `json:"ApplicationKey"`
-	AuthorityId                      string `json:"AuthorityId" default:"organizations"`
-	ApplicationCertificate           string `json:"ApplicationCertificate"`
-	ApplicationCertificateThumbprint string `json:"ApplicationCertificateThumbprint"`
-	SendCertificateChain             bool   `json:"SendCertificateChain"`
-	ApplicationToken                 string `json:"ApplicationToken"`
-	AZCLI                            bool   `json:"AZCLI"`
-	MSIAuthentication                bool   `json:"MSIAuthentication"`
-	ManagedServiceIdentity           string `json:"ManagedServiceIdentity"`
-	InteractiveLogin                 bool   `json:"InteractiveLogin"`
-	RedirectURL                      string `json:"RedirectURL"`
+	DataSource                       string
+	AADUserID                        string
+	Password                         string
+	UserToken                        string
+	ApplicationClientId              string
+	ApplicationKey                   string
+	AuthorityId                      string
+	ApplicationCertificate           string
+	ApplicationCertificateThumbprint string
+	SendCertificateChain             bool
+	ApplicationToken                 string
+	AZCLI                            bool
+	MSIAuthentication                bool
+	ManagedServiceIdentity           string
+	InteractiveLogin                 bool
+	RedirectURL                      string
 	ClientOptions                    *azcore.ClientOptions
 }
 
@@ -38,15 +38,9 @@ const (
 	applicationKey                   string = "ApplicationKey"
 	applicationCertificate           string = "ApplicationCertificate"
 	applicationCertificateThumbprint string = "ApplicationCertificateThumbprint"
-	sendCertificateChain             string = "SendCertificateChain"
 	authorityId                      string = "AuthorityId"
 	applicationToken                 string = "ApplicationToken"
 	userToken                        string = "UserToken"
-	msiAuth                          string = "MSIAuthentication"
-	managedServiceIdentity           string = "ManagedServiceIdentity"
-	azCli                            string = "AZCLI"
-	interactiveLogin                 string = "InteractiveLogin"
-	domainHint                       string = "RedirectURL"
 )
 
 func assertIfEmpty(key string, value string) {
@@ -185,7 +179,6 @@ func (kcsb connectionStringBuilder) WithAadAppKey(appId string, appKey string, a
 func (kcsb connectionStringBuilder) WithAppCertificate(appId string, certificate string, thumprint string, sendCertChain bool, authorityID string) connectionStringBuilder {
 	assertIfEmpty(dataSource, kcsb.DataSource)
 	assertIfEmpty(applicationCertificate, certificate)
-	assertIfEmpty(applicationCertificateThumbprint, thumprint)
 	assertIfEmpty(authorityId, authorityID)
 	kcsb.ApplicationClientId = appId
 	kcsb.AuthorityId = authorityID
@@ -251,7 +244,7 @@ func (kcsb connectionStringBuilder) AttachClientOptions(options *azcore.ClientOp
 }
 
 // Method to be used for generating TokenCredential
-func (kcsb *connectionStringBuilder) getTokenProvider(ctx context.Context) (*tokenProvider, error) {
+func (kcsb connectionStringBuilder) getTokenProvider() (*tokenProvider, error) {
 	tkp := &tokenProvider{}
 	//Fetches cloud meta data
 	fetchedCI, cierr := GetMetadata(context.Background(), kcsb.DataSource)
