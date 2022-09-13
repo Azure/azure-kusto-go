@@ -23,7 +23,6 @@ const (
 	defaultRedirectUri            = "https://microsoft/kustoclient"
 	defaultKustoServiceResourceId = "https://kusto.kusto.windows.net"
 	defaultFirstPartyAuthorityUrl = "https://login.microsoftonline.com/f8cdef31-a31e-4b4a-93e4-5f571e91255a"
-	azureADKey                    = "AzureAD"
 )
 
 // retrieved metadata

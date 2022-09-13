@@ -31,16 +31,15 @@ type connectionStringBuilder struct {
 
 // params mapping
 const (
-	dataSource                       string = "DataSource"
-	aadUserId                        string = "AADUserID"
-	password                         string = "Password"
-	applicationClientId              string = "ApplicationClientId"
-	applicationKey                   string = "ApplicationKey"
-	applicationCertificate           string = "ApplicationCertificate"
-	applicationCertificateThumbprint string = "ApplicationCertificateThumbprint"
-	authorityId                      string = "AuthorityId"
-	applicationToken                 string = "ApplicationToken"
-	userToken                        string = "UserToken"
+	dataSource             string = "DataSource"
+	aadUserId              string = "AADUserID"
+	password               string = "Password"
+	applicationClientId    string = "ApplicationClientId"
+	applicationKey         string = "ApplicationKey"
+	applicationCertificate string = "ApplicationCertificate"
+	authorityId            string = "AuthorityId"
+	applicationToken       string = "ApplicationToken"
+	userToken              string = "UserToken"
 )
 
 func assertIfEmpty(key string, value string) {

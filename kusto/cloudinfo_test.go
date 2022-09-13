@@ -27,7 +27,7 @@ func (s *server) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 	defer log.Println("server exited")
 	w.WriteHeader(s.code)
 	if s.code == 200 {
-		w.Write(s.payload)
+		_, _ = w.Write(s.payload)
 	}
 }
 
