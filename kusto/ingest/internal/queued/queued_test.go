@@ -82,8 +82,8 @@ type fakeBlobstore struct {
 	shouldErr bool
 }
 
-func (f *fakeBlobstore) uploadBlobStream(_ context.Context, reader io.Reader, _ azblob.BlockBlobClient,
-	_ azblob.UploadStreamToBlockBlobOptions) (azblob.BlockBlobCommitBlockListResponse, error) {
+func (f *fakeBlobstore) uploadBlobStream(_ context.Context, reader io.Reader, _ *azblob.BlockBlobClient,
+	_ azblob.UploadStreamOptions) (azblob.BlockBlobCommitBlockListResponse, error) {
 	if f.shouldErr {
 		return azblob.BlockBlobCommitBlockListResponse{}, fmt.Errorf("error")
 	}
@@ -91,7 +91,7 @@ func (f *fakeBlobstore) uploadBlobStream(_ context.Context, reader io.Reader, _ 
 	return azblob.BlockBlobCommitBlockListResponse{}, err
 }
 
-func (f *fakeBlobstore) uploadBlobFile(_ context.Context, fi *os.File, _ azblob.BlockBlobClient, _ azblob.HighLevelUploadToBlockBlobOption) (*http.Response, error) {
+func (f *fakeBlobstore) uploadBlobFile(_ context.Context, fi *os.File, _ *azblob.BlockBlobClient, _ azblob.UploadOption) (*http.Response, error) {
 	if f.shouldErr {
 		return nil, fmt.Errorf("error")
 	}
