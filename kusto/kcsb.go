@@ -67,7 +67,7 @@ var csMapping = map[string]string{"datasource": dataSource, "data source": dataS
 	"domain hint": domainHint, "domainhint": domainHint,
 }
 
-func assertIfEmpty(key string, value string) {
+func requireNonEmpty(key string, value string) {
 	if isEmpty(value) {
 		panic(fmt.Sprintf("Error: %s cannot be null", key))
 	}
@@ -148,9 +148,9 @@ func GetConnectionStringBuilder(connStr string) connectionStringBuilder {
 
 //Creates a KustoConnection string builder that will authenticate with AAD user name and password.
 func (kcsb connectionStringBuilder) WithAadUserPassAuth(uname string, pswrd string, authorityID string) connectionStringBuilder {
-	assertIfEmpty(dataSource, kcsb.dataSource)
-	assertIfEmpty(aadUserId, uname)
-	assertIfEmpty(password, pswrd)
+	requireNonEmpty(dataSource, kcsb.dataSource)
+	requireNonEmpty(aadUserId, uname)
+	requireNonEmpty(password, pswrd)
 	kcsb.aadUserID = uname
 	kcsb.password = pswrd
 	kcsb.authorityId = authorityID
@@ -159,18 +159,18 @@ func (kcsb connectionStringBuilder) WithAadUserPassAuth(uname string, pswrd stri
 
 //Creates a KustoConnection string builder that will authenticate with AAD user token
 func (kcsb connectionStringBuilder) WitAadUserToken(userTkn string) connectionStringBuilder {
-	assertIfEmpty(dataSource, kcsb.dataSource)
-	assertIfEmpty(userToken, userTkn)
+	requireNonEmpty(dataSource, kcsb.dataSource)
+	requireNonEmpty(userToken, userTkn)
 	kcsb.userToken = userTkn
 	return kcsb
 }
 
 //Creates a KustoConnection string builder that will authenticate with AAD application and key.
 func (kcsb connectionStringBuilder) WithAadAppKey(appId string, appKey string, authorityID string) connectionStringBuilder {
-	assertIfEmpty(dataSource, kcsb.dataSource)
-	assertIfEmpty(applicationClientId, appId)
-	assertIfEmpty(applicationKey, appKey)
-	assertIfEmpty(authorityId, authorityID)
+	requireNonEmpty(dataSource, kcsb.dataSource)
+	requireNonEmpty(applicationClientId, appId)
+	requireNonEmpty(applicationKey, appKey)
+	requireNonEmpty(authorityId, authorityID)
 	kcsb.applicationClientId = appId
 	kcsb.applicationKey = appKey
 	kcsb.authorityId = authorityID
@@ -179,9 +179,9 @@ func (kcsb connectionStringBuilder) WithAadAppKey(appId string, appKey string, a
 
 //Creates a KustoConnection string builder that will authenticate with AAD application using a certificate.
 func (kcsb connectionStringBuilder) WithAppCertificate(appId string, certificate string, thumprint string, sendCertChain bool, authorityID string) connectionStringBuilder {
-	assertIfEmpty(dataSource, kcsb.dataSource)
-	assertIfEmpty(applicationCertificate, certificate)
-	assertIfEmpty(authorityId, authorityID)
+	requireNonEmpty(dataSource, kcsb.dataSource)
+	requireNonEmpty(applicationCertificate, certificate)
+	requireNonEmpty(authorityId, authorityID)
 	kcsb.applicationClientId = appId
 	kcsb.authorityId = authorityID
 
@@ -193,15 +193,15 @@ func (kcsb connectionStringBuilder) WithAppCertificate(appId string, certificate
 
 // Creates a KustoConnection string builder that will authenticate with AAD application and an application token.
 func (kcsb connectionStringBuilder) WithApplicationToken(appId string, appToken string) connectionStringBuilder {
-	assertIfEmpty(dataSource, kcsb.dataSource)
-	assertIfEmpty(applicationToken, appToken)
+	requireNonEmpty(dataSource, kcsb.dataSource)
+	requireNonEmpty(applicationToken, appToken)
 	kcsb.applicationToken = appToken
 	return kcsb
 }
 
 // Creates a KustoConnection string builder that will use existing authenticated az cli profile password.
 func (kcsb connectionStringBuilder) WithAzCli() connectionStringBuilder {
-	assertIfEmpty(dataSource, kcsb.dataSource)
+	requireNonEmpty(dataSource, kcsb.dataSource)
 	kcsb.azcli = true
 	return kcsb
 }
@@ -212,7 +212,7 @@ Creates a KustoConnection string builder that will authenticate with AAD applica
   assigned application ID can be added to the token.
 */
 func (kcsb connectionStringBuilder) WithManagedServiceID(clientID string, resId string) connectionStringBuilder {
-	assertIfEmpty(dataSource, kcsb.dataSource)
+	requireNonEmpty(dataSource, kcsb.dataSource)
 	kcsb.msiAuthentication = true
 	if !isEmpty(clientID) {
 		kcsb.managedServiceIdentity = clientID
@@ -223,7 +223,7 @@ func (kcsb connectionStringBuilder) WithManagedServiceID(clientID string, resId 
 }
 
 func (kcsb connectionStringBuilder) WithInteractiveLogin(clientID string, authorityID string, redirectURL string) connectionStringBuilder {
-	assertIfEmpty(dataSource, kcsb.dataSource)
+	requireNonEmpty(dataSource, kcsb.dataSource)
 	if !isEmpty(clientID) {
 		kcsb.applicationClientId = clientID
 	}
@@ -238,7 +238,7 @@ func (kcsb connectionStringBuilder) WithInteractiveLogin(clientID string, author
 }
 
 func (kcsb connectionStringBuilder) AttachClientOptions(options *azcore.ClientOptions) connectionStringBuilder {
-	assertIfEmpty(dataSource, kcsb.dataSource)
+	requireNonEmpty(dataSource, kcsb.dataSource)
 	if options == nil {
 		kcsb.clientOptions = options
 	}
