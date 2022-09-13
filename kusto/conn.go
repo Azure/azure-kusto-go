@@ -204,9 +204,7 @@ func (c *conn) execute(ctx context.Context, execType int, db string, query Stmt,
 }
 
 func (c *conn) Close() error {
-	/*if closer, ok := c.auth.(io.Closer); ok {
-		return closer.Close()
-	}*/
 
+	c.client.CloseIdleConnections()
 	return nil
 }

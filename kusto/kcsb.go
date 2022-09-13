@@ -335,14 +335,17 @@ func (kcsb connectionStringBuilder) getTokenProvider() (*tokenProvider, error) {
 		}
 		tkp.tokenCred = cred
 	} else {
-		//env variables based auth
-		opts := &azidentity.EnvironmentCredentialOptions{}
+		//Default Azure authentication
+		opts := &azidentity.DefaultAzureCredentialOptions{}
 		if kcsb.ClientOptions != nil {
 			opts.ClientOptions = *kcsb.ClientOptions
 		}
-		cred, err := azidentity.NewEnvironmentCredential(opts)
+		if !isEmpty(kcsb.AuthorityId) {
+			opts.TenantID = kcsb.AuthorityId
+		}
+		cred, err := azidentity.NewDefaultAzureCredential(opts)
 		if err != nil {
-			return nil, fmt.Errorf("Error : Couldn't retrieve client credentiels: %s", err)
+			return nil, fmt.Errorf("Error : Couldn't retrieve client credentiels for DefaultAzureCredential: %s", err)
 		}
 		tkp.tokenCred = cred
 	}
