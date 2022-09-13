@@ -39,8 +39,8 @@ func (tkp *tokenProvider) acquireToken(ctx context.Context) (azcore.AccessToken,
 			}
 			tkp.scopes = []string{fmt.Sprintf("%s/.default", resourceURI)}
 		}
-		accessToken, err := tkp.tokenCred.GetToken(ctx, policy.TokenRequestOptions{Scopes: tkp.scopes})
-		return accessToken, err
+		return tkp.tokenCred.GetToken(ctx, policy.TokenRequestOptions{Scopes: tkp.scopes})
+		
 	} else {
 		act.Token = tkp.customToken
 	}

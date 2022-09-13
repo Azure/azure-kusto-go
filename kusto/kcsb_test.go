@@ -1,7 +1,6 @@
 package kusto
 
 import (
-	"os"
 	"testing"
 
 	"github.com/Azure/azure-sdk-for-go/sdk/azcore"
@@ -186,42 +185,6 @@ func TestGetTokenProviderHappy(t *testing.T) {
 		got, err := kscb.getTokenProvider()
 		assert.Nil(t, err)
 		assert.NotNil(t, got)
-	}
-
-}
-func TestGetTokenProviderErr(t *testing.T) {
-	s := newTestServ()
-	os.Unsetenv("AZURE_TENANT_ID")
-	payload := `{"AzureAD": {"LoginEndpoint": "https://login.microsofdummy.com","LoginMfaRequired": false,"KustoClientAppId": "db662dc1-0cfe-4e1c-a843-19a68e65xxxx","KustoClientRedirectUri": "https://microsoft/dummykustoclient","KustoServiceResourceId": "https://kusto.windows.net","FirstPartyAuthorityUrl": "https://login.microsofdummy.com/f8cdef31-a31e-4b4a-93e4-5f571e9xxxxx"  },  "dSTS": {"CloudEndpointSuffix": "windows.net","DstsRealm": "realm://xxx.windows.net","DstsInstance": "xxx.core.windows.net","KustoDnsHostName": "kusto.windows.net","ServiceName": "kusto"}}`
-	tests := []struct {
-		name    string
-		wantErr string
-		kcsb    connectionStringBuilder
-	}{
-		{
-			name: "test_tokenprovider_cred",
-			kcsb: connectionStringBuilder{
-				dataSource: s.urlStr() + "/test_tokenprovider_cred",
-			},
-			wantErr: "Error : Couldn't retrieve client credentiels: missing environment variable AZURE_TENANT_ID",
-		},
-		{
-			name:    "test_tokenprovider_invalid_datasource",
-			wantErr: "Get \"v1/rest/auth/metadata\": unsupported protocol scheme \"\"",
-			kcsb: connectionStringBuilder{
-				authorityId: "tenantID",
-			},
-		},
-	}
-	for _, test := range tests {
-		kscb := test.kcsb
-		s.code = 200
-		s.payload = []byte(payload)
-
-		got, err := kscb.getTokenProvider()
-		assert.Nil(t, got)
-		assert.NotNil(t, err)
-		assert.EqualValues(t, test.wantErr, err.Error())
 	}
 
 }

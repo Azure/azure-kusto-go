@@ -31,16 +31,41 @@ type connectionStringBuilder struct {
 
 // params mapping
 const (
-	dataSource             string = "DataSource"
-	aadUserId              string = "AADUserID"
-	password               string = "Password"
-	applicationClientId    string = "ApplicationClientId"
-	applicationKey         string = "ApplicationKey"
-	applicationCertificate string = "ApplicationCertificate"
-	authorityId            string = "AuthorityId"
-	applicationToken       string = "ApplicationToken"
-	userToken              string = "UserToken"
+	dataSource                       string = "DataSource"
+	aadUserId                        string = "AADUserID"
+	password                         string = "Password"
+	applicationClientId              string = "ApplicationClientId"
+	applicationKey                   string = "ApplicationKey"
+	applicationCertificate           string = "ApplicationCertificate"
+	authorityId                      string = "AuthorityId"
+	applicationToken                 string = "ApplicationToken"
+	userToken                        string = "UserToken"
+	applicationCertificateThumbprint string = "ApplicationCertificateThumbprint"
+	sendCertificateChain             string = "SendCertificateChain"
+	msiAuth                          string = "MSIAuthentication"
+	managedServiceIdentity           string = "ManagedServiceIdentity"
+	azCli                            string = "AZCLI"
+	interactiveLogin                 string = "InteractiveLogin"
+	domainHint                       string = "RedirectURL"
 )
+
+var csMapping = map[string]string{"datasource": dataSource, "data source": dataSource, "addr": dataSource, "address": dataSource, "network address": dataSource, "server": dataSource,
+	"aad user id": aadUserId, "aaduserid": aadUserId,
+	"password": password, "pwd": password,
+	"application client id": applicationClientId, "applicationclientid": applicationClientId, "appclientid": applicationClientId,
+	"application key": applicationKey, "applicationkey": applicationKey, "appkey": applicationKey,
+	"application certificate": applicationCertificate, "applicationcertificate": applicationCertificate,
+	"application certificate thumbprint": applicationCertificateThumbprint, "applicationcertificatethumbprint": applicationCertificateThumbprint,
+	"sendcertificatechain": sendCertificateChain, "send certificate chain": sendCertificateChain,
+	"authority id": authorityId, "authorityid": authorityId, "authority": authorityId, "tenantid": authorityId, "tenant": authorityId, "tid": authorityId,
+	"application token": applicationToken, "applicationtoken": applicationToken, "apptoken": applicationToken,
+	"user token": userToken, "usertoken": userToken, "usrtoken": userToken,
+	"msi_auth":               msiAuth,
+	"managedserviceidentity": managedServiceIdentity, "managed service identity": managedServiceIdentity,
+	"interactive login": interactiveLogin, "interactivelogin": interactiveLogin,
+	"az cli": azCli, "azcli": azCli,
+	"domain hint": domainHint, "domainhint": domainHint,
+}
 
 func assertIfEmpty(key string, value string) {
 	if isEmpty(value) {
@@ -48,67 +73,45 @@ func assertIfEmpty(key string, value string) {
 	}
 }
 
-func contains(list []string, tofind string) bool {
-	for _, s := range list {
-		if tofind == s {
-			return true
-		}
-	}
-	return false
-}
-
 func assignValue(kcsb *connectionStringBuilder, rawKey string, value string) {
 	rawKey = strings.ToLower(strings.Trim(rawKey, " "))
-	if contains([]string{"datasource", "data source", "addr", "address", "network address", "server"}, rawKey) {
+	parsedKey := csMapping[rawKey]
+	switch parsedKey {
+	case dataSource:
 		kcsb.dataSource = value
-	}
-	if contains([]string{"aad user id", "aaduserid"}, rawKey) {
+	case aadUserId:
 		kcsb.aadUserID = value
-	}
-	if contains([]string{"password", "pwd"}, rawKey) {
+	case password:
 		kcsb.password = value
-	}
-	if contains([]string{"application client id", "applicationclientid", "appclientid"}, rawKey) {
+	case applicationClientId:
 		kcsb.applicationClientId = value
-	}
-	if contains([]string{"application key", "applicationkey", "appkey"}, rawKey) {
+	case applicationKey:
 		kcsb.applicationKey = value
-	}
-	if contains([]string{"application certificate", "applicationcertificate"}, rawKey) {
+	case applicationCertificate:
 		kcsb.applicationCertificate = value
-	}
-	if contains([]string{"application certificate thumbprint", "applicationcertificatethumbprint"}, rawKey) {
+	case applicationCertificateThumbprint:
 		kcsb.applicationCertificateThumbprint = value
-	}
-	if contains([]string{"sendcertificatechain", "send certificate chain"}, rawKey) {
+	case sendCertificateChain:
 		bval, _ := strconv.ParseBool(value)
 		kcsb.sendCertificateChain = bval
-	}
-	if contains([]string{"authority id", "authorityid", "authority", "tenantid", "tenant", "tid"}, rawKey) {
+	case authorityId:
 		kcsb.authorityId = value
-	}
-	if contains([]string{"application token", "applicationtoken", "apptoken"}, rawKey) {
+	case applicationToken:
 		kcsb.applicationToken = value
-	}
-	if contains([]string{"user token", "usertoken", "usrtoken"}, rawKey) {
+	case userToken:
 		kcsb.userToken = value
-	}
-	if contains([]string{"msi_auth"}, rawKey) {
+	case msiAuth:
 		bval, _ := strconv.ParseBool(value)
 		kcsb.msiAuthentication = bval
-	}
-	if contains([]string{"managedserviceidentity", "managed service identity"}, rawKey) {
+	case managedServiceIdentity:
 		kcsb.managedServiceIdentity = value
-	}
-	if contains([]string{"az cli", "azcli"}, rawKey) {
+	case azCli:
 		bval, _ := strconv.ParseBool(value)
 		kcsb.azcli = bval
-	}
-	if contains([]string{"interactive login", "interactivelogin"}, rawKey) {
+	case interactiveLogin:
 		bval, _ := strconv.ParseBool(value)
 		kcsb.interactiveLogin = bval
-	}
-	if contains([]string{"domain hint", "domainhint"}, rawKey) {
+	case domainHint:
 		kcsb.redirectURL = value
 	}
 }
@@ -276,7 +279,12 @@ func (kcsb connectionStringBuilder) getTokenProvider() (*tokenProvider, error) {
 		}
 		tkp.tokenCred = cred
 	} else if !isEmpty(kcsb.applicationClientId) && !isEmpty(kcsb.applicationKey) {
-		cred, err := azidentity.NewClientSecretCredential(kcsb.authorityId, kcsb.applicationClientId, kcsb.applicationKey, &azidentity.ClientSecretCredentialOptions{ClientOptions: *kcsb.clientOptions})
+		var opts *azidentity.ClientSecretCredentialOptions
+		if kcsb.clientOptions != nil {
+			opts = &azidentity.ClientSecretCredentialOptions{}
+			opts.ClientOptions = *kcsb.clientOptions
+		}
+		cred, err := azidentity.NewClientSecretCredential(kcsb.authorityId, kcsb.applicationClientId, kcsb.applicationKey, opts)
 		if err != nil {
 			return nil, fmt.Errorf("Error : Couldn't retrieve client credentiels using Client Secret. Error: %s", err)
 		}
