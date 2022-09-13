@@ -3,6 +3,7 @@ package kusto
 import (
 	"context"
 	"fmt"
+	"strconv"
 	"strings"
 
 	"github.com/Azure/azure-sdk-for-go/sdk/azcore"
@@ -81,7 +82,8 @@ func assignValue(kcsb *connectionStringBuilder, rawKey string, value string) {
 		kcsb.ApplicationCertificateThumbprint = value
 	}
 	if contains([]string{"sendcertificatechain", "send certificate chain"}, rawKey) {
-		kcsb.SendCertificateChain = getBoolValue(value)
+		bval, _ := strconv.ParseBool(value)
+		kcsb.SendCertificateChain = bval
 	}
 	if contains([]string{"authority id", "authorityid", "authority", "tenantid", "tenant", "tid"}, rawKey) {
 		kcsb.AuthorityId = value
@@ -93,24 +95,23 @@ func assignValue(kcsb *connectionStringBuilder, rawKey string, value string) {
 		kcsb.UserToken = value
 	}
 	if contains([]string{"msi_auth"}, rawKey) {
-		kcsb.MSIAuthentication = getBoolValue(value)
+		bval, _ := strconv.ParseBool(value)
+		kcsb.MSIAuthentication = bval
 	}
 	if contains([]string{"managedserviceidentity", "managed service identity"}, rawKey) {
 		kcsb.ManagedServiceIdentity = value
 	}
 	if contains([]string{"az cli", "azcli"}, rawKey) {
-		kcsb.AZCLI = getBoolValue(value)
+		bval, _ := strconv.ParseBool(value)
+		kcsb.AZCLI = bval
 	}
 	if contains([]string{"interactive login", "interactivelogin"}, rawKey) {
-		kcsb.InteractiveLogin = getBoolValue(value)
+		bval, _ := strconv.ParseBool(value)
+		kcsb.InteractiveLogin = bval
 	}
 	if contains([]string{"domain hint", "domainhint"}, rawKey) {
 		kcsb.RedirectURL = value
 	}
-}
-
-func getBoolValue(val string) bool {
-	return strings.ToLower(val) == "true"
 }
 
 /*
