@@ -59,7 +59,7 @@ func New(kcsb connectionStringBuilder, options ...Option) (*Client, error) {
 	auth := &Authorization{
 		tokenProvider: *tkp,
 	}
-	endpoint := kcsb.DataSource
+	endpoint := kcsb.dataSource
 	u, err := url.Parse(endpoint)
 	if err != nil {
 		return nil, errors.ES(errors.OpServConn, errors.KClientArgs, "could not parse the endpoint(%s): %s", endpoint, err).SetNoRetry()

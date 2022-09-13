@@ -20,7 +20,7 @@ func TestGetConnectionStringBuilder(t *testing.T) {
 			name:             "test_conn_string_validURL",
 			connectionString: "https://endpoint",
 			want: connectionStringBuilder{
-				DataSource: "https://endpoint",
+				dataSource: "https://endpoint",
 			},
 		},
 		{
@@ -32,22 +32,22 @@ func TestGetConnectionStringBuilder(t *testing.T) {
 			name:             "test_conn_string_fullstring",
 			connectionString: "https://help.kusto.windows.net/Samples;aad user id=1234;password=****;application key=1234;application client id=1234;application key=0987;application certificate=avsefsfbsrgbrb; authority id=123456;application token=token;user token=usertoken; msi_auth=true;ManagedServiceIdentity=123456; azcli=true;interactivelogin=false; domainhint=www.google.com",
 			want: connectionStringBuilder{
-				DataSource:                       "https://help.kusto.windows.net/Samples",
-				AADUserID:                        "1234",
-				Password:                         "****",
-				UserToken:                        "usertoken",
-				ApplicationClientId:              "1234",
-				ApplicationKey:                   "0987",
-				AuthorityId:                      "123456",
-				ApplicationCertificate:           "avsefsfbsrgbrb",
-				ApplicationCertificateThumbprint: "",
-				SendCertificateChain:             false,
-				ApplicationToken:                 "token",
-				AZCLI:                            true,
-				MSIAuthentication:                true,
-				ManagedServiceIdentity:           "123456",
-				InteractiveLogin:                 false,
-				RedirectURL:                      "www.google.com",
+				dataSource:                       "https://help.kusto.windows.net/Samples",
+				aadUserID:                        "1234",
+				password:                         "****",
+				userToken:                        "usertoken",
+				applicationClientId:              "1234",
+				applicationKey:                   "0987",
+				authorityId:                      "123456",
+				applicationCertificate:           "avsefsfbsrgbrb",
+				applicationCertificateThumbprint: "",
+				sendCertificateChain:             false,
+				applicationToken:                 "token",
+				azcli:                            true,
+				msiAuthentication:                true,
+				managedServiceIdentity:           "123456",
+				interactiveLogin:                 false,
+				redirectURL:                      "www.google.com",
 			},
 		},
 	}
@@ -72,10 +72,10 @@ func TestGetConnectionStringBuilder(t *testing.T) {
 
 func TestWithAadUserPassAuth(t *testing.T) {
 	want := connectionStringBuilder{
-		DataSource:  "endpoint",
-		AADUserID:   "userid",
-		Password:    "password",
-		AuthorityId: "authorityID",
+		dataSource:  "endpoint",
+		aadUserID:   "userid",
+		password:    "password",
+		authorityId: "authorityID",
 	}
 
 	actual := GetConnectionStringBuilder("endpoint").WithAadUserPassAuth("userid", "password", "authorityID")
@@ -96,8 +96,8 @@ func TestWithAadUserPassAuthErr(t *testing.T) {
 
 func TestWitAadUserToken(t *testing.T) {
 	want := connectionStringBuilder{
-		DataSource: "endpoint",
-		UserToken:  "token",
+		dataSource: "endpoint",
+		userToken:  "token",
 	}
 
 	actual := GetConnectionStringBuilder("endpoint").WitAadUserToken("token")
@@ -127,55 +127,55 @@ func TestGetTokenProviderHappy(t *testing.T) {
 		{
 			name: "test_tokenprovider_usernamepasswordauth",
 			kcsb: connectionStringBuilder{
-				DataSource:          s.urlStr() + "/test_tokenprovider_usernamepasswordauth",
-				AuthorityId:         "tenantID",
-				ApplicationClientId: "clientID",
-				AADUserID:           "ussername",
-				Password:            "userpass",
+				dataSource:          s.urlStr() + "/test_tokenprovider_usernamepasswordauth",
+				authorityId:         "tenantID",
+				applicationClientId: "clientID",
+				aadUserID:           "ussername",
+				password:            "userpass",
 			},
 		}, {
 			name: "test_tokenprovider_intLogin",
 			kcsb: connectionStringBuilder{
-				DataSource:          s.urlStr() + "/test_tokenprovider_intLogin",
-				InteractiveLogin:    true,
-				AuthorityId:         "tenantID",
-				ApplicationClientId: "clientID",
+				dataSource:          s.urlStr() + "/test_tokenprovider_intLogin",
+				interactiveLogin:    true,
+				authorityId:         "tenantID",
+				applicationClientId: "clientID",
 			},
 		},
 		{
 			name: "test_tokenprovider_clientsec",
 			kcsb: connectionStringBuilder{
-				DataSource:          s.urlStr() + "/test_tokenprovider_clientsec",
-				InteractiveLogin:    true,
-				AuthorityId:         "tenantID",
-				ApplicationClientId: "clientID",
-				ApplicationKey:      "somekey",
+				dataSource:          s.urlStr() + "/test_tokenprovider_clientsec",
+				interactiveLogin:    true,
+				authorityId:         "tenantID",
+				applicationClientId: "clientID",
+				applicationKey:      "somekey",
 			},
 		}, {
 			name: "test_tokenprovider_managedsi",
 			kcsb: connectionStringBuilder{
-				DataSource:             s.urlStr() + "/test_tokenprovider_managedsi",
-				ManagedServiceIdentity: "managedid",
-				MSIAuthentication:      true,
-				ClientOptions:          &azcore.ClientOptions{},
+				dataSource:             s.urlStr() + "/test_tokenprovider_managedsi",
+				managedServiceIdentity: "managedid",
+				msiAuthentication:      true,
+				clientOptions:          &azcore.ClientOptions{},
 			},
 		}, {
 			name: "test_tokenprovider_managedidauth2",
 			kcsb: connectionStringBuilder{
-				DataSource:        s.urlStr() + "/test_tokenprovider_managedidauth2",
-				MSIAuthentication: true,
+				dataSource:        s.urlStr() + "/test_tokenprovider_managedidauth2",
+				msiAuthentication: true,
 			},
 		}, {
 			name: "test_tokenprovider_usertoken",
 			kcsb: connectionStringBuilder{
-				DataSource: s.urlStr() + "/test_tokenprovider_usertoken",
-				UserToken:  "token",
+				dataSource: s.urlStr() + "/test_tokenprovider_usertoken",
+				userToken:  "token",
 			},
 		}, {
 			name: "test_tokenprovider_apptoken",
 			kcsb: connectionStringBuilder{
-				DataSource: s.urlStr() + "/test_tokenprovider_apptoken",
-				UserToken:  "token",
+				dataSource: s.urlStr() + "/test_tokenprovider_apptoken",
+				userToken:  "token",
 			},
 		},
 	}
@@ -201,7 +201,7 @@ func TestGetTokenProviderErr(t *testing.T) {
 		{
 			name: "test_tokenprovider_cred",
 			kcsb: connectionStringBuilder{
-				DataSource: s.urlStr() + "/test_tokenprovider_cred",
+				dataSource: s.urlStr() + "/test_tokenprovider_cred",
 			},
 			wantErr: "Error : Couldn't retrieve client credentiels: missing environment variable AZURE_TENANT_ID",
 		},
@@ -209,7 +209,7 @@ func TestGetTokenProviderErr(t *testing.T) {
 			name:    "test_tokenprovider_invalid_datasource",
 			wantErr: "Get \"v1/rest/auth/metadata\": unsupported protocol scheme \"\"",
 			kcsb: connectionStringBuilder{
-				AuthorityId: "tenantID",
+				authorityId: "tenantID",
 			},
 		},
 	}
