@@ -14,10 +14,10 @@ import (
 // For more information please look at: https://docs.microsoft.com/en-us/azure/kusto/api/netfx/request-properties
 // Not all of the documented options are implemented.
 type requestProperties struct {
-	Options                   map[string]interface{}
-	Parameters                map[string]string
-	ApplicationNameForTracing string
-	UserNameForTracing        string
+	Options     map[string]interface{}
+	Parameters  map[string]string
+	Application string
+	User        string
 }
 
 type queryOptions struct {
@@ -75,16 +75,18 @@ const TruncationMaxRecordsValue = "truncation_max_records"
 const TruncationMaxSizeValue = "truncation_max_size"
 const ValidatePermissionsValue = "validate_permissions"
 
-func ApplicationNameForTracing(appName string) QueryOption {
+// Application sets the x-ms-app header, and can be used to identify the application making the request in the `.show queries` output.
+func Application(appName string) QueryOption {
 	return func(q *queryOptions) error {
-		q.requestProperties.ApplicationNameForTracing = appName
+		q.requestProperties.Application = appName
 		return nil
 	}
 }
 
-func UserNameForTracing(userName string) QueryOption {
+// User sets the x-ms-user header, and can be used to identify the user making the request in the `.show queries` output.
+func User(userName string) QueryOption {
 	return func(q *queryOptions) error {
-		q.requestProperties.UserNameForTracing = userName
+		q.requestProperties.User = userName
 		return nil
 	}
 }
@@ -444,7 +446,7 @@ func QueryConsistency(c string) QueryOption {
 }
 
 // RequestAppName Request application name to be used in the reporting (e.g. show queries).
-// Does not set the `Application` property in `.show queries`, see `ApplicationNameForTracing` for that.
+// Does not set the `Application` property in `.show queries`, see `Application` for that.
 func RequestAppName(s string) QueryOption {
 	return func(q *queryOptions) error {
 		q.requestProperties.Options[RequestAppNameValue] = s
@@ -517,7 +519,7 @@ func RequestSandboxedExecutionDisabled() QueryOption {
 }
 
 // RequestUser Request user to be used in the reporting (e.g. show queries).
-// Does not set the `User` property in `.show queries`, see `UserNameForTracing` for that.
+// Does not set the `User` property in `.show queries`, see `User` for that.
 func RequestUser(s string) QueryOption {
 	return func(q *queryOptions) error {
 		q.requestProperties.Options[RequestUserValue] = s
