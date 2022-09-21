@@ -6,6 +6,8 @@
 This is a data plane SDK (it is for interacting with Azure Data Explorer service). For the control plane (resource administration), go [here](https://github.com/Azure/azure-sdk-for-go/tree/master/services/kusto/mgmt)
 
 ## What's New
+### Version 0.8.1
+* Added `Application` and `User` as `ClientRequestProperties` to set the `x-ms-app` and `x-ms-user` headers, and the matching fields in `.show queries`. 
 ### Version 0.8.0
 * Add all missing client request properties, and the ability to use custom ones using `CustomQueryOption`
 * Add the option to not parse the response when querying, but to receieve the json directly - `QueryToJson`

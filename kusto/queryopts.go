@@ -14,18 +14,87 @@ import (
 // For more information please look at: https://docs.microsoft.com/en-us/azure/kusto/api/netfx/request-properties
 // Not all of the documented options are implemented.
 type requestProperties struct {
-	Options    map[string]interface{}
-	Parameters map[string]string
+	Options     map[string]interface{}
+	Parameters  map[string]string
+	Application string
+	User        string
 }
 
 type queryOptions struct {
 	requestProperties *requestProperties
 }
 
+const NoRequestTimeoutValue = "norequesttimeout"
+const NoTruncationValue = "notruncation"
+const ServerTimeoutValue = "servertimeout"
+const DeferPartialQueryFailuresValue = "deferpartialqueryfailures"
+const MaxMemoryConsumptionPerQueryPerNodeValue = "max_memory_consumption_per_query_per_node"
+const MaxMemoryConsumptionPerIteratorValue = "maxmemoryconsumptionperiterator"
+const MaxOutputColumnsValue = "maxoutputcolumns"
+const PushSelectionThroughAggregationValue = "push_selection_through_aggregation"
+const QueryCursorAfterDefaultValue = "query_cursor_after_default"
+const QueryCursorBeforeOrAtDefaultValue = "query_cursor_before_or_at_default"
+const QueryCursorCurrentValue = "query_cursor_current"
+const QueryCursorDisabledValue = "query_cursor_disabled"
+const QueryCursorScopedTablesValue = "query_cursor_scoped_tables"
+const QueryDatascopeValue = "query_datascope"
+const QueryDateTimeScopeColumnValue = "query_datetimescope_column"
+const QueryDateTimeScopeFromValue = "query_datetimescope_from"
+const QueryDateTimeScopeToValue = "query_datetimescope_to"
+const ClientMaxRedirectCountValue = "client_max_redirect_count"
+const MaterializedViewShuffleValue = "materialized_view_shuffle"
+const QueryBinAutoAtValue = "query_bin_auto_at"
+const QueryBinAutoSizeValue = "query_bin_auto_size"
+const QueryDistributionNodesSpanValue = "query_distribution_nodes_span"
+const QueryFanoutNodesPercentValue = "query_fanout_nodes_percent"
+const QueryFanoutThreadsPercentValue = "query_fanout_threads_percent"
+const QueryForceRowLevelSecurityValue = "query_force_row_level_security"
+const QueryLanguageValue = "query_language"
+const QueryLogQueryParametersValue = "query_log_query_parameters"
+const QueryMaxEntitiesInUnionValue = "query_max_entities_in_union"
+const QueryNowValue = "query_now"
+const QueryPythonDebugValue = "query_python_debug"
+const QueryResultsApplyGetschemaValue = "query_results_apply_getschema"
+const QueryResultsCacheMaxAgeValue = "query_results_cache_max_age"
+const QueryResultsCachePerShardValue = "query_results_cache_per_shard"
+const QueryResultsProgressiveRowCountValue = "query_results_progressive_row_count"
+const QueryResultsProgressiveUpdatePeriodValue = "query_results_progressive_update_period"
+const QueryTakeMaxRecordsValue = "query_take_max_records"
+const QueryConsistencyValue = "queryconsistency"
+const RequestAppNameValue = "request_app_name"
+const RequestBlockRowLevelSecurityValue = "request_block_row_level_security"
+const RequestCalloutDisabledValue = "request_callout_disabled"
+const RequestDescriptionValue = "request_description"
+const RequestExternalTableDisabledValue = "request_external_table_disabled"
+const RequestImpersonationDisabledValue = "request_impersonation_disabled"
+const RequestReadonlyValue = "request_readonly"
+const RequestRemoteEntitiesDisabledValue = "request_remote_entities_disabled"
+const RequestSandboxedExecutionDisabledValue = "request_sandboxed_execution_disabled"
+const RequestUserValue = "request_user"
+const TruncationMaxRecordsValue = "truncation_max_records"
+const TruncationMaxSizeValue = "truncation_max_size"
+const ValidatePermissionsValue = "validate_permissions"
+
+// Application sets the x-ms-app header, and can be used to identify the application making the request in the `.show queries` output.
+func Application(appName string) QueryOption {
+	return func(q *queryOptions) error {
+		q.requestProperties.Application = appName
+		return nil
+	}
+}
+
+// User sets the x-ms-user header, and can be used to identify the user making the request in the `.show queries` output.
+func User(userName string) QueryOption {
+	return func(q *queryOptions) error {
+		q.requestProperties.User = userName
+		return nil
+	}
+}
+
 // NoRequestTimeout enables setting the request timeout to its maximum value.
 func NoRequestTimeout() QueryOption {
 	return func(q *queryOptions) error {
-		q.requestProperties.Options["norequesttimeout"] = true
+		q.requestProperties.Options[NoRequestTimeoutValue] = true
 		return nil
 	}
 }
@@ -33,7 +102,7 @@ func NoRequestTimeout() QueryOption {
 // NoTruncation enables suppressing truncation of the query results returned to the caller.
 func NoTruncation() QueryOption {
 	return func(q *queryOptions) error {
-		q.requestProperties.Options["notruncation"] = true
+		q.requestProperties.Options[NoTruncationValue] = true
 		return nil
 	}
 }
@@ -54,14 +123,14 @@ func queryServerTimeout(d time.Duration) QueryOption {
 		if d > 1*time.Hour {
 			return errors.ES(errors.OpQuery, errors.KClientArgs, "ServerTimeout option was set to %v, but can't be more than 1 hour", d)
 		}
-		q.requestProperties.Options["servertimeout"] = value.Timespan{Valid: true, Value: d}.Marshal()
+		q.requestProperties.Options[ServerTimeoutValue] = value.Timespan{Valid: true, Value: d}.Marshal()
 		return nil
 	}
 }
 
 // CustomQueryOption exists to allow a QueryOption that is not defined in the Go SDK, as all options
 // are not defined. Please Note: you should always use the type safe options provided below when available.
-// Also note that Kusto does not error on non-existent paramater names or bad values, it simply doesn't
+// Also note that Kusto does not error on non-existent parameter names or bad values, it simply doesn't
 // work as expected.
 func CustomQueryOption(paramName string, i interface{}) QueryOption {
 	return func(q *queryOptions) error {
@@ -73,7 +142,7 @@ func CustomQueryOption(paramName string, i interface{}) QueryOption {
 // DeferPartialQueryFailures disables reporting partial query failures as part of the result set.
 func DeferPartialQueryFailures() QueryOption {
 	return func(q *queryOptions) error {
-		q.requestProperties.Options["deferpartialqueryfailures"] = true
+		q.requestProperties.Options[DeferPartialQueryFailuresValue] = true
 		return nil
 	}
 }
@@ -82,7 +151,7 @@ func DeferPartialQueryFailures() QueryOption {
 // may allocate per node.
 func MaxMemoryConsumptionPerQueryPerNode(i uint64) QueryOption {
 	return func(q *queryOptions) error {
-		q.requestProperties.Options["max_memory_consumption_per_query_per_node"] = i
+		q.requestProperties.Options[MaxMemoryConsumptionPerQueryPerNodeValue] = i
 		return nil
 	}
 }
@@ -90,7 +159,7 @@ func MaxMemoryConsumptionPerQueryPerNode(i uint64) QueryOption {
 // MaxMemoryConsumptionPerIterator overrides the default maximum amount of memory a query operator may allocate.
 func MaxMemoryConsumptionPerIterator(i uint64) QueryOption {
 	return func(q *queryOptions) error {
-		q.requestProperties.Options["maxmemoryconsumptionperiterator"] = i
+		q.requestProperties.Options[MaxMemoryConsumptionPerIteratorValue] = i
 		return nil
 	}
 }
@@ -98,7 +167,7 @@ func MaxMemoryConsumptionPerIterator(i uint64) QueryOption {
 // MaxOutputColumns overrides the default maximum number of columns a query is allowed to produce.
 func MaxOutputColumns(i int) QueryOption {
 	return func(q *queryOptions) error {
-		q.requestProperties.Options["maxoutputcolumns"] = i
+		q.requestProperties.Options[MaxOutputColumnsValue] = i
 		return nil
 	}
 }
@@ -106,7 +175,7 @@ func MaxOutputColumns(i int) QueryOption {
 // PushSelectionThroughAggregation will push simple selection through aggregation .
 func PushSelectionThroughAggregation() QueryOption {
 	return func(q *queryOptions) error {
-		q.requestProperties.Options["push_selection_through_aggregation"] = true
+		q.requestProperties.Options[PushSelectionThroughAggregationValue] = true
 		return nil
 	}
 }
@@ -115,7 +184,7 @@ func PushSelectionThroughAggregation() QueryOption {
 // called without parameters.
 func QueryCursorAfterDefault(s string) QueryOption {
 	return func(q *queryOptions) error {
-		q.requestProperties.Options["query_cursor_after_default"] = s
+		q.requestProperties.Options[QueryCursorAfterDefaultValue] = s
 		return nil
 	}
 }
@@ -124,7 +193,7 @@ func QueryCursorAfterDefault(s string) QueryOption {
 // without parameters.
 func QueryCursorBeforeOrAtDefault(s string) QueryOption {
 	return func(q *queryOptions) error {
-		q.requestProperties.Options["query_cursor_before_or_at_default"] = s
+		q.requestProperties.Options[QueryCursorBeforeOrAtDefaultValue] = s
 		return nil
 	}
 }
@@ -132,7 +201,7 @@ func QueryCursorBeforeOrAtDefault(s string) QueryOption {
 // QueryCursorCurrent overrides the cursor value returned by the cursor_current() or current_cursor() functions.
 func QueryCursorCurrent(s string) QueryOption {
 	return func(q *queryOptions) error {
-		q.requestProperties.Options["query_cursor_current"] = s
+		q.requestProperties.Options[QueryCursorCurrentValue] = s
 		return nil
 	}
 }
@@ -140,7 +209,7 @@ func QueryCursorCurrent(s string) QueryOption {
 // QueryCursorDisabled overrides the cursor value returned by the cursor_current() or current_cursor() functions.
 func QueryCursorDisabled(s string) QueryOption {
 	return func(q *queryOptions) error {
-		q.requestProperties.Options["query_cursor_disabled"] = s
+		q.requestProperties.Options[QueryCursorDisabledValue] = s
 		return nil
 	}
 }
@@ -149,7 +218,7 @@ func QueryCursorDisabled(s string) QueryOption {
 // cursor_before_or_at_default (upper bound is optional).
 func QueryCursorScopedTables(l []string) QueryOption {
 	return func(q *queryOptions) error {
-		q.requestProperties.Options["query_cursor_scoped_tables"] = l
+		q.requestProperties.Options[QueryCursorScopedTablesValue] = l
 		return nil
 	}
 }
@@ -181,7 +250,7 @@ func QueryDataScope(ds DataScope) QueryOption {
 		}
 	}
 	return func(q *queryOptions) error {
-		q.requestProperties.Options["query_datascope"] = string(ds.(dataScope))
+		q.requestProperties.Options[QueryDatascopeValue] = string(ds.(dataScope))
 		return nil
 	}
 }
@@ -190,7 +259,7 @@ func QueryDataScope(ds DataScope) QueryOption {
 // (query_datetimescope_to / query_datetimescope_from)
 func QueryDateTimeScopeColumn(s string) QueryOption {
 	return func(q *queryOptions) error {
-		q.requestProperties.Options["query_datetimescope_column"] = s
+		q.requestProperties.Options[QueryDateTimeScopeColumnValue] = s
 		return nil
 	}
 }
@@ -199,7 +268,7 @@ func QueryDateTimeScopeColumn(s string) QueryOption {
 // query_datetimescope_column only (if defined).
 func QueryDateTimeScopeFrom(t time.Time) QueryOption {
 	return func(q *queryOptions) error {
-		q.requestProperties.Options["query_datetimescope_from"] = t.Format(time.RFC3339Nano)
+		q.requestProperties.Options[QueryDateTimeScopeFromValue] = t.Format(time.RFC3339Nano)
 		return nil
 	}
 }
@@ -208,7 +277,7 @@ func QueryDateTimeScopeFrom(t time.Time) QueryOption {
 // query_datetimescope_column only (if defined).
 func QueryDateTimeScopeTo(t time.Time) QueryOption {
 	return func(q *queryOptions) error {
-		q.requestProperties.Options["query_datetimescope_to"] = t.Format(time.RFC3339Nano)
+		q.requestProperties.Options[QueryDateTimeScopeToValue] = t.Format(time.RFC3339Nano)
 		return nil
 	}
 }
@@ -216,7 +285,7 @@ func QueryDateTimeScopeTo(t time.Time) QueryOption {
 // ClientMaxRedirectCount If set and positive, indicates the maximum number of HTTP redirects that the client will process.
 func ClientMaxRedirectCount(i int64) QueryOption {
 	return func(q *queryOptions) error {
-		q.requestProperties.Options["client_max_redirect_count"] = i
+		q.requestProperties.Options[ClientMaxRedirectCountValue] = i
 		return nil
 	}
 }
@@ -226,7 +295,7 @@ func ClientMaxRedirectCount(i int64) QueryOption {
 // Examples: 'dynamic([ { "Name": "V1", "Keys" : [ "K1", "K2" ] } ])' (shuffle view V1 by K1, K2) or 'dynamic([ { "Name": "V1" } ])' (shuffle view V1 by all keys)
 func MaterializedViewShuffle(s string) QueryOption {
 	return func(q *queryOptions) error {
-		q.requestProperties.Options["materialized_view_shuffle"] = s
+		q.requestProperties.Options[MaterializedViewShuffleValue] = s
 		return nil
 	}
 }
@@ -234,7 +303,7 @@ func MaterializedViewShuffle(s string) QueryOption {
 // QueryBinAutoAt When evaluating the bin_auto() function, the start value to use.
 func QueryBinAutoAt(s string) QueryOption {
 	return func(q *queryOptions) error {
-		q.requestProperties.Options["query_bin_auto_at"] = s
+		q.requestProperties.Options[QueryBinAutoAtValue] = s
 		return nil
 	}
 }
@@ -242,7 +311,7 @@ func QueryBinAutoAt(s string) QueryOption {
 // QueryBinAutoSize When evaluating the bin_auto() function, the bin size value to use.
 func QueryBinAutoSize(s string) QueryOption {
 	return func(q *queryOptions) error {
-		q.requestProperties.Options["query_bin_auto_size"] = s
+		q.requestProperties.Options[QueryBinAutoSizeValue] = s
 		return nil
 	}
 }
@@ -251,7 +320,7 @@ func QueryBinAutoSize(s string) QueryOption {
 // level in the query hierarchy for each subgroup of nodes; the size of the subgroup is set by this option.
 func QueryDistributionNodesSpan(i int64) QueryOption {
 	return func(q *queryOptions) error {
-		q.requestProperties.Options["query_distribution_nodes_span"] = i
+		q.requestProperties.Options[QueryDistributionNodesSpanValue] = i
 		return nil
 	}
 }
@@ -259,7 +328,7 @@ func QueryDistributionNodesSpan(i int64) QueryOption {
 // QueryFanoutNodesPercent The percentage of nodes to fan out execution to.
 func QueryFanoutNodesPercent(i int) QueryOption {
 	return func(q *queryOptions) error {
-		q.requestProperties.Options["query_fanout_nodes_percent"] = i
+		q.requestProperties.Options[QueryFanoutNodesPercentValue] = i
 		return nil
 	}
 }
@@ -267,7 +336,7 @@ func QueryFanoutNodesPercent(i int) QueryOption {
 // QueryFanoutThreadsPercent The percentage of threads to fan out execution to.
 func QueryFanoutThreadsPercent(i int) QueryOption {
 	return func(q *queryOptions) error {
-		q.requestProperties.Options["query_fanout_threads_percent"] = i
+		q.requestProperties.Options[QueryFanoutThreadsPercentValue] = i
 		return nil
 	}
 }
@@ -275,7 +344,7 @@ func QueryFanoutThreadsPercent(i int) QueryOption {
 // QueryForceRowLevelSecurity If specified, forces Row Level Security rules, even if row_level_security policy is disabled
 func QueryForceRowLevelSecurity() QueryOption {
 	return func(q *queryOptions) error {
-		q.requestProperties.Options["query_force_row_level_security"] = true
+		q.requestProperties.Options[QueryForceRowLevelSecurityValue] = true
 		return nil
 	}
 }
@@ -283,7 +352,7 @@ func QueryForceRowLevelSecurity() QueryOption {
 // QueryLanguage Controls how the query text is to be interpreted (Kql or Sql).
 func QueryLanguage(s string) QueryOption {
 	return func(q *queryOptions) error {
-		q.requestProperties.Options["query_language"] = s
+		q.requestProperties.Options[QueryLanguageValue] = s
 		return nil
 	}
 }
@@ -291,7 +360,7 @@ func QueryLanguage(s string) QueryOption {
 // QueryLogQueryParameters Enables logging of the query parameters, so that they can be viewed later in the .show queries journal.
 func QueryLogQueryParameters() QueryOption {
 	return func(q *queryOptions) error {
-		q.requestProperties.Options["query_log_query_parameters"] = true
+		q.requestProperties.Options[QueryLogQueryParametersValue] = true
 		return nil
 	}
 }
@@ -299,7 +368,7 @@ func QueryLogQueryParameters() QueryOption {
 // QueryMaxEntitiesInUnion Overrides the default maximum number of entities in a union.
 func QueryMaxEntitiesInUnion(i int64) QueryOption {
 	return func(q *queryOptions) error {
-		q.requestProperties.Options["query_max_entities_in_union"] = i
+		q.requestProperties.Options[QueryMaxEntitiesInUnionValue] = i
 		return nil
 	}
 }
@@ -307,7 +376,7 @@ func QueryMaxEntitiesInUnion(i int64) QueryOption {
 // QueryNow Overrides the datetime value returned by the now(0s) function.
 func QueryNow(t time.Time) QueryOption {
 	return func(q *queryOptions) error {
-		q.requestProperties.Options["query_now"] = t.Format(time.RFC3339Nano)
+		q.requestProperties.Options[QueryNowValue] = t.Format(time.RFC3339Nano)
 		return nil
 	}
 }
@@ -315,7 +384,7 @@ func QueryNow(t time.Time) QueryOption {
 // QueryPythonDebug If set, generate python debug query for the enumerated python node (default first).
 func QueryPythonDebug(i int) QueryOption {
 	return func(q *queryOptions) error {
-		q.requestProperties.Options["query_python_debug"] = i
+		q.requestProperties.Options[QueryPythonDebugValue] = i
 		return nil
 	}
 }
@@ -323,7 +392,7 @@ func QueryPythonDebug(i int) QueryOption {
 // QueryResultsApplyGetschema If set, retrieves the schema of each tabular data in the results of the query instead of the data itself.
 func QueryResultsApplyGetschema() QueryOption {
 	return func(q *queryOptions) error {
-		q.requestProperties.Options["query_results_apply_getschema"] = true
+		q.requestProperties.Options[QueryResultsApplyGetschemaValue] = true
 		return nil
 	}
 }
@@ -331,7 +400,7 @@ func QueryResultsApplyGetschema() QueryOption {
 // QueryResultsCacheMaxAge If positive, controls the maximum age of the cached query results the service is allowed to return
 func QueryResultsCacheMaxAge(d time.Duration) QueryOption {
 	return func(q *queryOptions) error {
-		q.requestProperties.Options["query_results_cache_max_age"] = value.Timespan{Value: d, Valid: true}.Marshal()
+		q.requestProperties.Options[QueryResultsCacheMaxAgeValue] = value.Timespan{Value: d, Valid: true}.Marshal()
 		return nil
 	}
 }
@@ -339,7 +408,7 @@ func QueryResultsCacheMaxAge(d time.Duration) QueryOption {
 // QueryResultsCachePerShard If set, enables per-shard query cache.
 func QueryResultsCachePerShard() QueryOption {
 	return func(q *queryOptions) error {
-		q.requestProperties.Options["query_results_cache_per_shard"] = true
+		q.requestProperties.Options[QueryResultsCachePerShardValue] = true
 		return nil
 	}
 }
@@ -347,7 +416,7 @@ func QueryResultsCachePerShard() QueryOption {
 // QueryResultsProgressiveRowCount Hint for Kusto as to how many records to send in each update (takes effect only if OptionResultsProgressiveEnabled is set)
 func QueryResultsProgressiveRowCount(i int64) QueryOption {
 	return func(q *queryOptions) error {
-		q.requestProperties.Options["query_results_progressive_row_count"] = i
+		q.requestProperties.Options[QueryResultsProgressiveRowCountValue] = i
 		return nil
 	}
 }
@@ -355,7 +424,7 @@ func QueryResultsProgressiveRowCount(i int64) QueryOption {
 // QueryResultsProgressiveUpdatePeriod Hint for Kusto as to how often to send progress frames (takes effect only if OptionResultsProgressiveEnabled is set)
 func QueryResultsProgressiveUpdatePeriod(i int32) QueryOption {
 	return func(q *queryOptions) error {
-		q.requestProperties.Options["query_results_progressive_update_period"] = i
+		q.requestProperties.Options[QueryResultsProgressiveUpdatePeriodValue] = i
 		return nil
 	}
 }
@@ -363,7 +432,7 @@ func QueryResultsProgressiveUpdatePeriod(i int32) QueryOption {
 // QueryTakeMaxRecords Enables limiting query results to this number of records.
 func QueryTakeMaxRecords(i int64) QueryOption {
 	return func(q *queryOptions) error {
-		q.requestProperties.Options["query_take_max_records"] = i
+		q.requestProperties.Options[QueryTakeMaxRecordsValue] = i
 		return nil
 	}
 }
@@ -371,15 +440,16 @@ func QueryTakeMaxRecords(i int64) QueryOption {
 // QueryConsistency Controls query consistency
 func QueryConsistency(c string) QueryOption {
 	return func(q *queryOptions) error {
-		q.requestProperties.Options["queryconsistency"] = c
+		q.requestProperties.Options[QueryConsistencyValue] = c
 		return nil
 	}
 }
 
 // RequestAppName Request application name to be used in the reporting (e.g. show queries).
+// Does not set the `Application` property in `.show queries`, see `Application` for that.
 func RequestAppName(s string) QueryOption {
 	return func(q *queryOptions) error {
-		q.requestProperties.Options["request_app_name"] = s
+		q.requestProperties.Options[RequestAppNameValue] = s
 		return nil
 	}
 }
@@ -387,7 +457,7 @@ func RequestAppName(s string) QueryOption {
 // RequestBlockRowLevelSecurity If specified, blocks access to tables for which row_level_security policy is enabled.
 func RequestBlockRowLevelSecurity() QueryOption {
 	return func(q *queryOptions) error {
-		q.requestProperties.Options["request_block_row_level_security"] = true
+		q.requestProperties.Options[RequestBlockRowLevelSecurityValue] = true
 		return nil
 	}
 }
@@ -395,7 +465,7 @@ func RequestBlockRowLevelSecurity() QueryOption {
 // RequestCalloutDisabled If specified, indicates that the request can't call-out to a user-provided service.
 func RequestCalloutDisabled() QueryOption {
 	return func(q *queryOptions) error {
-		q.requestProperties.Options["request_callout_disabled"] = true
+		q.requestProperties.Options[RequestCalloutDisabledValue] = true
 		return nil
 	}
 }
@@ -403,7 +473,7 @@ func RequestCalloutDisabled() QueryOption {
 // RequestDescription Arbitrary text that the author of the request wants to include as the request description.
 func RequestDescription(s string) QueryOption {
 	return func(q *queryOptions) error {
-		q.requestProperties.Options["request_description"] = s
+		q.requestProperties.Options[RequestDescriptionValue] = s
 		return nil
 	}
 }
@@ -411,7 +481,7 @@ func RequestDescription(s string) QueryOption {
 // RequestExternalTableDisabled If specified, indicates that the request can't invoke code in the ExternalTable.
 func RequestExternalTableDisabled() QueryOption {
 	return func(q *queryOptions) error {
-		q.requestProperties.Options["request_external_table_disabled"] = true
+		q.requestProperties.Options[RequestExternalTableDisabledValue] = true
 		return nil
 	}
 }
@@ -419,7 +489,7 @@ func RequestExternalTableDisabled() QueryOption {
 // RequestImpersonationDisabled If specified, indicates that the service should not impersonate the caller's identity.
 func RequestImpersonationDisabled() QueryOption {
 	return func(q *queryOptions) error {
-		q.requestProperties.Options["request_impersonation_disabled"] = true
+		q.requestProperties.Options[RequestImpersonationDisabledValue] = true
 		return nil
 	}
 }
@@ -427,7 +497,7 @@ func RequestImpersonationDisabled() QueryOption {
 // RequestReadonly If specified, indicates that the request can't write anything.
 func RequestReadonly() QueryOption {
 	return func(q *queryOptions) error {
-		q.requestProperties.Options["request_readonly"] = true
+		q.requestProperties.Options[RequestReadonlyValue] = true
 		return nil
 	}
 }
@@ -435,7 +505,7 @@ func RequestReadonly() QueryOption {
 // RequestRemoteEntitiesDisabled If specified, indicates that the request can't access remote databases and clusters.
 func RequestRemoteEntitiesDisabled() QueryOption {
 	return func(q *queryOptions) error {
-		q.requestProperties.Options["request_remote_entities_disabled"] = true
+		q.requestProperties.Options[RequestRemoteEntitiesDisabledValue] = true
 		return nil
 	}
 }
@@ -443,15 +513,16 @@ func RequestRemoteEntitiesDisabled() QueryOption {
 // RequestSandboxedExecutionDisabled If specified, indicates that the request can't invoke code in the sandbox.
 func RequestSandboxedExecutionDisabled() QueryOption {
 	return func(q *queryOptions) error {
-		q.requestProperties.Options["request_sandboxed_execution_disabled"] = true
+		q.requestProperties.Options[RequestSandboxedExecutionDisabledValue] = true
 		return nil
 	}
 }
 
 // RequestUser Request user to be used in the reporting (e.g. show queries).
+// Does not set the `User` property in `.show queries`, see `User` for that.
 func RequestUser(s string) QueryOption {
 	return func(q *queryOptions) error {
-		q.requestProperties.Options["request_user"] = s
+		q.requestProperties.Options[RequestUserValue] = s
 		return nil
 	}
 }
@@ -459,7 +530,7 @@ func RequestUser(s string) QueryOption {
 // TruncationMaxRecords Overrides the default maximum number of records a query is allowed to return to the caller (truncation).
 func TruncationMaxRecords(i int64) QueryOption {
 	return func(q *queryOptions) error {
-		q.requestProperties.Options["truncation_max_records"] = i
+		q.requestProperties.Options[TruncationMaxRecordsValue] = i
 		return nil
 	}
 }
@@ -467,7 +538,7 @@ func TruncationMaxRecords(i int64) QueryOption {
 // TruncationMaxSize Overrides the default maximum data size a query is allowed to return to the caller (truncation).
 func TruncationMaxSize(i int64) QueryOption {
 	return func(q *queryOptions) error {
-		q.requestProperties.Options["truncation_max_size"] = i
+		q.requestProperties.Options[TruncationMaxSizeValue] = i
 		return nil
 	}
 }
@@ -475,7 +546,7 @@ func TruncationMaxSize(i int64) QueryOption {
 // ValidatePermissions Validates user's permissions to perform the query and doesn't run the query itself.
 func ValidatePermissions() QueryOption {
 	return func(q *queryOptions) error {
-		q.requestProperties.Options["validate_permissions"] = true
+		q.requestProperties.Options[ValidatePermissionsValue] = true
 		return nil
 	}
 }
