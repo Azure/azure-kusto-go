@@ -39,7 +39,11 @@ func (dt DataType) toColumn() (table.Column, error) {
 	col := table.Column{Name: dt.ColumnName}
 
 	if dt.ColumnType != "" {
-		col.Type = types.Column(dt.ColumnType)
+		var ok bool
+		col.Type, ok = translate[strings.ToLower(dt.ColumnType)]
+		if !ok {
+			return col, errors.ES(errors.OpMgmt, errors.KInternal, "DataTable.Columns(v1) had string entry with .ColumnType set to %s, which is not supported", dt.ColumnType)
+		}
 		return col, nil
 	}
 
