@@ -157,11 +157,11 @@ func (c *conn) execute(ctx context.Context, execType int, db string, query Stmt,
 		return execResp{}, errors.ES(op, errors.KInternal, "internal error: did not understand the type of execType: %d", execType)
 	}
 
-	token, tkerr := c.tokenProvider.acquireToken(ctx)
+	token, tokenType, tkerr := c.tokenProvider.acquireToken(ctx)
 	if tkerr != nil {
 		return execResp{}, errors.ES(op, errors.KInternal, "Error while getting token : %s", tkerr)
 	}
-	header.Add("Authorization", fmt.Sprintf("Bearer %s", token.Token))
+	header.Add("Authorization", fmt.Sprintf("%s %s", tokenType, token))
 
 	req := &http.Request{
 		Method: http.MethodPost,

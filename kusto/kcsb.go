@@ -49,6 +49,10 @@ const (
 	domainHint                       string = "RedirectURL"
 )
 
+const (
+	BEARER_TYPE = "Bearer"
+)
+
 var csMapping = map[string]string{"datasource": dataSource, "data source": dataSource, "addr": dataSource, "address": dataSource, "network address": dataSource, "server": dataSource,
 	"aad user id": aadUserId, "aaduserid": aadUserId,
 	"password": password, "pwd": password,
@@ -73,9 +77,12 @@ func requireNonEmpty(key string, value string) {
 	}
 }
 
-func assignValue(kcsb *connectionStringBuilder, rawKey string, value string) {
+func assignValue(kcsb *connectionStringBuilder, rawKey string, value string) error {
 	rawKey = strings.ToLower(strings.Trim(rawKey, " "))
-	parsedKey := csMapping[rawKey]
+	parsedKey, ok := csMapping[rawKey]
+	if !ok {
+		return fmt.Errorf("Error: unsupported key %q in connection string ", rawKey)
+	}
 	switch parsedKey {
 	case dataSource:
 		kcsb.dataSource = value
@@ -114,39 +121,42 @@ func assignValue(kcsb *connectionStringBuilder, rawKey string, value string) {
 	case domainHint:
 		kcsb.redirectURL = value
 	}
+	return nil
 }
 
 /*
-   Creates new KustoConnectionStringBuilder.
-   Params takes kusto connection string connStr: string.  Kusto connection string should be of the format:
-   https://<clusterName>.kusto.windows.net;AAD User ID="user@microsoft.com";Password=P@ssWord
-   For more information please look at:
-   https://docs.microsoft.com/azure/data-explorer/kusto/api/connection-strings/kusto
+Creates new KustoConnectionStringBuilder.
+Params takes kusto connection string connStr: string.  Kusto connection string should be of the format:
+https://<clusterName>.kusto.windows.net;AAD User ID="user@microsoft.com";Password=P@ssWord
+For more information please look at:
+https://docs.microsoft.com/azure/data-explorer/kusto/api/connection-strings/kusto
 */
 func GetConnectionStringBuilder(connStr string) connectionStringBuilder {
 	kcsb := connectionStringBuilder{}
 	if isEmpty(connStr) {
 		panic("Error : Connection string cannot be empty")
 	}
-
-	if !strings.Contains(strings.Split(connStr, ";")[0], "=") {
+	connStrArr := strings.Split(connStr, ";")
+	if !strings.Contains(connStrArr[0], "=") {
 		connStr = "Data Source=" + connStr
 	}
 
-	for _, kvp := range strings.Split(connStr, ";") {
+	for _, kvp := range connStrArr {
 		kvparr := strings.Split(kvp, "=")
 		val := strings.Trim(kvparr[1], " ")
 		if isEmpty(val) {
 			continue
 		}
-		assignValue(&kcsb, kvparr[0], val)
+		if err := assignValue(&kcsb, kvparr[0], val); err != nil {
+			panic(err)
+		}
 
 	}
 
 	return kcsb
 }
 
-//Creates a KustoConnection string builder that will authenticate with AAD user name and password.
+// Creates a KustoConnection string builder that will authenticate with AAD user name and password.
 func (kcsb connectionStringBuilder) WithAadUserPassAuth(uname string, pswrd string, authorityID string) connectionStringBuilder {
 	requireNonEmpty(dataSource, kcsb.dataSource)
 	requireNonEmpty(aadUserId, uname)
@@ -157,15 +167,15 @@ func (kcsb connectionStringBuilder) WithAadUserPassAuth(uname string, pswrd stri
 	return kcsb
 }
 
-//Creates a KustoConnection string builder that will authenticate with AAD user token
-func (kcsb connectionStringBuilder) WitAadUserToken(userTkn string) connectionStringBuilder {
+// Creates a KustoConnection string builder that will authenticate with AAD user token
+func (kcsb connectionStringBuilder) WitAadUserToken(usertoken string) connectionStringBuilder {
 	requireNonEmpty(dataSource, kcsb.dataSource)
-	requireNonEmpty(userToken, userTkn)
-	kcsb.userToken = userTkn
+	requireNonEmpty(userToken, usertoken)
+	kcsb.userToken = usertoken
 	return kcsb
 }
 
-//Creates a KustoConnection string builder that will authenticate with AAD application and key.
+// Creates a KustoConnection string builder that will authenticate with AAD application and key.
 func (kcsb connectionStringBuilder) WithAadAppKey(appId string, appKey string, authorityID string) connectionStringBuilder {
 	requireNonEmpty(dataSource, kcsb.dataSource)
 	requireNonEmpty(applicationClientId, appId)
@@ -177,7 +187,7 @@ func (kcsb connectionStringBuilder) WithAadAppKey(appId string, appKey string, a
 	return kcsb
 }
 
-//Creates a KustoConnection string builder that will authenticate with AAD application using a certificate.
+// Creates a KustoConnection string builder that will authenticate with AAD application using a certificate.
 func (kcsb connectionStringBuilder) WithAppCertificate(appId string, certificate string, thumprint string, sendCertChain bool, authorityID string) connectionStringBuilder {
 	requireNonEmpty(dataSource, kcsb.dataSource)
 	requireNonEmpty(applicationCertificate, certificate)
@@ -208,8 +218,7 @@ func (kcsb connectionStringBuilder) WithAzCli() connectionStringBuilder {
 
 /*
 Creates a KustoConnection string builder that will authenticate with AAD application, using
-  an application token obtained from a Microsoft Service Identity endpoint. An optional user
-  assigned application ID can be added to the token.
+an application token obtained from a Microsoft Service Identity endpoint. An optional user assigned application ID can be added to the token.
 */
 func (kcsb connectionStringBuilder) WithManagedServiceID(clientID string, resId string) connectionStringBuilder {
 	requireNonEmpty(dataSource, kcsb.dataSource)
@@ -248,6 +257,7 @@ func (kcsb connectionStringBuilder) AttachClientOptions(options *azcore.ClientOp
 // Method to be used for generating TokenCredential
 func (kcsb connectionStringBuilder) getTokenProvider() (*tokenProvider, error) {
 	tkp := &tokenProvider{}
+	tkp.tokenType = BEARER_TYPE
 	tkp.dataSource = kcsb.dataSource
 	if kcsb.interactiveLogin {
 		inOps := &azidentity.InteractiveBrowserCredentialOptions{}

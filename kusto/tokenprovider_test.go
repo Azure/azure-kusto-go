@@ -4,9 +4,7 @@ import (
 	"context"
 	"os"
 	"testing"
-	"time"
 
-	"github.com/Azure/azure-sdk-for-go/sdk/azcore"
 	"github.com/stretchr/testify/assert"
 )
 
@@ -25,29 +23,25 @@ func TestAcquireTokenErr(t *testing.T) {
 				tokenCred:  NewMockClient().auth.tokenProvider.tokenCred,
 				dataSource: s.urlStr() + "/test_acquiretoken_cred",
 			},
-			wantErr: "DefaultAzureCredential: failed to acquire a token.\nAttempted credentials:\n\tEnvironmentCredential: missing environment variable AZURE_TENANT_ID\n\tManagedIdentityCredential: IMDS token request timed out\n\tAzureCLICredential: ERROR: Please run 'az login' to setup account.\r\n",
+			wantErr: "",
 		},
-		/*{
-			name:    "test_acquiretoken_invalid_datasource",
-			wantErr: "Error: couldn't retrieve the clould Meta Info: Get \"v1/rest/auth/metadata\": unsupported protocol scheme \"\"",
+		{
+			name: "test_acquiretoken_invalid_datasource",
 			tkp: tokenProvider{
 				tokenCred:  NewMockClient().auth.tokenProvider.tokenCred,
 				dataSource: "endpoint",
 			},
-		},*/
+		},
 	}
 	for _, test := range tests {
 		tkp := test.tkp
 		s.code = 200
 		s.payload = []byte(payload)
 
-		got, err := tkp.acquireToken(context.Background())
+		got, token_type, err := tkp.acquireToken(context.Background())
 		assert.NotNil(t, err)
-		assert.EqualValues(t, azcore.AccessToken{
-			Token:     "",
-			ExpiresOn: time.Time{},
-		}, got)
-		assert.EqualValues(t, test.wantErr, err.Error())
+		assert.EqualValues(t, "", got)
+		assert.EqualValues(t, "", token_type)
 	}
 
 }

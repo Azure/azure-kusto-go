@@ -4,7 +4,6 @@ import (
 	"context"
 	"fmt"
 	"strings"
-	"time"
 
 	"github.com/Azure/azure-sdk-for-go/sdk/azcore"
 	"github.com/Azure/azure-sdk-for-go/sdk/azcore/policy"
@@ -12,24 +11,21 @@ import (
 
 type tokenProvider struct {
 	tokenCred     azcore.TokenCredential //holds the received token credential as per the authentication
+	tokenType     string
 	customToken   string
 	dataSource    string
 	cloudInfoInit bool
 	scopes        []string
 }
 
-//tokenProvider need to be received as reference, to reflect updations to the structs
-func (tkp *tokenProvider) acquireToken(ctx context.Context) (azcore.AccessToken, error) {
-	act := azcore.AccessToken{}
+// tokenProvider need to be received as reference, to reflect updations to the structs
+func (tkp *tokenProvider) acquireToken(ctx context.Context) (string, string, error) {
 	if tkp.tokenCred != nil {
 		if !tkp.cloudInfoInit {
 			//Fetches cloud meta data
 			fetchedCI, cierr := GetMetadata(context.Background(), tkp.dataSource)
 			if cierr != nil {
-				return azcore.AccessToken{
-					Token:     "",
-					ExpiresOn: time.Time{},
-				}, fmt.Errorf("Error: couldn't retrieve the clould Meta Info: %s", cierr)
+				return "", "", fmt.Errorf("Error: couldn't retrieve the clould Meta Info: %s", cierr)
 			}
 			tkp.cloudInfoInit = true
 			//Update resource URI if MFA enabled
@@ -39,12 +35,17 @@ func (tkp *tokenProvider) acquireToken(ctx context.Context) (azcore.AccessToken,
 			}
 			tkp.scopes = []string{fmt.Sprintf("%s/.default", resourceURI)}
 		}
-		return tkp.tokenCred.GetToken(ctx, policy.TokenRequestOptions{Scopes: tkp.scopes})
-		
-	} else {
-		act.Token = tkp.customToken
+		token, err := tkp.tokenCred.GetToken(ctx, policy.TokenRequestOptions{Scopes: tkp.scopes})
+		if err != nil {
+			return "", "", err
+		}
+		return token.Token, tkp.tokenType, nil
 	}
-	return act, nil
+
+	if !isEmpty(tkp.customToken) {
+		return tkp.customToken, tkp.tokenType, nil
+	}
+	return "", "", fmt.Errorf("Error: No token info present in token provider")
 }
 
 func (tkp tokenProvider) isInitialized() bool {
