@@ -12,14 +12,14 @@ func TestGetConnectionStringBuilder(t *testing.T) {
 	tests := []struct {
 		name             string
 		connectionString string
-		want             connectionStringBuilder
+		want             ConnectionStringBuilder
 		wantErr          string
 	}{
 		{
 			name:             "test_conn_string_validURL",
 			connectionString: "https://endpoint",
-			want: connectionStringBuilder{
-				dataSource: "https://endpoint",
+			want: ConnectionStringBuilder{
+				DataSource: "https://endpoint",
 			},
 		},
 		{
@@ -30,23 +30,23 @@ func TestGetConnectionStringBuilder(t *testing.T) {
 		{
 			name:             "test_conn_string_fullstring",
 			connectionString: "https://help.kusto.windows.net/Samples;aad user id=1234;password=****;application key=1234;application client id=1234;application key=0987;application certificate=avsefsfbsrgbrb; authority id=123456;application token=token;user token=usertoken; msi_auth=true;ManagedServiceIdentity=123456; azcli=true;interactivelogin=false; domainhint=www.google.com",
-			want: connectionStringBuilder{
-				dataSource:                       "https://help.kusto.windows.net/Samples",
-				aadUserID:                        "1234",
-				password:                         "****",
-				userToken:                        "usertoken",
-				applicationClientId:              "1234",
-				applicationKey:                   "0987",
-				authorityId:                      "123456",
-				applicationCertificate:           "avsefsfbsrgbrb",
-				applicationCertificateThumbprint: "",
-				sendCertificateChain:             false,
-				applicationToken:                 "token",
-				azcli:                            true,
-				msiAuthentication:                true,
-				managedServiceIdentity:           "123456",
-				interactiveLogin:                 false,
-				redirectURL:                      "www.google.com",
+			want: ConnectionStringBuilder{
+				DataSource:                       "https://help.kusto.windows.net/Samples",
+				AadUserID:                        "1234",
+				Password:                         "****",
+				UserToken:                        "usertoken",
+				ApplicationClientId:              "1234",
+				ApplicationKey:                   "0987",
+				AuthorityId:                      "123456",
+				ApplicationCertificate:           "avsefsfbsrgbrb",
+				ApplicationCertificateThumbprint: "",
+				SendCertificateChain:             false,
+				ApplicationToken:                 "token",
+				Azcli:                            true,
+				MsiAuthentication:                true,
+				ManagedServiceIdentity:           "123456",
+				InteractiveLogin:                 false,
+				RedirectURL:                      "www.google.com",
 			},
 		},
 	}
@@ -70,11 +70,11 @@ func TestGetConnectionStringBuilder(t *testing.T) {
 }
 
 func TestWithAadUserPassAuth(t *testing.T) {
-	want := connectionStringBuilder{
-		dataSource:  "endpoint",
-		aadUserID:   "userid",
-		password:    "password",
-		authorityId: "authorityID",
+	want := ConnectionStringBuilder{
+		DataSource:  "endpoint",
+		AadUserID:   "userid",
+		Password:    "password",
+		AuthorityId: "authorityID",
 	}
 
 	actual := GetConnectionStringBuilder("endpoint").WithAadUserPassAuth("userid", "password", "authorityID")
@@ -94,9 +94,9 @@ func TestWithAadUserPassAuthErr(t *testing.T) {
 }
 
 func TestWitAadUserToken(t *testing.T) {
-	want := connectionStringBuilder{
-		dataSource: "endpoint",
-		userToken:  "token",
+	want := ConnectionStringBuilder{
+		DataSource: "endpoint",
+		UserToken:  "token",
 	}
 
 	actual := GetConnectionStringBuilder("endpoint").WitAadUserToken("token")
@@ -120,61 +120,61 @@ func TestGetTokenProviderHappy(t *testing.T) {
 	payload := `{"AzureAD": {"LoginEndpoint": "https://login.microsofdummy.com","LoginMfaRequired": false,"KustoClientAppId": "db662dc1-0cfe-4e1c-a843-19a68e65xxxx","KustoClientRedirectUri": "https://microsoft/dummykustoclient","KustoServiceResourceId": "https://kusto.windows.net","FirstPartyAuthorityUrl": "https://login.microsofdummy.com/f8cdef31-a31e-4b4a-93e4-5f571e9xxxxx"  },  "dSTS": {"CloudEndpointSuffix": "windows.net","DstsRealm": "realm://xxx.windows.net","DstsInstance": "xxx.core.windows.net","KustoDnsHostName": "kusto.windows.net","ServiceName": "kusto"}}`
 	tests := []struct {
 		name    string
-		kcsb    connectionStringBuilder
+		kcsb    ConnectionStringBuilder
 		payload string
 	}{
 		{
 			name: "test_tokenprovider_usernamepasswordauth",
-			kcsb: connectionStringBuilder{
-				dataSource:          s.urlStr() + "/test_tokenprovider_usernamepasswordauth",
-				authorityId:         "tenantID",
-				applicationClientId: "clientID",
-				aadUserID:           "ussername",
-				password:            "userpass",
+			kcsb: ConnectionStringBuilder{
+				DataSource:          s.urlStr() + "/test_tokenprovider_usernamepasswordauth",
+				AuthorityId:         "tenantID",
+				ApplicationClientId: "clientID",
+				AadUserID:           "ussername",
+				Password:            "userpass",
 			},
 		}, {
 			name: "test_tokenprovider_intLogin",
-			kcsb: connectionStringBuilder{
-				dataSource:          s.urlStr() + "/test_tokenprovider_intLogin",
-				interactiveLogin:    true,
-				authorityId:         "tenantID",
-				applicationClientId: "clientID",
+			kcsb: ConnectionStringBuilder{
+				DataSource:          s.urlStr() + "/test_tokenprovider_intLogin",
+				InteractiveLogin:    true,
+				AuthorityId:         "tenantID",
+				ApplicationClientId: "clientID",
 			},
 		},
 		{
 			name: "test_tokenprovider_clientsec",
-			kcsb: connectionStringBuilder{
-				dataSource:          s.urlStr() + "/test_tokenprovider_clientsec",
-				interactiveLogin:    true,
-				authorityId:         "tenantID",
-				applicationClientId: "clientID",
-				applicationKey:      "somekey",
+			kcsb: ConnectionStringBuilder{
+				DataSource:          s.urlStr() + "/test_tokenprovider_clientsec",
+				InteractiveLogin:    true,
+				AuthorityId:         "tenantID",
+				ApplicationClientId: "clientID",
+				ApplicationKey:      "somekey",
 			},
 		}, {
 			name: "test_tokenprovider_managedsi",
-			kcsb: connectionStringBuilder{
-				dataSource:             s.urlStr() + "/test_tokenprovider_managedsi",
-				managedServiceIdentity: "managedid",
-				msiAuthentication:      true,
-				clientOptions:          &azcore.ClientOptions{},
+			kcsb: ConnectionStringBuilder{
+				DataSource:             s.urlStr() + "/test_tokenprovider_managedsi",
+				ManagedServiceIdentity: "managedid",
+				MsiAuthentication:      true,
+				ClientOptions:          &azcore.ClientOptions{},
 			},
 		}, {
 			name: "test_tokenprovider_managedidauth2",
-			kcsb: connectionStringBuilder{
-				dataSource:        s.urlStr() + "/test_tokenprovider_managedidauth2",
-				msiAuthentication: true,
+			kcsb: ConnectionStringBuilder{
+				DataSource:        s.urlStr() + "/test_tokenprovider_managedidauth2",
+				MsiAuthentication: true,
 			},
 		}, {
 			name: "test_tokenprovider_usertoken",
-			kcsb: connectionStringBuilder{
-				dataSource: s.urlStr() + "/test_tokenprovider_usertoken",
-				userToken:  "token",
+			kcsb: ConnectionStringBuilder{
+				DataSource: s.urlStr() + "/test_tokenprovider_usertoken",
+				UserToken:  "token",
 			},
 		}, {
 			name: "test_tokenprovider_apptoken",
-			kcsb: connectionStringBuilder{
-				dataSource: s.urlStr() + "/test_tokenprovider_apptoken",
-				userToken:  "token",
+			kcsb: ConnectionStringBuilder{
+				DataSource: s.urlStr() + "/test_tokenprovider_apptoken",
+				UserToken:  "token",
 			},
 		},
 	}

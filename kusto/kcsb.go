@@ -9,24 +9,24 @@ import (
 	"github.com/Azure/azure-sdk-for-go/sdk/azidentity"
 )
 
-type connectionStringBuilder struct {
-	dataSource                       string
-	aadUserID                        string
-	password                         string
-	userToken                        string
-	applicationClientId              string
-	applicationKey                   string
-	authorityId                      string
-	applicationCertificate           string
-	applicationCertificateThumbprint string
-	sendCertificateChain             bool
-	applicationToken                 string
-	azcli                            bool
-	msiAuthentication                bool
-	managedServiceIdentity           string
-	interactiveLogin                 bool
-	redirectURL                      string
-	clientOptions                    *azcore.ClientOptions
+type ConnectionStringBuilder struct {
+	DataSource                       string
+	AadUserID                        string
+	Password                         string
+	UserToken                        string
+	ApplicationClientId              string
+	ApplicationKey                   string
+	AuthorityId                      string
+	ApplicationCertificate           string
+	ApplicationCertificateThumbprint string
+	SendCertificateChain             bool
+	ApplicationToken                 string
+	Azcli                            bool
+	MsiAuthentication                bool
+	ManagedServiceIdentity           string
+	InteractiveLogin                 bool
+	RedirectURL                      string
+	ClientOptions                    *azcore.ClientOptions
 }
 
 // params mapping
@@ -77,7 +77,7 @@ func requireNonEmpty(key string, value string) {
 	}
 }
 
-func assignValue(kcsb *connectionStringBuilder, rawKey string, value string) error {
+func assignValue(kcsb *ConnectionStringBuilder, rawKey string, value string) error {
 	rawKey = strings.ToLower(strings.Trim(rawKey, " "))
 	parsedKey, ok := csMapping[rawKey]
 	if !ok {
@@ -85,41 +85,41 @@ func assignValue(kcsb *connectionStringBuilder, rawKey string, value string) err
 	}
 	switch parsedKey {
 	case dataSource:
-		kcsb.dataSource = value
+		kcsb.DataSource = value
 	case aadUserId:
-		kcsb.aadUserID = value
+		kcsb.AadUserID = value
 	case password:
-		kcsb.password = value
+		kcsb.Password = value
 	case applicationClientId:
-		kcsb.applicationClientId = value
+		kcsb.ApplicationClientId = value
 	case applicationKey:
-		kcsb.applicationKey = value
+		kcsb.ApplicationKey = value
 	case applicationCertificate:
-		kcsb.applicationCertificate = value
+		kcsb.ApplicationCertificate = value
 	case applicationCertificateThumbprint:
-		kcsb.applicationCertificateThumbprint = value
+		kcsb.ApplicationCertificateThumbprint = value
 	case sendCertificateChain:
 		bval, _ := strconv.ParseBool(value)
-		kcsb.sendCertificateChain = bval
+		kcsb.SendCertificateChain = bval
 	case authorityId:
-		kcsb.authorityId = value
+		kcsb.AuthorityId = value
 	case applicationToken:
-		kcsb.applicationToken = value
+		kcsb.ApplicationToken = value
 	case userToken:
-		kcsb.userToken = value
+		kcsb.UserToken = value
 	case msiAuth:
 		bval, _ := strconv.ParseBool(value)
-		kcsb.msiAuthentication = bval
+		kcsb.MsiAuthentication = bval
 	case managedServiceIdentity:
-		kcsb.managedServiceIdentity = value
+		kcsb.ManagedServiceIdentity = value
 	case azCli:
 		bval, _ := strconv.ParseBool(value)
-		kcsb.azcli = bval
+		kcsb.Azcli = bval
 	case interactiveLogin:
 		bval, _ := strconv.ParseBool(value)
-		kcsb.interactiveLogin = bval
+		kcsb.InteractiveLogin = bval
 	case domainHint:
-		kcsb.redirectURL = value
+		kcsb.RedirectURL = value
 	}
 	return nil
 }
@@ -131,8 +131,8 @@ https://<clusterName>.kusto.windows.net;AAD User ID="user@microsoft.com";Passwor
 For more information please look at:
 https://docs.microsoft.com/azure/data-explorer/kusto/api/connection-strings/kusto
 */
-func GetConnectionStringBuilder(connStr string) connectionStringBuilder {
-	kcsb := connectionStringBuilder{}
+func GetConnectionStringBuilder(connStr string) ConnectionStringBuilder {
+	kcsb := ConnectionStringBuilder{}
 	if isEmpty(connStr) {
 		panic("Error : Connection string cannot be empty")
 	}
@@ -157,62 +157,62 @@ func GetConnectionStringBuilder(connStr string) connectionStringBuilder {
 }
 
 // Creates a KustoConnection string builder that will authenticate with AAD user name and password.
-func (kcsb connectionStringBuilder) WithAadUserPassAuth(uname string, pswrd string, authorityID string) connectionStringBuilder {
-	requireNonEmpty(dataSource, kcsb.dataSource)
+func (kcsb ConnectionStringBuilder) WithAadUserPassAuth(uname string, pswrd string, authorityID string) ConnectionStringBuilder {
+	requireNonEmpty(dataSource, kcsb.DataSource)
 	requireNonEmpty(aadUserId, uname)
 	requireNonEmpty(password, pswrd)
-	kcsb.aadUserID = uname
-	kcsb.password = pswrd
-	kcsb.authorityId = authorityID
+	kcsb.AadUserID = uname
+	kcsb.Password = pswrd
+	kcsb.AuthorityId = authorityID
 	return kcsb
 }
 
 // Creates a KustoConnection string builder that will authenticate with AAD user token
-func (kcsb connectionStringBuilder) WitAadUserToken(usertoken string) connectionStringBuilder {
-	requireNonEmpty(dataSource, kcsb.dataSource)
+func (kcsb ConnectionStringBuilder) WitAadUserToken(usertoken string) ConnectionStringBuilder {
+	requireNonEmpty(dataSource, kcsb.DataSource)
 	requireNonEmpty(userToken, usertoken)
-	kcsb.userToken = usertoken
+	kcsb.UserToken = usertoken
 	return kcsb
 }
 
 // Creates a KustoConnection string builder that will authenticate with AAD application and key.
-func (kcsb connectionStringBuilder) WithAadAppKey(appId string, appKey string, authorityID string) connectionStringBuilder {
-	requireNonEmpty(dataSource, kcsb.dataSource)
+func (kcsb ConnectionStringBuilder) WithAadAppKey(appId string, appKey string, authorityID string) ConnectionStringBuilder {
+	requireNonEmpty(dataSource, kcsb.DataSource)
 	requireNonEmpty(applicationClientId, appId)
 	requireNonEmpty(applicationKey, appKey)
 	requireNonEmpty(authorityId, authorityID)
-	kcsb.applicationClientId = appId
-	kcsb.applicationKey = appKey
-	kcsb.authorityId = authorityID
+	kcsb.ApplicationClientId = appId
+	kcsb.ApplicationKey = appKey
+	kcsb.AuthorityId = authorityID
 	return kcsb
 }
 
 // Creates a KustoConnection string builder that will authenticate with AAD application using a certificate.
-func (kcsb connectionStringBuilder) WithAppCertificate(appId string, certificate string, thumprint string, sendCertChain bool, authorityID string) connectionStringBuilder {
-	requireNonEmpty(dataSource, kcsb.dataSource)
+func (kcsb ConnectionStringBuilder) WithAppCertificate(appId string, certificate string, thumprint string, sendCertChain bool, authorityID string) ConnectionStringBuilder {
+	requireNonEmpty(dataSource, kcsb.DataSource)
 	requireNonEmpty(applicationCertificate, certificate)
 	requireNonEmpty(authorityId, authorityID)
-	kcsb.applicationClientId = appId
-	kcsb.authorityId = authorityID
+	kcsb.ApplicationClientId = appId
+	kcsb.AuthorityId = authorityID
 
-	kcsb.applicationCertificate = certificate
-	kcsb.applicationCertificateThumbprint = thumprint
-	kcsb.sendCertificateChain = sendCertChain
+	kcsb.ApplicationCertificate = certificate
+	kcsb.ApplicationCertificateThumbprint = thumprint
+	kcsb.SendCertificateChain = sendCertChain
 	return kcsb
 }
 
 // Creates a KustoConnection string builder that will authenticate with AAD application and an application token.
-func (kcsb connectionStringBuilder) WithApplicationToken(appId string, appToken string) connectionStringBuilder {
-	requireNonEmpty(dataSource, kcsb.dataSource)
+func (kcsb ConnectionStringBuilder) WithApplicationToken(appId string, appToken string) ConnectionStringBuilder {
+	requireNonEmpty(dataSource, kcsb.DataSource)
 	requireNonEmpty(applicationToken, appToken)
-	kcsb.applicationToken = appToken
+	kcsb.ApplicationToken = appToken
 	return kcsb
 }
 
 // Creates a KustoConnection string builder that will use existing authenticated az cli profile password.
-func (kcsb connectionStringBuilder) WithAzCli() connectionStringBuilder {
-	requireNonEmpty(dataSource, kcsb.dataSource)
-	kcsb.azcli = true
+func (kcsb ConnectionStringBuilder) WithAzCli() ConnectionStringBuilder {
+	requireNonEmpty(dataSource, kcsb.DataSource)
+	kcsb.Azcli = true
 	return kcsb
 }
 
@@ -220,108 +220,108 @@ func (kcsb connectionStringBuilder) WithAzCli() connectionStringBuilder {
 Creates a KustoConnection string builder that will authenticate with AAD application, using
 an application token obtained from a Microsoft Service Identity endpoint. An optional user assigned application ID can be added to the token.
 */
-func (kcsb connectionStringBuilder) WithManagedServiceID(clientID string, resId string) connectionStringBuilder {
-	requireNonEmpty(dataSource, kcsb.dataSource)
-	kcsb.msiAuthentication = true
+func (kcsb ConnectionStringBuilder) WithManagedServiceID(clientID string, resId string) ConnectionStringBuilder {
+	requireNonEmpty(dataSource, kcsb.DataSource)
+	kcsb.MsiAuthentication = true
 	if !isEmpty(clientID) {
-		kcsb.managedServiceIdentity = clientID
+		kcsb.ManagedServiceIdentity = clientID
 	} else if !isEmpty(resId) {
-		kcsb.managedServiceIdentity = resId
+		kcsb.ManagedServiceIdentity = resId
 	}
 	return kcsb
 }
 
-func (kcsb connectionStringBuilder) WithInteractiveLogin(clientID string, authorityID string, redirectURL string) connectionStringBuilder {
-	requireNonEmpty(dataSource, kcsb.dataSource)
+func (kcsb ConnectionStringBuilder) WithInteractiveLogin(clientID string, authorityID string, redirectURL string) ConnectionStringBuilder {
+	requireNonEmpty(dataSource, kcsb.DataSource)
 	if !isEmpty(clientID) {
-		kcsb.applicationClientId = clientID
+		kcsb.ApplicationClientId = clientID
 	}
 	if !isEmpty(authorityID) {
-		kcsb.authorityId = authorityID
+		kcsb.AuthorityId = authorityID
 	}
 	if !isEmpty(redirectURL) {
-		kcsb.redirectURL = redirectURL
+		kcsb.RedirectURL = redirectURL
 	}
-	kcsb.interactiveLogin = true
+	kcsb.InteractiveLogin = true
 	return kcsb
 }
 
-func (kcsb connectionStringBuilder) AttachClientOptions(options *azcore.ClientOptions) connectionStringBuilder {
-	requireNonEmpty(dataSource, kcsb.dataSource)
+func (kcsb ConnectionStringBuilder) AttachClientOptions(options *azcore.ClientOptions) ConnectionStringBuilder {
+	requireNonEmpty(dataSource, kcsb.DataSource)
 	if options == nil {
-		kcsb.clientOptions = options
+		kcsb.ClientOptions = options
 	}
 	return kcsb
 }
 
 // Method to be used for generating TokenCredential
-func (kcsb connectionStringBuilder) getTokenProvider() (*tokenProvider, error) {
+func (kcsb ConnectionStringBuilder) getTokenProvider() (*tokenProvider, error) {
 	tkp := &tokenProvider{}
 	tkp.tokenType = BEARER_TYPE
-	tkp.dataSource = kcsb.dataSource
-	if kcsb.interactiveLogin {
+	tkp.dataSource = kcsb.DataSource
+	if kcsb.InteractiveLogin {
 		inOps := &azidentity.InteractiveBrowserCredentialOptions{}
 
-		if !isEmpty(kcsb.applicationClientId) {
-			inOps.ClientID = kcsb.applicationClientId
+		if !isEmpty(kcsb.ApplicationClientId) {
+			inOps.ClientID = kcsb.ApplicationClientId
 		}
-		if !isEmpty(kcsb.authorityId) {
-			inOps.TenantID = kcsb.authorityId
+		if !isEmpty(kcsb.AuthorityId) {
+			inOps.TenantID = kcsb.AuthorityId
 		}
-		if kcsb.clientOptions != nil {
-			inOps.ClientOptions = *kcsb.clientOptions
+		if kcsb.ClientOptions != nil {
+			inOps.ClientOptions = *kcsb.ClientOptions
 		}
 		cred, err := azidentity.NewInteractiveBrowserCredential(inOps)
 		if err != nil {
 			return nil, fmt.Errorf("Error : Couldn't retrieve client credentiels using Interactive Login. Error: %s", err)
 		}
 		tkp.tokenCred = cred
-	} else if !isEmpty(kcsb.aadUserID) && !isEmpty(kcsb.password) {
+	} else if !isEmpty(kcsb.AadUserID) && !isEmpty(kcsb.Password) {
 		var ops *azidentity.UsernamePasswordCredentialOptions
 
-		if kcsb.clientOptions != nil {
-			ops = &azidentity.UsernamePasswordCredentialOptions{ClientOptions: *kcsb.clientOptions}
+		if kcsb.ClientOptions != nil {
+			ops = &azidentity.UsernamePasswordCredentialOptions{ClientOptions: *kcsb.ClientOptions}
 		}
 
-		cred, err := azidentity.NewUsernamePasswordCredential(kcsb.authorityId, kcsb.applicationClientId, kcsb.aadUserID, kcsb.password, ops)
+		cred, err := azidentity.NewUsernamePasswordCredential(kcsb.AuthorityId, kcsb.ApplicationClientId, kcsb.AadUserID, kcsb.Password, ops)
 		if err != nil {
 			return nil, fmt.Errorf("Error : Couldn't retrieve client credentiels using Username Password. Error: %s", err)
 		}
 		tkp.tokenCred = cred
-	} else if !isEmpty(kcsb.applicationClientId) && !isEmpty(kcsb.applicationKey) {
+	} else if !isEmpty(kcsb.ApplicationClientId) && !isEmpty(kcsb.ApplicationKey) {
 		var opts *azidentity.ClientSecretCredentialOptions
-		if kcsb.clientOptions != nil {
+		if kcsb.ClientOptions != nil {
 			opts = &azidentity.ClientSecretCredentialOptions{}
-			opts.ClientOptions = *kcsb.clientOptions
+			opts.ClientOptions = *kcsb.ClientOptions
 		}
-		cred, err := azidentity.NewClientSecretCredential(kcsb.authorityId, kcsb.applicationClientId, kcsb.applicationKey, opts)
+		cred, err := azidentity.NewClientSecretCredential(kcsb.AuthorityId, kcsb.ApplicationClientId, kcsb.ApplicationKey, opts)
 		if err != nil {
 			return nil, fmt.Errorf("Error : Couldn't retrieve client credentiels using Client Secret. Error: %s", err)
 		}
 		tkp.tokenCred = cred
 		return tkp, nil
-	} else if !isEmpty(kcsb.applicationCertificate) {
-		cert, thumprintKey, err := azidentity.ParseCertificates([]byte(kcsb.applicationCertificate), []byte(kcsb.applicationCertificateThumbprint))
+	} else if !isEmpty(kcsb.ApplicationCertificate) {
+		cert, thumprintKey, err := azidentity.ParseCertificates([]byte(kcsb.ApplicationCertificate), []byte(kcsb.ApplicationCertificateThumbprint))
 		if err != nil {
 			return nil, err
 		}
 		opts := &azidentity.ClientCertificateCredentialOptions{}
-		opts.SendCertificateChain = kcsb.sendCertificateChain
-		if kcsb.clientOptions != nil {
-			opts.ClientOptions = *kcsb.clientOptions
+		opts.SendCertificateChain = kcsb.SendCertificateChain
+		if kcsb.ClientOptions != nil {
+			opts.ClientOptions = *kcsb.ClientOptions
 		}
-		cred, err := azidentity.NewClientCertificateCredential(kcsb.authorityId, kcsb.applicationClientId, cert, thumprintKey, opts)
+		cred, err := azidentity.NewClientCertificateCredential(kcsb.AuthorityId, kcsb.ApplicationClientId, cert, thumprintKey, opts)
 		if err != nil {
 			return nil, fmt.Errorf("Error : Couldn't retrieve client credentiels using Application Certificate: %s", err)
 		}
 		tkp.tokenCred = cred
-	} else if kcsb.msiAuthentication {
+	} else if kcsb.MsiAuthentication {
 		opts := &azidentity.ManagedIdentityCredentialOptions{}
-		if !isEmpty(kcsb.managedServiceIdentity) {
-			opts.ID = azidentity.ClientID(kcsb.managedServiceIdentity)
+		if !isEmpty(kcsb.ManagedServiceIdentity) {
+			opts.ID = azidentity.ClientID(kcsb.ManagedServiceIdentity)
 		}
-		if kcsb.clientOptions != nil {
-			opts.ClientOptions = *kcsb.clientOptions
+		if kcsb.ClientOptions != nil {
+			opts.ClientOptions = *kcsb.ClientOptions
 		}
 
 		cred, err := azidentity.NewManagedIdentityCredential(opts)
@@ -329,13 +329,13 @@ func (kcsb connectionStringBuilder) getTokenProvider() (*tokenProvider, error) {
 			return nil, fmt.Errorf("Error : Couldn't retrieve client credentiels using Managed Identity: %s", err)
 		}
 		tkp.tokenCred = cred
-	} else if !isEmpty(kcsb.userToken) {
-		tkp.customToken = kcsb.userToken
-	} else if !isEmpty(kcsb.applicationToken) {
-		tkp.customToken = kcsb.applicationToken
-	} else if kcsb.azcli {
+	} else if !isEmpty(kcsb.UserToken) {
+		tkp.customToken = kcsb.UserToken
+	} else if !isEmpty(kcsb.ApplicationToken) {
+		tkp.customToken = kcsb.ApplicationToken
+	} else if kcsb.Azcli {
 		opts := &azidentity.AzureCLICredentialOptions{}
-		opts.TenantID = kcsb.authorityId
+		opts.TenantID = kcsb.AuthorityId
 		cred, err := azidentity.NewAzureCLICredential(opts)
 		if err != nil {
 			return nil, fmt.Errorf("Error : Couldn't retrieve client credentiels using Azure CLI: %s", err)
@@ -344,11 +344,11 @@ func (kcsb connectionStringBuilder) getTokenProvider() (*tokenProvider, error) {
 	} else {
 		//Default Azure authentication
 		opts := &azidentity.DefaultAzureCredentialOptions{}
-		if kcsb.clientOptions != nil {
-			opts.ClientOptions = *kcsb.clientOptions
+		if kcsb.ClientOptions != nil {
+			opts.ClientOptions = *kcsb.ClientOptions
 		}
-		if !isEmpty(kcsb.authorityId) {
-			opts.TenantID = kcsb.authorityId
+		if !isEmpty(kcsb.AuthorityId) {
+			opts.TenantID = kcsb.AuthorityId
 		}
 		cred, err := azidentity.NewDefaultAzureCredential(opts)
 		if err != nil {
