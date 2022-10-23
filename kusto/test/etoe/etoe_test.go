@@ -1729,7 +1729,7 @@ func createStringyLogsData() string {
 
 func executeCommands(client *kusto.Client, database string, commandsToRun ...kusto.Stmt) error {
 	for _, cmd := range commandsToRun {
-		if _, err := client.Mgmt(context.Background(), database, cmd, kusto.AllowWrite()); err != nil {
+		if _, err := client.Mgmt(context.Background(), database, cmd); err != nil {
 			return err
 		}
 	}

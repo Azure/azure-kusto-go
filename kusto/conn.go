@@ -69,8 +69,6 @@ type queryMsg struct {
 	Properties requestProperties `json:"properties,omitempty"`
 }
 
-var writeRE = regexp.MustCompile(`(\.set|\.append|\.set-or-append|\.set-or-replace)`)
-
 type connOptions struct {
 	queryOptions *queryOptions
 	mgmtOptions  *mgmtOptions
@@ -88,18 +86,6 @@ func (c *conn) query(ctx context.Context, db string, query Stmt, options *queryO
 
 // mgmt is used to do management queries to Kusto.
 func (c *conn) mgmt(ctx context.Context, db string, query Stmt, options *mgmtOptions) (execResp, error) {
-	if writeRE.MatchString(query.String()) {
-		if !options.canWrite {
-			return execResp{}, errors.ES(
-				errors.OpQuery,
-				errors.KClientArgs,
-				"Mgmt() attempted to do a write operation. "+
-					"This requires the AllowWrite() QueryOption to be passed. "+
-					"Please see documentation on that option before use",
-			).SetNoRetry()
-		}
-	}
-
 	return c.execute(ctx, execMgmt, db, query, *options.requestProperties)
 }
 
@@ -158,7 +144,7 @@ func (c *conn) doRequest(ctx context.Context, execType int, db string, query Stm
 	header.Add("Accept-Encoding", "gzip")
 	header.Add("x-ms-client-version", "Kusto.Go.Client: "+version.Kusto)
 	header.Add("Content-Type", "application/json; charset=utf-8")
-	header.Add("x-ms-client-request-id", "KGC.execute;"+uuid.New().String())
+	header.Add("x-ms-client-request-id", "KGC.execute;test.false.progressive"+uuid.New().String())
 
 	if properties.Application != "" {
 		header.Add("x-ms-app", properties.Application)
