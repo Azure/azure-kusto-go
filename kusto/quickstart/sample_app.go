@@ -4,9 +4,8 @@ import (
 	"encoding/json"
 	"fmt"
 	"github.com/Azure/azure-kusto-go/kusto"
-	"github.com/Azure/azure-kusto-go/kusto/ingest"
 	"github.com/Azure/azure-kusto-go/kusto/quickstart/utils"
-	"github.com/Azure/azure-kusto-go/kusto/quickstart/utils/authentication"
+	"github.com/Azure/go-autorest/autorest/azure/auth"
 	"io/ioutil"
 	"os"
 )
@@ -16,6 +15,7 @@ type SourceType string
 const (
 	localFileSource SourceType = "localFileSource"
 	blobSource      SourceType = "blobSource"
+	noSource        SourceType = "nosource"
 )
 
 type AuthenticationModeOptions string
@@ -54,7 +54,7 @@ type ConfigData struct {
 	MappingValue       string `json:"mappingValue"`
 }
 
-func load_configs(configFileName string) ConfigJson {
+func loadConfigs(configFileName string) ConfigJson {
 	jsonFile, err := os.Open(configFileName)
 
 	if err != nil {
@@ -94,35 +94,41 @@ func main() {
 	fmt.Println("Kusto sample app is starting...")
 	var step = 1
 	const configFileName = "kusto/quickstart/kusto_sample_config.json"
-	var config = load_configs(configFileName)
+	var config = loadConfigs(configFileName)
 
 	if config.AuthenticationMode == UserPrompt {
 		waitForUserToProceed("You will be prompted *twice* for credentials during this script. Please return to the console after authenticating.", step, config.WaitForUser)
 	}
 
-	var kustoConnectionString = authentication.generate_connection_string(config.KustoUri, config.AuthenticationMode)
-	kustoClient, err := kusto.New(config.KustoUri, kustoConnectionString)
+	azAuthorizer, err := auth.NewAuthorizerFromCLI()
+
 	if err != nil {
-		utils.errorHandler("Couldn't create client. Please validate your URIs in the configuration file.", err)
+		fmt.Println("Failed to acquire auth token from az-cli" + err.Error())
+		return
+	} // TODO: Temp az cli connection
+
+	kustoClient, err := kusto.New(config.KustoUri, kusto.Authorization{Authorizer: azAuthorizer})
+	if err != nil {
+		utils.ErrorHandler("Couldn't create Kusto client. Please validate your URIs in the configuration file.", err)
 	}
 	defer func(client *kusto.Client) {
 		err := client.Close()
 		if err != nil {
-			utils.errorHandler("Couldn't close client.", err)
+			utils.ErrorHandler("Couldn't close client.", err)
 		}
 	}(kustoClient)
 
-	ingestClient, err := ingest.New(kustoClient, config.DatabaseName, config.TableName)
-	if err != nil {
-		utils.errorHandler("Couldn't create client. Please validate your URIs in the configuration file.", err)
-	}
-	// Be sure to close the ingestor when you're done. (Error handling omitted for brevity.)
-	defer func(ingestClient *ingest.Ingestion) {
-		err := ingestClient.Close()
-		if err != nil {
-			utils.errorHandler("Couldn't close client.", err)
-		}
-	}(ingestClient)
+	//ingestClient, err := ingest.New(kustoClient, config.DatabaseName, config.TableName)
+	//if err != nil {
+	//	utils.ErrorHandler("Couldn't create Ingest client. Please validate your URIs in the configuration file.", err)
+	//}
+	//// Be sure to close the ingestor when you're done. (Error handling omitted for brevity.)
+	//defer func(ingestClient *ingest.Ingestion) {
+	//	err := ingestClient.Close()
+	//	if err != nil {
+	//		utils.ErrorHandler("Couldn't close client.", err)
+	//	}
+	//}(ingestClient)
 
 	fmt.Println("\nKusto sample app done")
 }
