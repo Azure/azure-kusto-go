@@ -235,7 +235,14 @@ func (c *Client) Query(ctx context.Context, db string, query Stmt, options ...Qu
 	var sm stateMachine
 
 	// TODO: this is a workaround for a bug (currently kusto wrongly returns isProgressive: false always), change it back to see the header when fixed
-	if result, ok := opts.requestProperties.Options["results_progressive_enabled"]; result.(bool) && ok {
+	isProgressive := false
+	if result, ok := opts.requestProperties.Options["results_progressive_enabled"]; ok {
+		if r, ok := result.(bool); ok && r {
+			isProgressive = true
+		}
+	}
+
+	if isProgressive {
 		sm = &progressiveSM{
 			op:   errors.OpQuery,
 			iter: iter,
