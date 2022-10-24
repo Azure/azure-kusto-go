@@ -127,7 +127,7 @@ func TestQueries(t *testing.T) {
 		),
 	)
 
-	allDataTypesTable := "goe2e_all_data_types"
+	allDataTypesTable := fmt.Sprintf("goe2e_all_data_types_%d_%d", time.Now().UnixNano(), rand.Int())
 	require.NoError(t, createIngestionTable(t, client, allDataTypesTable, true))
 
 	tests := []struct {
@@ -1510,7 +1510,7 @@ func TestError(t *testing.T) {
 	))
 
 	kustoError, ok := errors.GetKustoError(err)
-	assert.True(t, ok)
+	require.True(t, ok)
 	assert.Equal(t, errors.OpQuery, kustoError.Op)
 	assert.Equal(t, errors.KHTTPError, kustoError.Kind)
 	assert.True(t, strings.Contains(kustoError.Error(), "Failed to resolve table expression"))
