@@ -425,10 +425,10 @@ func TestQueries(t *testing.T) {
 				require.Nilf(t, err, "TestQueries(%s): had test.qjcall error: %s", test.desc, err)
 
 				// replace guids with <GUID>
-				guidRegex := regexp.MustCompile("(\\w+-){4}\\w+")
+				guidRegex := regexp.MustCompile(`(\w+-){4}\w+`)
 				json = guidRegex.ReplaceAllString(json, "<GUID>")
 
-				timeRegex := regexp.MustCompile("([0:]+\\.(\\d)+)|([\\d\\-]+T[\\d\\-.:]+Z)")
+				timeRegex := regexp.MustCompile(`([0:]+\.(\d)+)|([\d\-]+T[\d\-.:]+Z)`)
 				json = timeRegex.ReplaceAllString(json, "<TIME>")
 
 				require.Equal(t, test.want, json)
