@@ -4,6 +4,7 @@ import (
 	"bytes"
 	"context"
 	"fmt"
+	"github.com/Azure/azure-sdk-for-go/sdk/storage/azblob"
 	"io"
 	"sync"
 
@@ -36,6 +37,8 @@ type Ingestion struct {
 
 	bufferSize int
 	maxBuffers int
+
+	tm azblob.TransferManager
 }
 
 // Option is an optional argument to New().
@@ -62,6 +65,15 @@ func WithHeaderPoolSize(size int) Option {
 	}
 }
 
+func WithTransferManager(tm azblob.TransferManager) Option {
+	return func(s Ingestor) {
+		switch s.(type) {
+		case *Ingestion:
+			s.(*Ingestion).tm = tm
+		}
+	}
+}
+
 // New is a constructor for Ingestion.
 func New(client QueryClient, db, table string, options ...Option) (*Ingestion, error) {
 	mgr, err := resources.New(client)
@@ -80,7 +92,16 @@ func New(client QueryClient, db, table string, options ...Option) (*Ingestion, e
 		option(i)
 	}
 
-	fs, err := queued.New(db, table, mgr, queued.WithStaticBuffer(i.bufferSize, i.maxBuffers))
+	if i.tm == nil {
+		if i.bufferSize > 0 && i.maxBuffers > 0 {
+			i.tm, err = azblob.NewStaticBuffer(i.bufferSize, i.maxBuffers)
+			if err != nil {
+				return nil, err
+			}
+		}
+	}
+
+	fs, err := queued.New(db, table, mgr, queued.WithTransferManager(i.tm))
 	if err != nil {
 		return nil, err
 	}

@@ -61,19 +61,14 @@ type Ingestion struct {
 	uploadStream    uploadStream
 	uploadBlob      uploadBlob
 	transferManager azblob.TransferManager
-
-	bufferSize int
-	maxBuffers int
 }
 
 // Option is an optional argument to New().
 type Option func(s *Ingestion)
 
-// WithStaticBuffer sets a static buffer with a buffer size and max amount of buffers for uploading blobs to kusto.
-func WithStaticBuffer(bufferSize int, maxBuffers int) Option {
+func WithTransferManager(tm azblob.TransferManager) Option {
 	return func(s *Ingestion) {
-		s.bufferSize = bufferSize
-		s.maxBuffers = maxBuffers
+		s.transferManager = tm
 	}
 }
 
@@ -97,14 +92,10 @@ func New(db, table string, mgr *resources.Manager, options ...Option) (*Ingestio
 
 	var transferManager azblob.TransferManager
 	var err error
-	if i.bufferSize == 0 && i.maxBuffers == 0 {
+	if i.transferManager == nil {
 		transferManager, err = azblob.NewSyncPool(BlockSize, Concurrency)
-	} else {
-		transferManager, err = azblob.NewStaticBuffer(i.bufferSize, i.maxBuffers)
-		if err != nil {
-			err = fmt.Errorf("invalid WithStaticBuffer option : %v", err)
-		}
 	}
+
 	if err != nil {
 		return nil, err
 	}
