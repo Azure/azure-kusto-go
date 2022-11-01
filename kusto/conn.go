@@ -39,6 +39,7 @@ type conn struct {
 	auth                           autorest.Authorizer
 	endMgmt, endQuery, streamQuery *url.URL
 	client                         *http.Client
+	closeLock                      sync.Once
 }
 
 // newConn returns a new conn object with an injected http.Client
@@ -227,9 +228,17 @@ func (c *conn) doRequest(ctx context.Context, execType int, db string, query Stm
 }
 
 func (c *conn) Close() error {
-	if closer, ok := c.auth.(io.Closer); ok {
-		return closer.Close()
-	}
+	var err error
+	c.closeLock.Do(func() {
+		auth, ok := c.auth.(io.Closer)
 
-	return nil
+		if !ok {
+			err = nil
+			return
+		}
+
+		err = auth.Close()
+	})
+
+	return err
 }
