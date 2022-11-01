@@ -3,7 +3,8 @@ package v2
 import (
 	"bytes"
 	"context"
-	"io/ioutil"
+	"io"
+	"os"
 	"testing"
 
 	"github.com/Azure/azure-kusto-go/kusto/data/errors"
@@ -20,7 +21,7 @@ import (
 
 func BenchmarkDecode(b *testing.B) {
 	b.ReportAllocs()
-	stream, err := ioutil.ReadFile("./testdata/stream_small.json")
+	stream, err := os.ReadFile("./testdata/stream_small.json")
 	if err != nil {
 		b.SkipNow() // We don't want to use our current testdata file, but want to keep the benchmark.
 		return
@@ -30,7 +31,7 @@ func BenchmarkDecode(b *testing.B) {
 
 	b.ResetTimer()
 	for n := 0; n < b.N; n++ {
-		r := ioutil.NopCloser(bytes.NewReader(stream))
+		r := io.NopCloser(bytes.NewReader(stream))
 		framesCh := dec.Decode(context.Background(), r, errors.OpQuery)
 
 		for fr := range framesCh {
