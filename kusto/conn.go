@@ -144,7 +144,7 @@ func (c *conn) doRequest(ctx context.Context, execType int, db string, query Stm
 	header.Add("Accept-Encoding", "gzip")
 	header.Add("x-ms-client-version", "Kusto.Go.Client: "+version.Kusto)
 	header.Add("Content-Type", "application/json; charset=utf-8")
-	header.Add("x-ms-client-request-id", "KGC.execute;test.false.progressive"+uuid.New().String())
+	header.Add("x-ms-client-request-id", "KGC.execute;"+uuid.New().String())
 
 	if properties.Application != "" {
 		header.Add("x-ms-app", properties.Application)
