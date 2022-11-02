@@ -59,12 +59,19 @@ jobs:
       - name: Upload coverage to Codecov
         uses: codecov/codecov-action@v2
 
-  event_file:
-    name: "Event File"
+  publish-test-results:
+    name: "Publish Unit Tests Results"
+    needs: build
     runs-on: ubuntu-latest
+    if: always()
+
     steps:
-      - name: Upload
-        uses: actions/upload-artifact@v2
+      - name: Download Artifacts
+        uses: actions/download-artifact@v2
         with:
-          name: Event File
-          path: ${{ github.event_path }}
+          path: artifacts
+
+      - name: Publish Unit Test Results
+        uses: EnricoMi/publish-unit-test-result-action@v1
+        with:
+          files: kusto/report.xml
