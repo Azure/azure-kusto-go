@@ -3,7 +3,7 @@ package v1
 import (
 	"context"
 	"encoding/json"
-	"io/ioutil"
+	"io"
 	"strings"
 	"testing"
 	"time"
@@ -152,7 +152,7 @@ func TestNormalDecode(t *testing.T) {
 	}
 
 	dec := Decoder{}
-	ch := dec.Decode(ctx, ioutil.NopCloser(strings.NewReader(jsonStr)), errors.OpQuery)
+	ch := dec.Decode(ctx, io.NopCloser(strings.NewReader(jsonStr)), errors.OpQuery)
 
 	for _, want := range wantFrames {
 		got := <-ch
@@ -326,7 +326,7 @@ func TestErrorDecode(t *testing.T) {
 	}
 
 	dec := Decoder{}
-	ch := dec.Decode(ctx, ioutil.NopCloser(strings.NewReader(jsonStr)), errors.OpQuery)
+	ch := dec.Decode(ctx, io.NopCloser(strings.NewReader(jsonStr)), errors.OpQuery)
 
 	for _, want := range wantFrames {
 		got := <-ch

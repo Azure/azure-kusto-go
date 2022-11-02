@@ -4,6 +4,7 @@ import (
 	"context"
 	"errors"
 	"fmt"
+	kustoErrors "github.com/Azure/azure-kusto-go/kusto/data/errors"
 	"testing"
 	"time"
 
@@ -66,8 +67,8 @@ func (n *NodeInfo) Node(ctx context.Context, id int64) (NodeRec, error) {
 	}
 
 	rec := NodeRec{}
-	err = iter.Do(
-		func(row *table.Row) error {
+	err = iter.DoOnRowOrError(
+		func(row *table.Row, _ *kustoErrors.Error) error {
 			return row.ToStruct(&rec)
 		},
 	)
@@ -89,17 +90,17 @@ type fakeQuerier struct {
 }
 
 // Query implements querier.querier.
-func (f *fakeQuerier) Query(ctx context.Context, db string, passedQuery kusto.Stmt, options ...kusto.QueryOption) (*kusto.RowIterator, error) {
+func (f *fakeQuerier) Query(_ context.Context, _ string, passedQuery kusto.Stmt, _ ...kusto.QueryOption) (*kusto.RowIterator, error) {
 	if passedQuery.String() != f.expectQuery {
 		panic("we expect the query to be " + f.expectQuery)
 	}
 
 	ri := &kusto.RowIterator{}
-	ri.Mock(f.mock)
+	_ = ri.Mock(f.mock)
 	return ri, nil
 }
 
-func ExampleMockRows(t *testing.T) {
+func ExampleMockRows(t *testing.T) { // nolint:govet // Example code
 	now := time.Now()
 
 	tests := []struct {
@@ -154,7 +155,7 @@ func ExampleMockRows(t *testing.T) {
 			}
 		}
 		if test.kustoErr {
-			m.Error(errors.New("kusto error"))
+			_ = m.Error(errors.New("kusto error"))
 		}
 
 		// Create our client and add in our fake querier, which pretends to be Kusto.

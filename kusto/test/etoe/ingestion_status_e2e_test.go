@@ -96,6 +96,7 @@ func TestIngestionStatus(t *testing.T) {
 			}()
 
 			res, err := ingestor.FromReader(ctx, reader, ingest.ReportResultToTable(), ingest.FileFormat(ingest.CSV))
+			require.NoError(t, err)
 			ch[i] = res.Wait(ctx)
 		}
 

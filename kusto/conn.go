@@ -9,7 +9,6 @@ import (
 	"encoding/json"
 	"fmt"
 	"io"
-	"io/ioutil"
 	"net/http"
 	"net/url"
 	"regexp"
@@ -37,7 +36,6 @@ var bufferPool = sync.Pool{
 
 // conn provides connectivity to a Kusto instance.
 type conn struct {
-	endpoint                       string
 	auth                           autorest.Authorizer
 	endMgmt, endQuery, streamQuery *url.URL
 	client                         *http.Client
@@ -105,10 +103,19 @@ func (c *conn) mgmt(ctx context.Context, db string, query Stmt, options *mgmtOpt
 	return c.execute(ctx, execMgmt, db, query, *options.requestProperties)
 }
 
+func (c *conn) queryToJson(ctx context.Context, db string, query Stmt, options *queryOptions) (string, error) {
+	_, _, _, body, e := c.doRequest(ctx, execQuery, db, query, *options.requestProperties)
+	if e != nil {
+		return "", e
+	}
+
+	all, e := io.ReadAll(body)
+	return string(all), e
+}
+
 const (
-	execUnknown = 0
-	execQuery   = 1
-	execMgmt    = 2
+	execQuery = 1
+	execMgmt  = 2
 )
 
 type execResp struct {
@@ -118,6 +125,27 @@ type execResp struct {
 }
 
 func (c *conn) execute(ctx context.Context, execType int, db string, query Stmt, properties requestProperties) (execResp, error) {
+	op, header, resp, body, e := c.doRequest(ctx, execType, db, query, properties)
+	if e != nil {
+		return execResp{}, e
+	}
+
+	var dec frames.Decoder
+	switch execType {
+	case execMgmt:
+		dec = &v1.Decoder{}
+	case execQuery:
+		dec = &v2.Decoder{}
+	default:
+		return execResp{}, errors.ES(op, errors.KInternal, "unknown execution type was %v", execType).SetNoRetry()
+	}
+
+	frameCh := dec.Decode(ctx, body, op)
+
+	return execResp{reqHeader: header, respHeader: resp.Header, frameCh: frameCh}, nil
+}
+
+func (c *conn) doRequest(ctx context.Context, execType int, db string, query Stmt, properties requestProperties) (errors.Op, http.Header, *http.Response, io.ReadCloser, error) {
 	var op errors.Op
 	if execType == execQuery {
 		op = errors.OpQuery
@@ -131,6 +159,14 @@ func (c *conn) execute(ctx context.Context, execType int, db string, query Stmt,
 	header.Add("x-ms-client-version", "Kusto.Go.Client: "+version.Kusto)
 	header.Add("Content-Type", "application/json; charset=utf-8")
 	header.Add("x-ms-client-request-id", "KGC.execute;"+uuid.New().String())
+
+	if properties.Application != "" {
+		header.Add("x-ms-app", properties.Application)
+	}
+
+	if properties.User != "" {
+		header.Add("x-ms-user", properties.User)
+	}
 
 	var endpoint *url.URL
 	buff := bufferPool.Get().(*bytes.Buffer)
@@ -148,7 +184,7 @@ func (c *conn) execute(ctx context.Context, execType int, db string, query Stmt,
 			},
 		)
 		if err != nil {
-			return execResp{}, errors.E(op, errors.KInternal, fmt.Errorf("could not JSON marshal the Query message: %w", err))
+			return 0, nil, nil, nil, errors.E(op, errors.KInternal, fmt.Errorf("could not JSON marshal the Query message: %w", err))
 		}
 		if execType == execQuery {
 			endpoint = c.endQuery
@@ -156,51 +192,38 @@ func (c *conn) execute(ctx context.Context, execType int, db string, query Stmt,
 			endpoint = c.endMgmt
 		}
 	default:
-		return execResp{}, errors.ES(op, errors.KInternal, "internal error: did not understand the type of execType: %d", execType)
+		return 0, nil, nil, nil, errors.ES(op, errors.KInternal, "internal error: did not understand the type of execType: %d", execType)
 	}
 
 	req := &http.Request{
 		Method: http.MethodPost,
 		URL:    endpoint,
 		Header: header,
-		Body:   ioutil.NopCloser(buff),
+		Body:   io.NopCloser(buff),
 	}
 
 	var err error
 	prep := c.auth.WithAuthorization()
 	req, err = prep(autorest.CreatePreparer()).Prepare(req)
 	if err != nil {
-		return execResp{}, errors.E(op, errors.KInternal, err)
+		return 0, nil, nil, nil, errors.E(op, errors.KInternal, err)
 	}
 
 	resp, err := c.client.Do(req.WithContext(ctx))
 	if err != nil {
 		// TODO(jdoak): We need a http error unwrap function that pulls out an *errors.Error.
-		return execResp{}, errors.E(op, errors.KHTTPError, fmt.Errorf("with query %q: %w", query.String(), err))
+		return 0, nil, nil, nil, errors.E(op, errors.KHTTPError, fmt.Errorf("with query %q: %w", query.String(), err))
 	}
 
 	body, err := response.TranslateBody(resp, op)
 	if err != nil {
-		return execResp{}, err
+		return 0, nil, nil, nil, err
 	}
 
 	if resp.StatusCode != http.StatusOK {
-		return execResp{}, errors.HTTP(op, resp.Status, resp.StatusCode, body, fmt.Sprintf("error from Kusto endpoint for query %q: ", query.String()))
+		return 0, nil, nil, nil, errors.HTTP(op, resp.Status, resp.StatusCode, body, fmt.Sprintf("error from Kusto endpoint for query %q: ", query.String()))
 	}
-
-	var dec frames.Decoder
-	switch execType {
-	case execMgmt:
-		dec = &v1.Decoder{}
-	case execQuery:
-		dec = &v2.Decoder{}
-	default:
-		return execResp{}, errors.ES(op, errors.KInternal, "unknown execution type was %v", execType).SetNoRetry()
-	}
-
-	frameCh := dec.Decode(ctx, body, op)
-
-	return execResp{reqHeader: header, respHeader: resp.Header, frameCh: frameCh}, nil
+	return op, header, resp, body, nil
 }
 
 func (c *conn) Close() error {
