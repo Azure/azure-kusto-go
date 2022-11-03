@@ -65,6 +65,7 @@ func GetMetadata(ctx context.Context, kustoUri string) (CloudInfo, error) {
 	if err != nil {
 		return CloudInfo{}, err
 	}
+	
 
 	u.Path = metadataPath
 	// TODO should we make this timeout configurable.
