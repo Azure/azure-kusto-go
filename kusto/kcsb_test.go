@@ -54,7 +54,7 @@ func TestGetConnectionStringBuilder(t *testing.T) {
 	for _, test := range tests {
 		if isEmpty(test.wantErr) {
 			actual := GetConnectionStringBuilder(test.connectionString)
-			assert.EqualValues(t, test.want, actual)
+			assert.EqualValues(t, test.want, *actual)
 		} else {
 			defer func() {
 				if res := recover(); res == nil {
@@ -78,7 +78,7 @@ func TestWithAadUserPassAuth(t *testing.T) {
 	}
 
 	actual := GetConnectionStringBuilder("endpoint").WithAadUserPassAuth("userid", "password", "authorityID")
-	assert.EqualValues(t, want, actual)
+	assert.EqualValues(t, want, *actual)
 }
 
 func TestWithAadUserPassAuthErr(t *testing.T) {
@@ -100,7 +100,7 @@ func TestWitAadUserToken(t *testing.T) {
 	}
 
 	actual := GetConnectionStringBuilder("endpoint").WitAadUserToken("token")
-	assert.EqualValues(t, want, actual)
+	assert.EqualValues(t, want, *actual)
 }
 
 func TestWitAadUserTokenErr(t *testing.T) {

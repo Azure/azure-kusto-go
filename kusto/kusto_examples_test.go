@@ -11,8 +11,6 @@ import (
 
 	"github.com/Azure/azure-kusto-go/kusto/data/table"
 	"github.com/Azure/azure-kusto-go/kusto/data/types"
-
-	"github.com/Azure/go-autorest/autorest/azure/auth"
 )
 
 func Example_simple() {
@@ -146,7 +144,7 @@ func ExampleAuthorization_config() {
 
 func ExampleAuthorization_msi() {
 
-	kcsb := GetConnectionStringBuilder("endpoint").WithManagedServiceID("", auth.NewMSIConfig().Resource)
+	kcsb := GetConnectionStringBuilder("endpoint").WithUserManagedIdentity("clientID")
 
 	// Normally here you take a client.
 	_, err := New(kcsb)
