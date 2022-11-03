@@ -19,6 +19,7 @@ type queryer interface {
 	io.Closer
 	query(ctx context.Context, db string, query Stmt, options *queryOptions) (execResp, error)
 	mgmt(ctx context.Context, db string, query Stmt, options *mgmtOptions) (execResp, error)
+	queryToJson(ctx context.Context, db string, query Stmt, options *queryOptions) (string, error)
 }
 
 // Authorization provides the ADAL authorizer needed to access the resource. You can set Authorizer or
@@ -194,6 +195,34 @@ func (c *Client) Query(ctx context.Context, db string, query Stmt, options ...Qu
 	<-columnsReady
 
 	return iter, nil
+}
+
+func (c *Client) QueryToJson(ctx context.Context, db string, query Stmt, options ...QueryOption) (string, error) {
+	c.mu.Lock()
+	defer c.mu.Unlock()
+
+	ctx, cancel, err := c.contextSetup(ctx, false) // Note: cancel is called when *RowIterator has Stop() called.
+	if err != nil {
+		return "", err
+	}
+
+	opts, err := c.setQueryOptions(ctx, errors.OpQuery, query, options...)
+	if err != nil {
+		return "", err
+	}
+
+	conn, err := c.getConn(queryCall, connOptions{queryOptions: opts})
+	if err != nil {
+		return "", err
+	}
+
+	json, err := conn.queryToJson(ctx, db, query, opts)
+	if err != nil {
+		cancel()
+		return "", err
+	}
+
+	return json, nil
 }
 
 // Mgmt is used to do management queries to Kusto.

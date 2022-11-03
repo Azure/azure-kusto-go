@@ -112,7 +112,6 @@ func (i *Ingestion) prepForIngestion(ctx context.Context, options []FileOption, 
 			props.Ingestion.TableEntryRef.TableConnectionString = managerResources.Tables[0].URL().String()
 			props.Ingestion.TableEntryRef.PartitionKey = props.Source.ID.String()
 			props.Ingestion.TableEntryRef.RowKey = uuid.Nil.String()
-			break
 		}
 	}
 

@@ -3,6 +3,7 @@ package kusto
 import (
 	"context"
 	"fmt"
+	kustoErrors "github.com/Azure/azure-kusto-go/kusto/data/errors"
 	"io"
 	"net/http"
 	"net/url"
@@ -42,10 +43,13 @@ func Example_simple() {
 	}
 	defer iter.Stop()
 
-	recs := []NodeRec{}
+	var recs []NodeRec
 
-	err = iter.Do(
-		func(row *table.Row) error {
+	err = iter.DoOnRowOrError(
+		func(row *table.Row, e *kustoErrors.Error) error {
+			if e != nil {
+				return e
+			}
 			rec := NodeRec{}
 			if err := row.ToStruct(&rec); err != nil {
 				return err
@@ -276,7 +280,7 @@ func ExampleClient_Query_struct() {
 	go func() {
 		// Note: we ignore the error here because we send it on a channel and an error will automatically
 		// end the iteration.
-		iter.Do(
+		_ = iter.Do(
 			func(row *table.Row) error {
 				rec := NodeRec{}
 				rec.err = row.ToStruct(&rec)
@@ -303,10 +307,9 @@ func ExampleClient_Query_struct() {
 	wg.Wait()
 }
 
-func ExampleCustomHttpClient() {
+func ExampleCustomHttpClient() { // nolint:govet // Example code
 	// Create a connection string builder with your Azure ClientID, Secret and TenantID.
 	kcsb := GetConnectionStringBuilder("endpoint").WithAadAppKey("clientID", "clientSecret", "tenentID")
-
 	httpClient := &http.Client{}
 	url, err := url.Parse("squid-proxy.corp.mycompany.com:2323")
 	if err != nil {

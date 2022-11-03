@@ -233,7 +233,6 @@ func (r *RowIterator) DoOnRowOrError(f func(r *table.Row, e *errors.Error) error
 // receiving a RowIterator.
 func (r *RowIterator) Stop() {
 	r.cancel()
-	return
 }
 
 // Deprecated: Use NextRowOrError() instead for more robust error handling. In a future version, this will be removed, and NextRowOrError will replace it.
@@ -340,8 +339,5 @@ func (r *RowIterator) GetQueryCompletionInformation() (v2.DataTable, error) {
 }
 
 func isTest() bool {
-	if flag.Lookup("test.v") == nil {
-		return false
-	}
-	return true
+	return flag.Lookup("test.v") != nil
 }

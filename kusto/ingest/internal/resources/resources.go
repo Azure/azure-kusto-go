@@ -218,8 +218,11 @@ func (m *Manager) AuthContext(ctx context.Context) (string, error) {
 
 	count := 0
 	token := token{}
-	err = rows.Do(
-		func(r *table.Row) error {
+	err = rows.DoOnRowOrError(
+		func(r *table.Row, e *kustoErrors.Error) error {
+			if e != nil {
+				return e
+			}
 			if count != 0 {
 				return fmt.Errorf("call for AuthContext returned more than 1 Row")
 			}
@@ -302,8 +305,11 @@ func (m *Manager) fetch(ctx context.Context) error {
 	}
 
 	ingest := Ingestion{}
-	err = rows.Do(
-		func(r *table.Row) error {
+	err = rows.DoOnRowOrError(
+		func(r *table.Row, e *kustoErrors.Error) error {
+			if e != nil {
+				return e
+			}
 			rec := ingestResc{}
 			if err := r.ToStruct(&rec); err != nil {
 				return err

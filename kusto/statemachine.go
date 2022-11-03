@@ -124,6 +124,7 @@ support for giving progress to APIs that want to know how far they are into a se
 should have the following structure and anything outside this should cause an error:
 
 Either:
+
 	TableHeader
 	Progress
 	DataTable

@@ -6,7 +6,6 @@ import (
 	"context"
 	"fmt"
 	"io"
-	"io/ioutil"
 	"net/http"
 	"net/url"
 	"path"
@@ -145,7 +144,7 @@ func (c *Conn) StreamIngest(ctx context.Context, db, table string, payload io.Re
 	var closeablePayload io.ReadCloser
 	var ok bool
 	if closeablePayload, ok = payload.(io.ReadCloser); !ok {
-		closeablePayload = ioutil.NopCloser(payload)
+		closeablePayload = io.NopCloser(payload)
 	}
 
 	req := &http.Request{
