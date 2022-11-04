@@ -197,7 +197,7 @@ func (c *conn) doRequest(ctx context.Context, execType int, db string, query Stm
 
 	token, tokenType, tkerr := c.tokenProvider.acquireToken(ctx)
 	if tkerr != nil {
-		return execResp{}, errors.ES(op, errors.KInternal, "Error while getting token : %s", tkerr)
+		return 0, nil, nil, nil, errors.ES(op, errors.KInternal, "Error while getting token : %s", tkerr)
 	}
 	header.Add("Authorization", fmt.Sprintf("%s %s", tokenType, token))
 

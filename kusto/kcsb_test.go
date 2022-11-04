@@ -4,7 +4,7 @@ import (
 	"testing"
 
 	"github.com/Azure/azure-sdk-for-go/sdk/azcore"
-	"github.com/stretchr/testify/assert"
+	"github.com/tj/assert"
 )
 
 func TestGetConnectionStringBuilder(t *testing.T) {
