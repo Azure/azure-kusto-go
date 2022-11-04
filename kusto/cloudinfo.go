@@ -22,7 +22,7 @@ const (
 	defaultPublicLoginUrl         = "https://login.microsoftonline.com"
 	defaultRedirectUri            = "https://microsoft/kustoclient"
 	defaultKustoServiceResourceId = "https://kusto.kusto.windows.net"
-	defaultFirstPartyAuthorityUri = "https://login.microsoftonline.com/f8cdef31-a31e-4b4a-93e4-5f571e91255a"
+	defaultFirstPartyAuthorityUrl = "https://login.microsoftonline.com/f8cdef31-a31e-4b4a-93e4-5f571e91255a"
 )
 
 // retrieved metadata
@@ -45,7 +45,7 @@ var defaultCloudInfo = CloudInfo{
 	KustoClientAppID:       defaultKustoClientAppId,
 	KustoClientRedirectURI: defaultRedirectUri,
 	KustoServiceResourceID: defaultKustoServiceResourceId,
-	FirstPartyAuthorityURL: defaultFirstPartyAuthorityUri,
+	FirstPartyAuthorityURL: defaultFirstPartyAuthorityUrl,
 }
 
 // cache to query it once per instance
