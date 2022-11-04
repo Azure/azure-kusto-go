@@ -4,7 +4,7 @@ import (
 	"context"
 	"encoding/json"
 	"fmt"
-	"io/ioutil"
+	"io"
 	"net/http"
 	"net/url"
 	"os"
@@ -65,7 +65,6 @@ func GetMetadata(ctx context.Context, kustoUri string) (CloudInfo, error) {
 	if err != nil {
 		return CloudInfo{}, err
 	}
-	
 
 	u.Path = metadataPath
 	// TODO should we make this timeout configurable.
@@ -91,7 +90,7 @@ func GetMetadata(ctx context.Context, kustoUri string) (CloudInfo, error) {
 
 	defer resp.Body.Close()
 
-	b, err := ioutil.ReadAll(resp.Body)
+	b, err := io.ReadAll(resp.Body)
 	if err != nil {
 		return CloudInfo{}, err
 	}
