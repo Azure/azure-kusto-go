@@ -195,9 +195,6 @@ const (
 // Note that the server has a timeout of 4 minutes for a query by default unless the context deadline is set. Queries can
 // take a maximum of 1 hour.
 func (c *Client) Query(ctx context.Context, db string, query Stmt, options ...QueryOption) (*RowIterator, error) {
-	c.mu.Lock()
-	defer c.mu.Unlock()
-
 	ctx, cancel, err := c.contextSetup(ctx, false) // Note: cancel is called when *RowIterator has Stop() called.
 	if err != nil {
 		return nil, err
@@ -258,9 +255,6 @@ func (c *Client) Query(ctx context.Context, db string, query Stmt, options ...Qu
 }
 
 func (c *Client) QueryToJson(ctx context.Context, db string, query Stmt, options ...QueryOption) (string, error) {
-	c.mu.Lock()
-	defer c.mu.Unlock()
-
 	ctx, cancel, err := c.contextSetup(ctx, false) // Note: cancel is called when *RowIterator has Stop() called.
 	if err != nil {
 		return "", err
@@ -291,9 +285,6 @@ func (c *Client) QueryToJson(ctx context.Context, db string, query Stmt, options
 // Note that the server has a timeout of 10 minutes for a management call by default unless the context deadline is set.
 // There is a maximum of 1 hour.
 func (c *Client) Mgmt(ctx context.Context, db string, query Stmt, options ...MgmtOption) (*RowIterator, error) {
-	c.mu.Lock()
-	defer c.mu.Unlock()
-
 	if !query.params.IsZero() || !query.defs.IsZero() {
 		return nil, errors.ES(errors.OpMgmt, errors.KClientArgs, "a Mgmt() call cannot accept a Stmt object that has Definitions or Parameters attached")
 	}
@@ -335,7 +326,7 @@ func (c *Client) Mgmt(ctx context.Context, db string, query Stmt, options ...Mgm
 	return iter, nil
 }
 
-func (c *Client) setQueryOptions(ctx context.Context, op errors.Op, query Stmt, options ...QueryOption) (*queryOptions, error) {
+func (*Client) setQueryOptions(ctx context.Context, op errors.Op, query Stmt, options ...QueryOption) (*queryOptions, error) {
 	params, err := query.params.toParameters(query.defs)
 	if err != nil {
 		return nil, errors.ES(op, errors.KClientArgs, "QueryValues in the the Stmt were incorrect: %s", err).SetNoRetry()
@@ -370,7 +361,7 @@ func (c *Client) setQueryOptions(ctx context.Context, op errors.Op, query Stmt, 
 	return opt, nil
 }
 
-func (c *Client) setMgmtOptions(ctx context.Context, op errors.Op, query Stmt, options ...MgmtOption) (*mgmtOptions, error) {
+func (*Client) setMgmtOptions(ctx context.Context, op errors.Op, query Stmt, options ...MgmtOption) (*mgmtOptions, error) {
 	params, err := query.params.toParameters(query.defs)
 	if err != nil {
 		return nil, errors.ES(op, errors.KClientArgs, "QueryValues in the the Stmt were incorrect: %s", err).SetNoRetry()
@@ -412,6 +403,9 @@ func (c *Client) getConn(callType callType, options connOptions) (queryer, error
 	case mgmtCall:
 		delete(options.mgmtOptions.requestProperties.Options, "results_progressive_enabled")
 		if options.mgmtOptions.queryIngestion {
+			c.mu.Lock()
+			defer c.mu.Unlock()
+
 			if c.ingestConn != nil {
 				return c.ingestConn, nil
 			}
