@@ -112,7 +112,7 @@ type Client struct {
 	conn, ingestConn queryer
 	endpoint         string
 	auth             Authorization
-	mu               sync.Mutex
+	mgmtConnMu       sync.Mutex
 	http             *http.Client
 }
 
@@ -404,8 +404,8 @@ func (c *Client) getConn(callType callType, options connOptions) (queryer, error
 	case mgmtCall:
 		delete(options.mgmtOptions.requestProperties.Options, "results_progressive_enabled")
 		if options.mgmtOptions.queryIngestion {
-			c.mu.Lock()
-			defer c.mu.Unlock()
+			c.mgmtConnMu.Lock()
+			defer c.mgmtConnMu.Unlock()
 
 			if c.ingestConn != nil {
 				return c.ingestConn, nil
