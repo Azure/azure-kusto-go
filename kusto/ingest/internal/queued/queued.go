@@ -347,7 +347,7 @@ func (i *Ingestion) localToBlob(ctx context.Context, from string, client *azblob
 		if err != nil {
 			return "", 0, errors.ES(errors.OpFileIngest, errors.KBlobstore, "problem uploading to Blob Storage: %s", err)
 		}
-		return client.URL(), gstream.InputSize(), nil
+		return urlWithContainer(client, container), gstream.InputSize(), nil
 	}
 
 	// The high-level API UploadFileToBlockBlob function uploads blocks in parallel for optimal performance, and can handle large files as well.
@@ -368,7 +368,7 @@ func (i *Ingestion) localToBlob(ctx context.Context, from string, client *azblob
 		return "", 0, errors.ES(errors.OpFileIngest, errors.KBlobstore, "problem uploading to Blob Storage: %s", err)
 	}
 
-	return client.URL(), stat.Size(), nil
+	return urlWithContainer(client, container), stat.Size(), nil
 }
 
 // CompressionDiscovery looks at the file extension. If it is one we support, we return that
@@ -421,6 +421,10 @@ func IsLocalPath(s string) (bool, error) {
 	}
 
 	return true, nil
+}
+
+func urlWithContainer(client *azblob.Client, container string) string {
+	return client.URL() + "/" + container
 }
 
 func (i *Ingestion) Close() error {
