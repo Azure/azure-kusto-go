@@ -3,7 +3,10 @@ package kusto
 import (
 	"context"
 	"fmt"
+	kustoErrors "github.com/Azure/azure-kusto-go/kusto/data/errors"
 	"io"
+	"net/http"
+	"net/url"
 	"sync"
 	"time"
 
@@ -33,6 +36,9 @@ func Example_simple() {
 		panic("add error handling")
 	}
 
+	// Be sure to close the client when you're done. (Error handling omitted for brevity.)
+	defer client.Close()
+
 	ctx := context.Background()
 
 	// Query our database table "systemNodes" for the CollectionTimes and the NodeIds.
@@ -42,10 +48,13 @@ func Example_simple() {
 	}
 	defer iter.Stop()
 
-	recs := []NodeRec{}
+	var recs []NodeRec
 
-	err = iter.Do(
-		func(row *table.Row) error {
+	err = iter.DoOnRowOrError(
+		func(row *table.Row, e *kustoErrors.Error) error {
+			if e != nil {
+				return e
+			}
 			rec := NodeRec{}
 			if err := row.ToStruct(&rec); err != nil {
 				return err
@@ -105,6 +114,8 @@ func Example_complex() {
 	if err != nil {
 		panic("add error handling")
 	}
+	// Be sure to close the client when you're done. (Error handling omitted for brevity.)
+	defer client.Close()
 
 	ctx := context.Background()
 
@@ -167,6 +178,8 @@ func ExampleClient_Query_rows() {
 	if err != nil {
 		panic("add error handling")
 	}
+	// Be sure to close the client when you're done. (Error handling omitted for brevity.)
+	defer client.Close()
 
 	ctx := context.Background()
 
@@ -210,6 +223,8 @@ func ExampleClient_Query_do() {
 	if err != nil {
 		panic("add error handling")
 	}
+	// Be sure to close the client when you're done. (Error handling omitted for brevity.)
+	defer client.Close()
 
 	ctx := context.Background()
 
@@ -263,6 +278,8 @@ func ExampleClient_Query_struct() {
 	if err != nil {
 		panic("add error handling")
 	}
+	// Be sure to close the client when you're done. (Error handling omitted for brevity.)
+	defer client.Close()
 
 	ctx := context.Background()
 
@@ -280,7 +297,7 @@ func ExampleClient_Query_struct() {
 	go func() {
 		// Note: we ignore the error here because we send it on a channel and an error will automatically
 		// end the iteration.
-		iter.Do(
+		_ = iter.Do(
 			func(row *table.Row) error {
 				rec := NodeRec{}
 				rec.err = row.ToStruct(&rec)
@@ -305,4 +322,24 @@ func ExampleClient_Query_struct() {
 	}()
 
 	wg.Wait()
+}
+
+func ExampleCustomHttpClient() { // nolint:govet // Example code
+	// Create an authorizer with your Azure ClientID, Secret and TenantID.
+	authorizer := Authorization{
+		Config: auth.NewClientCredentialsConfig("clientID", "clientSecret", "tenantID"),
+	}
+	httpClient := &http.Client{}
+	url, err := url.Parse("squid-proxy.corp.mycompany.com:2323")
+	if err != nil {
+		panic(err.Error())
+	}
+
+	httpClient.Transport = &http.Transport{Proxy: http.ProxyURL(url)}
+
+	// Normally here you take a client.
+	_, err = New("endpoint", authorizer, WithHttpClient(httpClient))
+	if err != nil {
+		panic(err.Error())
+	}
 }

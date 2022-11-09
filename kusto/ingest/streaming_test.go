@@ -5,7 +5,6 @@ import (
 	"context"
 	"fmt"
 	"io"
-	"io/ioutil"
 	"os"
 	"strings"
 	"testing"
@@ -25,6 +24,10 @@ type testStreamIngestFunc func(t *testing.T, ctx context.Context, db, table stri
 
 type fakeStreamIngestor struct {
 	onStreamIngest streamIngestFunc
+}
+
+func (f fakeStreamIngestor) Close() error {
+	return nil
 }
 
 func (f fakeStreamIngestor) StreamIngest(ctx context.Context, db, table string, payload io.Reader, format properties.DataFormat, mappingName string, clientRequestId string) error {
@@ -74,13 +77,13 @@ func TestStreaming(t *testing.T) {
 	ctx := context.Background()
 
 	filePath, reader := csvFileAndReader()
-	data, err := ioutil.ReadAll(reader)
+	data, err := io.ReadAll(reader)
 
 	require.NoError(t, err)
 
 	compressedBuffer := gzip.New()
 	compressedBuffer.Reset(io.NopCloser(bytes.NewReader(data)))
-	compressedBytes, err := ioutil.ReadAll(compressedBuffer)
+	compressedBytes, err := io.ReadAll(compressedBuffer)
 	require.NoError(t, err)
 
 	seek, err := reader.Seek(0, io.SeekStart)
@@ -100,7 +103,7 @@ func TestStreaming(t *testing.T) {
 				clientRequestId string) error {
 				assert.Equal(t, "defaultDb", db)
 				assert.Equal(t, "defaultTable", table)
-				payloadBytes, err := ioutil.ReadAll(payload)
+				payloadBytes, err := io.ReadAll(payload)
 				assert.NoError(t, err)
 				assert.Equal(t, compressedBytes, payloadBytes)
 				assert.Equal(t, properties.CSV, format)
@@ -122,7 +125,7 @@ func TestStreaming(t *testing.T) {
 				clientRequestId string) error {
 				assert.Equal(t, "otherDb", db)
 				assert.Equal(t, "otherTable", table)
-				payloadBytes, err := ioutil.ReadAll(payload)
+				payloadBytes, err := io.ReadAll(payload)
 				assert.NoError(t, err)
 				assert.Equal(t, compressedBytes, payloadBytes)
 				assert.Equal(t, properties.CSV, format)
@@ -130,7 +133,7 @@ func TestStreaming(t *testing.T) {
 				parts := strings.Split(clientRequestId, ";")
 				assert.Equal(t, "KGC.executeStreaming", parts[0])
 				_, err = uuid.Parse(parts[1])
-				return nil
+				return err
 			},
 		},
 		{
@@ -142,7 +145,7 @@ func TestStreaming(t *testing.T) {
 				clientRequestId string) error {
 				assert.Equal(t, "defaultDb", db)
 				assert.Equal(t, "defaultTable", table)
-				payloadBytes, err := ioutil.ReadAll(payload)
+				payloadBytes, err := io.ReadAll(payload)
 				assert.NoError(t, err)
 				assert.Equal(t, compressedBytes, payloadBytes)
 				assert.Equal(t, properties.JSON, format)
@@ -150,7 +153,7 @@ func TestStreaming(t *testing.T) {
 				parts := strings.Split(clientRequestId, ";")
 				assert.Equal(t, "KGC.executeStreaming", parts[0])
 				_, err = uuid.Parse(parts[1])
-				return nil
+				return err
 			},
 		},
 		{
@@ -163,7 +166,7 @@ func TestStreaming(t *testing.T) {
 				clientRequestId string) error {
 				assert.Equal(t, "defaultDb", db)
 				assert.Equal(t, "defaultTable", table)
-				payloadBytes, err := ioutil.ReadAll(payload)
+				payloadBytes, err := io.ReadAll(payload)
 				assert.NoError(t, err)
 				assert.Equal(t, compressedBytes, payloadBytes)
 				assert.Equal(t, properties.CSV, format)

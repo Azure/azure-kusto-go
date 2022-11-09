@@ -4,6 +4,7 @@ import (
 	"context"
 	"fmt"
 	"io"
+	"net/http"
 	"reflect"
 	"sync"
 
@@ -18,7 +19,6 @@ import (
 type columnData struct {
 	column   table.Column
 	position int
-	set      bool
 }
 
 type columnMap map[string]columnData
@@ -29,19 +29,6 @@ func newColumnMap(cols table.Columns) columnMap {
 		m[col.Name] = columnData{column: col, position: i}
 	}
 	return m
-}
-
-func (c columnMap) set(name string) error {
-	v, ok := c[name]
-	if !ok {
-		return fmt.Errorf("could not find a column named %q", name)
-	}
-	if v.set {
-		return fmt.Errorf("multiple struct fields with kust tag of %q", name)
-	}
-	v.set = true
-	c[name] = v
-	return nil
 }
 
 // MockRows provides the abilty to provide mocked Row data that can be played back from a RowIterator.
@@ -135,6 +122,14 @@ func (m *MockRows) Error(err error) error {
 type mockConn struct {
 }
 
+func (m mockConn) queryToJson(ctx context.Context, db string, query Stmt, options *queryOptions) (string, error) {
+	return "[]]", nil
+}
+
+func (m mockConn) Close() error {
+	return nil
+}
+
 func (m mockConn) query(_ context.Context, _ string, _ Stmt, _ *queryOptions) (execResp, error) {
 	return execResp{}, nil
 }
@@ -156,6 +151,7 @@ func NewMockClient() *Client {
 		ingestConn: mockConn{},
 		endpoint:   "https://sdkse2etest.eastus.kusto.windows.net",
 		auth:       Authorization{Authorizer: autorest.NewBasicAuthorizer("", "")},
-		mu:         sync.Mutex{},
+		mgmtConnMu: sync.Mutex{},
+		http:       &http.Client{},
 	}
 }

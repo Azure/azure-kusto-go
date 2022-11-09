@@ -165,7 +165,7 @@ func TestStream(t *testing.T) {
 			time.Sleep(10 * time.Millisecond)
 
 			fmt.Println(server.port)
-			conn, err := newWithoutValidation(fmt.Sprintf("http://127.0.0.1:%d", server.port), kusto.Authorization{})
+			conn, err := newWithoutValidation(fmt.Sprintf("http://127.0.0.1:%d", server.port), kusto.Authorization{}, &http.Client{})
 			if err != nil {
 				panic(err)
 			}
@@ -196,7 +196,8 @@ func TestStream(t *testing.T) {
 			err = conn.StreamIngest(ctx, db, "table", &payload, properties.JSON, test.mappingName, "")
 
 			if test.err != nil {
-				assert.Equal(t, test.err, err.(*errors.Error).Err)
+				e, _ := errors.GetKustoError(err)
+				assert.Equal(t, test.err, e.Err)
 				return
 			} else {
 				assert.NoError(t, err)

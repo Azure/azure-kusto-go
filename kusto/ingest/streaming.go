@@ -14,6 +14,7 @@ import (
 )
 
 type streamIngestor interface {
+	io.Closer
 	StreamIngest(ctx context.Context, db, table string, payload io.Reader, format properties.DataFormat, mappingName string, clientRequestId string) error
 }
 
@@ -31,7 +32,7 @@ var FileIsBlobErr = errors.ES(errors.OpIngestStream, errors.KClientArgs, "blobst
 // More information can be found here:
 // https://docs.microsoft.com/en-us/azure/kusto/management/create-ingestion-mapping-command
 func NewStreaming(client QueryClient, db, table string) (*Streaming, error) {
-	streamConn, err := conn.New(client.Endpoint(), client.Auth())
+	streamConn, err := conn.New(client.Endpoint(), client.Auth(), client.HttpClient())
 	if err != nil {
 		return nil, err
 	}
@@ -125,7 +126,7 @@ func streamImpl(c streamIngestor, ctx context.Context, payload io.Reader, props 
 		props.Streaming.ClientRequestId)
 
 	if err != nil {
-		if e, ok := err.(*errors.Error); ok {
+		if e, ok := errors.GetKustoError(err); ok {
 			return nil, e
 		}
 		return nil, errors.E(errors.OpIngestStream, errors.KClientArgs, err)
@@ -153,4 +154,8 @@ func (i *Streaming) newProp() properties.All {
 			ClientRequestId: "KGC.executeStreaming;" + uuid.New().String(),
 		},
 	}
+}
+
+func (i *Streaming) Close() error {
+	return i.streamConn.Close()
 }

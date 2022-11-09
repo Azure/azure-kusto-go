@@ -27,8 +27,6 @@ import (
 // This allows us to enforce the use of constants or strings built with injection protection.
 type stringConstant string
 
-func (s stringConstant) isStringConstant() {}
-
 // String implements fmt.Stringer.
 func (s stringConstant) String() string {
 	return string(s)
@@ -338,10 +336,7 @@ func NewParameters() Parameters {
 
 // IsZero returns if Parameters is the zero value.
 func (q Parameters) IsZero() bool {
-	if len(q.m) == 0 {
-		return true
-	}
-	return false
+	return len(q.m) == 0
 }
 
 // With returns a Parameters set to "values". values' keys represents Definitions names
@@ -452,11 +447,11 @@ func (q Parameters) validate(p Definitions) (Parameters, error) {
 			if !ok {
 				return q, fmt.Errorf("Parameters[%s](string) = %T, which is not a string", k, v)
 			}
-			out[k] = fmt.Sprintf("%s", s)
+			out[k] = fmt.Sprint(s)
 		case types.Timespan:
 			d, ok := v.(time.Duration)
 			if !ok {
-				return q, fmt.Errorf("Parameters[%s](timespan) = %T, which is not a time.Duration", k, v)
+				return q, fmt.Errorf("parameters[%s](timespan) = %T, which is not a time.Duration", k, v)
 			}
 			out[k] = fmt.Sprintf("timespan(%s)", value.Timespan{Value: d, Valid: true}.Marshal())
 		case types.Decimal:

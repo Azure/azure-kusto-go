@@ -6,7 +6,6 @@ import (
 	"context"
 	"fmt"
 	"io"
-	"io/ioutil"
 	"net/http"
 	"net/url"
 	"path"
@@ -39,12 +38,13 @@ type Conn struct {
 	reqHeaders  http.Header
 	headersPool chan http.Header
 	client      *http.Client
+	done        chan struct{}
 
 	inTest bool
 }
 
 // New returns a new Conn object.
-func New(endpoint string, auth kusto.Authorization) (*Conn, error) {
+func New(endpoint string, auth kusto.Authorization, client *http.Client) (*Conn, error) {
 	if !validURL.MatchString(endpoint) {
 		return nil, errors.ES(
 			errors.OpServConn,
@@ -56,10 +56,10 @@ func New(endpoint string, auth kusto.Authorization) (*Conn, error) {
 		return nil, err
 	}
 
-	return newWithoutValidation(endpoint, auth)
+	return newWithoutValidation(endpoint, auth, client)
 }
 
-func newWithoutValidation(endpoint string, auth kusto.Authorization) (*Conn, error) {
+func newWithoutValidation(endpoint string, auth kusto.Authorization, client *http.Client) (*Conn, error) {
 	headers := http.Header{}
 	headers.Add("Accept", "application/json")
 	headers.Add("Accept-Encoding", "gzip,deflate")
@@ -81,7 +81,8 @@ func newWithoutValidation(endpoint string, auth kusto.Authorization) (*Conn, err
 		baseURL:     &url.URL{Scheme: u.Scheme, Host: u.Host, Path: "/v1/rest/ingest/"},
 		reqHeaders:  headers,
 		headersPool: make(chan http.Header, 100),
-		client:      &http.Client{},
+		client:      client,
+		done:        make(chan struct{}),
 	}
 
 	// Fills a pool of headers to alleviate header copying timing at request time.
@@ -113,7 +114,13 @@ func (c *Conn) StreamIngest(ctx context.Context, db, table string, payload io.Re
 
 	headers := <-c.headersPool
 	go func() {
-		c.headersPool <- copyHeaders(c.reqHeaders)
+		header := copyHeaders(c.reqHeaders)
+		select {
+		case <-c.done:
+			return
+		case c.headersPool <- header:
+			return
+		}
 	}()
 
 	if clientRequestId != "" {
@@ -138,7 +145,7 @@ func (c *Conn) StreamIngest(ctx context.Context, db, table string, payload io.Re
 	var closeablePayload io.ReadCloser
 	var ok bool
 	if closeablePayload, ok = payload.(io.ReadCloser); !ok {
-		closeablePayload = ioutil.NopCloser(payload)
+		closeablePayload = io.NopCloser(payload)
 	}
 
 	req := &http.Request{
@@ -167,7 +174,7 @@ func (c *Conn) StreamIngest(ctx context.Context, db, table string, payload io.Re
 		if err != nil {
 			return err
 		}
-		return errors.HTTP(writeOp, resp.Status, body, "streaming ingest issue")
+		return errors.HTTP(writeOp, resp.Status, resp.StatusCode, body, "streaming ingest issue")
 	}
 	return nil
 }
@@ -178,4 +185,14 @@ func copyHeaders(header http.Header) http.Header {
 		headers[k] = v
 	}
 	return headers
+}
+
+func (c *Conn) Close() error {
+	select {
+	case <-c.done:
+		return nil
+	default:
+		close(c.done)
+		return nil
+	}
 }

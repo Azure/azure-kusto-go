@@ -14,6 +14,7 @@ import (
 	"github.com/Azure/azure-kusto-go/kusto/internal/frames"
 	v1 "github.com/Azure/azure-kusto-go/kusto/internal/frames/v1"
 	v2 "github.com/Azure/azure-kusto-go/kusto/internal/frames/v2"
+	"github.com/google/uuid"
 	"github.com/stretchr/testify/assert"
 )
 
@@ -57,13 +58,33 @@ func assertValues(t *testing.T, wantErr error, gotErr error, want table.Rows, go
 	gotInlineErrors []*errors.Error) {
 	if wantErr != nil {
 		assert.Error(t, gotErr)
-		assert.EqualValues(t, wantErr, gotErr)
+		assert.EqualValues(t, wantErr, gotErr, "wantErr: %v, gotErr: %v", wantErr, gotErr)
 	} else {
 		assert.NoError(t, gotErr)
 	}
 
 	assert.Equal(t, want, got)
 	assert.Equal(t, wantInlineErrors, gotInlineErrors)
+}
+
+func checkNonPrimary(t *testing.T, want map[frames.TableKind]v2.DataTable, iter *RowIterator) {
+	if want != nil {
+		assert.EqualValues(t, want, iter.nonPrimary)
+
+		extendedManual, err := iter.GetNonPrimary(frames.QueryProperties, frames.ExtendedProperties)
+		assert.NoError(t, err)
+		assert.EqualValues(t, want[frames.QueryProperties], extendedManual)
+		extended, err := iter.GetExtendedProperties()
+		assert.NoError(t, err)
+		assert.EqualValues(t, want[frames.QueryProperties], extended)
+
+		completionManual, err := iter.GetNonPrimary(frames.QueryCompletionInformation, frames.QueryCompletionInformation)
+		assert.NoError(t, err)
+		assert.EqualValues(t, want[frames.QueryCompletionInformation], completionManual)
+		completion, err := iter.GetQueryCompletionInformation()
+		assert.NoError(t, err)
+		assert.EqualValues(t, want[frames.QueryCompletionInformation], completion)
+	}
 }
 
 func streamStateMachine(stream []frames.Frame, createSM func(iter *RowIterator, toSM chan frames.Frame) stateMachine, recv func(iter *RowIterator)) {
@@ -184,6 +205,32 @@ func TestNonProgressive(t *testing.T) {
 						},
 					},
 				},
+				v2.DataTable{
+					Base:      v2.Base{FrameType: frames.TypeDataTable},
+					TableKind: frames.QueryCompletionInformation,
+					TableName: frames.QueryCompletionInformation,
+					Columns: []table.Column{
+						{
+							Name: "Timestamp",
+							Type: "datetime",
+						},
+						{
+							Name: "ClientRequestId",
+							Type: "string",
+						},
+						{
+							Name: "ActivityId",
+							Type: "guid",
+						},
+					},
+					KustoRows: []value.Values{
+						{
+							value.DateTime{Value: nowish, Valid: true},
+							value.String{Value: "KPC.execute;752dd747-5f6a-45c6-9ee2-e6662530ecc3", Valid: true},
+							value.GUID{Value: uuid.MustParse("011e7e1b-3c8f-4e91-a04b-0fa5f7be6100"), Valid: true},
+						},
+					},
+				},
 				v2.DataSetCompletion{},
 			},
 			want: table.Rows{
@@ -229,6 +276,33 @@ func TestNonProgressive(t *testing.T) {
 							value.Int{Value: 1, Valid: true},
 							value.String{Value: "Visualization", Valid: true},
 							value.Dynamic{Value: []byte(`{"Visualization":null,"Title":null,"XColumn":null,"Series":null,"YColumns":null,"XTitle":null}`), Valid: true},
+						},
+					},
+				},
+				frames.QueryCompletionInformation: {
+					Base:      v2.Base{FrameType: frames.TypeDataTable},
+					TableKind: frames.QueryCompletionInformation,
+					TableName: frames.QueryCompletionInformation,
+					Columns: []table.Column{
+						{
+							Name: "Timestamp",
+							Type: "datetime",
+						},
+						{
+							Name: "ClientRequestId",
+							Type: "string",
+						},
+						{
+							Name: "ActivityId",
+							Type: "guid",
+						},
+					},
+					KustoRows: []value.Values{
+						{
+							value.DateTime{Value: nowish, Valid: true},
+							value.String{Value: "KPC.execute;752dd747-5f6a-45c6-9ee2-e6662530ecc3", Valid: true},
+							value.GUID{Value: uuid.MustParse("011e7e1b-3c8f-4e91-a04b-0fa5f7be6100"),
+								Valid: true},
 						},
 					},
 				},
@@ -286,6 +360,32 @@ func TestNonProgressive(t *testing.T) {
 						*errors.ES(errors.OpUnknown, errors.KLimitsExceeded, "Some other error"),
 					},
 				},
+				v2.DataTable{
+					Base:      v2.Base{FrameType: frames.TypeDataTable},
+					TableKind: frames.QueryCompletionInformation,
+					TableName: frames.QueryCompletionInformation,
+					Columns: []table.Column{
+						{
+							Name: "Timestamp",
+							Type: "datetime",
+						},
+						{
+							Name: "ClientRequestId",
+							Type: "string",
+						},
+						{
+							Name: "ActivityId",
+							Type: "guid",
+						},
+					},
+					KustoRows: []value.Values{
+						{
+							value.DateTime{Value: nowish, Valid: true},
+							value.String{Value: "KPC.execute;752dd747-5f6a-45c6-9ee2-e6662530ecc3", Valid: true},
+							value.GUID{Value: uuid.MustParse("011e7e1b-3c8f-4e91-a04b-0fa5f7be6100"), Valid: true},
+						},
+					},
+				},
 				v2.DataSetCompletion{},
 			},
 			want: table.Rows{
@@ -333,6 +433,38 @@ func TestNonProgressive(t *testing.T) {
 							value.Dynamic{Value: []byte(`{"Visualization":null,"Title":null,"XColumn":null,"Series":null,"YColumns":null,"XTitle":null}`), Valid: true},
 						},
 					},
+					RowErrors: []errors.Error{
+						*errors.ES(errors.OpUnknown, errors.KLimitsExceeded, "Request is invalid and cannot be executed.;See https://docs.microsoft."+
+							"com/en-us/azure/kusto/concepts/querylimits"),
+						*errors.ES(errors.OpUnknown, errors.KLimitsExceeded, "Some other error"),
+					},
+				},
+				frames.QueryCompletionInformation: {
+					Base:      v2.Base{FrameType: frames.TypeDataTable},
+					TableKind: frames.QueryCompletionInformation,
+					TableName: frames.QueryCompletionInformation,
+					Columns: []table.Column{
+						{
+							Name: "Timestamp",
+							Type: "datetime",
+						},
+						{
+							Name: "ClientRequestId",
+							Type: "string",
+						},
+						{
+							Name: "ActivityId",
+							Type: "guid",
+						},
+					},
+					KustoRows: []value.Values{
+						{
+							value.DateTime{Value: nowish, Valid: true},
+							value.String{Value: "KPC.execute;752dd747-5f6a-45c6-9ee2-e6662530ecc3", Valid: true},
+							value.GUID{Value: uuid.MustParse("011e7e1b-3c8f-4e91-a04b-0fa5f7be6100"),
+								Valid: true},
+						},
+					},
 				},
 			},
 			inlineErrors: []*errors.Error{
@@ -369,6 +501,8 @@ func TestNonProgressive(t *testing.T) {
 				got, inlineErrors, err := iterateRowsWithErrors(iter)
 
 				assertValues(t, test.err, err, test.want, got, test.inlineErrors, inlineErrors)
+
+				checkNonPrimary(t, test.nonPrimary, iter)
 			})
 
 			streamStateMachine(test.stream, createSm, func(iter *RowIterator) {
@@ -385,6 +519,8 @@ func TestNonProgressive(t *testing.T) {
 				}
 
 				assertValues(t, testErr, err, want, got, nil, nil)
+
+				checkNonPrimary(t, test.nonPrimary, iter)
 			})
 
 		})
@@ -498,25 +634,6 @@ func TestProgressive(t *testing.T) {
 				},
 				v2.DataSetCompletion{},
 			},
-			nonPrimary: map[frames.TableKind]v2.DataTable{
-				frames.QueryProperties: {
-					Base:      v2.Base{FrameType: frames.TypeDataTable},
-					TableKind: frames.QueryProperties,
-					TableName: frames.ExtendedProperties,
-					Columns: table.Columns{
-						{Name: "TableId", Type: "int"},
-						{Name: "Key", Type: "string"},
-						{Name: "Value", Type: "dynamic"},
-					},
-					KustoRows: []value.Values{
-						{
-							value.Int{Value: 1, Valid: true},
-							value.String{Value: "Visualization", Valid: true},
-							value.Dynamic{Value: []byte(`{"Visualization":null,"Title":null,"XColumn":null,"Series":null,"YColumns":null,"XTitle":null}`), Valid: true},
-						},
-					},
-				},
-			},
 		},
 		{
 			desc: "Expected Result",
@@ -569,6 +686,32 @@ func TestProgressive(t *testing.T) {
 							value.Int{Value: 1, Valid: true},
 							value.String{Value: "Visualization", Valid: true},
 							value.Dynamic{Value: []byte(`{"Visualization":null,"Title":null,"XColumn":null,"Series":null,"YColumns":null,"XTitle":null}`), Valid: true},
+						},
+					},
+				},
+				v2.DataTable{
+					Base:      v2.Base{FrameType: frames.TypeDataTable},
+					TableKind: frames.QueryCompletionInformation,
+					TableName: frames.QueryCompletionInformation,
+					Columns: []table.Column{
+						{
+							Name: "Timestamp",
+							Type: "datetime",
+						},
+						{
+							Name: "ClientRequestId",
+							Type: "string",
+						},
+						{
+							Name: "ActivityId",
+							Type: "guid",
+						},
+					},
+					KustoRows: []value.Values{
+						{
+							value.DateTime{Value: nowish, Valid: true},
+							value.String{Value: "KPC.execute;752dd747-5f6a-45c6-9ee2-e6662530ecc3", Valid: true},
+							value.GUID{Value: uuid.MustParse("011e7e1b-3c8f-4e91-a04b-0fa5f7be6100"), Valid: true},
 						},
 					},
 				},
@@ -634,6 +777,33 @@ func TestProgressive(t *testing.T) {
 						},
 					},
 				},
+				frames.QueryCompletionInformation: {
+					Base:      v2.Base{FrameType: frames.TypeDataTable},
+					TableKind: frames.QueryCompletionInformation,
+					TableName: frames.QueryCompletionInformation,
+					Columns: []table.Column{
+						{
+							Name: "Timestamp",
+							Type: "datetime",
+						},
+						{
+							Name: "ClientRequestId",
+							Type: "string",
+						},
+						{
+							Name: "ActivityId",
+							Type: "guid",
+						},
+					},
+					KustoRows: []value.Values{
+						{
+							value.DateTime{Value: nowish, Valid: true},
+							value.String{Value: "KPC.execute;752dd747-5f6a-45c6-9ee2-e6662530ecc3", Valid: true},
+							value.GUID{Value: uuid.MustParse("011e7e1b-3c8f-4e91-a04b-0fa5f7be6100"),
+								Valid: true},
+						},
+					},
+				},
 			},
 		},
 		{
@@ -695,6 +865,32 @@ func TestProgressive(t *testing.T) {
 							value.Int{Value: 1, Valid: true},
 							value.String{Value: "Visualization", Valid: true},
 							value.Dynamic{Value: []byte(`{"Visualization":null,"Title":null,"XColumn":null,"Series":null,"YColumns":null,"XTitle":null}`), Valid: true},
+						},
+					},
+				},
+				v2.DataTable{
+					Base:      v2.Base{FrameType: frames.TypeDataTable},
+					TableKind: frames.QueryCompletionInformation,
+					TableName: frames.QueryCompletionInformation,
+					Columns: []table.Column{
+						{
+							Name: "Timestamp",
+							Type: "datetime",
+						},
+						{
+							Name: "ClientRequestId",
+							Type: "string",
+						},
+						{
+							Name: "ActivityId",
+							Type: "guid",
+						},
+					},
+					KustoRows: []value.Values{
+						{
+							value.DateTime{Value: nowish, Valid: true},
+							value.String{Value: "KPC.execute;752dd747-5f6a-45c6-9ee2-e6662530ecc3", Valid: true},
+							value.GUID{Value: uuid.MustParse("011e7e1b-3c8f-4e91-a04b-0fa5f7be6100"), Valid: true},
 						},
 					},
 				},
@@ -775,6 +971,33 @@ func TestProgressive(t *testing.T) {
 						},
 					},
 				},
+				frames.QueryCompletionInformation: {
+					Base:      v2.Base{FrameType: frames.TypeDataTable},
+					TableKind: frames.QueryCompletionInformation,
+					TableName: frames.QueryCompletionInformation,
+					Columns: []table.Column{
+						{
+							Name: "Timestamp",
+							Type: "datetime",
+						},
+						{
+							Name: "ClientRequestId",
+							Type: "string",
+						},
+						{
+							Name: "ActivityId",
+							Type: "guid",
+						},
+					},
+					KustoRows: []value.Values{
+						{
+							value.DateTime{Value: nowish, Valid: true},
+							value.String{Value: "KPC.execute;752dd747-5f6a-45c6-9ee2-e6662530ecc3", Valid: true},
+							value.GUID{Value: uuid.MustParse("011e7e1b-3c8f-4e91-a04b-0fa5f7be6100"),
+								Valid: true},
+						},
+					},
+				},
 			},
 			inlineErrors: []*errors.Error{
 				errors.ES(errors.OpUnknown, errors.KLimitsExceeded, "Request is invalid and cannot be executed.;See https://docs.microsoft."+
@@ -812,6 +1035,8 @@ func TestProgressive(t *testing.T) {
 				got, inlineErrors, err := iterateRowsWithErrors(iter)
 
 				assertValues(t, test.err, err, test.want, got, test.inlineErrors, inlineErrors)
+
+				checkNonPrimary(t, test.nonPrimary, iter)
 			})
 
 			streamStateMachine(test.stream, createSm, func(iter *RowIterator) {
@@ -828,6 +1053,8 @@ func TestProgressive(t *testing.T) {
 				}
 
 				assertValues(t, testErr, err, want, got, nil, nil)
+
+				checkNonPrimary(t, test.nonPrimary, iter)
 			})
 		})
 	}

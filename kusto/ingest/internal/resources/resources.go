@@ -13,7 +13,15 @@ import (
 	"time"
 
 	"github.com/Azure/azure-kusto-go/kusto"
+	kustoErrors "github.com/Azure/azure-kusto-go/kusto/data/errors"
 	"github.com/Azure/azure-kusto-go/kusto/data/table"
+	"github.com/cenkalti/backoff/v4"
+)
+
+const (
+	defaultInitialInterval = 1 * time.Second
+	defaultMultiplier      = 2
+	retryCount             = 4
 )
 
 // mgmter is a private interface that allows us to write hermetic tests against the kusto.Client.Mgmt() method.
@@ -154,7 +162,15 @@ func New(client mgmter) (*Manager, error) {
 
 // Close closes the manager. This stops any token refreshes.
 func (m *Manager) Close() {
-	close(m.done)
+	for {
+		select {
+		case <-m.done:
+			return
+		default:
+			close(m.done)
+			return
+		}
+	}
 }
 
 func (m *Manager) renewResources() {
@@ -179,15 +195,34 @@ func (m *Manager) AuthContext(ctx context.Context) (string, error) {
 		return m.kustoToken.AuthContext, nil
 	}
 
-	rows, err := m.client.Mgmt(ctx, "NetDefaultDB", kusto.NewStmt(".get kusto identity token"), kusto.IngestionEndpoint())
+	var rows *kusto.RowIterator
+	retryCtx := backoff.WithContext(InitBackoff(), ctx)
+	err := backoff.Retry(func() error {
+		var err error
+		rows, err = m.client.Mgmt(ctx, "NetDefaultDB", kusto.NewStmt(".get kusto identity token"), kusto.IngestionEndpoint())
+		if err == nil {
+			return nil
+		}
+		if httpErr, ok := err.(*kustoErrors.HttpError); ok {
+			// only retry in case of throttling
+			if httpErr.IsThrottled() {
+				return err
+			}
+		}
+		return backoff.Permanent(err)
+	}, retryCtx)
+
 	if err != nil {
 		return "", fmt.Errorf("problem getting authorization context from Kusto via Mgmt: %s", err)
 	}
 
 	count := 0
 	token := token{}
-	err = rows.Do(
-		func(r *table.Row) error {
+	err = rows.DoOnRowOrError(
+		func(r *table.Row, e *kustoErrors.Error) error {
+			if e != nil {
+				return e
+			}
 			if count != 0 {
 				return fmt.Errorf("call for AuthContext returned more than 1 Row")
 			}
@@ -247,14 +282,34 @@ func (i *Ingestion) importRec(rec ingestResc) error {
 func (m *Manager) fetch(ctx context.Context) error {
 	m.fetchLock.Lock()
 	defer m.fetchLock.Unlock()
-	rows, err := m.client.Mgmt(ctx, "NetDefaultDB", kusto.NewStmt(".get ingestion resources"), kusto.IngestionEndpoint())
+
+	var rows *kusto.RowIterator
+	retryCtx := backoff.WithContext(InitBackoff(), ctx)
+	err := backoff.Retry(func() error {
+		var err error
+		rows, err = m.client.Mgmt(ctx, "NetDefaultDB", kusto.NewStmt(".get ingestion resources"), kusto.IngestionEndpoint())
+		if err == nil {
+			return nil
+		}
+		if httpErr, ok := err.(*kustoErrors.HttpError); ok {
+			// only retry in case of throttling
+			if httpErr.IsThrottled() {
+				return err
+			}
+		}
+		return backoff.Permanent(err)
+	}, retryCtx)
+
 	if err != nil {
 		return fmt.Errorf("problem getting ingestion resources from Kusto: %s", err)
 	}
 
 	ingest := Ingestion{}
-	err = rows.Do(
-		func(r *table.Row) error {
+	err = rows.DoOnRowOrError(
+		func(r *table.Row, e *kustoErrors.Error) error {
+			if e != nil {
+				return e
+			}
 			rec := ingestResc{}
 			if err := r.ToStruct(&rec); err != nil {
 				return err
@@ -304,4 +359,11 @@ func (m *Manager) Resources() (Ingestion, error) {
 		return Ingestion{}, fmt.Errorf("manager has not retrieved an Ingestion object yet")
 	}
 	return i, nil
+}
+
+func InitBackoff() backoff.BackOff {
+	exp := backoff.NewExponentialBackOff()
+	exp.InitialInterval = defaultInitialInterval
+	exp.Multiplier = defaultMultiplier
+	return backoff.WithMaxRetries(exp, retryCount)
 }
