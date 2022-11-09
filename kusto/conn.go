@@ -213,6 +213,10 @@ func (c *conn) doRequest(ctx context.Context, execType int, db string, query Stm
 }
 
 func (c *conn) Close() error {
+	if c.auth == nil {
+		return nil
+	}
+
 	if closer, ok := c.auth.(io.Closer); ok {
 		return closer.Close()
 	}
