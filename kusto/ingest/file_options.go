@@ -164,6 +164,7 @@ type DataFormat = properties.DataFormat
 // note: any change here needs to be kept up to date with the properties version.
 // I'm not a fan of having two copies, but I don't think it is worth moving to its own package
 // to allow properties and ingest to both import without a cycle.
+//
 //goland:noinspection GoUnusedConst - Part of the API
 const (
 	// DFUnknown indicates the EncodingType is not set.
