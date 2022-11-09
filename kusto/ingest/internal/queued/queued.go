@@ -189,7 +189,7 @@ func (i *Ingestion) Reader(ctx context.Context, reader io.Reader, props properti
 		size = gz.InputSize()
 	}
 
-	if err := i.Blob(ctx, to.URL(), size, props); err != nil {
+	if err := i.Blob(ctx, urlWithContainer(to, blobName), size, props); err != nil {
 		return blobName, err
 	}
 
