@@ -347,11 +347,12 @@ func setQueryOptions(ctx context.Context, op errors.Op, query Stmt, options ...Q
 			Parameters: params,
 		},
 	}
-	if op == errors.OpQuery {
+	/*if op == errors.OpQuery {
 		// We want progressive frames by default for Query(), but not Mgmt() because it uses v1 framing and ingestion endpoints
 		// do not support it.
 		opt.requestProperties.Options["results_progressive_enabled"] = true
-	}
+	}*/
+	opt.requestProperties.Options["results_progressive_enabled"] = true
 
 	for _, o := range options {
 		if err := o(opt); err != nil {

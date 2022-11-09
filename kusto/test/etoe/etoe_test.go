@@ -127,7 +127,7 @@ func TestQueries(t *testing.T) {
 		),
 	)
 
-	allDataTypesTable := "goe2e_all_data_types"
+	allDataTypesTable := fmt.Sprintf("goe2e_all_data_types_%d_%d", time.Now().UnixNano(), rand.Int())
 	require.NoError(t, createIngestionTable(t, client, allDataTypesTable, true))
 
 	tests := []struct {
@@ -425,10 +425,10 @@ func TestQueries(t *testing.T) {
 				require.Nilf(t, err, "TestQueries(%s): had test.qjcall error: %s", test.desc, err)
 
 				// replace guids with <GUID>
-				guidRegex := regexp.MustCompile("(\\w+-){4}\\w+")
+				guidRegex := regexp.MustCompile(`(\w+-){4}\w+`)
 				json = guidRegex.ReplaceAllString(json, "<GUID>")
 
-				timeRegex := regexp.MustCompile("([0:]+\\.(\\d)+)|([\\d\\-]+T[\\d\\-.:]+Z)")
+				timeRegex := regexp.MustCompile(`([0:]+\.(\d)+)|([\d\-]+T[\d\-.:]+Z)`)
 				json = timeRegex.ReplaceAllString(json, "<TIME>")
 
 				require.Equal(t, test.want, json)
@@ -1510,7 +1510,7 @@ func TestError(t *testing.T) {
 	))
 
 	kustoError, ok := errors.GetKustoError(err)
-	assert.True(t, ok)
+	require.True(t, ok)
 	assert.Equal(t, errors.OpQuery, kustoError.Op)
 	assert.Equal(t, errors.KHTTPError, kustoError.Kind)
 	assert.True(t, strings.Contains(kustoError.Error(), "Failed to resolve table expression"))
@@ -1729,7 +1729,7 @@ func createStringyLogsData() string {
 
 func executeCommands(client *kusto.Client, database string, commandsToRun ...kusto.Stmt) error {
 	for _, cmd := range commandsToRun {
-		if _, err := client.Mgmt(context.Background(), database, cmd, kusto.AllowWrite()); err != nil {
+		if _, err := client.Mgmt(context.Background(), database, cmd); err != nil {
 			return err
 		}
 	}
