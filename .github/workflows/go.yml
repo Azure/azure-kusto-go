@@ -19,8 +19,9 @@ jobs:
         with:
           go-version: '^1.19.0'
         id: go
+
       - name: Setup JUnit Report
-        run: go get -u github.com/jstemmer/go-junit-report
+        run: go install github.com/jstemmer/go-junit-report/v2@latest
 
       - name: Check Format
         run: if [ "$(gofmt -d -s -l . | tee /dev/fd/2 | wc -l)" -gt 0 ]; then exit 1; fi
@@ -39,7 +40,7 @@ jobs:
         run: |
           cd kusto
           set -o pipefail
-          go test -v -race -coverprofile=coverage.out -covermode=atomic ./... 2>&1 | tee >(go-junit-report > report.xml)
+          go test -v -race -coverprofile=coverage.out -covermode=atomic ./... 2>&1 | tee >(go-junit-report -set-exit-code > report.xml)
         env:
           ENGINE_CONNECTION_STRING: ${{ secrets.ENGINE_CONNECTION_STRING }}
           APP_ID: ${{ secrets.APP_ID }}
