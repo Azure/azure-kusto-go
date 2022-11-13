@@ -12,16 +12,17 @@ jobs:
     runs-on: ubuntu-latest
     steps:
 
-      - name: Set up Go 1.19
-        uses: actions/setup-go@v2
-        with:
-          go-version: 1.19
-        id: go
-      - name: Setup JUnit Report
-        run: go install github.com/jstemmer/go-junit-report/v2@latest
-
       - name: Check out code into the Go module directory
         uses: actions/checkout@v2
+
+      - name: Set up Go 1.19
+        uses: actions/setup-go@v3
+        with:
+          go-version: '^1.19.0'
+        id: go
+
+      - name: Setup JUnit Report
+        run: go install github.com/jstemmer/go-junit-report/v2@latest
 
       - name: Check Format
         run: if [ "$(gofmt -d -s -l . | tee /dev/fd/2 | wc -l)" -gt 0 ]; then exit 1; fi
@@ -29,7 +30,7 @@ jobs:
       - name: Get dependencies
         run: |
           cd kusto
-          go install ./...
+          go get -v -t -d ./...
 
       - name: Build
         run: |
@@ -40,7 +41,7 @@ jobs:
         run: |
           cd kusto
           set -o pipefail
-          go test -v -race -coverprofile=coverage.out -covermode=atomic ./... 2>&1 | tee >(go-junit-report > report.xml)
+          go test -v -race -coverprofile=coverage.out -covermode=atomic ./... 2>&1 | tee >(go-junit-report -iocopy -set-exit-code -out report.xml)
         env:
           ENGINE_CONNECTION_STRING: ${{ secrets.ENGINE_CONNECTION_STRING }}
           APP_ID: ${{ secrets.APP_ID }}
