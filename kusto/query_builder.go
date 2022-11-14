@@ -13,6 +13,7 @@ import (
 	"strings"
 	"sync"
 	"time"
+	"unicode"
 
 	"github.com/Azure/azure-kusto-go/kusto/data/types"
 	"github.com/Azure/azure-kusto-go/kusto/data/value"
@@ -503,6 +504,143 @@ func NewStmt(query stringConstant, options ...StmtOption) Stmt {
 	for _, option := range options {
 		option(&s)
 	}
+	return s
+}
+
+func (s Stmt) AddDatabase(query string) Stmt {
+	return s.SafeAddName(query)
+}
+
+func (s Stmt) AddTable(query string) Stmt {
+	return s.SafeAddName(query)
+}
+
+func (s Stmt) AddColumn(query string) Stmt {
+	return s.SafeAddName(query)
+}
+
+func (s Stmt) AddFunction(query string) Stmt {
+	return s.SafeAddName(query)
+}
+
+func (s Stmt) SafeAddName(query string) Stmt {
+	if !(strings.Contains(query, "'")) {
+		query = "['" + query + "']"
+	}
+
+	if !(query == "" || strings.HasPrefix(query, "[")) {
+		query = "[\"" + query + "\"]"
+	}
+
+	s.queryStr = s.queryStr + query
+	return s
+}
+
+func (s Stmt) AddQuotedString(value string, hidden bool) Stmt {
+	if value == "" {
+		return s
+	}
+
+	literal := ""
+
+	if hidden {
+		literal += "h"
+	}
+	literal += "\""
+	for _, c := range value {
+		switch c {
+		case '\'':
+			literal += "\\'"
+
+		case '"':
+			literal += "\\\""
+
+		case '\\':
+			literal += "\\\\"
+
+		case '\x00':
+			literal += "\\0"
+
+		case '\a':
+			literal += "\\a"
+
+		case '\b':
+			literal += "\\b"
+
+		case '\f':
+			literal += "\\f"
+
+		case '\n':
+			literal += "\\n"
+
+		case '\r':
+			literal += "\\r"
+
+		case '\t':
+			literal += "\\t"
+
+		case '\v':
+			literal += "\\v"
+
+		default:
+			if !ShouldBeEscaped(c) {
+				literal += string(c)
+			} else {
+				literal += fmt.Sprintf("\\u%x", c)
+			}
+
+		}
+	}
+	literal += "\""
+
+	newStmt := s.Add(stringConstant(literal))
+	return newStmt
+}
+
+func ShouldBeEscaped(c int32) bool {
+	if c <= unicode.MaxLatin1 {
+		return unicode.IsControl(c)
+	}
+	return true
+}
+
+func (s Stmt) AddInt(query int) Stmt {
+	s.queryStr = s.queryStr + fmt.Sprintf("%v", query)
+	return s
+}
+
+func (s Stmt) AddFloat32(query float32) Stmt {
+	s.queryStr = s.queryStr + fmt.Sprintf("%v", query)
+	return s
+}
+
+func (s Stmt) AddFloat64(query float64) Stmt {
+	s.queryStr = s.queryStr + fmt.Sprintf("%v", query)
+	return s
+}
+
+func (s Stmt) AddComplex64(query complex64) Stmt {
+	s.queryStr = s.queryStr + fmt.Sprintf("%v", query)
+	return s
+}
+
+func (s Stmt) AddComplex128(query complex128) Stmt {
+	s.queryStr = s.queryStr + fmt.Sprintf("%v", query)
+	return s
+}
+
+func (s Stmt) AddBool(query bool) Stmt {
+	s.queryStr = s.queryStr + fmt.Sprintf("%v", query)
+	return s
+}
+
+func (s Stmt) AddByte(query byte) Stmt {
+	s.queryStr = s.queryStr + fmt.Sprintf("%v", query)
+	return s
+}
+
+func (s Stmt) AddRune(query rune) Stmt {
+	s.queryStr = s.queryStr + fmt.Sprintf("%v", query)
 	return s
 }
 
