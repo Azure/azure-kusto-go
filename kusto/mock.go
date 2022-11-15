@@ -153,7 +153,7 @@ func NewMockClient() *Client {
 		conn:       mockConn{},
 		ingestConn: mockConn{},
 		endpoint:   "https://sdkse2etest.eastus.kusto.windows.net",
-		auth:       Authorization{tokenProvider: *tkp},
+		auth:       Authorization{TokenProvider: *tkp},
 		mgmtConnMu: sync.Mutex{},
 		http:       &http.Client{},
 	}

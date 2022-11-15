@@ -15,20 +15,20 @@ func TestAcquireTokenErr(t *testing.T) {
 	tests := []struct {
 		name    string
 		wantErr string
-		tkp     tokenProvider
+		tkp     TokenProvider
 	}{
 		{
 			name: "test_acquiretoken_cred",
-			tkp: tokenProvider{
-				tokenCred:  NewMockClient().auth.tokenProvider.tokenCred,
+			tkp: TokenProvider{
+				tokenCred:  NewMockClient().auth.TokenProvider.tokenCred,
 				dataSource: s.urlStr() + "/test_acquiretoken_cred",
 			},
 			wantErr: "",
 		},
 		{
 			name: "test_acquiretoken_invalid_datasource",
-			tkp: tokenProvider{
-				tokenCred:  NewMockClient().auth.tokenProvider.tokenCred,
+			tkp: TokenProvider{
+				tokenCred:  NewMockClient().auth.TokenProvider.tokenCred,
 				dataSource: "endpoint",
 			},
 		},
@@ -38,7 +38,7 @@ func TestAcquireTokenErr(t *testing.T) {
 		s.code = 200
 		s.payload = []byte(payload)
 
-		got, token_type, err := tkp.acquireToken(context.Background())
+		got, token_type, err := tkp.AcquireToken(context.Background())
 		assert.NotNil(t, err)
 		assert.EqualValues(t, "", got)
 		assert.EqualValues(t, "", token_type)

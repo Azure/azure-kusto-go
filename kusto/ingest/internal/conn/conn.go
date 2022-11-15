@@ -130,6 +130,11 @@ func (c *Conn) StreamIngest(ctx context.Context, db, table string, payload io.Re
 
 	headers.Add("Content-Type", "application/json; charset=utf-8")
 	headers.Add("Content-Encoding", "gzip")
+	token, tokenType, tkerr := c.auth.TokenProvider.AcquireToken(ctx)
+	if tkerr != nil {
+		return tkerr
+	}
+	headers.Add("Authorization", fmt.Sprintf("%s %s", tokenType, token))
 
 	u, _ := url.Parse(c.baseURL.String()) // Safe copy of a known good URL object
 	u.Path = path.Join(u.Path, db, table)

@@ -36,7 +36,7 @@ var bufferPool = sync.Pool{
 // conn provides connectivity to a Kusto instance.
 type conn struct {
 	endpoint                       string
-	tokenProvider                  *tokenProvider
+	tokenProvider                  *TokenProvider
 	endMgmt, endQuery, streamQuery *url.URL
 	client                         *http.Client
 }
@@ -53,7 +53,7 @@ func newConn(endpoint string, auth Authorization, client *http.Client) (*conn, e
 	}
 
 	c := &conn{
-		tokenProvider: &auth.tokenProvider,
+		tokenProvider: &auth.TokenProvider,
 		endMgmt:       &url.URL{Scheme: "https", Host: u.Host, Path: "/v1/rest/mgmt"},
 		endQuery:      &url.URL{Scheme: "https", Host: u.Host, Path: "/v2/rest/query"},
 		streamQuery:   &url.URL{Scheme: "https", Host: u.Host, Path: "/v1/rest/ingest/"},
@@ -182,7 +182,7 @@ func (c *conn) doRequest(ctx context.Context, execType int, db string, query Stm
 		return 0, nil, nil, nil, errors.ES(op, errors.KInternal, "internal error: did not understand the type of execType: %d", execType)
 	}
 
-	token, tokenType, tkerr := c.tokenProvider.acquireToken(ctx)
+	token, tokenType, tkerr := c.tokenProvider.AcquireToken(ctx)
 	if tkerr != nil {
 		return 0, nil, nil, nil, errors.ES(op, errors.KInternal, "Error while getting token : %s", tkerr)
 	}

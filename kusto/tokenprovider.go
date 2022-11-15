@@ -9,7 +9,7 @@ import (
 	"github.com/Azure/azure-sdk-for-go/sdk/azcore/policy"
 )
 
-type tokenProvider struct {
+type TokenProvider struct {
 	tokenCred     azcore.TokenCredential //holds the received token credential as per the authentication
 	tokenType     string
 	customToken   string
@@ -19,7 +19,7 @@ type tokenProvider struct {
 }
 
 // tokenProvider need to be received as reference, to reflect updations to the structs
-func (tkp *tokenProvider) acquireToken(ctx context.Context) (string, string, error) {
+func (tkp *TokenProvider) AcquireToken(ctx context.Context) (string, string, error) {
 	if tkp.tokenCred != nil {
 		if !tkp.cloudInfoInit {
 			//Fetches cloud meta data
@@ -48,6 +48,6 @@ func (tkp *tokenProvider) acquireToken(ctx context.Context) (string, string, err
 	return "", "", fmt.Errorf("Error: No token info present in token provider")
 }
 
-func (tkp tokenProvider) isInitialized() bool {
+func (tkp TokenProvider) IsInitialized() bool {
 	return !(tkp.tokenCred == nil && isEmpty(tkp.customToken))
 }

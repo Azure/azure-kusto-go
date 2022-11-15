@@ -26,14 +26,14 @@ type queryer interface {
 // Config, but not both.
 type Authorization struct {
 	// Token provider that can be used to get the access token.
-	tokenProvider tokenProvider
+	TokenProvider TokenProvider
 }
 
 // Validate validates the Authorization object against the endpoint an preps it for use.
 // For internal use only.
 func (a *Authorization) Validate() error {
 	const rescField = "Resource"
-	if !a.tokenProvider.isInitialized() {
+	if !a.TokenProvider.IsInitialized() {
 		return errors.ES(errors.OpServConn, errors.KClientArgs, "Authoriztion.tokenProvider cannot be empty")
 	}
 	return nil
@@ -58,7 +58,7 @@ func New(kcsb *ConnectionStringBuilder, options ...Option) (*Client, error) {
 		return nil, err
 	}
 	auth := &Authorization{
-		tokenProvider: *tkp,
+		TokenProvider: *tkp,
 	}
 	endpoint := kcsb.DataSource
 	u, err := url.Parse(endpoint)

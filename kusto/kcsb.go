@@ -290,8 +290,8 @@ func (kcsb *ConnectionStringBuilder) AttachClientOptions(options *azcore.ClientO
 }
 
 // Method to be used for generating TokenCredential
-func (kcsb *ConnectionStringBuilder) getTokenProvider() (*tokenProvider, error) {
-	tkp := &tokenProvider{}
+func (kcsb *ConnectionStringBuilder) getTokenProvider() (*TokenProvider, error) {
+	tkp := &TokenProvider{}
 	tkp.tokenType = BEARER_TYPE
 	tkp.dataSource = kcsb.DataSource
 
