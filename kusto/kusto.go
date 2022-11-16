@@ -135,8 +135,6 @@ const (
 // Note that the server has a timeout of 4 minutes for a query by default unless the context deadline is set. Queries can
 // take a maximum of 1 hour.
 func (c *Client) Query(ctx context.Context, db string, query Stmt, options ...QueryOption) (*RowIterator, error) {
-	c.mgmtConnMu.Lock()
-	defer c.mgmtConnMu.Unlock()
 	ctx, cancel, err := c.contextSetup(ctx, false) // Note: cancel is called when *RowIterator has Stop() called.
 	if err != nil {
 		return nil, err
@@ -197,8 +195,6 @@ func (c *Client) Query(ctx context.Context, db string, query Stmt, options ...Qu
 }
 
 func (c *Client) QueryToJson(ctx context.Context, db string, query Stmt, options ...QueryOption) (string, error) {
-	c.mgmtConnMu.Lock()
-	defer c.mgmtConnMu.Unlock()
 	ctx, cancel, err := c.contextSetup(ctx, false) // Note: cancel is called when *RowIterator has Stop() called.
 	if err != nil {
 		return "", err
@@ -229,9 +225,6 @@ func (c *Client) QueryToJson(ctx context.Context, db string, query Stmt, options
 // Note that the server has a timeout of 10 minutes for a management call by default unless the context deadline is set.
 // There is a maximum of 1 hour.
 func (c *Client) Mgmt(ctx context.Context, db string, query Stmt, options ...MgmtOption) (*RowIterator, error) {
-
-	c.mgmtConnMu.Lock()
-	defer c.mgmtConnMu.Unlock()
 
 	if !query.params.IsZero() || !query.defs.IsZero() {
 		return nil, errors.ES(errors.OpMgmt, errors.KClientArgs, "a Mgmt() call cannot accept a Stmt object that has Definitions or Parameters attached")
