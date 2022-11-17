@@ -507,28 +507,44 @@ func NewStmt(query stringConstant, options ...StmtOption) Stmt {
 	return s
 }
 
+// AddDatabase will add a normalized Database string to the Stmt. This is similar to the + operator on two strings,
+// except it only can be done with string constants. This allows dynamically building of a query from a root Stmt.
 func (s Stmt) AddDatabase(query string) Stmt {
-	return s.SafeAddName(query)
+	return s.NormalizeName(query, false)
 }
 
+// AddTable will add a normalized Table string to the Stmt. This is similar to the + operator on two strings,
+// except it only can be done with string constants. This allows dynamically building of a query from a root Stmt.
 func (s Stmt) AddTable(query string) Stmt {
-	return s.SafeAddName(query)
+	return s.NormalizeName(query, false)
 }
 
+// AddColumn will add a normalized Column string to the Stmt. This is similar to the + operator on two strings,
+// except it only can be done with string constants. This allows dynamically building of a query from a root Stmt.
 func (s Stmt) AddColumn(query string) Stmt {
-	return s.SafeAddName(query)
+	return s.NormalizeName(query, false)
 }
 
+// AddFunction will add a normalized Function string to the Stmt. This is similar to the + operator on two strings,
+// except it only can be done with string constants. This allows dynamically building of a query from a root Stmt.
 func (s Stmt) AddFunction(query string) Stmt {
-	return s.SafeAddName(query)
+	return s.NormalizeName(query, false)
 }
 
-func (s Stmt) SafeAddName(query string) Stmt {
+// NormalizeName normalizes a string in order to be used safely in the engine.
+func (s Stmt) NormalizeName(query string, forceNormalization bool) Stmt {
+	if query == "" {
+		return s
+	}
+	if !forceNormalization && IsIdentifier(query) {
+		return s
+	}
+	if strings.HasPrefix(query, "[") {
+		return s
+	}
 	if !(strings.Contains(query, "'")) {
 		query = "['" + query + "']"
-	}
-
-	if !(query == "" || strings.HasPrefix(query, "[")) {
+	} else {
 		query = "[\"" + query + "\"]"
 	}
 
@@ -536,6 +552,23 @@ func (s Stmt) SafeAddName(query string) Stmt {
 	return s
 }
 
+// IsIdentifier checks whether a given string is an identifier
+func IsIdentifier(query string) bool {
+	if query == "" {
+		return false
+	}
+	if !unicode.IsLetter(rune(query[0])) && query[0] != '_' {
+		return false
+	}
+	for _, c := range query {
+		if !(((unicode.IsLetter(c) || unicode.IsDigit(c)) && unicode.In(c, unicode.ASCII_Hex_Digit)) || c == '_') {
+			return false
+		}
+	}
+	return true
+}
+
+// AddQuotedString escapes a string to be safely added to a stmt
 func (s Stmt) AddQuotedString(value string, hidden bool) Stmt {
 	if value == "" {
 		return s
@@ -597,6 +630,7 @@ func (s Stmt) AddQuotedString(value string, hidden bool) Stmt {
 	return newStmt
 }
 
+// ShouldBeEscaped Checks whether a rune should be escaped or not based on it's type.
 func ShouldBeEscaped(c int32) bool {
 	if c <= unicode.MaxLatin1 {
 		return unicode.IsControl(c)
@@ -604,41 +638,49 @@ func ShouldBeEscaped(c int32) bool {
 	return true
 }
 
+// AddInt will add an int as a string to the Stmt.  This allows dynamically building of a query from a root Stmt.
 func (s Stmt) AddInt(query int) Stmt {
 	s.queryStr = s.queryStr + fmt.Sprintf("%v", query)
 	return s
 }
 
+// AddFloat32 will add a Float32 as a string to the Stmt.  This allows dynamically building of a query from a root Stmt.
 func (s Stmt) AddFloat32(query float32) Stmt {
 	s.queryStr = s.queryStr + fmt.Sprintf("%v", query)
 	return s
 }
 
+// AddFloat64 will add a Float64 as a string to the Stmt.  This allows dynamically building of a query from a root Stmt.
 func (s Stmt) AddFloat64(query float64) Stmt {
 	s.queryStr = s.queryStr + fmt.Sprintf("%v", query)
 	return s
 }
 
+// AddComplex64 will add a Complex64 as a string to the Stmt.  This allows dynamically building of a query from a root Stmt.
 func (s Stmt) AddComplex64(query complex64) Stmt {
 	s.queryStr = s.queryStr + fmt.Sprintf("%v", query)
 	return s
 }
 
+// AddComplex128 will add a Complex128 as a string to the Stmt.  This allows dynamically building of a query from a root Stmt.
 func (s Stmt) AddComplex128(query complex128) Stmt {
 	s.queryStr = s.queryStr + fmt.Sprintf("%v", query)
 	return s
 }
 
+// AddBool will add a bool as a string to the Stmt.  This allows dynamically building of a query from a root Stmt.
 func (s Stmt) AddBool(query bool) Stmt {
 	s.queryStr = s.queryStr + fmt.Sprintf("%v", query)
 	return s
 }
 
+// AddByte will add a byte as a string to the Stmt.  This allows dynamically building of a query from a root Stmt.
 func (s Stmt) AddByte(query byte) Stmt {
 	s.queryStr = s.queryStr + fmt.Sprintf("%v", query)
 	return s
 }
 
+// AddRune will add a rune as a string to the Stmt.  This allows dynamically building of a query from a root Stmt.
 func (s Stmt) AddRune(query rune) Stmt {
 	s.queryStr = s.queryStr + fmt.Sprintf("%v", query)
 	return s
