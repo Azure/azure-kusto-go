@@ -21,11 +21,12 @@ type ConnectionStringBuilder struct {
 	ApplicationCertificateThumbprint string
 	SendCertificateChain             bool
 	ApplicationToken                 string
-	Azcli                            bool
+	AzCli                            bool
 	MsiAuthentication                bool
 	ManagedServiceIdentity           string
 	InteractiveLogin                 bool
 	RedirectURL                      string
+	NoAuthMode                       bool
 	ClientOptions                    *azcore.ClientOptions
 }
 
@@ -64,8 +65,6 @@ var csMapping = map[string]string{"datasource": dataSource, "data source": dataS
 	"authority id": authorityId, "authorityid": authorityId, "authority": authorityId, "tenantid": authorityId, "tenant": authorityId, "tid": authorityId,
 	"application token": applicationToken, "applicationtoken": applicationToken, "apptoken": applicationToken,
 	"user token": userToken, "usertoken": userToken, "usrtoken": userToken,
-	"msi_auth":               msiAuth,
-	"managedserviceidentity": managedServiceIdentity, "managed service identity": managedServiceIdentity,
 	"interactive login": interactiveLogin, "interactivelogin": interactiveLogin,
 	"az cli": azCli, "azcli": azCli,
 	"domain hint": domainHint, "domainhint": domainHint,
@@ -107,14 +106,6 @@ func assignValue(kcsb *ConnectionStringBuilder, rawKey string, value string) err
 		kcsb.ApplicationToken = value
 	case userToken:
 		kcsb.UserToken = value
-	case msiAuth:
-		bval, _ := strconv.ParseBool(value)
-		kcsb.MsiAuthentication = bval
-	case managedServiceIdentity:
-		kcsb.ManagedServiceIdentity = value
-	case azCli:
-		bval, _ := strconv.ParseBool(value)
-		kcsb.Azcli = bval
 	case interactiveLogin:
 		bval, _ := strconv.ParseBool(value)
 		kcsb.InteractiveLogin = bval
@@ -125,7 +116,7 @@ func assignValue(kcsb *ConnectionStringBuilder, rawKey string, value string) err
 }
 
 /*
-Creates new KustoConnectionStringBuilder.
+Creates new Kusto ConnectionStringBuilder.
 Params takes kusto connection string connStr: string.  Kusto connection string should be of the format:
 https://<clusterName>.kusto.windows.net;AAD User ID="user@microsoft.com";Password=P@ssWord
 For more information please look at:
@@ -150,14 +141,12 @@ func GetConnectionStringBuilder(connStr string) *ConnectionStringBuilder {
 		if err := assignValue(&kcsb, kvparr[0], val); err != nil {
 			panic(err)
 		}
-
 	}
 
 	return &kcsb
 }
 
 func (kcsb *ConnectionStringBuilder) resetConnectionString() {
-
 	kcsb.AadUserID = ""
 	kcsb.Password = ""
 	kcsb.UserToken = ""
@@ -168,7 +157,7 @@ func (kcsb *ConnectionStringBuilder) resetConnectionString() {
 	kcsb.ApplicationCertificateThumbprint = ""
 	kcsb.SendCertificateChain = false
 	kcsb.ApplicationToken = ""
-	kcsb.Azcli = false
+	kcsb.AzCli = false
 	kcsb.MsiAuthentication = false
 	kcsb.ManagedServiceIdentity = ""
 	kcsb.InteractiveLogin = false
@@ -176,7 +165,7 @@ func (kcsb *ConnectionStringBuilder) resetConnectionString() {
 	kcsb.ClientOptions = nil
 }
 
-// Creates a KustoConnection string builder that will authenticate with AAD user name and password.
+// Creates a Kusto Connection string builder that will authenticate with AAD user name and password.
 func (kcsb *ConnectionStringBuilder) WithAadUserPassAuth(uname string, pswrd string, authorityID string) *ConnectionStringBuilder {
 	requireNonEmpty(dataSource, kcsb.DataSource)
 	requireNonEmpty(aadUserId, uname)
@@ -188,7 +177,7 @@ func (kcsb *ConnectionStringBuilder) WithAadUserPassAuth(uname string, pswrd str
 	return kcsb
 }
 
-// Creates a KustoConnection string builder that will authenticate with AAD user token
+// Creates a Kusto Connection string builder that will authenticate with AAD user token
 func (kcsb *ConnectionStringBuilder) WitAadUserToken(usertoken string) *ConnectionStringBuilder {
 	requireNonEmpty(dataSource, kcsb.DataSource)
 	requireNonEmpty(userToken, usertoken)
@@ -197,7 +186,7 @@ func (kcsb *ConnectionStringBuilder) WitAadUserToken(usertoken string) *Connecti
 	return kcsb
 }
 
-// Creates a KustoConnection string builder that will authenticate with AAD application and key.
+// Creates a Kusto Connection string builder that will authenticate with AAD application and key.
 func (kcsb *ConnectionStringBuilder) WithAadAppKey(appId string, appKey string, authorityID string) *ConnectionStringBuilder {
 	requireNonEmpty(dataSource, kcsb.DataSource)
 	requireNonEmpty(applicationClientId, appId)
@@ -210,7 +199,7 @@ func (kcsb *ConnectionStringBuilder) WithAadAppKey(appId string, appKey string, 
 	return kcsb
 }
 
-// Creates a KustoConnection string builder that will authenticate with AAD application using a certificate.
+// Creates a Kusto Connection string builder that will authenticate with AAD application using a certificate.
 func (kcsb *ConnectionStringBuilder) WithAppCertificate(appId string, certificate string, thumprint string, sendCertChain bool, authorityID string) *ConnectionStringBuilder {
 	requireNonEmpty(dataSource, kcsb.DataSource)
 	requireNonEmpty(applicationCertificate, certificate)
@@ -225,7 +214,7 @@ func (kcsb *ConnectionStringBuilder) WithAppCertificate(appId string, certificat
 	return kcsb
 }
 
-// Creates a KustoConnection string builder that will authenticate with AAD application and an application token.
+// Creates a Kusto Connection string builder that will authenticate with AAD application and an application token.
 func (kcsb *ConnectionStringBuilder) WithApplicationToken(appId string, appToken string) *ConnectionStringBuilder {
 	requireNonEmpty(dataSource, kcsb.DataSource)
 	requireNonEmpty(applicationToken, appToken)
@@ -234,16 +223,16 @@ func (kcsb *ConnectionStringBuilder) WithApplicationToken(appId string, appToken
 	return kcsb
 }
 
-// Creates a KustoConnection string builder that will use existing authenticated az cli profile password.
+// Creates a Kusto Connection string builder that will use existing authenticated az cli profile password.
 func (kcsb *ConnectionStringBuilder) WithAzCli() *ConnectionStringBuilder {
 	requireNonEmpty(dataSource, kcsb.DataSource)
 	kcsb.resetConnectionString()
-	kcsb.Azcli = true
+	kcsb.AzCli = true
 	return kcsb
 }
 
 /*
-Creates a KustoConnection string builder that will authenticate with AAD application, using
+Creates a Kusto Connection string builder that will authenticate with AAD application, using
 an application token obtained from a Microsoft Service Identity endpoint using user assigned id.
 */
 func (kcsb *ConnectionStringBuilder) WithUserManagedIdentity(clientID string) *ConnectionStringBuilder {
@@ -255,7 +244,7 @@ func (kcsb *ConnectionStringBuilder) WithUserManagedIdentity(clientID string) *C
 }
 
 /*
-Creates a KustoConnection string builder that will authenticate with AAD application, using
+Creates a Kusto Connection string builder that will authenticate with AAD application, using
 an application token obtained from a Microsoft Service Identity endpoint using system assigned id.
 */
 func (kcsb *ConnectionStringBuilder) WithSystemManagedIdentity() *ConnectionStringBuilder {
@@ -265,6 +254,7 @@ func (kcsb *ConnectionStringBuilder) WithSystemManagedIdentity() *ConnectionStri
 	return kcsb
 }
 
+// Creates a Kusto Connection string builder that will authenticate by launching the system default browser to interactively authenticate a user, and obtain an access token
 func (kcsb *ConnectionStringBuilder) WithInteractiveLogin(clientID string, authorityID string, redirectURL string) *ConnectionStringBuilder {
 	requireNonEmpty(dataSource, kcsb.DataSource)
 	kcsb.resetConnectionString()
@@ -281,7 +271,11 @@ func (kcsb *ConnectionStringBuilder) WithInteractiveLogin(clientID string, autho
 	return kcsb
 }
 
-func (kcsb *ConnectionStringBuilder) AttachClientOptions(options *azcore.ClientOptions) *ConnectionStringBuilder {
+/*
+Assigns ClientOptions to string builder that contains configuration settings like Logging and Retry configs for a client's pipeline.
+Read more at https://pkg.go.dev/github.com/Azure/azure-sdk-for-go/sdk/azcore@v1.2.0/policy#ClientOptions
+*/
+func (kcsb *ConnectionStringBuilder) AttachPolicyClientOptions(options *azcore.ClientOptions) *ConnectionStringBuilder {
 	requireNonEmpty(dataSource, kcsb.DataSource)
 	if options == nil {
 		kcsb.ClientOptions = options
@@ -289,11 +283,21 @@ func (kcsb *ConnectionStringBuilder) AttachClientOptions(options *azcore.ClientO
 	return kcsb
 }
 
+// Create Kusto Conntection String that will be used for no auth mode. No auth token will be used for making requests.
+func (kcsb *ConnectionStringBuilder) WithNoAtuhentication() *ConnectionStringBuilder {
+	kcsb.resetConnectionString()
+	kcsb.NoAuthMode = true
+	return kcsb
+}
+
 // Method to be used for generating TokenCredential
-func (kcsb *ConnectionStringBuilder) getTokenProvider() (*TokenProvider, error) {
+func (kcsb *ConnectionStringBuilder) newTokenProvider() (*TokenProvider, error) {
 	tkp := &TokenProvider{}
-	tkp.tokenType = BEARER_TYPE
 	tkp.dataSource = kcsb.DataSource
+	if kcsb.NoAuthMode {
+		return tkp, nil
+	}
+	tkp.tokenScheme = BEARER_TYPE
 
 	switch {
 	case kcsb.InteractiveLogin:
@@ -391,7 +395,7 @@ func (kcsb *ConnectionStringBuilder) getTokenProvider() (*TokenProvider, error) 
 			tkp.customToken = kcsb.ApplicationToken
 			return tkp, nil
 		}
-	case kcsb.Azcli:
+	case kcsb.AzCli:
 		{
 			opts := &azidentity.AzureCLICredentialOptions{}
 			opts.TenantID = kcsb.AuthorityId

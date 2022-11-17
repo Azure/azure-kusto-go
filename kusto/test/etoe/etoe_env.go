@@ -6,6 +6,8 @@ import (
 	"os"
 	"path/filepath"
 	"runtime"
+
+	"github.com/Azure/azure-kusto-go/kusto"
 )
 
 // Config represents a config.json file that must be in the directory and hold information to do the integration tests.
@@ -24,6 +26,8 @@ type Config struct {
 	ClientSecret string
 	// TenantID is the tenant on which the principal exists
 	TenantID string
+	// Connection string builder to get a new kusto client
+	kcsb *kusto.ConnectionStringBuilder
 }
 
 func (c *Config) validate() error {
@@ -80,5 +84,10 @@ func init() {
 		return
 	}
 
+	if testConfig.ClientID == "" {
+		testConfig.kcsb = kusto.GetConnectionStringBuilder(testConfig.Endpoint).WithAzCli()
+	} else {
+		testConfig.kcsb = kusto.GetConnectionStringBuilder(testConfig.Endpoint).WithAadAppKey(testConfig.ClientID, testConfig.ClientSecret, testConfig.TenantID)
+	}
 	skipETOE = false
 }

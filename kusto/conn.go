@@ -36,7 +36,7 @@ var bufferPool = sync.Pool{
 // conn provides connectivity to a Kusto instance.
 type conn struct {
 	endpoint                       string
-	tokenProvider                  *TokenProvider
+	auth                           Authorization
 	endMgmt, endQuery, streamQuery *url.URL
 	client                         *http.Client
 }
@@ -53,11 +53,11 @@ func newConn(endpoint string, auth Authorization, client *http.Client) (*conn, e
 	}
 
 	c := &conn{
-		tokenProvider: &auth.TokenProvider,
-		endMgmt:       &url.URL{Scheme: "https", Host: u.Host, Path: "/v1/rest/mgmt"},
-		endQuery:      &url.URL{Scheme: "https", Host: u.Host, Path: "/v2/rest/query"},
-		streamQuery:   &url.URL{Scheme: "https", Host: u.Host, Path: "/v1/rest/ingest/"},
-		client:        client,
+		auth:        auth,
+		endMgmt:     &url.URL{Scheme: "https", Host: u.Host, Path: "/v1/rest/mgmt"},
+		endQuery:    &url.URL{Scheme: "https", Host: u.Host, Path: "/v2/rest/query"},
+		streamQuery: &url.URL{Scheme: "https", Host: u.Host, Path: "/v1/rest/ingest/"},
+		client:      client,
 	}
 
 	return c, nil
@@ -86,7 +86,6 @@ func (c *conn) query(ctx context.Context, db string, query Stmt, options *queryO
 
 // mgmt is used to do management queries to Kusto.
 func (c *conn) mgmt(ctx context.Context, db string, query Stmt, options *mgmtOptions) (execResp, error) {
-
 	return c.execute(ctx, execMgmt, db, query, *options.requestProperties)
 }
 
@@ -182,11 +181,13 @@ func (c *conn) doRequest(ctx context.Context, execType int, db string, query Stm
 		return 0, nil, nil, nil, errors.ES(op, errors.KInternal, "internal error: did not understand the type of execType: %d", execType)
 	}
 
-	token, tokenType, tkerr := c.tokenProvider.AcquireToken(ctx)
-	if tkerr != nil {
-		return 0, nil, nil, nil, errors.ES(op, errors.KInternal, "Error while getting token : %s", tkerr)
+	if c.auth.TokenProvider.AuthorizationRequired() {
+		token, tokenType, tkerr := c.auth.TokenProvider.AcquireToken(ctx)
+		if tkerr != nil {
+			return 0, nil, nil, nil, errors.ES(op, errors.KInternal, "Error while getting token : %s", tkerr)
+		}
+		header.Add("Authorization", fmt.Sprintf("%s %s", tokenType, token))
 	}
-	header.Add("Authorization", fmt.Sprintf("%s %s", tokenType, token))
 
 	req := &http.Request{
 		Method: http.MethodPost,

@@ -108,9 +108,7 @@ func TestQueries(t *testing.T) {
 	_, cancel := context.WithCancel(context.Background())
 	defer cancel()
 
-	kcsb := kusto.GetConnectionStringBuilder(testConfig.Endpoint).WithAadAppKey(testConfig.ClientID, testConfig.ClientSecret, testConfig.TenantID)
-
-	client, err := kusto.New(kcsb)
+	client, err := kusto.New(testConfig.kcsb)
 	if err != nil {
 		panic(err)
 	}
@@ -461,9 +459,7 @@ func TestFileIngestion(t *testing.T) {
 		t.Skipf("end to end tests disabled: missing config.json file in etoe directory")
 	}
 
-	kcsb := kusto.GetConnectionStringBuilder(testConfig.Endpoint).WithAadAppKey(testConfig.ClientID, testConfig.ClientSecret, testConfig.TenantID)
-
-	client, err := kusto.New(kcsb)
+	client, err := kusto.New(testConfig.kcsb)
 	if err != nil {
 		panic(err)
 	}
@@ -843,9 +839,7 @@ func TestReaderIngestion(t *testing.T) {
 	streamingTable := "goe2e_streaming_reader_logs"
 	managedTable := "goe2e_managed_streaming_reader_logs"
 
-	kcsb := kusto.GetConnectionStringBuilder(testConfig.Endpoint).WithAadAppKey(testConfig.ClientID, testConfig.ClientSecret, testConfig.TenantID)
-
-	client, err := kusto.New(kcsb)
+	client, err := kusto.New(testConfig.kcsb)
 	if err != nil {
 		panic(err)
 	}
@@ -1184,9 +1178,7 @@ func TestMultipleClusters(t *testing.T) {
 		t.Skipf("multiple clusters tests diasbled: needs SecondaryEndpoint and SecondaryDatabase")
 	}
 
-	kcsb := kusto.GetConnectionStringBuilder(testConfig.Endpoint).WithAadAppKey(testConfig.ClientID, testConfig.ClientSecret, testConfig.TenantID)
-
-	client, err := kusto.New(kcsb)
+	client, err := kusto.New(testConfig.kcsb)
 	if err != nil {
 		panic(err)
 	}
@@ -1392,9 +1384,7 @@ func TestStreamingIngestion(t *testing.T) {
 	if skipETOE || testing.Short() {
 		t.SkipNow()
 	}
-	kcsb := kusto.GetConnectionStringBuilder(testConfig.Endpoint).WithAadAppKey(testConfig.ClientID, testConfig.ClientSecret, testConfig.TenantID)
-
-	client, err := kusto.New(kcsb)
+	client, err := kusto.New(testConfig.kcsb)
 	if err != nil {
 		panic(err)
 	}
@@ -1508,9 +1498,7 @@ func TestStreamingIngestion(t *testing.T) {
 func TestError(t *testing.T) {
 	t.Parallel()
 
-	kcsb := kusto.GetConnectionStringBuilder(testConfig.Endpoint).WithAadAppKey(testConfig.ClientID, testConfig.ClientSecret, testConfig.TenantID)
-
-	client, err := kusto.New(kcsb)
+	client, err := kusto.New(testConfig.kcsb)
 	require.NoError(t, err)
 
 	t.Cleanup(func() {

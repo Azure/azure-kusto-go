@@ -42,7 +42,7 @@ func TestGetConnectionStringBuilder(t *testing.T) {
 				ApplicationCertificateThumbprint: "",
 				SendCertificateChain:             false,
 				ApplicationToken:                 "token",
-				Azcli:                            true,
+				AzCli:                            true,
 				MsiAuthentication:                true,
 				ManagedServiceIdentity:           "123456",
 				InteractiveLogin:                 false,
@@ -182,7 +182,7 @@ func TestGetTokenProviderHappy(t *testing.T) {
 		kscb := test.kcsb
 		s.code = 200
 		s.payload = []byte(payload)
-		got, err := kscb.getTokenProvider()
+		got, err := kscb.newTokenProvider()
 		assert.Nil(t, err)
 		assert.NotNil(t, got)
 	}

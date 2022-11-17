@@ -29,16 +29,6 @@ type Authorization struct {
 	TokenProvider TokenProvider
 }
 
-// Validate validates the Authorization object against the endpoint an preps it for use.
-// For internal use only.
-func (a *Authorization) Validate() error {
-	const rescField = "Resource"
-	if !a.TokenProvider.IsInitialized() {
-		return errors.ES(errors.OpServConn, errors.KClientArgs, "Authoriztion.tokenProvider cannot be empty")
-	}
-	return nil
-}
-
 // Client is a client to a Kusto instance.
 type Client struct {
 	conn, ingestConn queryer
@@ -53,7 +43,7 @@ type Option func(c *Client)
 
 // New returns a new Client. endpoint is the Kusto endpoint to use, example: https://somename.westus.kusto.windows.net .
 func New(kcsb *ConnectionStringBuilder, options ...Option) (*Client, error) {
-	tkp, err := kcsb.getTokenProvider()
+	tkp, err := kcsb.newTokenProvider()
 	if err != nil {
 		return nil, err
 	}
@@ -77,10 +67,6 @@ func New(kcsb *ConnectionStringBuilder, options ...Option) (*Client, error) {
 	client := &Client{auth: *auth, endpoint: endpoint}
 	for _, o := range options {
 		o(client)
-	}
-
-	if err := auth.Validate(); err != nil {
-		return nil, err
 	}
 
 	if client.http == nil {
@@ -355,9 +341,6 @@ func (c *Client) getConn(callType callType, options connOptions) (queryer, error
 			u, _ := url.Parse(c.endpoint) // Don't care about the error
 			u.Host = "ingest-" + u.Host
 			auth := c.auth
-			if err := auth.Validate(); err != nil {
-				return nil, err
-			}
 			iconn, err := newConn(u.String(), auth, c.http)
 			if err != nil {
 				return nil, err

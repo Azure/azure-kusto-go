@@ -51,9 +51,6 @@ func New(endpoint string, auth kusto.Authorization, client *http.Client) (*Conn,
 			"endpoint is not valid(%s) for Kusto streaming ingestion", endpoint,
 		).SetNoRetry()
 	}
-	if err := auth.Validate(); err != nil {
-		return nil, err
-	}
 
 	return newWithoutValidation(endpoint, auth, client)
 }
@@ -130,7 +127,7 @@ func (c *Conn) StreamIngest(ctx context.Context, db, table string, payload io.Re
 
 	headers.Add("Content-Type", "application/json; charset=utf-8")
 	headers.Add("Content-Encoding", "gzip")
-	if c.auth.TokenProvider.IsInitialized() {
+	if c.auth.TokenProvider.AuthorizationRequired() {
 		token, tokenType, tkerr := c.auth.TokenProvider.AcquireToken(ctx)
 		if tkerr != nil {
 			return tkerr

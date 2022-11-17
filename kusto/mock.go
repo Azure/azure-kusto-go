@@ -147,7 +147,7 @@ func (m mockConn) mgmt(_ context.Context, _ string, _ Stmt, _ *mgmtOptions) (exe
 func NewMockClient() *Client {
 
 	kcsb := GetConnectionStringBuilder("https://sdkse2etest.eastus.kusto.windows.net")
-	tkp, _ := kcsb.getTokenProvider()
+	tkp, _ := kcsb.newTokenProvider()
 
 	return &Client{
 		conn:       mockConn{},
