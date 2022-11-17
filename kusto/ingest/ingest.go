@@ -93,6 +93,18 @@ func (i *Ingestion) prepForIngestion(ctx context.Context, options []FileOption, 
 		}
 	}
 
+	if source == FromReader && props.Ingestion.Additional.Format == DFUnknown {
+		props.Ingestion.Additional.Format = CSV
+	}
+
+	if props.Ingestion.Additional.IngestionMappingType != DFUnknown && props.Ingestion.Additional.Format != props.Ingestion.Additional.IngestionMappingType {
+		return nil, properties.All{}, errors.ES(
+			errors.OpUnknown,
+			errors.KClientArgs,
+			"format and ingestion mapping type must match (hint: using ingestion mapping sets the format automatically)",
+		).SetNoRetry()
+	}
+
 	if props.Ingestion.ReportLevel != properties.None {
 		if props.Source.ID == uuid.Nil {
 			props.Source.ID = uuid.New()
@@ -174,10 +186,6 @@ func (i *Ingestion) fromReader(ctx context.Context, reader io.Reader, options []
 	result, props, err := i.prepForIngestion(ctx, options, props, FromReader)
 	if err != nil {
 		return nil, err
-	}
-
-	if props.Ingestion.Additional.Format == DFUnknown {
-		props.Ingestion.Additional.Format = CSV
 	}
 
 	path, err := i.fs.Reader(ctx, reader, props)
