@@ -1189,7 +1189,7 @@ func TestMultipleClusters(t *testing.T) {
 		t.Log("Closed client")
 	})
 
-	skcsb := kusto.GetConnectionStringBuilder(testConfig.SecondaryEndpoint).WithAadAppKey(testConfig.ClientID, testConfig.ClientSecret, testConfig.TenantID)
+	skcsb := kusto.NewConnectionStringBuilder(testConfig.SecondaryEndpoint).WithAadAppKey(testConfig.ClientID, testConfig.ClientSecret, testConfig.TenantID)
 
 	secondaryClient, err := kusto.New(skcsb)
 	if err != nil {

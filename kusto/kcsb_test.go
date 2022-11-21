@@ -53,7 +53,7 @@ func TestGetConnectionStringBuilder(t *testing.T) {
 
 	for _, test := range tests {
 		if isEmpty(test.wantErr) {
-			actual := GetConnectionStringBuilder(test.connectionString)
+			actual := NewConnectionStringBuilder(test.connectionString)
 			assert.EqualValues(t, test.want, *actual)
 		} else {
 			defer func() {
@@ -63,7 +63,7 @@ func TestGetConnectionStringBuilder(t *testing.T) {
 					t.Errorf("Wrong panic message: %s", res)
 				}
 			}()
-			GetConnectionStringBuilder(test.connectionString)
+			NewConnectionStringBuilder(test.connectionString)
 
 		}
 	}
@@ -77,7 +77,7 @@ func TestWithAadUserPassAuth(t *testing.T) {
 		AuthorityId: "authorityID",
 	}
 
-	actual := GetConnectionStringBuilder("endpoint").WithAadUserPassAuth("userid", "password", "authorityID")
+	actual := NewConnectionStringBuilder("endpoint").WithAadUserPassAuth("userid", "password", "authorityID")
 	assert.EqualValues(t, want, *actual)
 }
 
@@ -89,7 +89,7 @@ func TestWithAadUserPassAuthErr(t *testing.T) {
 			t.Errorf("Wrong panic message: %s", res)
 		}
 	}()
-	GetConnectionStringBuilder("endpoint").WithAadUserPassAuth("userid", "", "authorityID")
+	NewConnectionStringBuilder("endpoint").WithAadUserPassAuth("userid", "", "authorityID")
 
 }
 
@@ -99,7 +99,7 @@ func TestWitAadUserToken(t *testing.T) {
 		UserToken:  "token",
 	}
 
-	actual := GetConnectionStringBuilder("endpoint").WitAadUserToken("token")
+	actual := NewConnectionStringBuilder("endpoint").WitAadUserToken("token")
 	assert.EqualValues(t, want, *actual)
 }
 
@@ -111,7 +111,7 @@ func TestWitAadUserTokenErr(t *testing.T) {
 			t.Errorf("Wrong panic message: %s", res)
 		}
 	}()
-	GetConnectionStringBuilder("endpoint").WitAadUserToken("")
+	NewConnectionStringBuilder("endpoint").WitAadUserToken("")
 
 }
 

@@ -1,6 +1,7 @@
 package kusto
 
 import (
+	"context"
 	"fmt"
 	"strconv"
 	"strings"
@@ -122,7 +123,7 @@ https://<clusterName>.kusto.windows.net;AAD User ID="user@microsoft.com";Passwor
 For more information please look at:
 https://docs.microsoft.com/azure/data-explorer/kusto/api/connection-strings/kusto
 */
-func GetConnectionStringBuilder(connStr string) *ConnectionStringBuilder {
+func NewConnectionStringBuilder(connStr string) *ConnectionStringBuilder {
 	kcsb := ConnectionStringBuilder{}
 	if isEmpty(connStr) {
 		panic("Error : Connection string cannot be empty")
@@ -142,7 +143,6 @@ func GetConnectionStringBuilder(connStr string) *ConnectionStringBuilder {
 			panic(err)
 		}
 	}
-
 	return &kcsb
 }
 
@@ -293,23 +293,36 @@ func (kcsb *ConnectionStringBuilder) WithNoAtuhentication() *ConnectionStringBui
 // Method to be used for generating TokenCredential
 func (kcsb *ConnectionStringBuilder) newTokenProvider() (*TokenProvider, error) {
 	tkp := &TokenProvider{}
-	tkp.dataSource = kcsb.DataSource
 	if kcsb.NoAuthMode {
 		return tkp, nil
 	}
 	tkp.tokenScheme = BEARER_TYPE
+	// Fetches cloud meta data
+	fetchedCI, cierr := GetMetadata(context.Background(), kcsb.DataSource)
+	if cierr != nil {
+		return nil, cierr
+	}
+	// Update resource URI if MFA enabled
+	resourceURI := fetchedCI.KustoServiceResourceID
+	if fetchedCI.LoginMfaRequired {
+		resourceURI = strings.Replace(resourceURI, ".kusto.", ".kustomfa.", 1)
+	}
+	tkp.scopes = []string{fmt.Sprintf("%s/.default", resourceURI)}
 
 	switch {
 	case kcsb.InteractiveLogin:
 		{
+			if isEmpty(kcsb.AuthorityId) {
+				kcsb.AuthorityId = fetchedCI.FirstPartyAuthorityURL
+			}
+			if isEmpty(kcsb.ApplicationClientId) {
+				kcsb.ApplicationClientId = fetchedCI.KustoClientAppID
+			}
 			inOps := &azidentity.InteractiveBrowserCredentialOptions{}
+			inOps.ClientID = kcsb.ApplicationClientId
+			inOps.TenantID = kcsb.AuthorityId
+			inOps.RedirectURL = fetchedCI.KustoClientRedirectURI
 
-			if !isEmpty(kcsb.ApplicationClientId) {
-				inOps.ClientID = kcsb.ApplicationClientId
-			}
-			if !isEmpty(kcsb.AuthorityId) {
-				inOps.TenantID = kcsb.AuthorityId
-			}
 			if kcsb.ClientOptions != nil {
 				inOps.ClientOptions = *kcsb.ClientOptions
 			}
@@ -328,6 +341,13 @@ func (kcsb *ConnectionStringBuilder) newTokenProvider() (*TokenProvider, error) 
 				ops = &azidentity.UsernamePasswordCredentialOptions{ClientOptions: *kcsb.ClientOptions}
 			}
 
+			if isEmpty(kcsb.AuthorityId) {
+				kcsb.AuthorityId = fetchedCI.FirstPartyAuthorityURL
+			}
+			if isEmpty(kcsb.ApplicationClientId) {
+				kcsb.ApplicationClientId = fetchedCI.KustoClientAppID
+			}
+
 			cred, err := azidentity.NewUsernamePasswordCredential(kcsb.AuthorityId, kcsb.ApplicationClientId, kcsb.AadUserID, kcsb.Password, ops)
 			if err != nil {
 				return nil, fmt.Errorf("Error : Couldn't retrieve client credentiels using Username Password. Error: %s", err)
@@ -342,6 +362,9 @@ func (kcsb *ConnectionStringBuilder) newTokenProvider() (*TokenProvider, error) 
 				opts = &azidentity.ClientSecretCredentialOptions{}
 				opts.ClientOptions = *kcsb.ClientOptions
 			}
+			if isEmpty(kcsb.AuthorityId) {
+				kcsb.AuthorityId = fetchedCI.FirstPartyAuthorityURL
+			}
 			cred, err := azidentity.NewClientSecretCredential(kcsb.AuthorityId, kcsb.ApplicationClientId, kcsb.ApplicationKey, opts)
 			if err != nil {
 				return nil, fmt.Errorf("Error : Couldn't retrieve client credentiels using Client Secret. Error: %s", err)
@@ -354,6 +377,12 @@ func (kcsb *ConnectionStringBuilder) newTokenProvider() (*TokenProvider, error) 
 			cert, thumprintKey, err := azidentity.ParseCertificates([]byte(kcsb.ApplicationCertificate), []byte(kcsb.ApplicationCertificateThumbprint))
 			if err != nil {
 				return nil, err
+			}
+			if isEmpty(kcsb.AuthorityId) {
+				kcsb.AuthorityId = fetchedCI.FirstPartyAuthorityURL
+			}
+			if isEmpty(kcsb.ApplicationClientId) {
+				kcsb.ApplicationClientId = fetchedCI.KustoClientAppID
 			}
 			opts := &azidentity.ClientCertificateCredentialOptions{}
 			opts.SendCertificateChain = kcsb.SendCertificateChain

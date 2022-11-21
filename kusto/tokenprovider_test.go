@@ -20,16 +20,14 @@ func TestAcquireTokenErr(t *testing.T) {
 		{
 			name: "test_acquiretoken_cred",
 			tkp: TokenProvider{
-				tokenCred:  NewMockClient().auth.TokenProvider.tokenCred,
-				dataSource: s.urlStr() + "/test_acquiretoken_cred",
+				tokenCred: NewMockClient().auth.TokenProvider.tokenCred,
 			},
 			wantErr: "",
 		},
 		{
 			name: "test_acquiretoken_invalid_datasource",
 			tkp: TokenProvider{
-				tokenCred:  NewMockClient().auth.TokenProvider.tokenCred,
-				dataSource: "endpoint",
+				tokenCred: NewMockClient().auth.TokenProvider.tokenCred,
 			},
 		},
 	}

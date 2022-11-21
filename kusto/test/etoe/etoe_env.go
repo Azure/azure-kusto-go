@@ -85,9 +85,9 @@ func init() {
 	}
 
 	if testConfig.ClientID == "" {
-		testConfig.kcsb = kusto.GetConnectionStringBuilder(testConfig.Endpoint).WithAzCli()
+		testConfig.kcsb = kusto.NewConnectionStringBuilder(testConfig.Endpoint).WithAzCli()
 	} else {
-		testConfig.kcsb = kusto.GetConnectionStringBuilder(testConfig.Endpoint).WithAadAppKey(testConfig.ClientID, testConfig.ClientSecret, testConfig.TenantID)
+		testConfig.kcsb = kusto.NewConnectionStringBuilder(testConfig.Endpoint).WithAadAppKey(testConfig.ClientID, testConfig.ClientSecret, testConfig.TenantID)
 	}
 	skipETOE = false
 }

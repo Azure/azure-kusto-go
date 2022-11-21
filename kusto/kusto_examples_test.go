@@ -3,12 +3,13 @@ package kusto
 import (
 	"context"
 	"fmt"
-	kustoErrors "github.com/Azure/azure-kusto-go/kusto/data/errors"
 	"io"
 	"net/http"
 	"net/url"
 	"sync"
 	"time"
+
+	kustoErrors "github.com/Azure/azure-kusto-go/kusto/data/errors"
 
 	"github.com/Azure/azure-kusto-go/kusto/data/table"
 	"github.com/Azure/azure-kusto-go/kusto/data/types"
@@ -25,7 +26,7 @@ func Example_simple() {
 		CollectionTime time.Time
 	}
 
-	kcsb := GetConnectionStringBuilder("endpoint").WithAadAppKey("clientID", "clientSecret", "tenentID")
+	kcsb := NewConnectionStringBuilder("endpoint").WithAadAppKey("clientID", "clientSecret", "tenentID")
 	client, err := New(kcsb)
 	if err != nil {
 		panic("add error handling")
@@ -103,7 +104,7 @@ func Example_complex() {
 		CollectionTime time.Time
 	}
 
-	kcsb := GetConnectionStringBuilder("endpoint").WithAadAppKey("clientID", "clientSecret", "tenentID")
+	kcsb := NewConnectionStringBuilder("endpoint").WithAadAppKey("clientID", "clientSecret", "tenentID")
 
 	client, err := New(kcsb)
 	if err != nil {
@@ -137,7 +138,7 @@ func Example_complex() {
 }
 
 func ExampleAuthorization_config() {
-	kcsb := GetConnectionStringBuilder("endpoint").WithAadAppKey("clientID", "clientSecret", "tenentID")
+	kcsb := NewConnectionStringBuilder("endpoint").WithAadAppKey("clientID", "clientSecret", "tenentID")
 
 	// Normally here you take a client.
 	_, err := New(kcsb)
@@ -148,7 +149,7 @@ func ExampleAuthorization_config() {
 
 func ExampleAuthorization_msi() {
 
-	kcsb := GetConnectionStringBuilder("endpoint").WithUserManagedIdentity("clientID")
+	kcsb := NewConnectionStringBuilder("endpoint").WithUserManagedIdentity("clientID")
 
 	// Normally here you take a client.
 	_, err := New(kcsb)
@@ -159,7 +160,7 @@ func ExampleAuthorization_msi() {
 
 func ExampleClient_Query_rows() {
 
-	kcsb := GetConnectionStringBuilder("endpoint").WithAadAppKey("clientID", "clientSecret", "tenentID")
+	kcsb := NewConnectionStringBuilder("endpoint").WithAadAppKey("clientID", "clientSecret", "tenentID")
 
 	client, err := New(kcsb)
 	if err != nil {
@@ -202,7 +203,7 @@ func ExampleClient_Query_do() {
 	// This is similar to our (Row) example. In this one though, we use the RowIterator.Do() method instead of
 	// manually iterating over the row. This makes for shorter code while maintaining readability.
 
-	kcsb := GetConnectionStringBuilder("endpoint").WithAadAppKey("clientID", "clientSecret", "tenentID")
+	kcsb := NewConnectionStringBuilder("endpoint").WithAadAppKey("clientID", "clientSecret", "tenentID")
 
 	client, err := New(kcsb)
 	if err != nil {
@@ -255,7 +256,7 @@ func ExampleClient_Query_struct() {
 		err error
 	}
 
-	kcsb := GetConnectionStringBuilder("endpoint").WithAadAppKey("clientID", "clientSecret", "tenentID")
+	kcsb := NewConnectionStringBuilder("endpoint").WithAadAppKey("clientID", "clientSecret", "tenentID")
 
 	client, err := New(kcsb)
 	if err != nil {
@@ -309,7 +310,7 @@ func ExampleClient_Query_struct() {
 
 func ExampleCustomHttpClient() { // nolint:govet // Example code
 	// Create a connection string builder with your Azure ClientID, Secret and TenantID.
-	kcsb := GetConnectionStringBuilder("endpoint").WithAadAppKey("clientID", "clientSecret", "tenentID")
+	kcsb := NewConnectionStringBuilder("endpoint").WithAadAppKey("clientID", "clientSecret", "tenentID")
 	httpClient := &http.Client{}
 	url, err := url.Parse("squid-proxy.corp.mycompany.com:2323")
 	if err != nil {
