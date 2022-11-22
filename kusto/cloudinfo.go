@@ -49,18 +49,14 @@ var defaultCloudInfo = CloudInfo{
 }
 
 // cache to query it once per instance
-var cloudInfoCache = map[string]CloudInfo{}
-var lock = &sync.Mutex{}
+var cloudInfoCache sync.Map
 
 func GetMetadata(ctx context.Context, kustoUri string) (CloudInfo, error) {
 	// retrieve &return if exists
-	cachedCloudInfo, ok := cloudInfoCache[kustoUri]
+	anyCachedCloudInfo, ok := cloudInfoCache.Load(kustoUri)
 	if ok {
-		return cachedCloudInfo, nil
+		return anyCachedCloudInfo.(CloudInfo), nil
 	}
-	// there is no value for that URL that was picked.
-	lock.Lock()
-	defer lock.Unlock()
 	u, err := url.Parse(kustoUri)
 	if err != nil {
 		return CloudInfo{}, err
@@ -97,7 +93,7 @@ func GetMetadata(ctx context.Context, kustoUri string) (CloudInfo, error) {
 
 	// Covers scenarios of 200/OK with no body or a 404 where there is no body
 	if len(b) == 0 {
-		cloudInfoCache[kustoUri] = defaultCloudInfo
+		cloudInfoCache.Store(kustoUri, defaultCloudInfo)
 		return defaultCloudInfo, nil
 	}
 
@@ -107,7 +103,7 @@ func GetMetadata(ctx context.Context, kustoUri string) (CloudInfo, error) {
 		return CloudInfo{}, err
 	}
 	// this should be set in the map by now
-	cloudInfoCache[kustoUri] = md.AzureAD
+	cloudInfoCache.Store(kustoUri, md.AzureAD)
 	return md.AzureAD, nil
 }
 
