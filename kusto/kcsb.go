@@ -254,7 +254,10 @@ func (kcsb *ConnectionStringBuilder) WithSystemManagedIdentity() *ConnectionStri
 	return kcsb
 }
 
-// Creates a Kusto Connection string builder that will authenticate by launching the system default browser to interactively authenticate a user, and obtain an access token
+/*
+Creates a Kusto Connection string builder that will authenticate by launching the system default browser
+to interactively authenticate a user, and obtain an access token
+*/
 func (kcsb *ConnectionStringBuilder) WithInteractiveLogin(clientID string, authorityID string, redirectURL string) *ConnectionStringBuilder {
 	requireNonEmpty(dataSource, kcsb.DataSource)
 	kcsb.resetConnectionString()
@@ -312,20 +315,13 @@ func (kcsb *ConnectionStringBuilder) newTokenProvider() (*TokenProvider, error) 
 	switch {
 	case kcsb.InteractiveLogin:
 		{
-			if isEmpty(kcsb.AuthorityId) {
-				kcsb.AuthorityId = fetchedCI.FirstPartyAuthorityURL
-			}
-			if isEmpty(kcsb.ApplicationClientId) {
-				kcsb.ApplicationClientId = fetchedCI.KustoClientAppID
-			}
+			initialiseWithCloudInfo(kcsb, fetchedCI)
 			inOps := &azidentity.InteractiveBrowserCredentialOptions{}
 			inOps.ClientID = kcsb.ApplicationClientId
 			inOps.TenantID = kcsb.AuthorityId
-			inOps.RedirectURL = fetchedCI.KustoClientRedirectURI
+			inOps.RedirectURL = kcsb.RedirectURL
+			inOps.ClientOptions = *kcsb.ClientOptions
 
-			if kcsb.ClientOptions != nil {
-				inOps.ClientOptions = *kcsb.ClientOptions
-			}
 			cred, err := azidentity.NewInteractiveBrowserCredential(inOps)
 			if err != nil {
 				return nil, fmt.Errorf("Error : Couldn't retrieve client credentiels using Interactive Login. Error: %s", err)
@@ -335,18 +331,8 @@ func (kcsb *ConnectionStringBuilder) newTokenProvider() (*TokenProvider, error) 
 		}
 	case !isEmpty(kcsb.AadUserID) && !isEmpty(kcsb.Password):
 		{
-			var ops *azidentity.UsernamePasswordCredentialOptions
-
-			if kcsb.ClientOptions != nil {
-				ops = &azidentity.UsernamePasswordCredentialOptions{ClientOptions: *kcsb.ClientOptions}
-			}
-
-			if isEmpty(kcsb.AuthorityId) {
-				kcsb.AuthorityId = fetchedCI.FirstPartyAuthorityURL
-			}
-			if isEmpty(kcsb.ApplicationClientId) {
-				kcsb.ApplicationClientId = fetchedCI.KustoClientAppID
-			}
+			initialiseWithCloudInfo(kcsb, fetchedCI)
+			ops := &azidentity.UsernamePasswordCredentialOptions{ClientOptions: *kcsb.ClientOptions}
 
 			cred, err := azidentity.NewUsernamePasswordCredential(kcsb.AuthorityId, kcsb.ApplicationClientId, kcsb.AadUserID, kcsb.Password, ops)
 			if err != nil {
@@ -357,11 +343,9 @@ func (kcsb *ConnectionStringBuilder) newTokenProvider() (*TokenProvider, error) 
 		}
 	case !isEmpty(kcsb.ApplicationClientId) && !isEmpty(kcsb.ApplicationKey):
 		{
-			var opts *azidentity.ClientSecretCredentialOptions
-			if kcsb.ClientOptions != nil {
-				opts = &azidentity.ClientSecretCredentialOptions{}
-				opts.ClientOptions = *kcsb.ClientOptions
-			}
+			initialiseWithCloudInfo(kcsb, fetchedCI)
+			opts := &azidentity.ClientSecretCredentialOptions{ClientOptions: *kcsb.ClientOptions}
+
 			if isEmpty(kcsb.AuthorityId) {
 				kcsb.AuthorityId = fetchedCI.FirstPartyAuthorityURL
 			}
@@ -374,21 +358,15 @@ func (kcsb *ConnectionStringBuilder) newTokenProvider() (*TokenProvider, error) 
 		}
 	case !isEmpty(kcsb.ApplicationCertificate):
 		{
+			initialiseWithCloudInfo(kcsb, fetchedCI)
+			opts := &azidentity.ClientCertificateCredentialOptions{ClientOptions: *kcsb.ClientOptions}
+			opts.SendCertificateChain = kcsb.SendCertificateChain
+
 			cert, thumprintKey, err := azidentity.ParseCertificates([]byte(kcsb.ApplicationCertificate), []byte(kcsb.ApplicationCertificateThumbprint))
 			if err != nil {
 				return nil, err
 			}
-			if isEmpty(kcsb.AuthorityId) {
-				kcsb.AuthorityId = fetchedCI.FirstPartyAuthorityURL
-			}
-			if isEmpty(kcsb.ApplicationClientId) {
-				kcsb.ApplicationClientId = fetchedCI.KustoClientAppID
-			}
-			opts := &azidentity.ClientCertificateCredentialOptions{}
-			opts.SendCertificateChain = kcsb.SendCertificateChain
-			if kcsb.ClientOptions != nil {
-				opts.ClientOptions = *kcsb.ClientOptions
-			}
+
 			cred, err := azidentity.NewClientCertificateCredential(kcsb.AuthorityId, kcsb.ApplicationClientId, cert, thumprintKey, opts)
 			if err != nil {
 				return nil, fmt.Errorf("Error : Couldn't retrieve client credentiels using Application Certificate: %s", err)
@@ -399,11 +377,11 @@ func (kcsb *ConnectionStringBuilder) newTokenProvider() (*TokenProvider, error) 
 	case kcsb.MsiAuthentication:
 		{
 			opts := &azidentity.ManagedIdentityCredentialOptions{}
-			if !isEmpty(kcsb.ManagedServiceIdentity) {
-				opts.ID = azidentity.ClientID(kcsb.ManagedServiceIdentity)
-			}
 			if kcsb.ClientOptions != nil {
 				opts.ClientOptions = *kcsb.ClientOptions
+			}
+			if !isEmpty(kcsb.ManagedServiceIdentity) {
+				opts.ID = azidentity.ClientID(kcsb.ManagedServiceIdentity)
 			}
 
 			cred, err := azidentity.NewManagedIdentityCredential(opts)
@@ -438,10 +416,7 @@ func (kcsb *ConnectionStringBuilder) newTokenProvider() (*TokenProvider, error) 
 	default:
 		{
 			//Default Azure authentication
-			opts := &azidentity.DefaultAzureCredentialOptions{}
-			if kcsb.ClientOptions != nil {
-				opts.ClientOptions = *kcsb.ClientOptions
-			}
+			opts := &azidentity.DefaultAzureCredentialOptions{ClientOptions: *kcsb.ClientOptions}
 			if !isEmpty(kcsb.AuthorityId) {
 				opts.TenantID = kcsb.AuthorityId
 			}
@@ -454,6 +429,25 @@ func (kcsb *ConnectionStringBuilder) newTokenProvider() (*TokenProvider, error) 
 		}
 	}
 
+}
+
+func initialiseWithCloudInfo(kcsb *ConnectionStringBuilder, ci CloudInfo) {
+
+	if isEmpty(kcsb.ApplicationClientId) {
+		kcsb.ApplicationClientId = ci.KustoClientAppID
+	}
+	if isEmpty(kcsb.RedirectURL) {
+		kcsb.RedirectURL = ci.KustoClientRedirectURI
+	}
+
+	opts := kcsb.ClientOptions
+	if opts == nil {
+		kcsb.ClientOptions = &azcore.ClientOptions{}
+	}
+
+	if isEmpty(kcsb.ClientOptions.Cloud.ActiveDirectoryAuthorityHost) {
+		kcsb.ClientOptions.Cloud.ActiveDirectoryAuthorityHost = ci.LoginEndpoint
+	}
 }
 
 func isEmpty(str string) bool {
