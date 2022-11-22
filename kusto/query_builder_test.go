@@ -311,7 +311,7 @@ func TestDefinitions(t *testing.T) {
 				"HasLicense": ParamType{Type: types.Bool, Default: false},
 				"FirstName":  ParamType{Type: types.String},
 			},
-			wantStr: "declare query_parameters(FirstName:string, HasLicense:bool = false);",
+			wantStr: "declare query_parameters(FirstName:string, HasLicense:bool = bool(false));",
 		},
 	}
 
