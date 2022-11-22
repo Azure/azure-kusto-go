@@ -416,7 +416,10 @@ func (kcsb *ConnectionStringBuilder) newTokenProvider() (*TokenProvider, error) 
 	default:
 		{
 			//Default Azure authentication
-			opts := &azidentity.DefaultAzureCredentialOptions{ClientOptions: *kcsb.ClientOptions}
+			opts := &azidentity.DefaultAzureCredentialOptions{}
+			if kcsb.ClientOptions != nil {
+				opts.ClientOptions = *kcsb.ClientOptions
+			}
 			if !isEmpty(kcsb.AuthorityId) {
 				opts.TenantID = kcsb.AuthorityId
 			}
