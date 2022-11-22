@@ -258,17 +258,11 @@ func (kcsb *ConnectionStringBuilder) WithSystemManagedIdentity() *ConnectionStri
 Creates a Kusto Connection string builder that will authenticate by launching the system default browser
 to interactively authenticate a user, and obtain an access token
 */
-func (kcsb *ConnectionStringBuilder) WithInteractiveLogin(clientID string, authorityID string, redirectURL string) *ConnectionStringBuilder {
+func (kcsb *ConnectionStringBuilder) WithInteractiveLogin(authorityID string) *ConnectionStringBuilder {
 	requireNonEmpty(dataSource, kcsb.DataSource)
 	kcsb.resetConnectionString()
-	if !isEmpty(clientID) {
-		kcsb.ApplicationClientId = clientID
-	}
 	if !isEmpty(authorityID) {
 		kcsb.AuthorityId = authorityID
-	}
-	if !isEmpty(redirectURL) {
-		kcsb.RedirectURL = redirectURL
 	}
 	kcsb.InteractiveLogin = true
 	return kcsb
@@ -315,7 +309,7 @@ func (kcsb *ConnectionStringBuilder) newTokenProvider() (*TokenProvider, error) 
 	switch {
 	case kcsb.InteractiveLogin:
 		{
-			initialiseWithCloudInfo(kcsb, fetchedCI)
+			kcsb.initialiseWithCloudInfo(fetchedCI)
 			inOps := &azidentity.InteractiveBrowserCredentialOptions{}
 			inOps.ClientID = kcsb.ApplicationClientId
 			inOps.TenantID = kcsb.AuthorityId
@@ -331,7 +325,7 @@ func (kcsb *ConnectionStringBuilder) newTokenProvider() (*TokenProvider, error) 
 		}
 	case !isEmpty(kcsb.AadUserID) && !isEmpty(kcsb.Password):
 		{
-			initialiseWithCloudInfo(kcsb, fetchedCI)
+			kcsb.initialiseWithCloudInfo(fetchedCI)
 			ops := &azidentity.UsernamePasswordCredentialOptions{ClientOptions: *kcsb.ClientOptions}
 
 			cred, err := azidentity.NewUsernamePasswordCredential(kcsb.AuthorityId, kcsb.ApplicationClientId, kcsb.AadUserID, kcsb.Password, ops)
@@ -343,7 +337,7 @@ func (kcsb *ConnectionStringBuilder) newTokenProvider() (*TokenProvider, error) 
 		}
 	case !isEmpty(kcsb.ApplicationClientId) && !isEmpty(kcsb.ApplicationKey):
 		{
-			initialiseWithCloudInfo(kcsb, fetchedCI)
+			kcsb.initialiseWithCloudInfo(fetchedCI)
 			opts := &azidentity.ClientSecretCredentialOptions{ClientOptions: *kcsb.ClientOptions}
 
 			if isEmpty(kcsb.AuthorityId) {
@@ -358,7 +352,7 @@ func (kcsb *ConnectionStringBuilder) newTokenProvider() (*TokenProvider, error) 
 		}
 	case !isEmpty(kcsb.ApplicationCertificate):
 		{
-			initialiseWithCloudInfo(kcsb, fetchedCI)
+			kcsb.initialiseWithCloudInfo(fetchedCI)
 			opts := &azidentity.ClientCertificateCredentialOptions{ClientOptions: *kcsb.ClientOptions}
 			opts.SendCertificateChain = kcsb.SendCertificateChain
 
@@ -434,7 +428,7 @@ func (kcsb *ConnectionStringBuilder) newTokenProvider() (*TokenProvider, error) 
 
 }
 
-func initialiseWithCloudInfo(kcsb *ConnectionStringBuilder, ci CloudInfo) {
+func (kcsb *ConnectionStringBuilder) initialiseWithCloudInfo(ci CloudInfo) {
 
 	if isEmpty(kcsb.ApplicationClientId) {
 		kcsb.ApplicationClientId = ci.KustoClientAppID
