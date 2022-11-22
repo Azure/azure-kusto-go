@@ -5,6 +5,7 @@ import (
 	"fmt"
 	"strconv"
 	"strings"
+	"sync"
 
 	"github.com/Azure/azure-sdk-for-go/sdk/azcore"
 	"github.com/Azure/azure-sdk-for-go/sdk/azidentity"
@@ -54,6 +55,8 @@ const (
 const (
 	BEARER_TYPE = "Bearer"
 )
+
+var mu sync.Mutex
 
 var csMapping = map[string]string{"datasource": dataSource, "data source": dataSource, "addr": dataSource, "address": dataSource, "network address": dataSource, "server": dataSource,
 	"aad user id": aadUserId, "aaduserid": aadUserId,
@@ -429,6 +432,9 @@ func (kcsb *ConnectionStringBuilder) newTokenProvider() (*TokenProvider, error) 
 }
 
 func (kcsb *ConnectionStringBuilder) initialiseWithCloudInfo(ci CloudInfo) {
+
+	mu.Lock()
+	defer mu.Unlock()
 
 	if isEmpty(kcsb.ApplicationClientId) {
 		kcsb.ApplicationClientId = ci.KustoClientAppID
