@@ -53,9 +53,9 @@ var cloudInfoCache sync.Map
 
 func GetMetadata(ctx context.Context, kustoUri string) (CloudInfo, error) {
 	// retrieve &return if exists
-	anyCachedCloudInfo, ok := cloudInfoCache.Load(kustoUri)
+	clusterCachedCloudInfo, ok := cloudInfoCache.Load(kustoUri)
 	if ok {
-		return anyCachedCloudInfo.(CloudInfo), nil
+		return clusterCachedCloudInfo.(CloudInfo), nil
 	}
 	u, err := url.Parse(kustoUri)
 	if err != nil {

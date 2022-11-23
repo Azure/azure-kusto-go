@@ -28,7 +28,7 @@ type ConnectionStringBuilder struct {
 	ManagedServiceIdentity           string
 	InteractiveLogin                 bool
 	RedirectURL                      string
-	NoAuthMode                       bool
+	DefaultAuth                      bool
 	ClientOptions                    *azcore.ClientOptions
 }
 
@@ -166,6 +166,7 @@ func (kcsb *ConnectionStringBuilder) resetConnectionString() {
 	kcsb.InteractiveLogin = false
 	kcsb.RedirectURL = ""
 	kcsb.ClientOptions = nil
+	kcsb.DefaultAuth = false
 }
 
 // Creates a Kusto Connection string builder that will authenticate with AAD user name and password.
@@ -283,19 +284,19 @@ func (kcsb *ConnectionStringBuilder) AttachPolicyClientOptions(options *azcore.C
 	return kcsb
 }
 
-// Create Kusto Conntection String that will be used for no auth mode. No auth token will be used for making requests.
-func (kcsb *ConnectionStringBuilder) WithNoAtuhentication() *ConnectionStringBuilder {
+/*
+Create Kusto Conntection String that will be used for default auth mode. The order of auth will be via environment variables, managed identity and Azure CLI .
+Read more at https://learn.microsoft.com/azure/developer/go/azure-sdk-authentication?tabs=bash#2-authenticate-with-azure
+*/
+func (kcsb *ConnectionStringBuilder) WithDefaultAzureCredential() *ConnectionStringBuilder {
 	kcsb.resetConnectionString()
-	kcsb.NoAuthMode = true
+	kcsb.DefaultAuth = true
 	return kcsb
 }
 
 // Method to be used for generating TokenCredential
 func (kcsb *ConnectionStringBuilder) newTokenProvider() (*TokenProvider, error) {
 	tkp := &TokenProvider{}
-	if kcsb.NoAuthMode {
-		return tkp, nil
-	}
 	tkp.tokenScheme = BEARER_TYPE
 	// Fetches cloud meta data
 	fetchedCI, cierr := GetMetadata(context.Background(), kcsb.DataSource)
@@ -312,12 +313,18 @@ func (kcsb *ConnectionStringBuilder) newTokenProvider() (*TokenProvider, error) 
 	switch {
 	case kcsb.InteractiveLogin:
 		{
-			kcsb.initialiseWithCloudInfo(fetchedCI)
+			cliOpts := kcsb.ClientOptions
+			if cliOpts == nil {
+				cliOpts = &azcore.ClientOptions{}
+			}
+			if isEmpty(cliOpts.Cloud.ActiveDirectoryAuthorityHost) {
+				cliOpts.Cloud.ActiveDirectoryAuthorityHost = fetchedCI.LoginEndpoint
+			}
 			inOps := &azidentity.InteractiveBrowserCredentialOptions{}
-			inOps.ClientID = kcsb.ApplicationClientId
+			inOps.ClientID = fetchedCI.KustoClientAppID
 			inOps.TenantID = kcsb.AuthorityId
-			inOps.RedirectURL = kcsb.RedirectURL
-			inOps.ClientOptions = *kcsb.ClientOptions
+			inOps.RedirectURL = fetchedCI.KustoClientRedirectURI
+			inOps.ClientOptions = *cliOpts
 
 			cred, err := azidentity.NewInteractiveBrowserCredential(inOps)
 			if err != nil {
@@ -328,10 +335,21 @@ func (kcsb *ConnectionStringBuilder) newTokenProvider() (*TokenProvider, error) 
 		}
 	case !isEmpty(kcsb.AadUserID) && !isEmpty(kcsb.Password):
 		{
-			kcsb.initialiseWithCloudInfo(fetchedCI)
-			ops := &azidentity.UsernamePasswordCredentialOptions{ClientOptions: *kcsb.ClientOptions}
+			cliOpts := kcsb.ClientOptions
+			appClientId := kcsb.ApplicationClientId
+			if cliOpts == nil {
+				cliOpts = &azcore.ClientOptions{}
+			}
+			if isEmpty(cliOpts.Cloud.ActiveDirectoryAuthorityHost) {
+				cliOpts.Cloud.ActiveDirectoryAuthorityHost = fetchedCI.LoginEndpoint
+			}
+			if isEmpty(appClientId) {
+				appClientId = fetchedCI.KustoClientAppID
+			}
 
-			cred, err := azidentity.NewUsernamePasswordCredential(kcsb.AuthorityId, kcsb.ApplicationClientId, kcsb.AadUserID, kcsb.Password, ops)
+			ops := &azidentity.UsernamePasswordCredentialOptions{ClientOptions: *cliOpts}
+
+			cred, err := azidentity.NewUsernamePasswordCredential(kcsb.AuthorityId, appClientId, kcsb.AadUserID, kcsb.Password, ops)
 			if err != nil {
 				return nil, fmt.Errorf("Error : Couldn't retrieve client credentiels using Username Password. Error: %s", err)
 			}
@@ -340,13 +358,24 @@ func (kcsb *ConnectionStringBuilder) newTokenProvider() (*TokenProvider, error) 
 		}
 	case !isEmpty(kcsb.ApplicationClientId) && !isEmpty(kcsb.ApplicationKey):
 		{
-			kcsb.initialiseWithCloudInfo(fetchedCI)
-			opts := &azidentity.ClientSecretCredentialOptions{ClientOptions: *kcsb.ClientOptions}
+			cliOpts := kcsb.ClientOptions
+			appClientId := kcsb.ApplicationClientId
+			if cliOpts == nil {
+				cliOpts = &azcore.ClientOptions{}
+			}
+			if isEmpty(cliOpts.Cloud.ActiveDirectoryAuthorityHost) {
+				cliOpts.Cloud.ActiveDirectoryAuthorityHost = fetchedCI.LoginEndpoint
+			}
+			if isEmpty(appClientId) {
+				appClientId = fetchedCI.KustoClientAppID
+			}
+
+			ops := &azidentity.ClientSecretCredentialOptions{ClientOptions: *cliOpts}
 
 			if isEmpty(kcsb.AuthorityId) {
 				kcsb.AuthorityId = fetchedCI.FirstPartyAuthorityURL
 			}
-			cred, err := azidentity.NewClientSecretCredential(kcsb.AuthorityId, kcsb.ApplicationClientId, kcsb.ApplicationKey, opts)
+			cred, err := azidentity.NewClientSecretCredential(kcsb.AuthorityId, appClientId, kcsb.ApplicationKey, ops)
 			if err != nil {
 				return nil, fmt.Errorf("Error : Couldn't retrieve client credentiels using Client Secret. Error: %s", err)
 			}
@@ -355,16 +384,27 @@ func (kcsb *ConnectionStringBuilder) newTokenProvider() (*TokenProvider, error) 
 		}
 	case !isEmpty(kcsb.ApplicationCertificate):
 		{
-			kcsb.initialiseWithCloudInfo(fetchedCI)
-			opts := &azidentity.ClientCertificateCredentialOptions{ClientOptions: *kcsb.ClientOptions}
-			opts.SendCertificateChain = kcsb.SendCertificateChain
+			cliOpts := kcsb.ClientOptions
+			appClientId := kcsb.ApplicationClientId
+			if cliOpts == nil {
+				cliOpts = &azcore.ClientOptions{}
+			}
+			if isEmpty(cliOpts.Cloud.ActiveDirectoryAuthorityHost) {
+				cliOpts.Cloud.ActiveDirectoryAuthorityHost = fetchedCI.LoginEndpoint
+			}
+			if isEmpty(appClientId) {
+				appClientId = fetchedCI.KustoClientAppID
+			}
+
+			ops := &azidentity.ClientCertificateCredentialOptions{ClientOptions: *cliOpts}
+			ops.SendCertificateChain = kcsb.SendCertificateChain
 
 			cert, thumprintKey, err := azidentity.ParseCertificates([]byte(kcsb.ApplicationCertificate), []byte(kcsb.ApplicationCertificateThumbprint))
 			if err != nil {
 				return nil, err
 			}
 
-			cred, err := azidentity.NewClientCertificateCredential(kcsb.AuthorityId, kcsb.ApplicationClientId, cert, thumprintKey, opts)
+			cred, err := azidentity.NewClientCertificateCredential(kcsb.AuthorityId, appClientId, cert, thumprintKey, ops)
 			if err != nil {
 				return nil, fmt.Errorf("Error : Couldn't retrieve client credentiels using Application Certificate: %s", err)
 			}
@@ -410,12 +450,20 @@ func (kcsb *ConnectionStringBuilder) newTokenProvider() (*TokenProvider, error) 
 			tkp.tokenCred = cred
 			return tkp, nil
 		}
-	default:
+	case kcsb.DefaultAuth:
 		{
+			cliOpts := kcsb.ClientOptions
+			if cliOpts == nil {
+				cliOpts = &azcore.ClientOptions{}
+			}
+			if isEmpty(cliOpts.Cloud.ActiveDirectoryAuthorityHost) {
+				cliOpts.Cloud.ActiveDirectoryAuthorityHost = fetchedCI.LoginEndpoint
+			}
+
 			//Default Azure authentication
 			opts := &azidentity.DefaultAzureCredentialOptions{}
 			if kcsb.ClientOptions != nil {
-				opts.ClientOptions = *kcsb.ClientOptions
+				opts.ClientOptions = *cliOpts
 			}
 			if !isEmpty(kcsb.AuthorityId) {
 				opts.TenantID = kcsb.AuthorityId
@@ -429,28 +477,7 @@ func (kcsb *ConnectionStringBuilder) newTokenProvider() (*TokenProvider, error) 
 		}
 	}
 
-}
-
-func (kcsb *ConnectionStringBuilder) initialiseWithCloudInfo(ci CloudInfo) {
-
-	mu.Lock()
-	defer mu.Unlock()
-
-	if isEmpty(kcsb.ApplicationClientId) {
-		kcsb.ApplicationClientId = ci.KustoClientAppID
-	}
-	if isEmpty(kcsb.RedirectURL) {
-		kcsb.RedirectURL = ci.KustoClientRedirectURI
-	}
-
-	opts := kcsb.ClientOptions
-	if opts == nil {
-		kcsb.ClientOptions = &azcore.ClientOptions{}
-	}
-
-	if isEmpty(kcsb.ClientOptions.Cloud.ActiveDirectoryAuthorityHost) {
-		kcsb.ClientOptions.Cloud.ActiveDirectoryAuthorityHost = ci.LoginEndpoint
-	}
+	return tkp, nil
 }
 
 func isEmpty(str string) bool {
