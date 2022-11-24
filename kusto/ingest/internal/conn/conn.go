@@ -127,7 +127,7 @@ func (c *Conn) StreamIngest(ctx context.Context, db, table string, payload io.Re
 
 	headers.Add("Content-Type", "application/json; charset=utf-8")
 	headers.Add("Content-Encoding", "gzip")
-	if c.auth.TokenProvider.AuthorizationRequired() {
+	if c.auth.TokenProvider != nil && c.auth.TokenProvider.AuthorizationRequired() {
 		token, tokenType, tkerr := c.auth.TokenProvider.AcquireToken(ctx)
 		if tkerr != nil {
 			return tkerr

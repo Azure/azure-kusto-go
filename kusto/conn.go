@@ -181,7 +181,7 @@ func (c *conn) doRequest(ctx context.Context, execType int, db string, query Stm
 		return 0, nil, nil, nil, errors.ES(op, errors.KInternal, "internal error: did not understand the type of execType: %d", execType)
 	}
 
-	if c.auth.TokenProvider.AuthorizationRequired() {
+	if c.auth.TokenProvider != nil && c.auth.TokenProvider.AuthorizationRequired() {
 		token, tokenType, tkerr := c.auth.TokenProvider.AcquireToken(ctx)
 		if tkerr != nil {
 			return 0, nil, nil, nil, errors.ES(op, errors.KInternal, "Error while getting token : %s", tkerr)
