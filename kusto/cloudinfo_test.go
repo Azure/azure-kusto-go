@@ -131,21 +131,22 @@ func TestGetMetadata(t *testing.T) {
 
 	ctx := context.Background()
 	for _, test := range tests {
-		s.code = test.code
-		s.payload = []byte(test.payload)
-		res, err := GetMetadata(ctx, s.urlStr()+"/"+test.name) // Adding test name to the path make sure multiple URL's can be cached
-		switch {
-		case err != nil && !test.err:
-			t.Errorf("TestGetMetadata(%s): got err == %s, want err == nil", test.desc, err)
-			continue
-		case err == nil && test.err:
-			t.Errorf("TestGetMetadata(%s): got err == nil, want err != nil", test.desc)
-			continue
-		}
-		if test.err {
-			assert.NotNil(t, err)
-			assert.Equal(t, test.errwant, err.Error())
-		}
-		assert.Equal(t, test.want, res)
+		test := test
+		t.Run(test.name, func(t *testing.T) {
+			s.code = test.code
+			s.payload = []byte(test.payload)
+			res, err := GetMetadata(ctx, s.urlStr()+"/"+test.name) // Adding test name to the path make sure multiple URL's can be cached
+			switch {
+			case err != nil && !test.err:
+				assert.FailNow(t, fmt.Sprintf("TestGetMetadata(%s): got err == %s, want err == nil", test.desc, err))
+			case err == nil && test.err:
+				assert.FailNow(t, fmt.Sprintf("TestGetMetadata(%s): got err == nil, want err != nil", test.desc))
+			}
+			if test.err {
+				assert.NotNil(t, err)
+				assert.Equal(t, test.errwant, err.Error())
+			}
+			assert.Equal(t, test.want, res)
+		})
 	}
 }

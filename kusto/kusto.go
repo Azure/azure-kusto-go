@@ -22,11 +22,10 @@ type queryer interface {
 	queryToJson(ctx context.Context, db string, query Stmt, options *queryOptions) (string, error)
 }
 
-// Authorization provides the ADAL authorizer needed to access the resource. You can set Authorizer or
-// Config, but not both.
+// Authorization provides the Tokenprovider needed to acquire the auth token.
 type Authorization struct {
 	// Token provider that can be used to get the access token.
-	TokenProvider TokenProvider
+	TokenProvider *TokenProvider
 }
 
 // Client is a client to a Kusto instance.
@@ -41,14 +40,14 @@ type Client struct {
 // Option is an optional argument type for New().
 type Option func(c *Client)
 
-// New returns a new Client. endpoint is the Kusto endpoint to use, example: https://somename.westus.kusto.windows.net .
+// New returns a new Client.
 func New(kcsb *ConnectionStringBuilder, options ...Option) (*Client, error) {
 	tkp, err := kcsb.newTokenProvider()
 	if err != nil {
 		return nil, err
 	}
 	auth := &Authorization{
-		TokenProvider: *tkp,
+		TokenProvider: tkp,
 	}
 	endpoint := kcsb.DataSource
 	u, err := url.Parse(endpoint)

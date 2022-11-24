@@ -70,7 +70,10 @@ func GetMetadata(ctx context.Context, kustoUri string) (CloudInfo, error) {
 	if err != nil {
 		return CloudInfo{}, err
 	}
-
+	clusterCachedCloudInfo, ok = cloudInfoCache.Load(kustoUri)
+	if ok {
+		return clusterCachedCloudInfo.(CloudInfo), nil
+	}
 	resp, err := metadataClient.Do(req)
 
 	if err != nil {
@@ -81,8 +84,6 @@ func GetMetadata(ctx context.Context, kustoUri string) (CloudInfo, error) {
 	if resp.StatusCode >= http.StatusInternalServerError {
 		return CloudInfo{}, fmt.Errorf("error %s when querying endpoint %s", resp.Status, u.String())
 	}
-
-	//  return fmt.Errorf("error %s when querying endpoint %s", metadataResponse.StatusCode, fullMetadataEndpoint)
 
 	defer resp.Body.Close()
 

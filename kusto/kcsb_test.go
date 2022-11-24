@@ -25,11 +25,11 @@ func TestGetConnectionStringBuilder(t *testing.T) {
 		{
 			name:             "test_conn_string_emptyconnstr",
 			connectionString: "",
-			wantErr:          "Error : Connection string cannot be empty",
+			wantErr:          "error : Connection string cannot be empty",
 		},
 		{
 			name:             "test_conn_string_fullstring",
-			connectionString: "https://help.kusto.windows.net/Samples;aad user id=1234;password=****;application key=1234;application client id=1234;application key=0987;application certificate=avsefsfbsrgbrb; authority id=123456;application token=token;user token=usertoken; msi_auth=true;ManagedServiceIdentity=123456; azcli=true;interactivelogin=false; domainhint=www.google.com",
+			connectionString: "https://help.kusto.windows.net/Samples;aad user id=1234;password=****;application key=1234;application client id=1234;application key=0987;application certificate=avsefsfbsrgbrb; authority id=123456;application token=token;user token=usertoken;;interactivelogin=false; domainhint=www.google.com",
 			want: ConnectionStringBuilder{
 				DataSource:                       "https://help.kusto.windows.net/Samples",
 				AadUserID:                        "1234",
@@ -42,9 +42,9 @@ func TestGetConnectionStringBuilder(t *testing.T) {
 				ApplicationCertificateThumbprint: "",
 				SendCertificateChain:             false,
 				ApplicationToken:                 "token",
-				AzCli:                            true,
-				MsiAuthentication:                true,
-				ManagedServiceIdentity:           "123456",
+				AzCli:                            false,
+				MsiAuthentication:                false,
+				ManagedServiceIdentity:           "",
 				InteractiveLogin:                 false,
 				RedirectURL:                      "www.google.com",
 			},
@@ -52,20 +52,25 @@ func TestGetConnectionStringBuilder(t *testing.T) {
 	}
 
 	for _, test := range tests {
-		if isEmpty(test.wantErr) {
-			actual := NewConnectionStringBuilder(test.connectionString)
-			assert.EqualValues(t, test.want, *actual)
-		} else {
-			defer func() {
-				if res := recover(); res == nil {
-					t.Errorf("Should have panic")
-				} else if res != test.wantErr {
-					t.Errorf("Wrong panic message: %s", res)
-				}
-			}()
-			NewConnectionStringBuilder(test.connectionString)
+		test := test
+		t.Run(test.name, func(t *testing.T) {
+			t.Parallel()
+			if isEmpty(test.wantErr) {
+				actual := NewConnectionStringBuilder(test.connectionString)
+				assert.EqualValues(t, test.want, *actual)
+			} else {
+				defer func() {
+					if res := recover(); res == nil {
+						t.Errorf("Should have panic")
+					} else if res != test.wantErr {
+						t.Errorf("Wrong panic message: %s", res)
+					}
+				}()
+				NewConnectionStringBuilder(test.connectionString)
 
-		}
+			}
+		})
+
 	}
 }
 
@@ -179,12 +184,16 @@ func TestGetTokenProviderHappy(t *testing.T) {
 		},
 	}
 	for _, test := range tests {
-		kscb := test.kcsb
-		s.code = 200
-		s.payload = []byte(payload)
-		got, err := kscb.newTokenProvider()
-		assert.Nil(t, err)
-		assert.NotNil(t, got)
+		test := test
+		t.Run(test.name, func(t *testing.T) {
+			t.Parallel()
+			kscb := test.kcsb
+			s.code = 200
+			s.payload = []byte(payload)
+			got, err := kscb.newTokenProvider()
+			assert.Nil(t, err)
+			assert.NotNil(t, got)
+		})
 	}
 
 }
