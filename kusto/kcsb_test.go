@@ -121,8 +121,6 @@ func TestWitAadUserTokenErr(t *testing.T) {
 }
 
 func TestGetTokenProviderHappy(t *testing.T) {
-	s := newTestServ()
-	payload := `{"AzureAD": {"LoginEndpoint": "https://login.microsofdummy.com","LoginMfaRequired": false,"KustoClientAppId": "db662dc1-0cfe-4e1c-a843-19a68e65xxxx","KustoClientRedirectUri": "https://microsoft/dummykustoclient","KustoServiceResourceId": "https://kusto.windows.net","FirstPartyAuthorityUrl": "https://login.microsofdummy.com/f8cdef31-a31e-4b4a-93e4-5f571e9xxxxx"  },  "dSTS": {"CloudEndpointSuffix": "windows.net","DstsRealm": "realm://xxx.windows.net","DstsInstance": "xxx.core.windows.net","KustoDnsHostName": "kusto.windows.net","ServiceName": "kusto"}}`
 	tests := []struct {
 		name    string
 		kcsb    ConnectionStringBuilder
@@ -131,7 +129,7 @@ func TestGetTokenProviderHappy(t *testing.T) {
 		{
 			name: "test_tokenprovider_usernamepasswordauth",
 			kcsb: ConnectionStringBuilder{
-				DataSource:          s.urlStr() + "/test_tokenprovider_usernamepasswordauth",
+				DataSource:          "https://endpoint/test_tokenprovider_usernamepasswordauth",
 				AuthorityId:         "tenantID",
 				ApplicationClientId: "clientID",
 				AadUserID:           "ussername",
@@ -140,7 +138,7 @@ func TestGetTokenProviderHappy(t *testing.T) {
 		}, {
 			name: "test_tokenprovider_intLogin",
 			kcsb: ConnectionStringBuilder{
-				DataSource:          s.urlStr() + "/test_tokenprovider_intLogin",
+				DataSource:          "https://endpoint/test_tokenprovider_intLogin",
 				InteractiveLogin:    true,
 				AuthorityId:         "tenantID",
 				ApplicationClientId: "clientID",
@@ -149,7 +147,7 @@ func TestGetTokenProviderHappy(t *testing.T) {
 		{
 			name: "test_tokenprovider_clientsec",
 			kcsb: ConnectionStringBuilder{
-				DataSource:          s.urlStr() + "/test_tokenprovider_clientsec",
+				DataSource:          "https://endpoint/test_tokenprovider_clientsec",
 				InteractiveLogin:    true,
 				AuthorityId:         "tenantID",
 				ApplicationClientId: "clientID",
@@ -158,7 +156,7 @@ func TestGetTokenProviderHappy(t *testing.T) {
 		}, {
 			name: "test_tokenprovider_managedsi",
 			kcsb: ConnectionStringBuilder{
-				DataSource:             s.urlStr() + "/test_tokenprovider_managedsi",
+				DataSource:             "https://endpoint/test_tokenprovider_managedsi",
 				ManagedServiceIdentity: "managedid",
 				MsiAuthentication:      true,
 				ClientOptions:          &azcore.ClientOptions{},
@@ -166,19 +164,19 @@ func TestGetTokenProviderHappy(t *testing.T) {
 		}, {
 			name: "test_tokenprovider_managedidauth2",
 			kcsb: ConnectionStringBuilder{
-				DataSource:        s.urlStr() + "/test_tokenprovider_managedidauth2",
+				DataSource:        "https://endpoint/test_tokenprovider_managedidauth2",
 				MsiAuthentication: true,
 			},
 		}, {
 			name: "test_tokenprovider_usertoken",
 			kcsb: ConnectionStringBuilder{
-				DataSource: s.urlStr() + "/test_tokenprovider_usertoken",
+				DataSource: "https://endpoint/test_tokenprovider_usertoken",
 				UserToken:  "token",
 			},
 		}, {
 			name: "test_tokenprovider_apptoken",
 			kcsb: ConnectionStringBuilder{
-				DataSource: s.urlStr() + "/test_tokenprovider_apptoken",
+				DataSource: "https://endpoint/test_tokenprovider_apptoken",
 				UserToken:  "token",
 			},
 		},
@@ -188,8 +186,6 @@ func TestGetTokenProviderHappy(t *testing.T) {
 		t.Run(test.name, func(t *testing.T) {
 			t.Parallel()
 			kscb := test.kcsb
-			s.code = 200
-			s.payload = []byte(payload)
 			got, err := kscb.newTokenProvider()
 			assert.Nil(t, err)
 			assert.NotNil(t, got)
