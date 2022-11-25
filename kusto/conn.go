@@ -39,6 +39,7 @@ type conn struct {
 	auth                           Authorization
 	endMgmt, endQuery, streamQuery *url.URL
 	client                         *http.Client
+	versionName                    string
 }
 
 // newConn returns a new conn object with an injected http.Client
@@ -142,7 +143,7 @@ func (c *conn) doRequest(ctx context.Context, execType int, db string, query Stm
 	header := http.Header{}
 	header.Add("Accept", "application/json")
 	header.Add("Accept-Encoding", "gzip")
-	header.Add("x-ms-client-version", "Kusto.Go.Client: "+version.Kusto)
+	header.Add("x-ms-client-version", "Kusto.Go.Client: "+version.Kusto+"["+c.versionName+"]")
 	header.Add("Content-Type", "application/json; charset=utf-8")
 	header.Add("x-ms-client-request-id", "KGC.execute;"+uuid.New().String())
 

@@ -13,9 +13,10 @@ import (
 )
 
 type mockClient struct {
-	endpoint string
-	auth     kusto.Authorization
-	onMgmt   func(ctx context.Context, db string, query kusto.Stmt, options ...kusto.MgmtOption) (*kusto.RowIterator, error)
+	endpoint    string
+	auth        kusto.Authorization
+	onMgmt      func(ctx context.Context, db string, query kusto.Stmt, options ...kusto.MgmtOption) (*kusto.RowIterator, error)
+	versionName string
 }
 
 func (m mockClient) HttpClient() *http.Client {
@@ -32,6 +33,10 @@ func (m mockClient) Auth() kusto.Authorization {
 
 func (m mockClient) Endpoint() string {
 	return m.endpoint
+}
+
+func (m mockClient) VersionName() string {
+	return m.versionName
 }
 
 func (m mockClient) Query(context.Context, string, kusto.Stmt, ...kusto.QueryOption) (*kusto.RowIterator, error) {

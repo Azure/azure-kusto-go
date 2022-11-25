@@ -165,7 +165,7 @@ func TestStream(t *testing.T) {
 			time.Sleep(10 * time.Millisecond)
 
 			fmt.Println(server.port)
-			conn, err := newWithoutValidation(fmt.Sprintf("http://127.0.0.1:%d", server.port), kusto.Authorization{}, &http.Client{})
+			conn, err := newWithoutValidation(fmt.Sprintf("http://127.0.0.1:%d", server.port), kusto.Authorization{}, &http.Client{}, "test-client")
 			if err != nil {
 				panic(err)
 			}

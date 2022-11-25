@@ -29,6 +29,7 @@ type ConnectionStringBuilder struct {
 	InteractiveLogin                 bool
 	RedirectURL                      string
 	DefaultAuth                      bool
+	ClientVersionName                string
 	ClientOptions                    *azcore.ClientOptions
 }
 
@@ -499,6 +500,12 @@ func (kcsb *ConnectionStringBuilder) newTokenProvider() (*TokenProvider, error) 
 		}
 	}
 	return tkp, nil
+}
+
+func (kcsb *ConnectionStringBuilder) SetClientVersionForTracing(clientVersionName string) {
+	if isEmpty(clientVersionName) {
+		kcsb.ClientVersionName = strings.Trim(clientVersionName, " ")
+	}
 }
 
 func isEmpty(str string) bool {

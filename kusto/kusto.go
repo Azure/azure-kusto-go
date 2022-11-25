@@ -35,6 +35,7 @@ type Client struct {
 	auth             Authorization
 	mgmtConnMu       sync.Mutex
 	http             *http.Client
+	versionName      string
 }
 
 // Option is an optional argument type for New().
@@ -66,6 +67,10 @@ func New(kcsb *ConnectionStringBuilder, options ...Option) (*Client, error) {
 	client := &Client{auth: *auth, endpoint: endpoint}
 	for _, o := range options {
 		o(client)
+	}
+
+	if !isEmpty(kcsb.ClientVersionName) {
+		client.versionName = kcsb.ClientVersionName
 	}
 
 	if client.http == nil {
@@ -105,6 +110,11 @@ func (c *Client) Auth() Authorization {
 // Endpoint returns the endpoint passed to New().
 func (c *Client) Endpoint() string {
 	return c.endpoint
+}
+
+// VersionName returns the client's version string passed to New().
+func (c *Client) VersionName() string {
+	return c.versionName
 }
 
 type callType int8

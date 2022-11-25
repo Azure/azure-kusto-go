@@ -225,7 +225,7 @@ func (i *Ingestion) getStreamConn() (*conn.Conn, error) {
 		return i.streamConn, nil
 	}
 
-	sc, err := conn.New(i.client.Endpoint(), i.client.Auth(), i.client.HttpClient())
+	sc, err := conn.New(i.client.Endpoint(), i.client.Auth(), i.client.HttpClient(), i.client.VersionName())
 	if err != nil {
 		return nil, err
 	}
