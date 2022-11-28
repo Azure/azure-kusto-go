@@ -117,7 +117,7 @@ func (c *Conn) StreamIngest(ctx context.Context, db, table string, payload io.Re
 
 	headers := c.headersPool.Get().(http.Header)
 	go func() {
-		c.headersPool.Put(headers)
+		c.headersPool.Put(copyHeaders(headers))
 	}()
 
 	if clientRequestId != "" {
