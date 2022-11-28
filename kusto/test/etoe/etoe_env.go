@@ -8,7 +8,6 @@ import (
 	"runtime"
 
 	"github.com/Azure/azure-kusto-go/kusto"
-	"github.com/Azure/go-autorest/autorest/azure/auth"
 )
 
 // Config represents a config.json file that must be in the directory and hold information to do the integration tests.
@@ -27,8 +26,8 @@ type Config struct {
 	ClientSecret string
 	// TenantID is the tenant on which the principal exists
 	TenantID string
-	// Authorizer generates bearer tokens on behalf of the principal
-	Authorizer kusto.Authorization
+	// Connection string builder to get a new kusto client
+	kcsb *kusto.ConnectionStringBuilder
 }
 
 func (c *Config) validate() error {
@@ -70,11 +69,10 @@ func init() {
 			SecondaryEndpoint: os.Getenv("SECONDARY_ENGINE_CONNECTION_STRING"),
 			Database:          os.Getenv("TEST_DATABASE"),
 			SecondaryDatabase: os.Getenv("SECONDARY_DATABASE"),
-			ClientID:          os.Getenv("APP_ID"),
-			ClientSecret:      os.Getenv("APP_KEY"),
-			TenantID:          os.Getenv("AUTH_ID"),
+			ClientID:          os.Getenv("AZURE_CLIENT_ID"),
+			ClientSecret:      os.Getenv("AZURE_CLIENT_SECRET"),
+			TenantID:          os.Getenv("AZURE_TENANT_ID"),
 		}
-
 		if testConfig.Endpoint == "" {
 			fmt.Println("Skipping E2E Tests - No json config and no test environment")
 			return
@@ -87,16 +85,9 @@ func init() {
 	}
 
 	if testConfig.ClientID == "" {
-		azAuthorizer, err := auth.NewAuthorizerFromCLIWithResource(testConfig.Endpoint)
-		if err != nil {
-			fmt.Println("Failed to acquire auth token from az-cli" + err.Error())
-			return
-		}
-
-		testConfig.Authorizer = kusto.Authorization{Authorizer: azAuthorizer}
+		testConfig.kcsb = kusto.NewConnectionStringBuilder(testConfig.Endpoint).WithAzCli()
 	} else {
-		testConfig.Authorizer = kusto.Authorization{Config: auth.NewClientCredentialsConfig(testConfig.ClientID, testConfig.ClientSecret, testConfig.TenantID)}
+		testConfig.kcsb = kusto.NewConnectionStringBuilder(testConfig.Endpoint).WithAadAppKey(testConfig.ClientID, testConfig.ClientSecret, testConfig.TenantID)
 	}
-
 	skipETOE = false
 }
