@@ -3,6 +3,8 @@ package kusto
 import (
 	"encoding/json"
 	"fmt"
+	kustoErrors "github.com/Azure/azure-kusto-go/kusto/data/errors"
+	"github.com/Azure/azure-kusto-go/kusto/utils"
 	"io"
 	"net/http"
 	"net/url"
@@ -52,59 +54,59 @@ var cloudInfoCache sync.Map
 
 func GetMetadata(kustoUri string) (CloudInfo, error) {
 	// retrieve &return if exists
-	clusterCachedCloudInfo, ok := cloudInfoCache.Load(kustoUri)
-	if ok {
-		return clusterCachedCloudInfo.(CloudInfo), nil
-	}
-	u, err := url.Parse(kustoUri)
-	if err != nil {
-		return CloudInfo{}, err
+	once, ok := cloudInfoCache.Load(kustoUri)
+	if !ok {
+		once = utils.NewOnce[CloudInfo]()
+		cloudInfoCache.Store(kustoUri, once)
 	}
 
-	u.Path = metadataPath
-	// TODO should we make this timeout configurable.
-	metadataClient := http.Client{Timeout: time.Duration(5) * time.Second}
-	req, err := http.NewRequest("GET", u.String(), nil)
+	return once.(utils.Once[CloudInfo]).Do(func() (CloudInfo, error) {
+		u, err := url.Parse(kustoUri)
+		if err != nil {
+			return CloudInfo{}, err
+		}
 
-	if err != nil {
-		return CloudInfo{}, err
-	}
-	clusterCachedCloudInfo, ok = cloudInfoCache.Load(kustoUri)
-	if ok {
-		return clusterCachedCloudInfo.(CloudInfo), nil
-	}
-	resp, err := metadataClient.Do(req)
+		u.Path = metadataPath
+		// TODO should we make this timeout configurable.
+		metadataClient := http.Client{Timeout: time.Duration(5) * time.Second}
+		req, err := http.NewRequest("GET", u.String(), nil)
 
-	if err != nil {
-		return CloudInfo{}, err
-	}
+		if err != nil {
+			return CloudInfo{}, kustoErrors.E(kustoErrors.OpCloudInfo, kustoErrors.KHTTPError, err)
+		}
+		resp, err := metadataClient.Do(req)
 
-	// Handle internal server error as a special case and return as an error (to be consistent with other SDK's)
-	if resp.StatusCode >= http.StatusInternalServerError {
-		return CloudInfo{}, fmt.Errorf("error %s when querying endpoint %s", resp.Status, u.String())
-	}
+		if err != nil {
+			return CloudInfo{}, err
+		}
 
-	defer resp.Body.Close()
+		// Handle internal server error as a special case and return as an error (to be consistent with other SDK's)
+		if resp.StatusCode >= http.StatusInternalServerError {
+			return CloudInfo{}, kustoErrors.E(kustoErrors.OpCloudInfo, kustoErrors.KHTTPError, fmt.Errorf("error %s when querying endpoint %s",
+				resp.Status, u.String()),
+			)
+		}
 
-	b, err := io.ReadAll(resp.Body)
-	if err != nil {
-		return CloudInfo{}, err
-	}
+		defer resp.Body.Close()
 
-	// Covers scenarios of 200/OK with no body or a 404 where there is no body
-	if len(b) == 0 {
-		cloudInfoCache.Store(kustoUri, defaultCloudInfo)
-		return defaultCloudInfo, nil
-	}
+		b, err := io.ReadAll(resp.Body)
+		if err != nil {
+			return CloudInfo{}, kustoErrors.E(kustoErrors.OpCloudInfo, kustoErrors.KHTTPError, err)
+		}
 
-	md := metaResp{}
+		// Covers scenarios of 200/OK with no body or a 404 where there is no body
+		if len(b) == 0 {
+			return defaultCloudInfo, nil
+		}
 
-	if err := json.Unmarshal(b, &md); err != nil {
-		return CloudInfo{}, err
-	}
-	// this should be set in the map by now
-	cloudInfoCache.Store(kustoUri, md.AzureAD)
-	return md.AzureAD, nil
+		md := metaResp{}
+
+		if err := json.Unmarshal(b, &md); err != nil {
+			return CloudInfo{}, err
+		}
+		// this should be set in the map by now
+		return md.AzureAD, nil
+	})
 }
 
 func getEnvOrDefault(key, fallback string) string {

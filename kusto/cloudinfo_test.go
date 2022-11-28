@@ -95,7 +95,7 @@ func TestGetMetadata(t *testing.T) {
 			desc:    "Internal server error",
 			payload: "",
 			want:    CloudInfo{},
-			errwant: fmt.Sprintf("error 500 Internal Server Error when querying endpoint %s/%s", s.urlStr(), metadataPath),
+			errwant: fmt.Sprintf("Op(Op(6)): Kind(KHTTPError): error 500 Internal Server Error when querying endpoint %s/%s", s.urlStr(), metadataPath),
 		},
 		{
 			name:    "test_cloud_info_missing_key",
