@@ -18,7 +18,6 @@ import (
 	"github.com/Azure/azure-kusto-go/kusto/ingest/internal/properties"
 	"github.com/Azure/azure-kusto-go/kusto/internal/response"
 	"github.com/Azure/azure-kusto-go/kusto/internal/version"
-	"github.com/Azure/go-autorest/autorest"
 	"github.com/google/uuid"
 )
 
@@ -51,9 +50,6 @@ func New(endpoint string, auth kusto.Authorization, client *http.Client) (*Conn,
 			errors.KClientArgs,
 			"endpoint is not valid(%s) for Kusto streaming ingestion", endpoint,
 		).SetNoRetry()
-	}
-	if err := auth.Validate(endpoint); err != nil {
-		return nil, err
 	}
 
 	return newWithoutValidation(endpoint, auth, client)
@@ -131,6 +127,13 @@ func (c *Conn) StreamIngest(ctx context.Context, db, table string, payload io.Re
 
 	headers.Add("Content-Type", "application/json; charset=utf-8")
 	headers.Add("Content-Encoding", "gzip")
+	if c.auth.TokenProvider != nil && c.auth.TokenProvider.AuthorizationRequired() {
+		token, tokenType, tkerr := c.auth.TokenProvider.AcquireToken(ctx)
+		if tkerr != nil {
+			return tkerr
+		}
+		headers.Add("Authorization", fmt.Sprintf("%s %s", tokenType, token))
+	}
 
 	u, _ := url.Parse(c.baseURL.String()) // Safe copy of a known good URL object
 	u.Path = path.Join(u.Path, db, table)
@@ -153,15 +156,6 @@ func (c *Conn) StreamIngest(ctx context.Context, db, table string, payload io.Re
 		URL:    u,
 		Header: headers,
 		Body:   closeablePayload,
-	}
-
-	if !c.inTest {
-		var err error
-		prep := c.auth.Authorizer.WithAuthorization()
-		req, err = prep(autorest.CreatePreparer()).Prepare(req)
-		if err != nil {
-			return errors.E(writeOp, errors.KInternal, err)
-		}
 	}
 
 	resp, err := c.client.Do(req.WithContext(ctx))
