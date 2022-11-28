@@ -1,7 +1,6 @@
 package kusto
 
 import (
-	"context"
 	"encoding/json"
 	"fmt"
 	"io"
@@ -51,7 +50,7 @@ var defaultCloudInfo = CloudInfo{
 // cache to query it once per instance
 var cloudInfoCache sync.Map
 
-func GetMetadata(ctx context.Context, kustoUri string) (CloudInfo, error) {
+func GetMetadata(kustoUri string) (CloudInfo, error) {
 	// retrieve &return if exists
 	clusterCachedCloudInfo, ok := cloudInfoCache.Load(kustoUri)
 	if ok {

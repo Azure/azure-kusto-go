@@ -1,7 +1,6 @@
 package kusto
 
 import (
-	"context"
 	"fmt"
 	"log"
 	"net/http"
@@ -97,7 +96,8 @@ func TestGetMetadata(t *testing.T) {
 			payload: "",
 			want:    CloudInfo{},
 			errwant: fmt.Sprintf("error 500 Internal Server Error when querying endpoint %s/%s", s.urlStr(), metadataPath),
-		}, {
+		},
+		{
 			name:    "test_cloud_info_missing_key",
 			code:    200,
 			err:     false,
@@ -129,24 +129,19 @@ func TestGetMetadata(t *testing.T) {
 		},
 	}
 
-	ctx := context.Background()
 	for _, test := range tests {
 		test := test
 		t.Run(test.name, func(t *testing.T) {
 			s.code = test.code
 			s.payload = []byte(test.payload)
-			res, err := GetMetadata(ctx, s.urlStr()+"/"+test.name) // Adding test name to the path make sure multiple URL's can be cached
-			switch {
-			case err != nil && !test.err:
-				assert.FailNow(t, fmt.Sprintf("TestGetMetadata(%s): got err == %s, want err == nil", test.desc, err))
-			case err == nil && test.err:
-				assert.FailNow(t, fmt.Sprintf("TestGetMetadata(%s): got err == nil, want err != nil", test.desc))
-			}
+			res, err := GetMetadata(s.urlStr() + "/" + test.name) // Adding test name to the path make sure multiple URL's can be cached
 			if test.err {
 				assert.NotNil(t, err)
 				assert.Equal(t, test.errwant, err.Error())
+			} else {
+				assert.NoError(t, err)
+				assert.Equal(t, test.want, res)
 			}
-			assert.Equal(t, test.want, res)
 		})
 	}
 }

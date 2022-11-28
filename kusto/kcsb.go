@@ -1,7 +1,6 @@
 package kusto
 
 import (
-	"context"
 	"fmt"
 	"strconv"
 	"strings"
@@ -294,11 +293,18 @@ func (kcsb *ConnectionStringBuilder) newTokenProvider() (*TokenProvider, error) 
 			tkp.initOnce = &sync.Once{}
 			tkp.init = func() {
 				// Fetches cloud meta data
-				tkp.ci, err = GetMetadata(context.Background(), kcsb.DataSource)
+				tkp.ci, err = GetMetadata(kcsb.DataSource)
 				if err != nil {
 					tkp.err = err
 					return
 				}
+				// Update resource URI if MFA enabled
+				resourceURI := tkp.ci.KustoServiceResourceID
+				if tkp.ci.LoginMfaRequired {
+					resourceURI = strings.Replace(resourceURI, ".kusto.", ".kustomfa.", 1)
+				}
+				scopes := []string{fmt.Sprintf("%s/.default", resourceURI)}
+				tkp.scopes = scopes
 				cliOpts := kcsb.ClientOptions
 				if cliOpts == nil {
 					cliOpts = &azcore.ClientOptions{}
@@ -324,11 +330,18 @@ func (kcsb *ConnectionStringBuilder) newTokenProvider() (*TokenProvider, error) 
 			tkp.initOnce = &sync.Once{}
 			tkp.init = func() {
 				// Fetches cloud meta data
-				tkp.ci, err = GetMetadata(context.Background(), kcsb.DataSource)
+				tkp.ci, err = GetMetadata(kcsb.DataSource)
 				if err != nil {
 					tkp.err = err
 					return
 				}
+				// Update resource URI if MFA enabled
+				resourceURI := tkp.ci.KustoServiceResourceID
+				if tkp.ci.LoginMfaRequired {
+					resourceURI = strings.Replace(resourceURI, ".kusto.", ".kustomfa.", 1)
+				}
+				scopes := []string{fmt.Sprintf("%s/.default", resourceURI)}
+				tkp.scopes = scopes
 				cliOpts := kcsb.ClientOptions
 				appClientId := kcsb.ApplicationClientId
 				if cliOpts == nil {
@@ -356,11 +369,18 @@ func (kcsb *ConnectionStringBuilder) newTokenProvider() (*TokenProvider, error) 
 			tkp.initOnce = &sync.Once{}
 			tkp.init = func() {
 				// Fetches cloud meta data
-				tkp.ci, err = GetMetadata(context.Background(), kcsb.DataSource)
+				tkp.ci, err = GetMetadata(kcsb.DataSource)
 				if err != nil {
 					tkp.err = err
 					return
 				}
+				// Update resource URI if MFA enabled
+				resourceURI := tkp.ci.KustoServiceResourceID
+				if tkp.ci.LoginMfaRequired {
+					resourceURI = strings.Replace(resourceURI, ".kusto.", ".kustomfa.", 1)
+				}
+				scopes := []string{fmt.Sprintf("%s/.default", resourceURI)}
+				tkp.scopes = scopes
 				cliOpts := kcsb.ClientOptions
 				appClientId := kcsb.ApplicationClientId
 				if cliOpts == nil {
@@ -391,11 +411,18 @@ func (kcsb *ConnectionStringBuilder) newTokenProvider() (*TokenProvider, error) 
 			tkp.initOnce = &sync.Once{}
 			tkp.init = func() {
 				// Fetches cloud meta data
-				tkp.ci, err = GetMetadata(context.Background(), kcsb.DataSource)
+				tkp.ci, err = GetMetadata(kcsb.DataSource)
 				if err != nil {
 					tkp.err = err
 					return
 				}
+				// Update resource URI if MFA enabled
+				resourceURI := tkp.ci.KustoServiceResourceID
+				if tkp.ci.LoginMfaRequired {
+					resourceURI = strings.Replace(resourceURI, ".kusto.", ".kustomfa.", 1)
+				}
+				scopes := []string{fmt.Sprintf("%s/.default", resourceURI)}
+				tkp.scopes = scopes
 				cliOpts := kcsb.ClientOptions
 				appClientId := kcsb.ApplicationClientId
 				if cliOpts == nil {
@@ -467,12 +494,18 @@ func (kcsb *ConnectionStringBuilder) newTokenProvider() (*TokenProvider, error) 
 			tkp.initOnce = &sync.Once{}
 			tkp.init = func() {
 				// Fetches cloud meta data
-				tkp.ci, err = GetMetadata(context.Background(), kcsb.DataSource)
+				tkp.ci, err = GetMetadata(kcsb.DataSource)
 				if err != nil {
 					tkp.err = err
 					return
 				}
-
+				// Update resource URI if MFA enabled
+				resourceURI := tkp.ci.KustoServiceResourceID
+				if tkp.ci.LoginMfaRequired {
+					resourceURI = strings.Replace(resourceURI, ".kusto.", ".kustomfa.", 1)
+				}
+				scopes := []string{fmt.Sprintf("%s/.default", resourceURI)}
+				tkp.scopes = scopes
 				cliOpts := kcsb.ClientOptions
 				if cliOpts == nil {
 					cliOpts = &azcore.ClientOptions{}

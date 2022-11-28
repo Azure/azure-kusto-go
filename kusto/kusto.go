@@ -22,7 +22,7 @@ type queryer interface {
 	queryToJson(ctx context.Context, db string, query Stmt, options *queryOptions) (string, error)
 }
 
-// Authorization provides the Tokenprovider needed to acquire the auth token.
+// Authorization provides the TokenProvider needed to acquire the auth token.
 type Authorization struct {
 	// Token provider that can be used to get the access token.
 	TokenProvider *TokenProvider

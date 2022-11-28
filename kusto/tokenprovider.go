@@ -3,7 +3,6 @@ package kusto
 import (
 	"context"
 	"fmt"
-	"strings"
 	"sync"
 
 	"github.com/Azure/azure-sdk-for-go/sdk/azcore"
@@ -33,14 +32,6 @@ func (tkp *TokenProvider) AcquireToken(ctx context.Context) (string, string, err
 		if tkp.err != nil {
 			return "", "", tkp.err
 		}
-		// Update resource URI if MFA enabled
-		resourceURI := tkp.ci.KustoServiceResourceID
-		if tkp.ci.LoginMfaRequired {
-			resourceURI = strings.Replace(resourceURI, ".kusto.", ".kustomfa.", 1)
-		}
-		scopes := []string{fmt.Sprintf("%s/.default", resourceURI)}
-		tkp.scopes = scopes
-
 	}
 
 	if tkp.tokenCred != nil {
