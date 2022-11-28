@@ -59,15 +59,7 @@ func TestGetConnectionStringBuilder(t *testing.T) {
 				actual := NewConnectionStringBuilder(test.connectionString)
 				assert.EqualValues(t, test.want, *actual)
 			} else {
-				defer func() {
-					if res := recover(); res == nil {
-						t.Errorf("Should have panic")
-					} else if res != test.wantErr {
-						t.Errorf("Wrong panic message: %s", res)
-					}
-				}()
-				NewConnectionStringBuilder(test.connectionString)
-
+				assert.Panics(t, func() { NewConnectionStringBuilder(test.connectionString) }, test.wantErr)
 			}
 		})
 
