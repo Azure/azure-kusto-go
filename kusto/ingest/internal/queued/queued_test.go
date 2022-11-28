@@ -83,7 +83,7 @@ type fakeBlobstore struct {
 }
 
 func (f *fakeBlobstore) uploadBlobStream(_ context.Context, reader io.Reader, _ azblob.BlockBlobClient,
-	_ azblob.UploadStreamToBlockBlobOptions) (azblob.BlockBlobCommitBlockListResponse, error) {
+	_ azblob.UploadStreamOptions) (azblob.BlockBlobCommitBlockListResponse, error) {
 	if f.shouldErr {
 		return azblob.BlockBlobCommitBlockListResponse{}, fmt.Errorf("error")
 	}
@@ -91,7 +91,7 @@ func (f *fakeBlobstore) uploadBlobStream(_ context.Context, reader io.Reader, _ 
 	return azblob.BlockBlobCommitBlockListResponse{}, err
 }
 
-func (f *fakeBlobstore) uploadBlobFile(_ context.Context, fi *os.File, _ azblob.BlockBlobClient, _ azblob.HighLevelUploadToBlockBlobOption) (*http.Response, error) {
+func (f *fakeBlobstore) uploadBlobFile(_ context.Context, fi *os.File, _ azblob.BlockBlobClient, _ azblob.UploadOption) (*http.Response, error) {
 	if f.shouldErr {
 		return nil, fmt.Errorf("error")
 	}
@@ -198,7 +198,7 @@ func TestLocalToBlob(t *testing.T) {
 			uploadBlob:   fbs.uploadBlobFile,
 		}
 
-		_, _, err := in.localToBlob(context.Background(), test.from, to, &properties.All{})
+		_, _, err := in.localToBlob(context.Background(), test.from, *to, &properties.All{})
 		switch {
 		case err == nil && test.err:
 			t.Errorf("TestLocalToBlob(%s): got err == nil, want err != nil", test.desc)
