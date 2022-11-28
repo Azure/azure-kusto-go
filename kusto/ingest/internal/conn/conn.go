@@ -76,12 +76,13 @@ func newWithoutValidation(endpoint string, auth kusto.Authorization, client *htt
 		).SetNoRetry()
 	}
 
+	headersForPool := headers
 	c := &Conn{
 		auth:       auth,
 		baseURL:    &url.URL{Scheme: u.Scheme, Host: u.Host, Path: "/v1/rest/ingest/"},
 		reqHeaders: headers,
 		headersPool: sync.Pool{New: func() interface{} {
-			return copyHeaders(headers)
+			return copyHeaders(headersForPool)
 		}},
 		client: client,
 		done:   make(chan struct{}),
@@ -116,8 +117,9 @@ func (c *Conn) StreamIngest(ctx context.Context, db, table string, payload io.Re
 	}
 
 	headers := c.headersPool.Get().(http.Header)
+	headersForPool := headers
 	go func() {
-		c.headersPool.Put(copyHeaders(headers))
+		c.headersPool.Put(copyHeaders(headersForPool))
 	}()
 
 	if clientRequestId != "" {
