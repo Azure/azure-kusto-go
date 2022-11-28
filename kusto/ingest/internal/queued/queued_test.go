@@ -196,7 +196,7 @@ func TestLocalToBlob(t *testing.T) {
 			uploadBlob:   fbs.uploadBlobFile,
 		}
 
-		_, _, err := in.localToBlob(context.Background(), test.from, to, "test", &properties.All{})
+		_, _, err := in.localToBlob(context.Background(), test.from, *to, "test", &properties.All{})
 		switch {
 		case err == nil && test.err:
 			t.Errorf("TestLocalToBlob(%s): got err == nil, want err != nil", test.desc)

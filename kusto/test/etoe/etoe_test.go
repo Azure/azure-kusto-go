@@ -108,7 +108,7 @@ func TestQueries(t *testing.T) {
 	_, cancel := context.WithCancel(context.Background())
 	defer cancel()
 
-	client, err := kusto.New(testConfig.Endpoint, testConfig.Authorizer)
+	client, err := kusto.New(testConfig.kcsb)
 	if err != nil {
 		panic(err)
 	}
@@ -459,7 +459,7 @@ func TestFileIngestion(t *testing.T) {
 		t.Skipf("end to end tests disabled: missing config.json file in etoe directory")
 	}
 
-	client, err := kusto.New(testConfig.Endpoint, testConfig.Authorizer)
+	client, err := kusto.New(testConfig.kcsb)
 	if err != nil {
 		panic(err)
 	}
@@ -839,7 +839,7 @@ func TestReaderIngestion(t *testing.T) {
 	streamingTable := "goe2e_streaming_reader_logs"
 	managedTable := "goe2e_managed_streaming_reader_logs"
 
-	client, err := kusto.New(testConfig.Endpoint, testConfig.Authorizer)
+	client, err := kusto.New(testConfig.kcsb)
 	if err != nil {
 		panic(err)
 	}
@@ -1178,7 +1178,7 @@ func TestMultipleClusters(t *testing.T) {
 		t.Skipf("multiple clusters tests diasbled: needs SecondaryEndpoint and SecondaryDatabase")
 	}
 
-	client, err := kusto.New(testConfig.Endpoint, testConfig.Authorizer)
+	client, err := kusto.New(testConfig.kcsb)
 	if err != nil {
 		panic(err)
 	}
@@ -1189,7 +1189,9 @@ func TestMultipleClusters(t *testing.T) {
 		t.Log("Closed client")
 	})
 
-	secondaryClient, err := kusto.New(testConfig.SecondaryEndpoint, testConfig.Authorizer)
+	skcsb := kusto.NewConnectionStringBuilder(testConfig.SecondaryEndpoint).WithAadAppKey(testConfig.ClientID, testConfig.ClientSecret, testConfig.TenantID)
+
+	secondaryClient, err := kusto.New(skcsb)
 	if err != nil {
 		panic(err)
 	}
@@ -1382,8 +1384,7 @@ func TestStreamingIngestion(t *testing.T) {
 	if skipETOE || testing.Short() {
 		t.SkipNow()
 	}
-
-	client, err := kusto.New(testConfig.Endpoint, testConfig.Authorizer)
+	client, err := kusto.New(testConfig.kcsb)
 	if err != nil {
 		panic(err)
 	}
@@ -1496,7 +1497,8 @@ func TestStreamingIngestion(t *testing.T) {
 
 func TestError(t *testing.T) {
 	t.Parallel()
-	client, err := kusto.New(testConfig.Endpoint, testConfig.Authorizer)
+
+	client, err := kusto.New(testConfig.kcsb)
 	require.NoError(t, err)
 
 	t.Cleanup(func() {
@@ -1585,21 +1587,21 @@ func getExpectedResult() AllDataType {
 	}
 }
 
-func createIngestionTable(t *testing.T, client *kusto.Client, tableName string, withInitialRow bool) error {
-	return createIngestionTableWithDB(t, client, testConfig.Database, tableName, withInitialRow)
+func createIngestionTable(t *testing.T, client *kusto.Client, tableName string, isAllTypes bool) error {
+	return createIngestionTableWithDB(t, client, testConfig.Database, tableName, isAllTypes)
 }
 
-func createIngestionTableWithDB(t *testing.T, client *kusto.Client, database string, tableName string, withInitialRow bool) error {
+func createIngestionTableWithDB(t *testing.T, client *kusto.Client, database string, tableName string, isAllTypes bool) error {
 	defaultScheme := "(header_time: datetime, header_id: guid, header_api_version: string, payload_data: string, payload_user: string)"
-	return createIngestionTableWithDBAndScheme(t, client, database, tableName, withInitialRow, defaultScheme)
+	return createIngestionTableWithDBAndScheme(t, client, database, tableName, isAllTypes, defaultScheme)
 }
 
-func createIngestionTableWithDBAndScheme(t *testing.T, client *kusto.Client, database string, tableName string, withInitialRow bool, scheme string) error {
+func createIngestionTableWithDBAndScheme(t *testing.T, client *kusto.Client, database string, tableName string, isAllTypes bool, scheme string) error {
 	t.Logf("Creating ingestion table %s", tableName)
 	dropUnsafe := kusto.NewStmt(".drop table ", kusto.UnsafeStmt(unsafe.Stmt{Add: true})).UnsafeAdd(tableName).Add(" ifexists")
 	var createUnsafe kusto.Stmt
-	if withInitialRow {
-		createUnsafe = kusto.NewStmt(".set ", kusto.UnsafeStmt(unsafe.Stmt{Add: true})).UnsafeAdd(tableName).Add(" <| AllDataTypes")
+	if isAllTypes {
+		createUnsafe = kusto.NewStmt(".set ", kusto.UnsafeStmt(unsafe.Stmt{Add: true})).UnsafeAdd(tableName).Add(" <| datatable(vnum:int, vdec:decimal, vdate:datetime, vspan:timespan, vobj:dynamic, vb:bool, vreal:real, vstr:string, vlong:long, vguid:guid)\n[\n    1, decimal(2.00000000000001), datetime(2020-03-04T14:05:01.3109965Z), time(01:23:45.6789000), dynamic({\n  \"moshe\": \"value\"\n}), true, 0.01, \"asdf\", 9223372036854775807, guid(74be27de-1e4e-49d9-b579-fe0b331d3642), \n]")
 	} else {
 		createUnsafe = kusto.NewStmt(".create table ", kusto.UnsafeStmt(unsafe.Stmt{Add: true})).UnsafeAdd(tableName).UnsafeAdd(" " + scheme + " ")
 	}

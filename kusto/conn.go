@@ -22,7 +22,6 @@ import (
 	"github.com/Azure/azure-kusto-go/kusto/internal/response"
 	"github.com/Azure/azure-kusto-go/kusto/internal/version"
 
-	"github.com/Azure/go-autorest/autorest"
 	"github.com/google/uuid"
 )
 
@@ -36,7 +35,8 @@ var bufferPool = sync.Pool{
 
 // conn provides connectivity to a Kusto instance.
 type conn struct {
-	auth                           autorest.Authorizer
+	endpoint                       string
+	auth                           Authorization
 	endMgmt, endQuery, streamQuery *url.URL
 	client                         *http.Client
 }
@@ -53,7 +53,7 @@ func newConn(endpoint string, auth Authorization, client *http.Client) (*conn, e
 	}
 
 	c := &conn{
-		auth:        auth.Authorizer,
+		auth:        auth,
 		endMgmt:     &url.URL{Scheme: "https", Host: u.Host, Path: "/v1/rest/mgmt"},
 		endQuery:    &url.URL{Scheme: "https", Host: u.Host, Path: "/v2/rest/query"},
 		streamQuery: &url.URL{Scheme: "https", Host: u.Host, Path: "/v1/rest/ingest/"},
@@ -181,6 +181,14 @@ func (c *conn) doRequest(ctx context.Context, execType int, db string, query Stm
 		return 0, nil, nil, nil, errors.ES(op, errors.KInternal, "internal error: did not understand the type of execType: %d", execType)
 	}
 
+	if c.auth.TokenProvider != nil && c.auth.TokenProvider.AuthorizationRequired() {
+		token, tokenType, tkerr := c.auth.TokenProvider.AcquireToken(ctx)
+		if tkerr != nil {
+			return 0, nil, nil, nil, errors.ES(op, errors.KInternal, "Error while getting token : %s", tkerr)
+		}
+		header.Add("Authorization", fmt.Sprintf("%s %s", tokenType, token))
+	}
+
 	req := &http.Request{
 		Method: http.MethodPost,
 		URL:    endpoint,
@@ -189,11 +197,6 @@ func (c *conn) doRequest(ctx context.Context, execType int, db string, query Stm
 	}
 
 	var err error
-	prep := c.auth.WithAuthorization()
-	req, err = prep(autorest.CreatePreparer()).Prepare(req)
-	if err != nil {
-		return 0, nil, nil, nil, errors.E(op, errors.KInternal, err)
-	}
 
 	resp, err := c.client.Do(req.WithContext(ctx))
 	if err != nil {
@@ -213,13 +216,7 @@ func (c *conn) doRequest(ctx context.Context, execType int, db string, query Stm
 }
 
 func (c *conn) Close() error {
-	if c.auth == nil {
-		return nil
-	}
 
-	if closer, ok := c.auth.(io.Closer); ok {
-		return closer.Close()
-	}
-
+	c.client.CloseIdleConnections()
 	return nil
 }

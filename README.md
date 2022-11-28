@@ -7,6 +7,13 @@ This is a data plane SDK (it is for interacting with Azure Data Explorer service
 
 ## What's New
 
+### Version 0.9.1
+* Setting a mapping now implies the ingestion format
+* Fixed possible context race
+com/Azure/azure-kusto-go/pull/134
+* Json parsing errors now display the failed json string
+* E2E tests require fewer prerequisites
+
 ### Version 0.9.0
 * Deprecate AllowWrite - now it is the default like in other SDKs.
 * Remove mutex from query client. Now queries can run in parallel, achieving much better performance.
