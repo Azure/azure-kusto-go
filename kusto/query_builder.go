@@ -537,6 +537,7 @@ func (s Stmt) NormalizeName(query string, forceNormalization bool) Stmt {
 		return s
 	}
 	if !forceNormalization && !RequiresQuoting(query) {
+		s.queryStr = s.queryStr + query
 		return s
 	}
 

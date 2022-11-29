@@ -598,3 +598,304 @@ func buildQueryStr(query string, params Definitions) string {
 	}
 	return query
 }
+
+func TestNormalizeName(t *testing.T) {
+	t.Parallel()
+	tests := []struct {
+		desc               string
+		query              string
+		forceNormalization bool
+		want               Stmt
+	}{
+		{
+			desc:               "Success simple query",
+			query:              "KustoLogs",
+			forceNormalization: false,
+			want:               NewStmt("[\"KustoLogs\"]"),
+		},
+		{
+			desc:               "Success empty string",
+			query:              "",
+			forceNormalization: false,
+			want:               NewStmt(""),
+		},
+		{
+			desc:               "Success Quoting",
+			query:              "&",
+			forceNormalization: false,
+			want:               NewStmt("&"),
+		},
+		{
+			desc:               "Success forced",
+			query:              "&",
+			forceNormalization: true,
+			want:               NewStmt("[\"&\"]"),
+		},
+	}
+
+	for _, test := range tests {
+		test := test // capture
+		s := NewStmt("")
+		t.Run(test.desc, func(t *testing.T) {
+			t.Parallel()
+			got := s.NormalizeName(test.query, test.forceNormalization)
+
+			assert.EqualValues(t, test.want, got)
+		})
+
+	}
+}
+
+func TestRequiresQuoting(t *testing.T) {
+	t.Parallel()
+	tests := []struct {
+		desc  string
+		query string
+		want  bool
+	}{
+		{
+			desc:  "Success simple letter",
+			query: "a",
+			want:  true,
+		},
+		{
+			desc:  "Success simple digit",
+			query: "8",
+			want:  true,
+		},
+		{
+			desc:  "Success underscore",
+			query: "_",
+			want:  true,
+		},
+		{
+			desc:  "Success empty string",
+			query: "",
+			want:  false,
+		},
+		{
+			desc:  "Success not quoted",
+			query: "&",
+			want:  false,
+		},
+	}
+
+	for _, test := range tests {
+		test := test // capture
+		t.Run(test.desc, func(t *testing.T) {
+			t.Parallel()
+			got := RequiresQuoting(test.query)
+
+			assert.EqualValues(t, test.want, got)
+		})
+
+	}
+}
+
+func TestAddQuotedString(t *testing.T) {
+	t.Parallel()
+	tests := []struct {
+		desc   string
+		value  string
+		hidden bool
+		want   string
+	}{
+		{
+			desc:  "Success empty string",
+			value: "",
+			want:  "",
+		},
+		{
+			desc:  "Success simple string",
+			value: "abcd",
+			want:  "\"abcd\"",
+		},
+		{
+			desc:   "Success hidden",
+			value:  "abcd",
+			hidden: true,
+			want:   "h\"abcd\"",
+		},
+		{
+			desc:  "Success non latin escaping (should be escaped)",
+			value: "aאbcd",
+			want:  "\"a\\u5d0bcd\"",
+		},
+		{
+			desc:  "Success case \\'",
+			value: "a'bcd",
+			want:  "\"a\\'bcd\"",
+		},
+		{
+			desc:  "Success case \\\"",
+			value: "a\"bcd",
+			want:  "\"a\\\"bcd\"",
+		},
+		{
+			desc:  "Success case \\\\",
+			value: "a\\bcd",
+			want:  "\"a\\\\bcd\"",
+		},
+		{
+			desc:  "Success case \\0",
+			value: "a\x00bcd",
+			want:  "\"a\\0bcd\"",
+		},
+		{
+			desc:  "Success case \\a",
+			value: "a\abcd",
+			want:  "\"a\\abcd\"",
+		},
+		{
+			desc:  "Success case \\b",
+			value: "a\bbcd",
+			want:  "\"a\\bbcd\"",
+		},
+		{
+			desc:  "Success case \\f",
+			value: "a\fbcd",
+			want:  "\"a\\fbcd\"",
+		},
+		{
+			desc:  "Success case \\n",
+			value: "a\nbcd",
+			want:  "\"a\\nbcd\"",
+		},
+		{
+			desc:  "Success case \\r",
+			value: "a\rbcd",
+			want:  "\"a\\rbcd\"",
+		},
+		{
+			desc:  "Success case \\t",
+			value: "a\tbcd",
+			want:  "\"a\\tbcd\"",
+		},
+		{
+			desc:  "Success case \\v",
+			value: "a\vbcd",
+			want:  "\"a\\vbcd\"",
+		},
+	}
+
+	for _, test := range tests {
+		test := test // capture
+		t.Run(test.desc, func(t *testing.T) {
+			t.Parallel()
+			got := AddQuotedString(test.value, test.hidden)
+
+			assert.EqualValues(t, test.want, got)
+		})
+
+	}
+}
+
+func TestAddInt(t *testing.T) {
+	t.Parallel()
+	tests := []struct {
+		desc  string
+		query int
+		want  Stmt
+	}{
+		{
+			desc:  "Success simple add",
+			query: 7,
+			want:  NewStmt("7"),
+		},
+	}
+
+	for _, test := range tests {
+		test := test // capture
+		s := NewStmt("")
+		t.Run(test.desc, func(t *testing.T) {
+			t.Parallel()
+			got := s.AddInt(test.query)
+
+			assert.EqualValues(t, test.want, got)
+		})
+
+	}
+}
+func TestAddFloat(t *testing.T) {
+	t.Parallel()
+	tests := []struct {
+		desc  string
+		query float64
+		want  Stmt
+	}{
+		{
+			desc:  "Success simple add",
+			query: 7.7,
+			want:  NewStmt("7.700000"),
+		},
+	}
+
+	for _, test := range tests {
+		test := test // capture
+		s := NewStmt("")
+		t.Run(test.desc, func(t *testing.T) {
+			t.Parallel()
+			got := s.AddFloat64(test.query)
+
+			assert.EqualValues(t, test.want, got)
+		})
+
+	}
+}
+func TestAddComplex(t *testing.T) {
+	t.Parallel()
+	tests := []struct {
+		desc  string
+		query complex64
+		want  Stmt
+	}{
+		{
+			desc:  "Success simple add",
+			query: complex(10, 11),
+			want:  NewStmt("(10+11i)"),
+		},
+	}
+
+	for _, test := range tests {
+		test := test // capture
+		s := NewStmt("")
+		t.Run(test.desc, func(t *testing.T) {
+			t.Parallel()
+			got := s.AddComplex64(test.query)
+
+			assert.EqualValues(t, test.want, got)
+		})
+
+	}
+}
+func TestAddBool(t *testing.T) {
+	t.Parallel()
+	tests := []struct {
+		desc  string
+		query bool
+		want  Stmt
+	}{
+		{
+			desc:  "Success simple true",
+			query: true,
+			want:  NewStmt("true"),
+		},
+		{
+			desc:  "Success simple false",
+			query: false,
+			want:  NewStmt("false"),
+		},
+	}
+
+	for _, test := range tests {
+		test := test // capture
+		s := NewStmt("")
+		t.Run(test.desc, func(t *testing.T) {
+			t.Parallel()
+			got := s.AddBool(test.query)
+
+			assert.EqualValues(t, test.want, got)
+		})
+
+	}
+}
