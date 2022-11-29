@@ -35,6 +35,7 @@ type Client struct {
 	auth             Authorization
 	mgmtConnMu       sync.Mutex
 	http             *http.Client
+	versionName      string
 }
 
 // Option is an optional argument type for New().
@@ -72,7 +73,11 @@ func New(kcsb *ConnectionStringBuilder, options ...Option) (*Client, error) {
 		client.http = &http.Client{}
 	}
 
-	conn, err := newConn(endpoint, *auth, client.http)
+	if !isEmpty(kcsb.ClientVersionName) {
+		client.versionName = kcsb.ClientVersionName
+	}
+
+	conn, err := newConn(endpoint, *auth, client.http, client.versionName)
 	if err != nil {
 		return nil, err
 	}
@@ -340,7 +345,7 @@ func (c *Client) getConn(callType callType, options connOptions) (queryer, error
 			u, _ := url.Parse(c.endpoint) // Don't care about the error
 			u.Host = "ingest-" + u.Host
 			auth := c.auth
-			iconn, err := newConn(u.String(), auth, c.http)
+			iconn, err := newConn(u.String(), auth, c.http, c.versionName)
 			if err != nil {
 				return nil, err
 			}
@@ -379,6 +384,11 @@ func contextSetup(ctx context.Context, mgmtCall bool) (context.Context, context.
 
 func (c *Client) HttpClient() *http.Client {
 	return c.http
+}
+
+// VersionName returns the client's version string passed to New().
+func (c *Client) VersionName() string {
+	return c.versionName
 }
 
 func (c *Client) Close() error {

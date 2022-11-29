@@ -39,10 +39,11 @@ type conn struct {
 	auth                           Authorization
 	endMgmt, endQuery, streamQuery *url.URL
 	client                         *http.Client
+	versionName                    string
 }
 
 // newConn returns a new conn object with an injected http.Client
-func newConn(endpoint string, auth Authorization, client *http.Client) (*conn, error) {
+func newConn(endpoint string, auth Authorization, client *http.Client, versionName string) (*conn, error) {
 	if !validURL.MatchString(endpoint) {
 		return nil, errors.ES(errors.OpServConn, errors.KClientArgs, "endpoint is not valid(%s), should be https://<cluster name>.*", endpoint).SetNoRetry()
 	}
@@ -58,6 +59,7 @@ func newConn(endpoint string, auth Authorization, client *http.Client) (*conn, e
 		endQuery:    &url.URL{Scheme: "https", Host: u.Host, Path: "/v2/rest/query"},
 		streamQuery: &url.URL{Scheme: "https", Host: u.Host, Path: "/v1/rest/ingest/"},
 		client:      client,
+		versionName: versionName,
 	}
 
 	return c, nil
@@ -142,7 +144,7 @@ func (c *conn) doRequest(ctx context.Context, execType int, db string, query Stm
 	header := http.Header{}
 	header.Add("Accept", "application/json")
 	header.Add("Accept-Encoding", "gzip")
-	header.Add("x-ms-client-version", "Kusto.Go.Client: "+version.Kusto)
+	header.Add("x-ms-client-version", "Kusto.Go.Client: "+version.Kusto+"["+c.versionName+"]")
 	header.Add("Content-Type", "application/json; charset=utf-8")
 	header.Add("x-ms-client-request-id", "KGC.execute;"+uuid.New().String())
 

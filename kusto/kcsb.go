@@ -2,11 +2,12 @@ package kusto
 
 import (
 	"fmt"
+	"strconv"
+	"strings"
+
 	kustoErrors "github.com/Azure/azure-kusto-go/kusto/data/errors"
 	"github.com/Azure/azure-sdk-for-go/sdk/azcore"
 	"github.com/Azure/azure-sdk-for-go/sdk/azidentity"
-	"strconv"
-	"strings"
 )
 
 type ConnectionStringBuilder struct {
@@ -28,6 +29,7 @@ type ConnectionStringBuilder struct {
 	RedirectURL                      string
 	DefaultAuth                      bool
 	ClientOptions                    *azcore.ClientOptions
+	ClientVersionName                string
 }
 
 // params mapping
@@ -278,6 +280,12 @@ func (kcsb *ConnectionStringBuilder) WithDefaultAzureCredential() *ConnectionStr
 	kcsb.resetConnectionString()
 	kcsb.DefaultAuth = true
 	return kcsb
+}
+
+func (kcsb *ConnectionStringBuilder) SetClientVersionForTracing(clientVersionName string) {
+	if isEmpty(clientVersionName) {
+		kcsb.ClientVersionName = strings.Trim(clientVersionName, " ")
+	}
 }
 
 // Method to be used for generating TokenCredential

@@ -43,7 +43,7 @@ type Conn struct {
 }
 
 // New returns a new Conn object.
-func New(endpoint string, auth kusto.Authorization, client *http.Client) (*Conn, error) {
+func New(endpoint string, auth kusto.Authorization, client *http.Client, versionName string) (*Conn, error) {
 	if !validURL.MatchString(endpoint) {
 		return nil, errors.ES(
 			errors.OpServConn,
@@ -52,14 +52,14 @@ func New(endpoint string, auth kusto.Authorization, client *http.Client) (*Conn,
 		).SetNoRetry()
 	}
 
-	return newWithoutValidation(endpoint, auth, client)
+	return newWithoutValidation(endpoint, auth, client, versionName)
 }
 
-func newWithoutValidation(endpoint string, auth kusto.Authorization, client *http.Client) (*Conn, error) {
+func newWithoutValidation(endpoint string, auth kusto.Authorization, client *http.Client, versionName string) (*Conn, error) {
 	headers := http.Header{}
 	headers.Add("Accept", "application/json")
 	headers.Add("Accept-Encoding", "gzip,deflate")
-	headers.Add("x-ms-client-version", "Kusto.Go.Client: "+version.Kusto)
+	headers.Add("x-ms-client-version", "Kusto.Go.Client: "+version.Kusto+"["+versionName+"]")
 	headers.Add("Connection", "Keep-Alive")
 
 	// TODO(daniel/jdoak): Get rid of this Replace stuff. I mean, its just hacky.

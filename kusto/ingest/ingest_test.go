@@ -13,9 +13,10 @@ import (
 )
 
 type mockClient struct {
-	endpoint string
-	auth     kusto.Authorization
-	onMgmt   func(ctx context.Context, db string, query kusto.Stmt, options ...kusto.MgmtOption) (*kusto.RowIterator, error)
+	endpoint    string
+	versionName string
+	auth        kusto.Authorization
+	onMgmt      func(ctx context.Context, db string, query kusto.Stmt, options ...kusto.MgmtOption) (*kusto.RowIterator, error)
 }
 
 func (m mockClient) HttpClient() *http.Client {
@@ -36,6 +37,10 @@ func (m mockClient) Endpoint() string {
 
 func (m mockClient) Query(context.Context, string, kusto.Stmt, ...kusto.QueryOption) (*kusto.RowIterator, error) {
 	panic("not implemented")
+}
+
+func (m mockClient) VersionName() string {
+	return m.versionName
 }
 
 func (m mockClient) Mgmt(ctx context.Context, db string, query kusto.Stmt, options ...kusto.MgmtOption) (*kusto.RowIterator, error) {
