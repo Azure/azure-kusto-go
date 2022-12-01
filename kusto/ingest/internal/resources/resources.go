@@ -367,7 +367,7 @@ func (m *Manager) fetchRetry(ctx context.Context) {
 // of fetching from source.
 func (m *Manager) Resources() (Ingestion, error) {
 	lastFetchTime, ok := m.lastFetchTime.Load().(time.Time)
-	if !ok || lastFetchTime.Add(2*fetchInterval).After(time.Now().UTC()) {
+	if !ok || lastFetchTime.Add(2*fetchInterval).Before(time.Now().UTC()) {
 		m.fetchRetry(context.Background())
 	}
 
