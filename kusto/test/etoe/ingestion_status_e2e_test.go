@@ -38,6 +38,15 @@ func TestIngestionStatus(t *testing.T) {
 	ingestor, err := ingest.New(client, testConfig.Database, tableName)
 	require.NoError(t, err)
 
+	t.Cleanup(func() {
+		t.Log("Closing client")
+		require.NoError(t, client.Close())
+		t.Log("Closed client")
+		t.Log("Closing ingestor")
+		require.NoError(t, ingestor.Close())
+		t.Log("Closed ingestor")
+	})
+
 	err = createIngestionTableWithDBAndScheme(t, client, testConfig.Database, tableName, false, scheme)
 	require.NoError(t, err)
 
@@ -202,6 +211,15 @@ func TestIngestionStatus(t *testing.T) {
 		ingestor, err := ingest.New(client, testConfig.Database, tableName)
 		require.NoError(t, err)
 
+		t.Cleanup(func() {
+			t.Log("Closing client")
+			require.NoError(t, client.Close())
+			t.Log("Closed client")
+			t.Log("Closing ingestor")
+			require.NoError(t, ingestor.Close())
+			t.Log("Closed ingestor")
+		})
+
 		res, err := ingestor.FromFile(ctx, csvFile, ingest.ReportResultToTable(), ingest.FlushImmediately())
 		require.NoError(t, err)
 
@@ -215,6 +233,7 @@ func TestIngestionStatus(t *testing.T) {
 		defer cancel()
 
 		f, err := os.Open(csvFile)
+		defer f.Close()
 		require.NoError(t, err)
 
 		reader, writer := io.Pipe()

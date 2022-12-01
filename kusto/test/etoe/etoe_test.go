@@ -1733,6 +1733,7 @@ func createIngestionTableWithDBAndScheme(t *testing.T, client *kusto.Client, dat
 	t.Cleanup(func() {
 		t.Logf("Dropping ingestion table %s", tableName)
 		_ = executeCommands(client, database, dropUnsafe)
+		t.Logf("Dropped ingestion table %s", tableName)
 	})
 
 	return executeCommands(client, database, dropUnsafe, createUnsafe, addMappingUnsafe, clearStreamingCacheStatement)
