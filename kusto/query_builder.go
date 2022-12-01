@@ -548,14 +548,17 @@ func (s Stmt) NormalizeName(query string, forceNormalization bool) Stmt {
 // RequiresQuoting checks whether a given string is an identifier
 func RequiresQuoting(query string) bool {
 	if query == "" {
-		return false
+		return true
+	}
+	if !unicode.IsLetter(rune(query[0])) && rune(query[0]) != '_' {
+		return true
 	}
 	for _, c := range query {
-		if !((unicode.IsLetter(c) || unicode.IsDigit(c)) || c == '_') {
-			return false
+		if !(unicode.IsLetter(c) || unicode.IsDigit(c) || c == '_') {
+			return true
 		}
 	}
-	return true
+	return false
 }
 
 // AddQuotedString escapes a string to be safely added to a stmt
@@ -666,12 +669,6 @@ func (s Stmt) AddBool(query bool) Stmt {
 // AddByte will add a byte as a string to the Stmt.  This allows dynamically building of a query from a root Stmt.
 func (s Stmt) AddByte(query byte) Stmt {
 	s.queryStr = s.queryStr + fmt.Sprintf("%d", query)
-	return s
-}
-
-// AddRune will add a rune as a string to the Stmt.  This allows dynamically building of a query from a root Stmt.
-func (s Stmt) AddRune(query rune) Stmt {
-	s.queryStr = s.queryStr + fmt.Sprintf("%c", query)
 	return s
 }
 

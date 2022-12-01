@@ -656,7 +656,7 @@ func TestRequiresQuoting(t *testing.T) {
 		{
 			desc:  "Success simple letter",
 			query: "a",
-			want:  true,
+			want:  false,
 		},
 		{
 			desc:  "Success simple digit",
@@ -664,19 +664,29 @@ func TestRequiresQuoting(t *testing.T) {
 			want:  true,
 		},
 		{
+			desc:  "Success simple digit",
+			query: "8a",
+			want:  true,
+		},
+		{
+			desc:  "Success simple digit",
+			query: "a8",
+			want:  false,
+		},
+		{
 			desc:  "Success underscore",
 			query: "_",
-			want:  true,
+			want:  false,
 		},
 		{
 			desc:  "Success empty string",
 			query: "",
-			want:  false,
+			want:  true,
 		},
 		{
-			desc:  "Success not quoted",
+			desc:  "Success special",
 			query: "&",
-			want:  false,
+			want:  true,
 		},
 	}
 
@@ -827,6 +837,11 @@ func TestAddFloat(t *testing.T) {
 			desc:  "Success simple add",
 			query: 7.7,
 			want:  NewStmt("7.700000"),
+		},
+		{
+			desc:  "Success casting",
+			query: float64(7),
+			want:  NewStmt("7.000000"),
 		},
 	}
 
