@@ -341,12 +341,16 @@ func (m *Manager) fetch(ctx context.Context) error {
 	return nil
 }
 
-func (m *Manager) fetchRetry(ctx context.Context) {
+func (m *Manager) fetchRetry(ctx context.Context) error {
 	attempts := 0
 	for {
+		if attempts > retryCount {
+			return fmt.Errorf("failed to fetch ingestion resources")
+		}
+
 		select {
 		case <-m.done:
-			return
+			return nil
 		default:
 		}
 
@@ -355,11 +359,10 @@ func (m *Manager) fetchRetry(ctx context.Context) {
 		cancel()
 		if err != nil {
 			attempts++
-			//log.Printf("problem fetching the resources from Kusto Mgmt(attempt %d): %s", attempts, err)
 			time.Sleep(10 * time.Second)
 			continue
 		}
-		return
+		return nil
 	}
 }
 
@@ -368,7 +371,10 @@ func (m *Manager) fetchRetry(ctx context.Context) {
 func (m *Manager) Resources() (Ingestion, error) {
 	lastFetchTime, ok := m.lastFetchTime.Load().(time.Time)
 	if !ok || lastFetchTime.Add(2*fetchInterval).Before(time.Now().UTC()) {
-		m.fetchRetry(context.Background())
+		err := m.fetchRetry(context.Background())
+		if err != nil {
+			return Ingestion{}, err
+		}
 	}
 
 	i, ok := m.resources.Load().(Ingestion)
