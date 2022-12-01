@@ -72,4 +72,4 @@ jobs:
       - name: Publish Unit Test Results
         uses: EnricoMi/publish-unit-test-result-action@v1
         with:
-          files: kusto/report.xml
+          files: artifacts/**/*.xml

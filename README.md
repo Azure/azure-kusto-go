@@ -6,6 +6,24 @@
 This is a data plane SDK (it is for interacting with Azure Data Explorer service). For the control plane (resource administration), go [here](https://github.com/Azure/azure-sdk-for-go/tree/master/services/kusto/mgmt)
 
 ## What's New
+
+### Version 0.9.2
+* Fixed default values for parameters not parsing correctly
+* Fixed goroutine leak when streaming ingestion fails
+* Fixed leaks in tests
+
+### Version 0.9.1
+* Setting a mapping now implies the ingestion format
+* Fixed possible context race
+com/Azure/azure-kusto-go/pull/134
+* Json parsing errors now display the failed json string
+* E2E tests require fewer prerequisites
+
+### Version 0.9.0
+* Deprecate AllowWrite - now it is the default like in other SDKs.
+* Remove mutex from query client. Now queries can run in parallel, achieving much better performance.
+* Fix Column.Type assignment. Was using string, now using types.  by @jesseward
+* Lint and test fixes
 ### Version 0.8.1
 * Added `Application` and `User` as `ClientRequestProperties` to set the `x-ms-app` and `x-ms-user` headers, and the matching fields in `.show queries`. 
 ### Version 0.8.0
