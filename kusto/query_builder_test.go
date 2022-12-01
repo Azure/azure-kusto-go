@@ -611,6 +611,12 @@ func TestNormalizeName(t *testing.T) {
 			desc:               "Success simple query",
 			query:              "KustoLogs",
 			forceNormalization: false,
+			want:               NewStmt("KustoLogs"),
+		},
+		{
+			desc:               "Success simple query",
+			query:              "KustoLogs",
+			forceNormalization: true,
 			want:               NewStmt("[\"KustoLogs\"]"),
 		},
 		{
@@ -620,15 +626,9 @@ func TestNormalizeName(t *testing.T) {
 			want:               NewStmt(""),
 		},
 		{
-			desc:               "Success Quoting",
+			desc:               "Success special Quoting",
 			query:              "&",
 			forceNormalization: false,
-			want:               NewStmt("&"),
-		},
-		{
-			desc:               "Success forced",
-			query:              "&",
-			forceNormalization: true,
 			want:               NewStmt("[\"&\"]"),
 		},
 	}
