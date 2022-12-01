@@ -174,11 +174,18 @@ func (m *Manager) Close() {
 }
 
 func (m *Manager) renewResources() {
-	tick := time.NewTicker(1 * time.Hour)
+	tickDuration := 30 * time.Second
+	tickTotal := 1 * time.Hour
+	tick := time.NewTicker(tickDuration)
+	count := 0 * time.Second
 	for {
 		select {
 		case <-tick.C:
-			m.fetchRetry(context.Background())
+			count += tickDuration
+			if count >= tickTotal {
+				count = 0 * time.Second
+				m.fetchRetry(context.Background())
+			}
 		case <-m.done:
 			tick.Stop()
 			return
