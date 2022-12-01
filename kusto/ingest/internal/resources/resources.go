@@ -22,6 +22,7 @@ const (
 	defaultInitialInterval = 1 * time.Second
 	defaultMultiplier      = 2
 	retryCount             = 4
+	fetchInterval          = 1 * time.Hour
 )
 
 // mgmter is a private interface that allows us to write hermetic tests against the kusto.Client.Mgmt() method.
@@ -138,6 +139,7 @@ type Manager struct {
 	client                    mgmter
 	done                      chan struct{}
 	resources                 atomic.Value // Stores Ingestion
+	lastFetchTime             atomic.Value // Stores time.Time
 	kustoToken                token
 	kustoTokenCacheExpiration time.Time
 	authLock                  sync.Mutex
@@ -152,6 +154,7 @@ func New(client mgmter) (*Manager, error) {
 	}
 
 	m.kustoTokenCacheExpiration = time.Now().UTC()
+	m.lastFetchTime.Store(time.Now().UTC())
 	go m.renewResources()
 
 	m.authLock = sync.Mutex{}
@@ -175,14 +178,14 @@ func (m *Manager) Close() {
 
 func (m *Manager) renewResources() {
 	tickDuration := 30 * time.Second
-	tickTotal := 1 * time.Hour
+
 	tick := time.NewTicker(tickDuration)
 	count := 0 * time.Second
 	for {
 		select {
 		case <-tick.C:
 			count += tickDuration
-			if count >= tickTotal {
+			if count >= fetchInterval {
 				count = 0 * time.Second
 				m.fetchRetry(context.Background())
 			}
@@ -333,6 +336,8 @@ func (m *Manager) fetch(ctx context.Context) error {
 
 	m.resources.Store(ingest)
 
+	m.lastFetchTime.Store(time.Now().UTC())
+
 	return nil
 }
 
@@ -361,6 +366,11 @@ func (m *Manager) fetchRetry(ctx context.Context) {
 // Resources returns information about the ingestion resources. This will used cached information instead
 // of fetching from source.
 func (m *Manager) Resources() (Ingestion, error) {
+	lastFetchTime, ok := m.lastFetchTime.Load().(time.Time)
+	if !ok || lastFetchTime.Add(2*fetchInterval).After(time.Now().UTC()) {
+		m.fetchRetry(context.Background())
+	}
+
 	i, ok := m.resources.Load().(Ingestion)
 	if !ok {
 		return Ingestion{}, fmt.Errorf("manager has not retrieved an Ingestion object yet")
