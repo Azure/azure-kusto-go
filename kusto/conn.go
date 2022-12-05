@@ -95,8 +95,8 @@ func (c *conn) queryToJson(ctx context.Context, db string, query Stmt, options *
 		return "", e
 	}
 
+	defer body.Close()
 	all, e := io.ReadAll(body)
-	body.Close()
 	return string(all), e
 }
 
