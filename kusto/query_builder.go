@@ -8,7 +8,7 @@ These provide injection safe querying for data retrieval and insertion.
 import (
 	"encoding/json"
 	"fmt"
-	"math/big"
+	"github.com/Azure/azure-kusto-go/kusto/data/value"
 	"sort"
 	"strings"
 	"sync"
@@ -16,7 +16,6 @@ import (
 	"unicode"
 
 	"github.com/Azure/azure-kusto-go/kusto/data/types"
-	"github.com/Azure/azure-kusto-go/kusto/data/value"
 	ilog "github.com/Azure/azure-kusto-go/kusto/internal/log"
 	"github.com/Azure/azure-kusto-go/kusto/unsafe"
 
@@ -65,6 +64,53 @@ type ParamType struct {
 	name string
 }
 
+// isValid validates whether the value is of known kusto Types.
+func isValid(kustoType types.Column, value interface{}) bool {
+	if !kustoType.Valid() {
+		return false
+	}
+
+	switch kustoType {
+	case types.Bool:
+		_, ok := value.(bool)
+		return ok
+	case types.DateTime:
+		_, ok := value.(time.Time)
+		return ok
+	case types.Dynamic:
+		return false
+	case types.GUID:
+		_, ok := value.(uuid.UUID)
+		return ok
+	case types.Int:
+		_, ok := value.(int)
+		return ok
+	case types.Long:
+		_, ok := value.(int64)
+		return ok
+	case types.Real:
+		_, ok := value.(float64)
+		return ok
+	case types.String:
+		_, ok := value.(string)
+		return ok
+	case types.Timespan:
+		_, ok := value.(time.Duration)
+		return ok
+	case types.Decimal:
+		switch value.(type) {
+		case float32:
+			return true
+		case float64:
+			return true
+		default:
+			return false
+		}
+	}
+	return false
+}
+
+// validate validates that Parameters is valid .
 func (p ParamType) validate() error {
 	if !p.Type.Valid() {
 		return fmt.Errorf("the .Type was not a valid value, must be one of the values in this package starting with CT<type name>, was %s", p.Type)
@@ -73,139 +119,70 @@ func (p ParamType) validate() error {
 		return nil
 	}
 
-	switch p.Type {
-	case types.Bool:
-		if _, ok := p.Default.(bool); !ok {
-			return fmt.Errorf("the .Type was %s, but the value was a %T", p.Type, p.Default)
-		}
-		return nil
-	case types.DateTime:
-		if _, ok := p.Default.(time.Time); !ok {
-			return fmt.Errorf("the .Type was %s, but the value was a %T", p.Type, p.Default)
-		}
-		return nil
-	case types.Dynamic:
-		return fmt.Errorf("the .Type was %s, but Dynamic types cannot have default values", p.Type)
-	case types.GUID:
-		if _, ok := p.Default.(uuid.UUID); !ok {
-			return fmt.Errorf("the .Type was %s, but the value was a %T", p.Type, p.Default)
-		}
-		return nil
-	case types.Int:
-		if _, ok := p.Default.(int32); !ok {
-			return fmt.Errorf("the .Type was %s, but the value was a %T", p.Type, p.Default)
-		}
-		return nil
-	case types.Long:
-		if _, ok := p.Default.(int64); !ok {
-			return fmt.Errorf("the .Type was %s, but the value was a %T", p.Type, p.Default)
-		}
-		return nil
-	case types.Real:
-		if _, ok := p.Default.(float64); !ok {
-			return fmt.Errorf("the .Type was %s, but the value was a %T", p.Type, p.Default)
-		}
-		return nil
-	case types.String:
-		if _, ok := p.Default.(string); !ok {
-			return fmt.Errorf("the .Type was %s, but the value was a %T", p.Type, p.Default)
-		}
-		return nil
-	case types.Timespan:
-		if _, ok := p.Default.(time.Duration); !ok {
-			return fmt.Errorf("the .Type was %s, but the value was a %T", p.Type, p.Default)
-		}
-		return nil
-	case types.Decimal:
-		switch v := p.Default.(type) {
-		case string:
-			if !value.DecRE.MatchString(v) {
-				return fmt.Errorf("string representing decimal does not appear to be a decimal number, was %v", v)
-			}
-			return nil
-		case *big.Float:
-			if v == nil {
-				return fmt.Errorf("*big.Float type cannot be set to the nil value")
-			}
-			return nil
-		case *big.Int:
-			if v == nil {
-				return fmt.Errorf("*big.Int type cannot be set to the nil value")
-			}
-			return nil
-		}
-		return fmt.Errorf("the .Type was %s, but the value was a %T", p.Type, p.Default)
+	if !isValid(p.Type, p.Default) {
+		return fmt.Errorf("received a field type %q we don't recognize", p.Type)
 	}
-	return fmt.Errorf("received a field type %q we don't recognize", p.Type)
+	return nil
+}
+
+// convertTypeToKustoString Converts a valid kustoType val to a string
+func convertTypeToKustoString(kustoType types.Column, val interface{}) (string, error) {
+
+	if !isValid(kustoType, val) {
+		return "", fmt.Errorf("received a field type %q we don't recognize", kustoType)
+	}
+
+	switch kustoType {
+	case types.String:
+		return AddQuotedString(fmt.Sprintf("%v", val), false), nil
+	case types.DateTime:
+		date := val.(time.Time)
+		return fmt.Sprintf("datetime(%v)", date.Format(time.RFC3339Nano)), nil
+	case types.Int:
+		return fmt.Sprintf("int(%d)", val), nil
+	case types.Bool:
+		return fmt.Sprintf("bool(%t)", val), nil
+	case types.Dynamic:
+		b, err := json.Marshal(val)
+		if err != nil {
+			return "", fmt.Errorf("(dynamic) %T could not be marshalled into JSON, err: %s", val, err)
+		}
+		return fmt.Sprintf("dynamic(%s)", string(b)), nil
+	case types.GUID:
+		u, err := val.(uuid.UUID)
+		if !err {
+			return "", fmt.Errorf("%T which is not a uuid.UUID", val)
+		}
+		return fmt.Sprintf("guid(%s)", u.String()), nil
+	case types.Long:
+		return fmt.Sprintf("long(%d)", val), nil
+	case types.Real:
+		return fmt.Sprintf("real(%f)", val), nil
+	case types.Timespan:
+		d, err := val.(time.Duration)
+		if !err {
+			return "", fmt.Errorf("%T, which is not a time.Duration", val)
+		}
+		return fmt.Sprintf("timespan(%s)", value.Timespan{Value: d, Valid: true}.Marshal()), nil
+	case types.Decimal:
+		switch val.(type) {
+		case float32:
+			return fmt.Sprintf("decimal(%f)", val), nil
+		case float64:
+			return fmt.Sprintf("decimal(%f)", val), nil
+		default:
+			return "", fmt.Errorf("received a field type %q that we do not handle", kustoType)
+		}
+	}
+	return "", fmt.Errorf("received a field type %q we don't recognize", kustoType)
 }
 
 func (p ParamType) string() string {
-	switch p.Type {
-	case types.Bool:
-		if p.Default == nil {
-			return p.name + ":bool"
-		}
-		v := p.Default.(bool)
-		return fmt.Sprintf("%s:bool = %v", p.name, v)
-	case types.DateTime:
-		if p.Default == nil {
-			return p.name + ":datetime"
-		}
-		v := p.Default.(time.Time)
-		return fmt.Sprintf("%s:datetime = %s", p.name, v.Format(time.RFC3339Nano))
-	case types.Dynamic:
-		return p.name + ":dynamic"
-	case types.GUID:
-		if p.Default == nil {
-			return p.name + ":guid"
-		}
-		v := p.Default.(uuid.UUID)
-		return fmt.Sprintf("%s:guid = %s", p.name, v.String())
-	case types.Int:
-		if p.Default == nil {
-			return p.name + ":int"
-		}
-		v := p.Default.(int32)
-		return fmt.Sprintf("%s:int = %d", p.name, v)
-	case types.Long:
-		if p.Default == nil {
-			return p.name + ":long"
-		}
-		v := p.Default.(int64)
-		return fmt.Sprintf("%s:long = %d", p.name, v)
-	case types.Real:
-		if p.Default == nil {
-			return p.name + ":real"
-		}
-		v := p.Default.(float64)
-		return fmt.Sprintf("%s:real = %f", p.name, v)
-	case types.String:
-		if p.Default == nil {
-			return p.name + ":string"
-		}
-		v := p.Default.(string)
-		return fmt.Sprintf(`%s:string = "%s"`, p.name, v)
-	case types.Timespan:
-		if p.Default == nil {
-			return p.name + ":timespan"
-		}
-		v := p.Default.(time.Duration)
-		return fmt.Sprintf("%s:timespan = %s", p.name, value.Timespan{Value: v, Valid: true}.Marshal())
-	case types.Decimal:
-		if p.Default == nil {
-			return p.name + ":decimal"
-		}
-
-		var sval string
-		switch v := p.Default.(type) {
-		case string:
-			sval = v
-		case *big.Float:
-			sval = v.String()
-		}
-		return fmt.Sprintf("%s:decimal = %s", p.name, sval)
+	if p.Default == nil {
+		return fmt.Sprintf("%v:%v", p.name, p.Type)
 	}
-	panic("internal bug: ParamType.string() called without a call to .validate()")
+	kustoString, _ := convertTypeToKustoString(p.Type, p.Default)
+	return fmt.Sprintf("%v:%v=%v", p.name, p.Type, kustoString)
 }
 
 // Definitions represents definitions of parameters that are substituted for variables in
@@ -392,84 +369,10 @@ func (q Parameters) validate(p Definitions) (Parameters, error) {
 	out := make(map[string]string, len(q.m))
 
 	for k, v := range q.m {
-		paramType, ok := p.m[k]
-		if !ok {
-			return q, fmt.Errorf("Parameters contains key %q that is not defined in the Stmt's Parameters", k)
-		}
-		switch paramType.Type {
-		case types.Bool:
-			b, ok := v.(bool)
-			if !ok {
-				return q, fmt.Errorf("Parameters[%s](bool) = %T, which is not a bool", k, v)
-			}
-			if b {
-				out[k] = "bool(true)"
-				break
-			}
-			out[k] = "bool(false)"
-		case types.DateTime:
-			t, ok := v.(time.Time)
-			if !ok {
-				return q, fmt.Errorf("Parameters[%s](datetime) = %T, which is not a time.Time", k, v)
-			}
-			out[k] = fmt.Sprintf("datetime(%s)", t.Format(time.RFC3339Nano))
-		case types.Dynamic:
-			b, err := json.Marshal(v)
-			if err != nil {
-				return q, fmt.Errorf("Parameters[%s](dynamic), %T could not be marshalled into JSON, err: %s", k, v, err)
-			}
-			out[k] = fmt.Sprintf("dynamic(%s)", string(b))
-		case types.GUID:
-			u, ok := v.(uuid.UUID)
-			if !ok {
-				return q, fmt.Errorf("Parameters[%s](guid) = %T, which is not a uuid.UUID", k, v)
-			}
-			out[k] = fmt.Sprintf("guid(%s)", u.String())
-		case types.Int:
-			i, ok := v.(int32)
-			if !ok {
-				return q, fmt.Errorf("Parameters[%s](int) = %T, which is not an int32", k, v)
-			}
-			out[k] = fmt.Sprintf("int(%d)", i)
-		case types.Long:
-			i, ok := v.(int64)
-			if !ok {
-				return q, fmt.Errorf("Parameters[%s](long) = %T, which is not an int64", k, v)
-			}
-			out[k] = fmt.Sprintf("long(%d)", i)
-		case types.Real:
-			i, ok := v.(float64)
-			if !ok {
-				return q, fmt.Errorf("Parameters[%s](real) = %T, which is not a float64", k, v)
-			}
-			out[k] = fmt.Sprintf("real(%f)", i)
-		case types.String:
-			s, ok := v.(string)
-			if !ok {
-				return q, fmt.Errorf("Parameters[%s](string) = %T, which is not a string", k, v)
-			}
-			out[k] = fmt.Sprint(s)
-		case types.Timespan:
-			d, ok := v.(time.Duration)
-			if !ok {
-				return q, fmt.Errorf("parameters[%s](timespan) = %T, which is not a time.Duration", k, v)
-			}
-			out[k] = fmt.Sprintf("timespan(%s)", value.Timespan{Value: d, Valid: true}.Marshal())
-		case types.Decimal:
-			var sval string
-			switch v := v.(type) {
-			case string:
-				sval = v
-			case *big.Float:
-				sval = v.String()
-			case *big.Int:
-				sval = v.String()
-			default:
-				return q, fmt.Errorf("Parameters[%s](decimal) = %T, which is not a string or *big.Float", k, v)
-			}
-			out[k] = fmt.Sprintf("decimal(%s)", sval)
-		}
+		str, _ := convertTypeToKustoString(p.m[k].Type, v)
+		out[k] = str
 	}
+
 	q.outM = out
 	return q, nil
 }
@@ -612,7 +515,7 @@ func AddQuotedString(value string, hidden bool) string {
 			if !ShouldBeEscaped(c) {
 				literal.WriteString(string(c))
 			} else {
-				literal.WriteString(fmt.Sprintf("\\u%x", c))
+				literal.WriteString(fmt.Sprintf("\\u%04x", c))
 			}
 
 		}
@@ -632,43 +535,38 @@ func ShouldBeEscaped(c int32) bool {
 
 // AddInt will add an int as a string to the Stmt.  This allows dynamically building of a query from a root Stmt.
 func (s Stmt) AddInt(query int) Stmt {
-	s.queryStr = s.queryStr + fmt.Sprintf("%d", query)
-	return s
+	return s.addBase(types.Int, query)
 }
 
 // AddFloat32 will add a Float32 as a string to the Stmt.  This allows dynamically building of a query from a root Stmt.
 func (s Stmt) AddFloat32(query float32) Stmt {
-	s.queryStr = s.queryStr + fmt.Sprintf("%f", query)
-	return s
+	return s.addBase(types.Decimal, query)
 }
 
 // AddFloat64 will add a Float64 as a string to the Stmt.  This allows dynamically building of a query from a root Stmt.
 func (s Stmt) AddFloat64(query float64) Stmt {
-	s.queryStr = s.queryStr + fmt.Sprintf("%f", query)
-	return s
-}
-
-// AddComplex64 will add a Complex64 as a string to the Stmt.  This allows dynamically building of a query from a root Stmt.
-func (s Stmt) AddComplex64(query complex64) Stmt {
-	s.queryStr = s.queryStr + fmt.Sprintf("%v", query)
-	return s
-}
-
-// AddComplex128 will add a Complex128 as a string to the Stmt.  This allows dynamically building of a query from a root Stmt.
-func (s Stmt) AddComplex128(query complex128) Stmt {
-	s.queryStr = s.queryStr + fmt.Sprintf("%v", query)
-	return s
+	return s.addBase(types.Decimal, query)
 }
 
 // AddBool will add a bool as a string to the Stmt.  This allows dynamically building of a query from a root Stmt.
 func (s Stmt) AddBool(query bool) Stmt {
-	s.queryStr = s.queryStr + fmt.Sprintf("%t", query)
-	return s
+	return s.addBase(types.Bool, query)
 }
 
 // AddByte will add a byte as a string to the Stmt.  This allows dynamically building of a query from a root Stmt.
 func (s Stmt) AddByte(query byte) Stmt {
-	s.queryStr = s.queryStr + fmt.Sprintf("%d", query)
+	return s.addBase(types.Int, query)
+}
+
+// AddDate will add a date as a string to the Stmt.  This allows dynamically building of a query from a root Stmt.
+func (s Stmt) AddDate(query time.Time) Stmt {
+	return s.addBase(types.DateTime, query)
+}
+
+// addBase will add a query of some kustoType as a string to the Stmt.  This allows dynamically building of a query from a root Stmt.
+func (s Stmt) addBase(kustoType types.Column, query interface{}) Stmt {
+	kustoString, _ := convertTypeToKustoString(kustoType, query)
+	s.queryStr = s.queryStr + kustoString
 	return s
 }
 

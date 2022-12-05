@@ -631,6 +631,30 @@ func TestNormalizeName(t *testing.T) {
 			forceNormalization: false,
 			want:               NewStmt("[\"&\"]"),
 		},
+		{
+			desc:               "Success string with numbers",
+			query:              "test123",
+			forceNormalization: false,
+			want:               NewStmt("test123"),
+		},
+		{
+			desc:               "Success string that starts with a number",
+			query:              "123test",
+			forceNormalization: false,
+			want:               NewStmt("[\"123test\"]"),
+		},
+		{
+			desc:               "Success string that starts with an underscore",
+			query:              "_test",
+			forceNormalization: false,
+			want:               NewStmt("_test"),
+		},
+		{
+			desc:               "Success string that has an underscore",
+			query:              "test_123",
+			forceNormalization: false,
+			want:               NewStmt("test_123"),
+		},
 	}
 
 	for _, test := range tests {
@@ -729,7 +753,7 @@ func TestAddQuotedString(t *testing.T) {
 		{
 			desc:  "Success non latin escaping (should be escaped)",
 			value: "aאbcd",
-			want:  "\"a\\u5d0bcd\"",
+			want:  "\"a\\u05d0bcd\"",
 		},
 		{
 			desc:  "Success case \\'",
@@ -810,7 +834,7 @@ func TestAddInt(t *testing.T) {
 		{
 			desc:  "Success simple add",
 			query: 7,
-			want:  NewStmt("7"),
+			want:  NewStmt("int(7)"),
 		},
 	}
 
@@ -836,12 +860,12 @@ func TestAddFloat(t *testing.T) {
 		{
 			desc:  "Success simple add",
 			query: 7.7,
-			want:  NewStmt("7.700000"),
+			want:  NewStmt("decimal(7.700000)"),
 		},
 		{
 			desc:  "Success casting",
 			query: float64(7),
-			want:  NewStmt("7.000000"),
+			want:  NewStmt("decimal(7.000000)"),
 		},
 	}
 
@@ -851,32 +875,6 @@ func TestAddFloat(t *testing.T) {
 		t.Run(test.desc, func(t *testing.T) {
 			t.Parallel()
 			got := s.AddFloat64(test.query)
-
-			assert.EqualValues(t, test.want, got)
-		})
-
-	}
-}
-func TestAddComplex(t *testing.T) {
-	t.Parallel()
-	tests := []struct {
-		desc  string
-		query complex64
-		want  Stmt
-	}{
-		{
-			desc:  "Success simple add",
-			query: complex(10, 11),
-			want:  NewStmt("(10+11i)"),
-		},
-	}
-
-	for _, test := range tests {
-		test := test // capture
-		s := NewStmt("")
-		t.Run(test.desc, func(t *testing.T) {
-			t.Parallel()
-			got := s.AddComplex64(test.query)
 
 			assert.EqualValues(t, test.want, got)
 		})
@@ -893,12 +891,12 @@ func TestAddBool(t *testing.T) {
 		{
 			desc:  "Success simple true",
 			query: true,
-			want:  NewStmt("true"),
+			want:  NewStmt("bool(true)"),
 		},
 		{
 			desc:  "Success simple false",
 			query: false,
-			want:  NewStmt("false"),
+			want:  NewStmt("bool(false)"),
 		},
 	}
 
@@ -908,6 +906,34 @@ func TestAddBool(t *testing.T) {
 		t.Run(test.desc, func(t *testing.T) {
 			t.Parallel()
 			got := s.AddBool(test.query)
+
+			assert.EqualValues(t, test.want, got)
+		})
+
+	}
+}
+func TestAddDate(t *testing.T) {
+	t.Parallel()
+	now := time.Date(2009, time.November, 10, 23, 0, 0, 0, time.UTC)
+
+	tests := []struct {
+		desc  string
+		query time.Time
+		want  Stmt
+	}{
+		{
+			desc:  "Success simple add",
+			query: now,
+			want:  NewStmt("datetime(2009-11-10T23:00:00Z)"),
+		},
+	}
+
+	for _, test := range tests {
+		test := test // capture
+		s := NewStmt("")
+		t.Run(test.desc, func(t *testing.T) {
+			t.Parallel()
+			got := s.AddDate(test.query)
 
 			assert.EqualValues(t, test.want, got)
 		})
