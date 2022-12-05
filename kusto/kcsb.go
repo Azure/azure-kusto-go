@@ -380,14 +380,23 @@ func (kcsb *ConnectionStringBuilder) newTokenProvider() (*TokenProvider, error) 
 			tkp.customToken = kcsb.ApplicationToken
 		}
 	case kcsb.AzCli:
-		{
+		init = func(ci *CloudInfo, cliOpts *azcore.ClientOptions, appClientId string) (azcore.TokenCredential, error) {
+			authorityId := kcsb.AuthorityId
+
+			if isEmpty(authorityId) {
+				authorityId = ci.FirstPartyAuthorityURL
+			}
+
 			opts := &azidentity.AzureCLICredentialOptions{}
 			opts.TenantID = kcsb.AuthorityId
 			cred, err := azidentity.NewAzureCLICredential(opts)
+
 			if err != nil {
-				return nil, fmt.Errorf("error: Couldn't retrieve client credentials using Azure CLI: %s", err)
+				return nil, kustoErrors.E(kustoErrors.OpTokenProvider, kustoErrors.KOther,
+					fmt.Errorf("error: Couldn't retrieve client credentials using Azure CLI: %s", err))
 			}
-			tkp.tokenCred = cred
+
+			return cred, nil
 		}
 	case kcsb.DefaultAuth:
 		init = func(ci *CloudInfo, cliOpts *azcore.ClientOptions, appClientId string) (azcore.TokenCredential, error) {
