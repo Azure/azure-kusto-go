@@ -159,6 +159,7 @@ func (c *Conn) StreamIngest(ctx context.Context, db, table string, payload io.Re
 	}
 
 	resp, err := c.client.Do(req.WithContext(ctx))
+	defer resp.Body.Close()
 	if err != nil {
 		return errors.E(writeOp, errors.KHTTPError, err)
 	}

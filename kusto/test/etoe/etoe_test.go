@@ -4,6 +4,7 @@ import (
 	"context"
 	"encoding/csv"
 	"fmt"
+	"go.uber.org/goleak"
 	"io"
 	"math/rand"
 	"os"
@@ -1940,4 +1941,15 @@ func isASCII(s string) bool {
 		}
 	}
 	return true
+}
+
+func TestMain(m *testing.M) {
+	goleak.VerifyTestMain(m, goleak.Cleanup(func(exitCode int) {
+		if exitCode == 0 {
+			// Some of our dependencies (azure queues, auth) have a global http client, which is hardcoded to kill idle connections after x minutes,
+			// so we need to wait for that to happen before we exit.
+			time.Sleep(120 * time.Second)
+		}
+		os.Exit(exitCode)
+	}))
 }
