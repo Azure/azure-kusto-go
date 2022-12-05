@@ -184,6 +184,7 @@ func (c *conn) doRequest(ctx context.Context, execType int, db string, query Stm
 	}
 
 	if c.auth.TokenProvider != nil && c.auth.TokenProvider.AuthorizationRequired() {
+		c.auth.TokenProvider.SetHttp(c.client)
 		token, tokenType, tkerr := c.auth.TokenProvider.AcquireToken(ctx)
 		if tkerr != nil {
 			return 0, nil, nil, nil, errors.ES(op, errors.KInternal, "Error while getting token : %s", tkerr)
