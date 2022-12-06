@@ -177,7 +177,6 @@ func convertTypeToKustoString(kustoType types.Column, val interface{}) (string, 
 	return "", fmt.Errorf("received a field type %q we don't recognize", kustoType)
 }
 
-
 func (p ParamType) string() string {
 	if p.Default == nil {
 		return fmt.Sprintf("%v:%v", p.name, p.Type)
