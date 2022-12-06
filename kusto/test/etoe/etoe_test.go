@@ -303,6 +303,130 @@ func TestQueries(t *testing.T) {
 			want: &[]AllDataType{getExpectedResult()},
 		},
 		{
+			desc: "Query: All parameter types are working",
+			stmt: pTableStmt.Add(" | where  vnum == num and vdec == dec and vdate == dt and vspan == span and tostring(vobj) == tostring(obj) and vb == b and vreal" +
+				" == rl and vstr == str and vlong == lg and vguid == guid ").
+				MustDefinitions(kusto.NewDefinitions().Must(
+					kusto.ParamTypes{
+						"tableName": kusto.ParamType{Type: types.String},
+						"num":       kusto.ParamType{Type: types.Int},
+						"dec":       kusto.ParamType{Type: types.Decimal},
+						"dt":        kusto.ParamType{Type: types.DateTime},
+						"span":      kusto.ParamType{Type: types.Timespan},
+						"obj":       kusto.ParamType{Type: types.Dynamic},
+						"b":         kusto.ParamType{Type: types.Bool},
+						"rl":        kusto.ParamType{Type: types.Real},
+						"str":       kusto.ParamType{Type: types.String},
+						"lg":        kusto.ParamType{Type: types.Long},
+						"guid":      kusto.ParamType{Type: types.GUID},
+					})).
+				MustParameters(kusto.NewParameters().Must(kusto.
+					QueryValues{
+					"tableName": allDataTypesTable,
+					"num":       int32(1),
+					"dec":       "2.00000000000001",
+					"dt":        time.Date(2020, 03, 04, 14, 05, 01, 310996500, time.UTC),
+					"span":      time.Hour + 23*time.Minute + 45*time.Second + 678900000*time.Nanosecond,
+					"obj":       map[string]interface{}{"moshe": "value"},
+					"b":         true,
+					"rl":        0.01,
+					"str":       "asdf",
+					"lg":        int64(9223372036854775807),
+					"guid":      uuid.MustParse("74be27de-1e4e-49d9-b579-fe0b331d3642"),
+				})),
+			qcall:   client.Query,
+			options: []kusto.QueryOption{kusto.ResultsProgressiveDisable()},
+			doer: func(row *table.Row, update interface{}) error {
+				rec := AllDataType{}
+				if err := row.ToStruct(&rec); err != nil {
+					return err
+				}
+
+				valuesRec := AllDataType{}
+
+				err := row.ExtractValues(&valuesRec.Vnum,
+					&valuesRec.Vdec,
+					&valuesRec.Vdate,
+					&valuesRec.Vspan,
+					&valuesRec.Vobj,
+					&valuesRec.Vb,
+					&valuesRec.Vreal,
+					&valuesRec.Vstr,
+					&valuesRec.Vlong,
+					&valuesRec.Vguid,
+				)
+
+				if err != nil {
+					return err
+				}
+
+				assert.Equal(t, rec, valuesRec)
+
+				recs := update.(*[]AllDataType)
+				*recs = append(*recs, rec)
+				return nil
+			},
+			gotInit: func() interface{} {
+				ad := []AllDataType{}
+				return &ad
+			},
+			want: &[]AllDataType{getExpectedResult()},
+		},
+		{
+			desc: "Query: All parameter types are working with defaults",
+			stmt: pTableStmt.Add(" | where  vnum == num and vdec == dec and vdate == dt and vspan == span and vb == b and vreal == rl and vstr == str and vlong == lg and vguid == guid ").
+				MustDefinitions(kusto.NewDefinitions().Must(
+					kusto.ParamTypes{
+						"tableName": kusto.ParamType{Type: types.String, Default: allDataTypesTable},
+						"num":       kusto.ParamType{Type: types.Int, Default: int32(1)},
+						"dec":       kusto.ParamType{Type: types.Decimal, Default: "2.00000000000001"},
+						"dt":        kusto.ParamType{Type: types.DateTime, Default: time.Date(2020, 03, 04, 14, 05, 01, 310996500, time.UTC)},
+						"span":      kusto.ParamType{Type: types.Timespan, Default: time.Hour + 23*time.Minute + 45*time.Second + 678900000*time.Nanosecond},
+						"b":         kusto.ParamType{Type: types.Bool, Default: true},
+						"rl":        kusto.ParamType{Type: types.Real, Default: 0.01},
+						"str":       kusto.ParamType{Type: types.String, Default: "asdf"},
+						"lg":        kusto.ParamType{Type: types.Long, Default: int64(9223372036854775807)},
+						"guid":      kusto.ParamType{Type: types.GUID, Default: uuid.MustParse("74be27de-1e4e-49d9-b579-fe0b331d3642")},
+					})),
+			qcall:   client.Query,
+			options: []kusto.QueryOption{kusto.ResultsProgressiveDisable()},
+			doer: func(row *table.Row, update interface{}) error {
+				rec := AllDataType{}
+				if err := row.ToStruct(&rec); err != nil {
+					return err
+				}
+
+				valuesRec := AllDataType{}
+
+				err := row.ExtractValues(&valuesRec.Vnum,
+					&valuesRec.Vdec,
+					&valuesRec.Vdate,
+					&valuesRec.Vspan,
+					&valuesRec.Vobj,
+					&valuesRec.Vb,
+					&valuesRec.Vreal,
+					&valuesRec.Vstr,
+					&valuesRec.Vlong,
+					&valuesRec.Vguid,
+				)
+
+				if err != nil {
+					return err
+				}
+
+				assert.Equal(t, rec, valuesRec)
+
+				recs := update.(*[]AllDataType)
+				*recs = append(*recs, rec)
+				return nil
+			},
+			gotInit: func() interface{} {
+				ad := []AllDataType{}
+				return &ad
+			},
+			want: &[]AllDataType{getExpectedResult()},
+		},
+		{
 			desc:    "Query: make sure Dynamic data type variations can be parsed",
 			stmt:    kusto.NewStmt(`print PlainValue = dynamic('1'), PlainArray = dynamic('[1,2,3]'), PlainJson= dynamic('{ "a": 1}'), JsonArray= dynamic('[{ "a": 1}, { "a": 2}]')`),
 			qcall:   client.Query,
@@ -1611,6 +1735,7 @@ func createIngestionTableWithDBAndScheme(t *testing.T, client *kusto.Client, dat
 	t.Cleanup(func() {
 		t.Logf("Dropping ingestion table %s", tableName)
 		_ = executeCommands(client, database, dropUnsafe)
+		t.Logf("Dropped ingestion table %s", tableName)
 	})
 
 	return executeCommands(client, database, dropUnsafe, createUnsafe, addMappingUnsafe, clearStreamingCacheStatement)
