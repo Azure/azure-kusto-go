@@ -9,6 +9,7 @@ import (
 	"encoding/json"
 	"fmt"
 	"github.com/Azure/azure-kusto-go/kusto/data/value"
+	"math/big"
 	"sort"
 	"strings"
 	"sync"
@@ -65,43 +66,58 @@ type ParamType struct {
 }
 
 // isValid validates whether the value is of known kusto Types.
-func isValid(kustoType types.Column, value interface{}) bool {
+func isValid(kustoType types.Column, val interface{}) bool {
 	if !kustoType.Valid() {
 		return false
 	}
 
 	switch kustoType {
 	case types.Bool:
-		_, ok := value.(bool)
+		_, ok := val.(bool)
 		return ok
 	case types.DateTime:
-		_, ok := value.(time.Time)
+		_, ok := val.(time.Time)
 		return ok
 	case types.Dynamic:
 		return false
 	case types.GUID:
-		_, ok := value.(uuid.UUID)
+		_, ok := val.(uuid.UUID)
 		return ok
 	case types.Int:
-		_, ok := value.(int)
-		return ok
+		switch val.(type) {
+		case int32:
+			return true
+		case int:
+			return true
+		default:
+			return false
+		}
 	case types.Long:
-		_, ok := value.(int64)
+		_, ok := val.(int64)
 		return ok
 	case types.Real:
-		_, ok := value.(float64)
+		_, ok := val.(float64)
 		return ok
 	case types.String:
-		_, ok := value.(string)
+		_, ok := val.(string)
 		return ok
 	case types.Timespan:
-		_, ok := value.(time.Duration)
+		_, ok := val.(time.Duration)
 		return ok
 	case types.Decimal:
-		switch value.(type) {
+		switch val.(type) {
+		case string:
+			if value.DecRE.MatchString(val.(string)) {
+				return true
+			}
+			return false
 		case float32:
 			return true
 		case float64:
+			return true
+		case *big.Float:
+			return true
+		case *big.Int:
 			return true
 		default:
 			return false
@@ -166,10 +182,16 @@ func convertTypeToKustoString(kustoType types.Column, val interface{}) (string, 
 		return fmt.Sprintf("timespan(%s)", value.Timespan{Value: d, Valid: true}.Marshal()), nil
 	case types.Decimal:
 		switch val.(type) {
+		case string:
+			return fmt.Sprintf("decimal(%s)", val), nil
 		case float32:
 			return fmt.Sprintf("decimal(%f)", val), nil
 		case float64:
 			return fmt.Sprintf("decimal(%f)", val), nil
+		case *big.Float:
+			return fmt.Sprintf("decimal(%s)", val.(*big.Float).String()), nil
+		case *big.Int:
+			return fmt.Sprintf("decimal(%s)", val.(*big.Int).String()), nil
 		default:
 			return "", fmt.Errorf("received a field type %q that we do not handle", kustoType)
 		}
@@ -369,7 +391,10 @@ func (q Parameters) validate(p Definitions) (Parameters, error) {
 	out := make(map[string]string, len(q.m))
 
 	for k, v := range q.m {
-		str, _ := convertTypeToKustoString(p.m[k].Type, v)
+		str, err := convertTypeToKustoString(p.m[k].Type, v)
+		if err != nil {
+			return q, err
+		}
 		out[k] = str
 	}
 

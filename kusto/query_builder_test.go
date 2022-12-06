@@ -311,7 +311,7 @@ func TestDefinitions(t *testing.T) {
 				"HasLicense": ParamType{Type: types.Bool, Default: false},
 				"FirstName":  ParamType{Type: types.String},
 			},
-			wantStr: "declare query_parameters(FirstName:string, HasLicense:bool = bool(false));",
+			wantStr: "declare query_parameters(FirstName:string, HasLicense:bool=bool(false));",
 		},
 	}
 
@@ -446,7 +446,7 @@ func TestParameters(t *testing.T) {
 			desc:    "Success string",
 			qParams: NewDefinitions().Must(map[string]ParamType{"key1": {Type: types.String}}),
 			qValues: NewParameters().Must(map[string]interface{}{"key1": "string"}),
-			want:    map[string]string{"key1": "string"},
+			want:    map[string]string{"key1": "\"string\""},
 		},
 		{
 			desc:    "Success time.Duration",
