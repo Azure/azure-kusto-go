@@ -7,6 +7,11 @@ This is a data plane SDK (it is for interacting with Azure Data Explorer service
 
 ## What's New
 
+### Version 0.9.2
+* Fixed default values for parameters not parsing correctly
+* Fixed goroutine leak when streaming ingestion fails
+* Fixed leaks in tests
+
 ### Version 0.9.1
 * Setting a mapping now implies the ingestion format
 * Fixed possible context race
