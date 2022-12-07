@@ -4,6 +4,7 @@ import (
 	"context"
 	"fmt"
 	"github.com/Azure/azure-kusto-go/kusto/utils"
+	"net/http"
 	"strings"
 
 	"github.com/Azure/azure-sdk-for-go/sdk/azcore"
@@ -16,6 +17,7 @@ type TokenProvider struct {
 	customToken string                                  //Holds the custom auth token to be used for authorization
 	initOnce    utils.OnceWithInit[*tokenWrapperResult] //To ensure tokenprovider will be initialized only once while aquiring token
 	scopes      []string                                //Contains scopes of the auth token
+	http        *http.Client                            //Contains the http client to be used for token provider
 }
 
 // tokenProvider need to be received as reference, to reflect updations to the structs
@@ -53,7 +55,7 @@ type tokenWrapperResult struct {
 
 func (tkp *TokenProvider) setInit(kcsb *ConnectionStringBuilder, f func(*CloudInfo, *azcore.ClientOptions, string) (azcore.TokenCredential, error)) {
 	tkp.initOnce = utils.NewOnceWithInit(func() (*tokenWrapperResult, error) {
-		wrapper, err := tokenWrapper(kcsb, f)
+		wrapper, err := tokenWrapper(kcsb, func() *http.Client { return tkp.http }, f)
 		if err != nil {
 			return nil, err
 		}
@@ -65,9 +67,13 @@ func (tkp *TokenProvider) setInit(kcsb *ConnectionStringBuilder, f func(*CloudIn
 	})
 }
 
-func tokenWrapper(kcsb *ConnectionStringBuilder, f func(*CloudInfo, *azcore.ClientOptions, string) (azcore.TokenCredential, error)) (*tokenWrapperResult,
+func (tkp *TokenProvider) SetHttp(http *http.Client) {
+	tkp.http = http
+}
+
+func tokenWrapper(kcsb *ConnectionStringBuilder, http func() *http.Client, f func(*CloudInfo, *azcore.ClientOptions, string) (azcore.TokenCredential, error)) (*tokenWrapperResult,
 	error) {
-	ci, cliOpts, appClientId, err := getCommonCloudInfo(kcsb)
+	ci, cliOpts, appClientId, err := getCommonCloudInfo(kcsb, http)
 	if err != nil {
 		return nil, err
 	}
@@ -89,15 +95,22 @@ func tokenWrapper(kcsb *ConnectionStringBuilder, f func(*CloudInfo, *azcore.Clie
 	}, nil
 }
 
-func getCommonCloudInfo(kcsb *ConnectionStringBuilder) (*CloudInfo, *azcore.ClientOptions, string, error) {
-	cloud, err := GetMetadata(kcsb.DataSource)
+func getCommonCloudInfo(kcsb *ConnectionStringBuilder, http func() *http.Client) (*CloudInfo, *azcore.ClientOptions, string, error) {
+	client := http()
+	if http == nil {
+		return nil, nil, "", fmt.Errorf("error: No http client provided")
+	}
+
+	cloud, err := GetMetadata(kcsb.DataSource, client)
 	if err != nil {
 		return nil, nil, "", err
 	}
 	cliOpts := kcsb.ClientOptions
 	appClientId := kcsb.ApplicationClientId
 	if cliOpts == nil {
-		cliOpts = &azcore.ClientOptions{}
+		cliOpts = &azcore.ClientOptions{
+			Transport: client,
+		}
 	}
 	if isEmpty(cliOpts.Cloud.ActiveDirectoryAuthorityHost) {
 		cliOpts.Cloud.ActiveDirectoryAuthorityHost = cloud.LoginEndpoint
