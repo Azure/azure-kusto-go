@@ -95,6 +95,7 @@ func (c *conn) queryToJson(ctx context.Context, db string, query Stmt, options *
 		return "", e
 	}
 
+	defer body.Close()
 	all, e := io.ReadAll(body)
 	return string(all), e
 }
@@ -111,7 +112,7 @@ type execResp struct {
 }
 
 func (c *conn) execute(ctx context.Context, execType int, db string, query Stmt, properties requestProperties) (execResp, error) {
-	op, header, resp, body, e := c.doRequest(ctx, execType, db, query, properties)
+	op, reqHeader, respHeader, body, e := c.doRequest(ctx, execType, db, query, properties)
 	if e != nil {
 		return execResp{}, e
 	}
@@ -128,10 +129,11 @@ func (c *conn) execute(ctx context.Context, execType int, db string, query Stmt,
 
 	frameCh := dec.Decode(ctx, body, op)
 
-	return execResp{reqHeader: header, respHeader: resp.Header, frameCh: frameCh}, nil
+	return execResp{reqHeader: reqHeader, respHeader: respHeader, frameCh: frameCh}, nil
 }
 
-func (c *conn) doRequest(ctx context.Context, execType int, db string, query Stmt, properties requestProperties) (errors.Op, http.Header, *http.Response, io.ReadCloser, error) {
+func (c *conn) doRequest(ctx context.Context, execType int, db string, query Stmt, properties requestProperties) (errors.Op, http.Header, http.Header,
+	io.ReadCloser, error) {
 	var op errors.Op
 	if execType == execQuery {
 		op = errors.OpQuery
@@ -182,6 +184,7 @@ func (c *conn) doRequest(ctx context.Context, execType int, db string, query Stm
 	}
 
 	if c.auth.TokenProvider != nil && c.auth.TokenProvider.AuthorizationRequired() {
+		c.auth.TokenProvider.SetHttp(c.client)
 		token, tokenType, tkerr := c.auth.TokenProvider.AcquireToken(ctx)
 		if tkerr != nil {
 			return 0, nil, nil, nil, errors.ES(op, errors.KInternal, "Error while getting token : %s", tkerr)
@@ -212,11 +215,10 @@ func (c *conn) doRequest(ctx context.Context, execType int, db string, query Stm
 	if resp.StatusCode != http.StatusOK {
 		return 0, nil, nil, nil, errors.HTTP(op, resp.Status, resp.StatusCode, body, fmt.Sprintf("error from Kusto endpoint for query %q: ", query.String()))
 	}
-	return op, header, resp, body, nil
+	return op, header, resp.Header, body, nil
 }
 
 func (c *conn) Close() error {
-
 	c.client.CloseIdleConnections()
 	return nil
 }
