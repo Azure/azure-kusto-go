@@ -4,6 +4,7 @@ import (
 	"context"
 	"encoding/csv"
 	"fmt"
+	"go.uber.org/goleak"
 	"io"
 	"math/rand"
 	"os"
@@ -1940,4 +1941,8 @@ func isASCII(s string) bool {
 		}
 	}
 	return true
+}
+
+func TestMain(m *testing.M) {
+	goleak.VerifyTestMain(m)
 }
