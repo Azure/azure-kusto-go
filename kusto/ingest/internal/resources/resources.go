@@ -136,25 +136,21 @@ type token struct {
 
 // Manager manages Kusto resources.
 type Manager struct {
-	client                    mgmter
-	done                      chan struct{}
-	resources                 atomic.Value // Stores Ingestion
-	lastFetchTime             atomic.Value // Stores time.Time
-	kustoToken                token
-	kustoTokenCacheExpiration time.Time
-	authLock                  sync.Mutex
-	fetchLock                 sync.Mutex
+	client                   mgmter
+	done                     chan struct{}
+	resources                atomic.Value // Stores Ingestion
+	lastFetchTime            atomic.Value // Stores time.Time
+	kustoToken               token
+	authTokenCacheExpiration time.Time
+	authLock                 sync.Mutex
+	fetchLock                sync.Mutex
 }
 
 // New is the constructor for Manager.
 func New(client mgmter) (*Manager, error) {
 	m := &Manager{client: client, done: make(chan struct{})}
-	if err := m.fetch(context.Background()); err != nil {
-		return nil, err
-	}
 
-	m.kustoTokenCacheExpiration = time.Now().UTC()
-	m.lastFetchTime.Store(time.Now().UTC())
+	m.authTokenCacheExpiration = time.Now().UTC()
 	go m.renewResources()
 
 	m.authLock = sync.Mutex{}
@@ -180,7 +176,8 @@ func (m *Manager) renewResources() {
 	tickDuration := 30 * time.Second
 
 	tick := time.NewTicker(tickDuration)
-	count := 0 * time.Second
+	count := fetchInterval // Start with a fetch immediately.
+
 	for {
 		select {
 		case <-tick.C:
@@ -201,7 +198,7 @@ func (m *Manager) renewResources() {
 func (m *Manager) AuthContext(ctx context.Context) (string, error) {
 	m.authLock.Lock()
 	defer m.authLock.Unlock()
-	if m.kustoTokenCacheExpiration.After(time.Now().UTC()) {
+	if m.authTokenCacheExpiration.After(time.Now().UTC()) {
 		return m.kustoToken.AuthContext, nil
 	}
 
@@ -245,7 +242,7 @@ func (m *Manager) AuthContext(ctx context.Context) (string, error) {
 	}
 
 	m.kustoToken = token
-	m.kustoTokenCacheExpiration = time.Now().UTC().Add(time.Hour)
+	m.authTokenCacheExpiration = time.Now().UTC().Add(time.Hour)
 	return token.AuthContext, nil
 }
 
@@ -344,9 +341,6 @@ func (m *Manager) fetch(ctx context.Context) error {
 func (m *Manager) fetchRetry(ctx context.Context) error {
 	attempts := 0
 	for {
-		if attempts > retryCount {
-			return fmt.Errorf("failed to fetch ingestion resources")
-		}
 
 		select {
 		case <-m.done:
@@ -360,6 +354,9 @@ func (m *Manager) fetchRetry(ctx context.Context) error {
 		if err != nil {
 			attempts++
 			time.Sleep(10 * time.Second)
+			if attempts > retryCount {
+				return fmt.Errorf("failed to fetch ingestion resources")
+			}
 			continue
 		}
 		return nil
