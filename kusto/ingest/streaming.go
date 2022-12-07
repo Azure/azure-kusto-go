@@ -18,10 +18,6 @@ type streamIngestor interface {
 	StreamIngest(ctx context.Context, db, table string, payload io.Reader, format properties.DataFormat, mappingName string, clientRequestId string) error
 }
 
-type headerPoolPopulator interface {
-	PopulateHeaderPool(count int)
-}
-
 // Streaming provides data ingestion from external sources into Kusto.
 type Streaming struct {
 	db         string
@@ -113,12 +109,6 @@ func (i *Streaming) FromReader(ctx context.Context, reader io.Reader, options ..
 	}
 
 	return streamImpl(i.streamConn, ctx, reader, props)
-}
-
-func (i *Streaming) PopulateHeaderPool() {
-	if h, ok := i.streamConn.(headerPoolPopulator); ok {
-		h.PopulateHeaderPool(10)
-	}
 }
 
 func streamImpl(c streamIngestor, ctx context.Context, payload io.Reader, props properties.All) (*Result, error) {

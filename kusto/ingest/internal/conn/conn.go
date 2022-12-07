@@ -32,12 +32,11 @@ var BuffPool = sync.Pool{
 
 // Conn provides connectivity to the Kusto streaming ingestion service.
 type Conn struct {
-	auth        kusto.Authorization
-	baseURL     *url.URL
-	reqHeaders  http.Header
-	headersPool sync.Pool
-	client      *http.Client
-	done        chan struct{}
+	auth       kusto.Authorization
+	baseURL    *url.URL
+	reqHeaders http.Header
+	client     *http.Client
+	done       chan struct{}
 
 	inTest bool
 }
@@ -76,25 +75,14 @@ func newWithoutValidation(endpoint string, auth kusto.Authorization, client *htt
 		auth:       auth,
 		baseURL:    &url.URL{Scheme: u.Scheme, Host: u.Host, Path: "/v1/rest/ingest/"},
 		reqHeaders: headers,
-		headersPool: sync.Pool{New: func() interface{} {
-			return copyHeaders(headers)
-		}},
-		client: client,
-		done:   make(chan struct{}),
+		client:     client,
+		done:       make(chan struct{}),
 	}
 
 	return c, nil
 }
 
 var writeOp = errors.OpIngestStream
-
-func (c *Conn) PopulateHeaderPool(count int) {
-	// Fills a pool with headers to alleviate header copying timing at request time.
-	// These are automatically renewed by spun off goroutines when a header is pulled.
-	for i := 0; i < count; i++ {
-		c.headersPool.Put(copyHeaders(c.reqHeaders))
-	}
-}
 
 // StreamIngest ingests into database "db", table "table" what is stored in "payload" which should be encoded in "format" and
 // have a server side data mapping reference named "mappingName".  "mappingName" can be nil.
@@ -111,10 +99,7 @@ func (c *Conn) StreamIngest(ctx context.Context, db, table string, payload io.Re
 		format = properties.CSV
 	}
 
-	headers := c.headersPool.Get().(http.Header)
-	go func() {
-		c.headersPool.Put(copyHeaders(c.reqHeaders))
-	}()
+	headers := copyHeaders(c.reqHeaders)
 
 	if clientRequestId != "" {
 		headers.Add("x-ms-client-request-id", clientRequestId)
