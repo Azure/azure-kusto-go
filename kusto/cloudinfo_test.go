@@ -134,7 +134,7 @@ func TestGetMetadata(t *testing.T) {
 		t.Run(test.name, func(t *testing.T) {
 			s.code = test.code
 			s.payload = []byte(test.payload)
-			res, err := GetMetadata(s.urlStr() + "/" + test.name) // Adding test name to the path make sure multiple URL's can be cached
+			res, err := GetMetadata(s.urlStr()+"/"+test.name, &http.Client{}) // Adding test name to the path make sure multiple URL's can be cached
 			if test.err {
 				assert.NotNil(t, err)
 				assert.Equal(t, test.errwant, err.Error())

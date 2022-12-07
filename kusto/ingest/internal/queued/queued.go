@@ -5,8 +5,11 @@ package queued
 import (
 	"context"
 	"fmt"
+	"github.com/Azure/azure-pipeline-go/pipeline"
+	"github.com/Azure/azure-sdk-for-go/sdk/azcore"
 	"io"
 	"math/rand"
+	"net/http"
 	"net/url"
 	"os"
 	"path"
@@ -53,6 +56,7 @@ type uploadBlob func(context.Context, *os.File, *azblob.Client, string, string, 
 // Ingestion provides methods for taking data from a filesystem of some type and ingesting it into Kusto.
 // This object is scoped for a single database and table.
 type Ingestion struct {
+	http  *http.Client
 	db    string
 	table string
 	mgr   *resources.Manager
@@ -76,11 +80,12 @@ func WithStaticBuffer(bufferSize int, maxBuffers int) Option {
 }
 
 // New is the constructor for Ingestion.
-func New(db, table string, mgr *resources.Manager, options ...Option) (*Ingestion, error) {
+func New(db, table string, mgr *resources.Manager, http *http.Client, options ...Option) (*Ingestion, error) {
 	i := &Ingestion{
 		db:    db,
 		table: table,
 		mgr:   mgr,
+		http:  http,
 		uploadStream: func(ctx context.Context, reader io.Reader, client *azblob.Client, container, blob string,
 			options *azblob.UploadStreamOptions) (azblob.UploadStreamResponse, error) {
 			return client.UploadStream(ctx, container, blob, reader, options)
@@ -270,7 +275,12 @@ func (i *Ingestion) upstreamContainer() (*azblob.Client, string, error) {
 	storageURI := mgrResources.Containers[rand.Intn(len(mgrResources.Containers))]
 	serviceURL := fmt.Sprintf("https://%s.blob.core.windows.net?%s", storageURI.Account(), storageURI.SAS().Encode())
 
-	client, err := azblob.NewClientWithNoCredential(serviceURL, nil)
+	client, err := azblob.NewClientWithNoCredential(serviceURL, &azblob.ClientOptions{
+		ClientOptions: azcore.ClientOptions{
+			Transport: i.http,
+		},
+	})
+
 	if err != nil {
 		return nil, "", errors.E(errors.OpFileIngest, errors.KBlobstore, err)
 	}
@@ -295,10 +305,24 @@ func (i *Ingestion) upstreamQueue() (azqueue.MessagesURL, error) {
 	queue := mgrResources.Queues[rand.Intn(len(mgrResources.Queues))]
 	service, _ := url.Parse(fmt.Sprintf("https://%s.queue.core.windows.net?%s", queue.Account(), queue.SAS().Encode()))
 
-	creds := azqueue.NewAnonymousCredential()
-	p := azqueue.NewPipeline(creds, azqueue.PipelineOptions{})
+	p := createPipeline(i.http)
 
 	return azqueue.NewServiceURL(*service, p).NewQueueURL(queue.ObjectName()).NewMessagesURL(), nil
+}
+
+func createPipeline(http *http.Client) pipeline.Pipeline {
+	// This is a lot of boilerplate, but all it does is setting the http client to be our own.
+	return pipeline.NewPipeline([]pipeline.Factory{pipeline.MethodFactoryMarker()}, pipeline.Options{
+		HTTPSender: pipeline.FactoryFunc(func(next pipeline.Policy, po *pipeline.PolicyOptions) pipeline.PolicyFunc {
+			return func(ctx context.Context, request pipeline.Request) (pipeline.Response, error) {
+				r, err := http.Do(request.WithContext(ctx))
+				if err != nil {
+					err = pipeline.NewError(err, "HTTP request failed")
+				}
+				return pipeline.NewHTTPResponse(r), err
+			}
+		}),
+	})
 }
 
 var nower = time.Now

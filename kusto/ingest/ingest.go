@@ -67,7 +67,7 @@ func New(client QueryClient, db, table string, options ...Option) (*Ingestion, e
 		option(i)
 	}
 
-	fs, err := queued.New(db, table, mgr, queued.WithStaticBuffer(i.bufferSize, i.maxBuffers))
+	fs, err := queued.New(db, table, mgr, client.HttpClient(), queued.WithStaticBuffer(i.bufferSize, i.maxBuffers))
 	if err != nil {
 		return nil, err
 	}

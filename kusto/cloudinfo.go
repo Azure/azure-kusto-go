@@ -3,15 +3,13 @@ package kusto
 import (
 	"encoding/json"
 	"fmt"
+	kustoErrors "github.com/Azure/azure-kusto-go/kusto/data/errors"
+	"github.com/Azure/azure-kusto-go/kusto/utils"
 	"io"
 	"net/http"
 	"net/url"
 	"os"
 	"sync"
-	"time"
-
-	kustoErrors "github.com/Azure/azure-kusto-go/kusto/data/errors"
-	"github.com/Azure/azure-kusto-go/kusto/utils"
 )
 
 // abstraction to query metadata and use this information for providing all
@@ -53,7 +51,7 @@ var defaultCloudInfo = CloudInfo{
 // cache to query it once per instance
 var cloudInfoCache sync.Map
 
-func GetMetadata(kustoUri string) (CloudInfo, error) {
+func GetMetadata(kustoUri string, httpClient *http.Client) (CloudInfo, error) {
 	// retrieve &return if exists
 	once, ok := cloudInfoCache.Load(kustoUri)
 	if !ok {
@@ -69,14 +67,12 @@ func GetMetadata(kustoUri string) (CloudInfo, error) {
 
 		u.Path = metadataPath
 		// TODO should we make this timeout configurable.
-		metadataClient := http.Client{Timeout: time.Duration(5) * time.Second}
-		defer metadataClient.CloseIdleConnections() // close this client once we get the metadata
 		req, err := http.NewRequest("GET", u.String(), nil)
 
 		if err != nil {
 			return CloudInfo{}, kustoErrors.E(kustoErrors.OpCloudInfo, kustoErrors.KHTTPError, err)
 		}
-		resp, err := metadataClient.Do(req)
+		resp, err := httpClient.Do(req)
 
 		if err != nil {
 			return CloudInfo{}, err
