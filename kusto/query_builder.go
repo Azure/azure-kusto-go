@@ -79,7 +79,7 @@ func isValid(kustoType types.Column, val interface{}) bool {
 		_, ok := val.(time.Time)
 		return ok
 	case types.Dynamic:
-		return false
+		return true
 	case types.GUID:
 		_, ok := val.(uuid.UUID)
 		return ok
@@ -96,8 +96,12 @@ func isValid(kustoType types.Column, val interface{}) bool {
 		_, ok := val.(int64)
 		return ok
 	case types.Real:
-		_, ok := val.(float64)
-		return ok
+		switch val.(type) {
+		case float32:
+			return true
+		case float64:
+			return true
+		}
 	case types.String:
 		_, ok := val.(string)
 		return ok
