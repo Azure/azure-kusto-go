@@ -7,6 +7,29 @@ This is a data plane SDK (it is for interacting with Azure Data Explorer service
 
 ## What's New
 
+### Version 0.10.0
+* [BREAKING] - The minimal go version is now 1.19
+* [BREAKING] - Moving to a connection-string based approach to creating and authenticating clients.  
+    This change aligns the go SDK with the others, and gives the option to re-use connection strings between SDKs.   
+    This also marks a move from the old go-autorest based authentication to the new Azure Identity based authentication.  
+    To initialize a client:
+```go
+    // OLD WAY - REMOVED
+    authConfig := auth.NewClientCredentialsConfig("clientID", "clientSecret", "tenantID")
+    client, err := kusto.New("endpoint", kusto.Authorization{Config: authConfig})
+    
+    // NEW WAY
+    kcsb := kusto.NewConnectionStringBuilder(`endpoint`).WithAadAppKey("clientID", "clientSecret", "tenentID")
+    client, err := kusto.New(kcsb)
+```
+* [BREAKING] - Upgraded the azblob library to 0.5.1. This solves compatibility issues with other libraries, but might cause errors to those who still depend on the old version.
+* Added automatic metadata fetching from clusters. This should be invisible to use, but add support to more kinds of clouds.
+* All of our operations now share the same HTTP client inside the kusto client object.  
+    Now using the option `WithHttpClient` will use the passed http client for all of the SDKs request, granting support for configuring proxies and other HTTP related settings.
+* Fixed various goroutine leaks. Now there are automatic tests to make sure we are not leaking resources.
+* Fetching ingestion resources is now done more consistently, without blocking the user.
+* Removed the header caching mechanism from streaming ingestion, as it was using a lot of memory for no major benefit.
+
 ### Version 0.9.1
 * Setting a mapping now implies the ingestion format
 * Fixed possible context race
