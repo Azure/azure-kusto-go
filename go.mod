@@ -6,7 +6,7 @@ require (
 	github.com/Azure/azure-sdk-for-go v61.2.0+incompatible
 	github.com/Azure/azure-sdk-for-go/sdk/azcore v1.1.4
 	github.com/Azure/azure-sdk-for-go/sdk/azidentity v1.1.0
-	github.com/Azure/azure-sdk-for-go/sdk/storage/azblob v0.5.1
+	github.com/Azure/azure-sdk-for-go/sdk/storage/azblob v0.5.2-0.20221208004834-94de68cd45de
 	github.com/Azure/azure-storage-queue-go v0.0.0-20191125232315-636801874cdd
 	github.com/cenkalti/backoff/v4 v4.1.2
 	github.com/gofrs/uuid v4.2.0+incompatible

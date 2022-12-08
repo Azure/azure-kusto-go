@@ -183,7 +183,7 @@ func (i *Ingestion) Reader(ctx context.Context, reader io.Reader, props properti
 		to,
 		toContainer,
 		blobName,
-		&azblob.UploadStreamOptions{BlockSize: i.bufferSize, Concurrency: i.maxBuffers},
+		&azblob.UploadStreamOptions{BlockSize: int64(i.bufferSize), Concurrency: i.maxBuffers},
 	)
 
 	if err != nil {
@@ -364,7 +364,7 @@ func (i *Ingestion) localToBlob(ctx context.Context, from string, client *azblob
 			client,
 			container,
 			blobName,
-			&azblob.UploadStreamOptions{BlockSize: i.bufferSize, Concurrency: i.maxBuffers},
+			&azblob.UploadStreamOptions{BlockSize: int64(i.bufferSize), Concurrency: i.maxBuffers},
 		)
 
 		if err != nil {
