@@ -23,7 +23,7 @@ This is a data plane SDK (it is for interacting with Azure Data Explorer service
     client, err := kusto.New(kcsb)
 ```
 * [BREAKING] - Upgraded the azblob library to 0.5.1. This solves compatibility issues with other libraries, but might cause errors to those who still depend on the old version.
-* Added automatic metadata fetching from clusters. This should be invisible to use, but add support to more kinds of clouds.
+* Implicit cloud detection.
 * All of our operations now share the same HTTP client inside the kusto client object.  
     Using the option `WithHttpClient` will use the passed http client for all of the SDKs request, granting support for configuring proxies and other HTTP related settings.
 
