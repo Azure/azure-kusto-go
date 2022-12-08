@@ -11,7 +11,8 @@ This is a data plane SDK (it is for interacting with Azure Data Explorer service
 * [BREAKING] - The minimal go version is now 1.19
 * [BREAKING] - Moving to a connection-string based approach to creating and authenticating clients.  
     This change aligns the go SDK with the others, and gives the option to re-use connection strings between SDKs.   
-    This also marks a move from the old go-autorest based authentication to the new Azure Identity based authentication.  
+    As part of this change use of go-autorest based authentication is deprecated in favor of Azure Identity.  
+
     To initialize a client:
 ```go
     // OLD WAY - REMOVED
