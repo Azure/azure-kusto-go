@@ -149,12 +149,11 @@ type Manager struct {
 // New is the constructor for Manager.
 func New(client mgmter) (*Manager, error) {
 	m := &Manager{client: client, done: make(chan struct{})}
+	m.authLock = sync.Mutex{}
+	m.fetchLock = sync.Mutex{}
 
 	m.authTokenCacheExpiration = time.Now().UTC()
 	go m.renewResources()
-
-	m.authLock = sync.Mutex{}
-	m.fetchLock = sync.Mutex{}
 
 	return m, nil
 }
@@ -353,10 +352,10 @@ func (m *Manager) fetchRetry(ctx context.Context) error {
 		cancel()
 		if err != nil {
 			attempts++
-			time.Sleep(10 * time.Second)
 			if attempts > retryCount {
 				return fmt.Errorf("failed to fetch ingestion resources")
 			}
+			time.Sleep(10 * time.Second)
 			continue
 		}
 		return nil
