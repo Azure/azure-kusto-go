@@ -22,6 +22,7 @@ const (
 	defaultInitialInterval = 1 * time.Second
 	defaultMultiplier      = 2
 	retryCount             = 4
+	fetchInterval          = 1 * time.Hour
 )
 
 // mgmter is a private interface that allows us to write hermetic tests against the kusto.Client.Mgmt() method.
@@ -135,27 +136,24 @@ type token struct {
 
 // Manager manages Kusto resources.
 type Manager struct {
-	client                    mgmter
-	done                      chan struct{}
-	resources                 atomic.Value // Stores Ingestion
-	kustoToken                token
-	kustoTokenCacheExpiration time.Time
-	authLock                  sync.Mutex
-	fetchLock                 sync.Mutex
+	client                   mgmter
+	done                     chan struct{}
+	resources                atomic.Value // Stores Ingestion
+	lastFetchTime            atomic.Value // Stores time.Time
+	kustoToken               token
+	authTokenCacheExpiration time.Time
+	authLock                 sync.Mutex
+	fetchLock                sync.Mutex
 }
 
 // New is the constructor for Manager.
 func New(client mgmter) (*Manager, error) {
 	m := &Manager{client: client, done: make(chan struct{})}
-	if err := m.fetch(context.Background()); err != nil {
-		return nil, err
-	}
-
-	m.kustoTokenCacheExpiration = time.Now().UTC()
-	go m.renewResources()
-
 	m.authLock = sync.Mutex{}
 	m.fetchLock = sync.Mutex{}
+
+	m.authTokenCacheExpiration = time.Now().UTC()
+	go m.renewResources()
 
 	return m, nil
 }
@@ -175,14 +173,15 @@ func (m *Manager) Close() {
 
 func (m *Manager) renewResources() {
 	tickDuration := 30 * time.Second
-	tickTotal := 1 * time.Hour
+
 	tick := time.NewTicker(tickDuration)
-	count := 0 * time.Second
+	count := fetchInterval // Start with a fetch immediately.
+
 	for {
 		select {
 		case <-tick.C:
 			count += tickDuration
-			if count >= tickTotal {
+			if count >= fetchInterval {
 				count = 0 * time.Second
 				m.fetchRetry(context.Background())
 			}
@@ -198,7 +197,7 @@ func (m *Manager) renewResources() {
 func (m *Manager) AuthContext(ctx context.Context) (string, error) {
 	m.authLock.Lock()
 	defer m.authLock.Unlock()
-	if m.kustoTokenCacheExpiration.After(time.Now().UTC()) {
+	if m.authTokenCacheExpiration.After(time.Now().UTC()) {
 		return m.kustoToken.AuthContext, nil
 	}
 
@@ -242,7 +241,7 @@ func (m *Manager) AuthContext(ctx context.Context) (string, error) {
 	}
 
 	m.kustoToken = token
-	m.kustoTokenCacheExpiration = time.Now().UTC().Add(time.Hour)
+	m.authTokenCacheExpiration = time.Now().UTC().Add(time.Hour)
 	return token.AuthContext, nil
 }
 
@@ -333,15 +332,18 @@ func (m *Manager) fetch(ctx context.Context) error {
 
 	m.resources.Store(ingest)
 
+	m.lastFetchTime.Store(time.Now().UTC())
+
 	return nil
 }
 
-func (m *Manager) fetchRetry(ctx context.Context) {
+func (m *Manager) fetchRetry(ctx context.Context) error {
 	attempts := 0
 	for {
+
 		select {
 		case <-m.done:
-			return
+			return nil
 		default:
 		}
 
@@ -350,17 +352,27 @@ func (m *Manager) fetchRetry(ctx context.Context) {
 		cancel()
 		if err != nil {
 			attempts++
-			//log.Printf("problem fetching the resources from Kusto Mgmt(attempt %d): %s", attempts, err)
+			if attempts > retryCount {
+				return fmt.Errorf("failed to fetch ingestion resources")
+			}
 			time.Sleep(10 * time.Second)
 			continue
 		}
-		return
+		return nil
 	}
 }
 
 // Resources returns information about the ingestion resources. This will used cached information instead
 // of fetching from source.
 func (m *Manager) Resources() (Ingestion, error) {
+	lastFetchTime, ok := m.lastFetchTime.Load().(time.Time)
+	if !ok || lastFetchTime.Add(2*fetchInterval).Before(time.Now().UTC()) {
+		err := m.fetchRetry(context.Background())
+		if err != nil {
+			return Ingestion{}, err
+		}
+	}
+
 	i, ok := m.resources.Load().(Ingestion)
 	if !ok {
 		return Ingestion{}, fmt.Errorf("manager has not retrieved an Ingestion object yet")
