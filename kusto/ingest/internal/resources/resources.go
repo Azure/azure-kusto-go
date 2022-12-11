@@ -45,8 +45,8 @@ type URI struct {
 
 // parse parses a string representing a Kutso resource URI.
 func parse(uri string) (*URI, error) {
-	// Regex representing URI that is expected:
-	// https://(\w+).(queue|blob|table).[\w.]+/([\w,-]+)\?(.*)
+	// Example for a valid url:
+	// https://fkjsalfdks.blob.core.windows.com/sdsadsadsa?sas=asdasdasd
 
 	u, err := url.Parse(uri)
 	if err != nil {
