@@ -58,8 +58,8 @@ func parse(uri string) (*URI, error) {
 	}
 
 	hostSplit := strings.Split(u.Hostname(), ".")
-	if len(hostSplit) != 5 {
-		return nil, fmt.Errorf("Storage URI (%s) is invalid'", uri)
+	if len(hostSplit) < 5 {
+		return nil, fmt.Errorf("error: Storage URI (%s) is invalid'", uri)
 	}
 
 	v := &URI{
