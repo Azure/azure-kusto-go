@@ -46,7 +46,7 @@ type URI struct {
 // parse parses a string representing a Kutso resource URI.
 func parse(uri string) (*URI, error) {
 	// Regex representing URI that is expected:
-	// https://(\w+).(queue|blob|table).core.windows.net/([\w,-]+)\?(.*)
+	// https://(\w+).(queue|blob|table).[\w.]+/([\w,-]+)\?(.*)
 
 	u, err := url.Parse(uri)
 	if err != nil {
@@ -55,10 +55,6 @@ func parse(uri string) (*URI, error) {
 
 	if u.Scheme != "https" {
 		return nil, fmt.Errorf("URI scheme must be 'https', was '%s'", u.Scheme)
-	}
-
-	if !strings.HasSuffix(u.Hostname(), ".core.windows.net") {
-		return nil, fmt.Errorf("URI hostname does not end with '.core.windows.net'")
 	}
 
 	hostSplit := strings.Split(u.Hostname(), ".")
