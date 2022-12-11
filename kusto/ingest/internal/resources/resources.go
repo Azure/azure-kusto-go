@@ -59,7 +59,7 @@ func parse(uri string) (*URI, error) {
 
 	hostSplit := strings.Split(u.Hostname(), ".")
 	if len(hostSplit) != 5 {
-		return nil, fmt.Errorf("URI(%s) is invalid: had incorrect URL path before '.core.windows.net'", uri)
+		return nil, fmt.Errorf("Storage URI (%s) is invalid'", uri)
 	}
 
 	v := &URI{
