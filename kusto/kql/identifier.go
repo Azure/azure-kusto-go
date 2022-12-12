@@ -7,24 +7,20 @@ type Identifier struct {
 	wrappingFunction string
 }
 
-func newIdentifier(name string) Identifier {
-	return Identifier{name: name}
+func (b *builder) AddDatabase(database string) Builder {
+	return b.addBase(Identifier{wrappingFunction: "database", name: database})
 }
 
-func NewDatabase(database string) Identifier {
-	return Identifier{wrappingFunction: "database", name: database}
+func (b *builder) AddTable(table string) Builder {
+	return b.addBase(Identifier{name: table})
 }
 
-func NewTable(table string) Identifier {
-	return Identifier{wrappingFunction: "table", name: table}
+func (b *builder) AddColumn(column string) Builder {
+	return b.addBase(Identifier{name: column})
 }
 
-func NewColumn(column string) Identifier {
-	return Identifier{name: column}
-}
-
-func NewFunction(function string) Identifier {
-	return Identifier{name: function}
+func (b *builder) AddFunction(function string) Builder {
+	return b.addBase(Identifier{name: function})
 }
 
 func (i Identifier) String() string {

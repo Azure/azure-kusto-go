@@ -50,42 +50,42 @@ func newValue(value interface{}, kustoType types.Column) Value {
 	}
 }
 
-func NewBool(value bool) Value {
-	return newValue(value, types.Bool)
+func (b *builder) AddBool(value bool) Builder {
+	return b.addBase(newValue(value, types.Bool))
 }
 
-func NewDateTime(value time.Time) Value {
-	return newValue(value, types.DateTime)
+func (b *builder) AddDateTime(value time.Time) Builder {
+	return b.addBase(newValue(value, types.DateTime))
 }
 
-func NewDynamic(value string) Value {
-	return newValue(value, types.Dynamic)
+func (b *builder) AddDynamic(value string) Builder {
+	return b.addBase(newValue(value, types.Dynamic))
 }
 
-func NewGUID(value uuid.UUID) Value {
-	return newValue(value, types.GUID)
+func (b *builder) AddGUID(value uuid.UUID) Builder {
+	return b.addBase(newValue(value, types.GUID))
 }
 
-func NewInt(value int32) Value {
-	return newValue(value, types.Int)
+func (b *builder) AddInt(value int32) Builder {
+	return b.addBase(newValue(value, types.Int))
 }
 
-func NewLong(value int64) Value {
-	return newValue(value, types.Long)
+func (b *builder) AddLong(value int64) Builder {
+	return b.addBase(newValue(value, types.Long))
 }
 
-func NewReal(value float64) Value {
-	return newValue(value, types.Real)
+func (b *builder) AddReal(value float64) Builder {
+	return b.addBase(newValue(value, types.Real))
 }
 
-func NewString(value string) Value {
-	return newValue(value, types.String)
+func (b *builder) AddString(value string) Builder {
+	return b.addBase(newValue(value, types.String))
 }
 
-func NewTimespan(value time.Duration) Value {
-	return newValue(value, types.Timespan)
+func (b *builder) AddTimespan(value time.Duration) Builder {
+	return b.addBase(newValue(value, types.Timespan))
 }
 
-func NewDecimal(value decimal.Decimal) Value {
-	return newValue(value, types.Decimal)
+func (b *builder) AddDecimal(value decimal.Decimal) Builder {
+	return b.addBase(newValue(value, types.Decimal))
 }
