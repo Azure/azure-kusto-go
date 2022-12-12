@@ -40,7 +40,7 @@ func ExampleStmt() {
 
 	// If we wanted to query for a single node, we could build a Stmt fron singleStmt like so:
 	params := kusto.NewParameters()
-	params, err = params.With(kusto.QueryValues{"Node": "\"my_id\""}) // Substitute "my_id" in every place in the query where "Node" is
+	params, err = params.With(kusto.QueryValues{"Node": "my_id"}) // Substitute "my_id" in every place in the query where "Node" is
 	if err != nil {
 		panic(err)
 	}
@@ -88,7 +88,7 @@ func ExampleStmt() {
 	// | where NodeId == Node
 	//
 	// Single Statement Parameters:
-	//  {"Node":"my_id"}
+	//  {"Node":"\"my_id\""}
 	// Single Statement(Condensed):
 	//  declare query_parameters(Node:string);
 	// set notruncation;dcmInventoryComponentSystem
