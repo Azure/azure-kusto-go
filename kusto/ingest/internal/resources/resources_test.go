@@ -37,11 +37,6 @@ func TestParse(t *testing.T) {
 			err:  true,
 		},
 		{
-			desc: "invalid domain",
-			url:  "https://account.blob.core.invalid.net/objectname",
-			err:  true,
-		},
-		{
 			desc: "no object name provided",
 			url:  "https://account.invalid.core.windows.net/",
 			err:  true,
