@@ -7,6 +7,8 @@ This is a data plane SDK (it is for interacting with Azure Data Explorer service
 
 ## What's New
 
+### Version 0.10.1
+* Fixed issue with queued ingestion to other clouds
 ### Version 0.10.0
 * [BREAKING] - The minimal go version is now 1.19
 * [BREAKING] - Moving to a connection-string based approach to creating and authenticating clients.  
