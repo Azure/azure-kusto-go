@@ -164,6 +164,7 @@ type DataFormat = properties.DataFormat
 // note: any change here needs to be kept up to date with the properties version.
 // I'm not a fan of having two copies, but I don't think it is worth moving to its own package
 // to allow properties and ingest to both import without a cycle.
+//
 //goland:noinspection GoUnusedConst - Part of the API
 const (
 	// DFUnknown indicates the EncodingType is not set.
@@ -209,6 +210,7 @@ const (
 // "ref" will be JSON encoded, so it can be any type that can be JSON marshalled. If you pass a string
 // or []byte, it will be interpreted as already being JSON encoded.
 // mappingKind can only be: CSV, JSON, AVRO, Parquet or ORC.
+// The mappingKind parameter will also automatically set the FileFormat option.
 func IngestionMapping(mapping interface{}, mappingKind DataFormat) FileOption {
 	return option{
 		run: func(p *properties.All) error {
@@ -240,6 +242,7 @@ func IngestionMapping(mapping interface{}, mappingKind DataFormat) FileOption {
 
 			p.Ingestion.Additional.IngestionMapping = j
 			p.Ingestion.Additional.IngestionMappingType = mappingKind
+			p.Ingestion.Additional.Format = mappingKind
 
 			return nil
 		},
@@ -252,6 +255,7 @@ func IngestionMapping(mapping interface{}, mappingKind DataFormat) FileOption {
 // IngestionMappingRef provides the name of a pre-created mapping for the data being imported to the fields in the table.
 // mappingKind can only be: CSV, JSON, AVRO, Parquet or ORC.
 // For more details, see: https://docs.microsoft.com/en-us/azure/kusto/management/create-ingestion-mapping-command
+// The mappingKind parameter will also automatically set the FileFormat option.
 func IngestionMappingRef(refName string, mappingKind DataFormat) FileOption {
 	return option{
 		run: func(p *properties.All) error {
@@ -260,6 +264,7 @@ func IngestionMappingRef(refName string, mappingKind DataFormat) FileOption {
 			}
 			p.Ingestion.Additional.IngestionMappingRef = refName
 			p.Ingestion.Additional.IngestionMappingType = mappingKind
+			p.Ingestion.Additional.Format = mappingKind
 			return nil
 		},
 		clientScopes: QueuedClient | StreamingClient | ManagedClient,
@@ -411,6 +416,7 @@ func ValidationPolicy(policy ValPolicy) FileOption {
 // FileFormat can be used to indicate what type of encoding is supported for the file. This is only needed if
 // the file extension is not present. A file like: "input.json.gz" or "input.json" does not need this option, while
 // "input" would.
+// If an ingestion mapping is specified, there is no need to specify the file format.
 func FileFormat(et DataFormat) FileOption {
 	return option{
 		run: func(p *properties.All) error {

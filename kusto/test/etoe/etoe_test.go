@@ -4,6 +4,7 @@ import (
 	"context"
 	"encoding/csv"
 	"fmt"
+	"go.uber.org/goleak"
 	"io"
 	"math/rand"
 	"os"
@@ -108,7 +109,7 @@ func TestQueries(t *testing.T) {
 	_, cancel := context.WithCancel(context.Background())
 	defer cancel()
 
-	client, err := kusto.New(testConfig.Endpoint, testConfig.Authorizer)
+	client, err := kusto.New(testConfig.kcsb)
 	if err != nil {
 		panic(err)
 	}
@@ -127,7 +128,7 @@ func TestQueries(t *testing.T) {
 		),
 	)
 
-	allDataTypesTable := "goe2e_all_data_types"
+	allDataTypesTable := fmt.Sprintf("goe2e_all_data_types_%d_%d", time.Now().UnixNano(), rand.Int())
 	require.NoError(t, createIngestionTable(t, client, allDataTypesTable, true))
 
 	tests := []struct {
@@ -303,6 +304,130 @@ func TestQueries(t *testing.T) {
 			want: &[]AllDataType{getExpectedResult()},
 		},
 		{
+			desc: "Query: All parameter types are working",
+			stmt: pTableStmt.Add(" | where  vnum == num and vdec == dec and vdate == dt and vspan == span and tostring(vobj) == tostring(obj) and vb == b and vreal" +
+				" == rl and vstr == str and vlong == lg and vguid == guid ").
+				MustDefinitions(kusto.NewDefinitions().Must(
+					kusto.ParamTypes{
+						"tableName": kusto.ParamType{Type: types.String},
+						"num":       kusto.ParamType{Type: types.Int},
+						"dec":       kusto.ParamType{Type: types.Decimal},
+						"dt":        kusto.ParamType{Type: types.DateTime},
+						"span":      kusto.ParamType{Type: types.Timespan},
+						"obj":       kusto.ParamType{Type: types.Dynamic},
+						"b":         kusto.ParamType{Type: types.Bool},
+						"rl":        kusto.ParamType{Type: types.Real},
+						"str":       kusto.ParamType{Type: types.String},
+						"lg":        kusto.ParamType{Type: types.Long},
+						"guid":      kusto.ParamType{Type: types.GUID},
+					})).
+				MustParameters(kusto.NewParameters().Must(kusto.
+					QueryValues{
+					"tableName": allDataTypesTable,
+					"num":       int32(1),
+					"dec":       "2.00000000000001",
+					"dt":        time.Date(2020, 03, 04, 14, 05, 01, 310996500, time.UTC),
+					"span":      time.Hour + 23*time.Minute + 45*time.Second + 678900000*time.Nanosecond,
+					"obj":       map[string]interface{}{"moshe": "value"},
+					"b":         true,
+					"rl":        0.01,
+					"str":       "asdf",
+					"lg":        int64(9223372036854775807),
+					"guid":      uuid.MustParse("74be27de-1e4e-49d9-b579-fe0b331d3642"),
+				})),
+			qcall:   client.Query,
+			options: []kusto.QueryOption{kusto.ResultsProgressiveDisable()},
+			doer: func(row *table.Row, update interface{}) error {
+				rec := AllDataType{}
+				if err := row.ToStruct(&rec); err != nil {
+					return err
+				}
+
+				valuesRec := AllDataType{}
+
+				err := row.ExtractValues(&valuesRec.Vnum,
+					&valuesRec.Vdec,
+					&valuesRec.Vdate,
+					&valuesRec.Vspan,
+					&valuesRec.Vobj,
+					&valuesRec.Vb,
+					&valuesRec.Vreal,
+					&valuesRec.Vstr,
+					&valuesRec.Vlong,
+					&valuesRec.Vguid,
+				)
+
+				if err != nil {
+					return err
+				}
+
+				assert.Equal(t, rec, valuesRec)
+
+				recs := update.(*[]AllDataType)
+				*recs = append(*recs, rec)
+				return nil
+			},
+			gotInit: func() interface{} {
+				ad := []AllDataType{}
+				return &ad
+			},
+			want: &[]AllDataType{getExpectedResult()},
+		},
+		{
+			desc: "Query: All parameter types are working with defaults",
+			stmt: pTableStmt.Add(" | where  vnum == num and vdec == dec and vdate == dt and vspan == span and vb == b and vreal == rl and vstr == str and vlong == lg and vguid == guid ").
+				MustDefinitions(kusto.NewDefinitions().Must(
+					kusto.ParamTypes{
+						"tableName": kusto.ParamType{Type: types.String, Default: allDataTypesTable},
+						"num":       kusto.ParamType{Type: types.Int, Default: int32(1)},
+						"dec":       kusto.ParamType{Type: types.Decimal, Default: "2.00000000000001"},
+						"dt":        kusto.ParamType{Type: types.DateTime, Default: time.Date(2020, 03, 04, 14, 05, 01, 310996500, time.UTC)},
+						"span":      kusto.ParamType{Type: types.Timespan, Default: time.Hour + 23*time.Minute + 45*time.Second + 678900000*time.Nanosecond},
+						"b":         kusto.ParamType{Type: types.Bool, Default: true},
+						"rl":        kusto.ParamType{Type: types.Real, Default: 0.01},
+						"str":       kusto.ParamType{Type: types.String, Default: "asdf"},
+						"lg":        kusto.ParamType{Type: types.Long, Default: int64(9223372036854775807)},
+						"guid":      kusto.ParamType{Type: types.GUID, Default: uuid.MustParse("74be27de-1e4e-49d9-b579-fe0b331d3642")},
+					})),
+			qcall:   client.Query,
+			options: []kusto.QueryOption{kusto.ResultsProgressiveDisable()},
+			doer: func(row *table.Row, update interface{}) error {
+				rec := AllDataType{}
+				if err := row.ToStruct(&rec); err != nil {
+					return err
+				}
+
+				valuesRec := AllDataType{}
+
+				err := row.ExtractValues(&valuesRec.Vnum,
+					&valuesRec.Vdec,
+					&valuesRec.Vdate,
+					&valuesRec.Vspan,
+					&valuesRec.Vobj,
+					&valuesRec.Vb,
+					&valuesRec.Vreal,
+					&valuesRec.Vstr,
+					&valuesRec.Vlong,
+					&valuesRec.Vguid,
+				)
+
+				if err != nil {
+					return err
+				}
+
+				assert.Equal(t, rec, valuesRec)
+
+				recs := update.(*[]AllDataType)
+				*recs = append(*recs, rec)
+				return nil
+			},
+			gotInit: func() interface{} {
+				ad := []AllDataType{}
+				return &ad
+			},
+			want: &[]AllDataType{getExpectedResult()},
+		},
+		{
 			desc:    "Query: make sure Dynamic data type variations can be parsed",
 			stmt:    kusto.NewStmt(`print PlainValue = dynamic('1'), PlainArray = dynamic('[1,2,3]'), PlainJson= dynamic('{ "a": 1}'), JsonArray= dynamic('[{ "a": 1}, { "a": 2}]')`),
 			qcall:   client.Query,
@@ -350,7 +475,8 @@ func TestQueries(t *testing.T) {
 				kusto.NewParameters().Must(kusto.QueryValues{"tableName": allDataTypesTable}),
 			),
 			options: []kusto.QueryOption{kusto.QueryNow(time.Now()), kusto.NoRequestTimeout(), kusto.NoTruncation(), kusto.RequestAppName("bd1e472c-a8e4-4c6e-859d-c86d72253197"),
-				kusto.RequestDescription("9bff424f-711d-48b8-9a6e-d3a618748334")},
+				kusto.RequestDescription("9bff424f-711d-48b8-9a6e-d3a618748334"), kusto.Application("aaa"), kusto.User("bbb"),
+				kusto.CustomQueryOption("additional", "additional")},
 			qcall: client.Query,
 			doer: func(row *table.Row, update interface{}) error {
 				rec := CountResult{}
@@ -424,10 +550,10 @@ func TestQueries(t *testing.T) {
 				require.Nilf(t, err, "TestQueries(%s): had test.qjcall error: %s", test.desc, err)
 
 				// replace guids with <GUID>
-				guidRegex := regexp.MustCompile("(\\w+-){4}\\w+")
+				guidRegex := regexp.MustCompile(`(\w+-){4}\w+`)
 				json = guidRegex.ReplaceAllString(json, "<GUID>")
 
-				timeRegex := regexp.MustCompile("([0:]+\\.(\\d)+)|([\\d\\-]+T[\\d\\-.:]+Z)")
+				timeRegex := regexp.MustCompile(`([0:]+\.(\d)+)|([\d\-]+T[\d\-.:]+Z)`)
 				json = timeRegex.ReplaceAllString(json, "<TIME>")
 
 				require.Equal(t, test.want, json)
@@ -458,7 +584,7 @@ func TestFileIngestion(t *testing.T) {
 		t.Skipf("end to end tests disabled: missing config.json file in etoe directory")
 	}
 
-	client, err := kusto.New(testConfig.Endpoint, testConfig.Authorizer)
+	client, err := kusto.New(testConfig.kcsb)
 	if err != nil {
 		panic(err)
 	}
@@ -838,7 +964,7 @@ func TestReaderIngestion(t *testing.T) {
 	streamingTable := "goe2e_streaming_reader_logs"
 	managedTable := "goe2e_managed_streaming_reader_logs"
 
-	client, err := kusto.New(testConfig.Endpoint, testConfig.Authorizer)
+	client, err := kusto.New(testConfig.kcsb)
 	if err != nil {
 		panic(err)
 	}
@@ -1177,7 +1303,7 @@ func TestMultipleClusters(t *testing.T) {
 		t.Skipf("multiple clusters tests diasbled: needs SecondaryEndpoint and SecondaryDatabase")
 	}
 
-	client, err := kusto.New(testConfig.Endpoint, testConfig.Authorizer)
+	client, err := kusto.New(testConfig.kcsb)
 	if err != nil {
 		panic(err)
 	}
@@ -1188,7 +1314,9 @@ func TestMultipleClusters(t *testing.T) {
 		t.Log("Closed client")
 	})
 
-	secondaryClient, err := kusto.New(testConfig.SecondaryEndpoint, testConfig.Authorizer)
+	skcsb := kusto.NewConnectionStringBuilder(testConfig.SecondaryEndpoint).WithAadAppKey(testConfig.ClientID, testConfig.ClientSecret, testConfig.TenantID)
+
+	secondaryClient, err := kusto.New(skcsb)
 	if err != nil {
 		panic(err)
 	}
@@ -1381,8 +1509,7 @@ func TestStreamingIngestion(t *testing.T) {
 	if skipETOE || testing.Short() {
 		t.SkipNow()
 	}
-
-	client, err := kusto.New(testConfig.Endpoint, testConfig.Authorizer)
+	client, err := kusto.New(testConfig.kcsb)
 	if err != nil {
 		panic(err)
 	}
@@ -1495,7 +1622,8 @@ func TestStreamingIngestion(t *testing.T) {
 
 func TestError(t *testing.T) {
 	t.Parallel()
-	client, err := kusto.New(testConfig.Endpoint, testConfig.Authorizer)
+
+	client, err := kusto.New(testConfig.kcsb)
 	require.NoError(t, err)
 
 	t.Cleanup(func() {
@@ -1509,7 +1637,7 @@ func TestError(t *testing.T) {
 	))
 
 	kustoError, ok := errors.GetKustoError(err)
-	assert.True(t, ok)
+	require.True(t, ok)
 	assert.Equal(t, errors.OpQuery, kustoError.Op)
 	assert.Equal(t, errors.KHTTPError, kustoError.Kind)
 	assert.True(t, strings.Contains(kustoError.Error(), "Failed to resolve table expression"))
@@ -1584,21 +1712,21 @@ func getExpectedResult() AllDataType {
 	}
 }
 
-func createIngestionTable(t *testing.T, client *kusto.Client, tableName string, withInitialRow bool) error {
-	return createIngestionTableWithDB(t, client, testConfig.Database, tableName, withInitialRow)
+func createIngestionTable(t *testing.T, client *kusto.Client, tableName string, isAllTypes bool) error {
+	return createIngestionTableWithDB(t, client, testConfig.Database, tableName, isAllTypes)
 }
 
-func createIngestionTableWithDB(t *testing.T, client *kusto.Client, database string, tableName string, withInitialRow bool) error {
+func createIngestionTableWithDB(t *testing.T, client *kusto.Client, database string, tableName string, isAllTypes bool) error {
 	defaultScheme := "(header_time: datetime, header_id: guid, header_api_version: string, payload_data: string, payload_user: string)"
-	return createIngestionTableWithDBAndScheme(t, client, database, tableName, withInitialRow, defaultScheme)
+	return createIngestionTableWithDBAndScheme(t, client, database, tableName, isAllTypes, defaultScheme)
 }
 
-func createIngestionTableWithDBAndScheme(t *testing.T, client *kusto.Client, database string, tableName string, withInitialRow bool, scheme string) error {
+func createIngestionTableWithDBAndScheme(t *testing.T, client *kusto.Client, database string, tableName string, isAllTypes bool, scheme string) error {
 	t.Logf("Creating ingestion table %s", tableName)
 	dropUnsafe := kusto.NewStmt(".drop table ", kusto.UnsafeStmt(unsafe.Stmt{Add: true})).UnsafeAdd(tableName).Add(" ifexists")
 	var createUnsafe kusto.Stmt
-	if withInitialRow {
-		createUnsafe = kusto.NewStmt(".set ", kusto.UnsafeStmt(unsafe.Stmt{Add: true})).UnsafeAdd(tableName).Add(" <| AllDataTypes")
+	if isAllTypes {
+		createUnsafe = kusto.NewStmt(".set ", kusto.UnsafeStmt(unsafe.Stmt{Add: true})).UnsafeAdd(tableName).Add(" <| datatable(vnum:int, vdec:decimal, vdate:datetime, vspan:timespan, vobj:dynamic, vb:bool, vreal:real, vstr:string, vlong:long, vguid:guid)\n[\n    1, decimal(2.00000000000001), datetime(2020-03-04T14:05:01.3109965Z), time(01:23:45.6789000), dynamic({\n  \"moshe\": \"value\"\n}), true, 0.01, \"asdf\", 9223372036854775807, guid(74be27de-1e4e-49d9-b579-fe0b331d3642), \n]")
 	} else {
 		createUnsafe = kusto.NewStmt(".create table ", kusto.UnsafeStmt(unsafe.Stmt{Add: true})).UnsafeAdd(tableName).UnsafeAdd(" " + scheme + " ")
 	}
@@ -1608,6 +1736,7 @@ func createIngestionTableWithDBAndScheme(t *testing.T, client *kusto.Client, dat
 	t.Cleanup(func() {
 		t.Logf("Dropping ingestion table %s", tableName)
 		_ = executeCommands(client, database, dropUnsafe)
+		t.Logf("Dropped ingestion table %s", tableName)
 	})
 
 	return executeCommands(client, database, dropUnsafe, createUnsafe, addMappingUnsafe, clearStreamingCacheStatement)
@@ -1728,7 +1857,7 @@ func createStringyLogsData() string {
 
 func executeCommands(client *kusto.Client, database string, commandsToRun ...kusto.Stmt) error {
 	for _, cmd := range commandsToRun {
-		if _, err := client.Mgmt(context.Background(), database, cmd, kusto.AllowWrite()); err != nil {
+		if _, err := client.Mgmt(context.Background(), database, cmd); err != nil {
 			return err
 		}
 	}
@@ -1812,4 +1941,8 @@ func isASCII(s string) bool {
 		}
 	}
 	return true
+}
+
+func TestMain(m *testing.M) {
+	goleak.VerifyTestMain(m)
 }

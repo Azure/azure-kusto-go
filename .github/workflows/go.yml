@@ -4,7 +4,7 @@ on:
   push:
     branches: [ master ]
   pull_request:
-    branches: [ master ]
+    branches: [ "**" ]
 
 jobs:
   build:
@@ -12,16 +12,17 @@ jobs:
     runs-on: ubuntu-latest
     steps:
 
-      - name: Set up Go 1.16
-        uses: actions/setup-go@v2
-        with:
-          go-version: 1.16
-        id: go
-      - name: Setup JUnit Report
-        run: go get -u github.com/jstemmer/go-junit-report
-
       - name: Check out code into the Go module directory
         uses: actions/checkout@v2
+
+      - name: Set up Go 1.19
+        uses: actions/setup-go@v3
+        with:
+          go-version: '^1.19.0'
+        id: go
+
+      - name: Setup JUnit Report
+        run: go install github.com/jstemmer/go-junit-report/v2@latest
 
       - name: Check Format
         run: if [ "$(gofmt -d -s -l . | tee /dev/fd/2 | wc -l)" -gt 0 ]; then exit 1; fi
@@ -40,12 +41,12 @@ jobs:
         run: |
           cd kusto
           set -o pipefail
-          go test -v -race -coverprofile=coverage.out -covermode=atomic ./... 2>&1 | tee >(go-junit-report > report.xml)
+          go test -v -race -coverprofile=coverage.out -covermode=atomic ./... 2>&1 | tee >(go-junit-report -iocopy -set-exit-code -out report.xml)
         env:
           ENGINE_CONNECTION_STRING: ${{ secrets.ENGINE_CONNECTION_STRING }}
-          APP_ID: ${{ secrets.APP_ID }}
-          APP_KEY: ${{ secrets.APP_KEY }}
-          AUTH_ID: ${{ secrets.AUTH_ID }}
+          AZURE_CLIENT_ID: ${{ secrets.APP_ID }}
+          AZURE_CLIENT_SECRET: ${{ secrets.APP_KEY }}
+          AZURE_TENANT_ID: ${{ secrets.AUTH_ID }}
           TEST_DATABASE: ${{ secrets.TEST_DATABASE }}
           SECONDARY_ENGINE_CONNECTION_STRING: ${{ secrets.SECONDARY_ENGINE_CONNECTION_STRING }}
           SECONDARY_DATABASE: ${{ secrets.SECONDARY_DATABASE }}
@@ -59,12 +60,19 @@ jobs:
       - name: Upload coverage to Codecov
         uses: codecov/codecov-action@v2
 
-  event_file:
-    name: "Event File"
+  publish-test-results:
+    name: "Publish Unit Tests Results"
+    needs: build
     runs-on: ubuntu-latest
+    if: always()
+
     steps:
-      - name: Upload
-        uses: actions/upload-artifact@v2
+      - name: Download Artifacts
+        uses: actions/download-artifact@v2
         with:
-          name: Event File
-          path: ${{ github.event_path }}
+          path: artifacts
+
+      - name: Publish Unit Test Results
+        uses: EnricoMi/publish-unit-test-result-action@v1
+        with:
+          files: artifacts/**/*.xml
