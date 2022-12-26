@@ -6,9 +6,9 @@ import (
 	"github.com/Azure/azure-kusto-go/kusto"
 	"github.com/Azure/azure-kusto-go/kusto/data/types"
 	"github.com/Azure/azure-kusto-go/kusto/quickstart/utils"
+	"github.com/Azure/azure-kusto-go/kusto/quickstart/utils/authentication"
 	"github.com/Azure/azure-kusto-go/kusto/quickstart/utils/queries"
 	"github.com/Azure/azure-kusto-go/kusto/unsafe"
-	"github.com/Azure/go-autorest/autorest/azure/auth"
 	"io/ioutil"
 	"os"
 )
@@ -21,31 +21,22 @@ const (
 	noSource        SourceType = "nosource"
 )
 
-type AuthenticationModeOptions string
-
-const (
-	UserPrompt      AuthenticationModeOptions = "UserPrompt"
-	ManagedIdentity AuthenticationModeOptions = "ManagedIdentity"
-	AppKey          AuthenticationModeOptions = "AppKey"
-	AppCertificate  AuthenticationModeOptions = "AppCertificate"
-)
-
 type ConfigJson struct {
-	UseExistingTable     bool                      `json:"useExistingTable"`
-	DatabaseName         string                    `json:"databaseName"`
-	TableName            string                    `json:"tableName"`
-	TableSchema          string                    `json:"tableSchema"`
-	KustoUri             string                    `json:"kustoUri"`
-	IngestUri            string                    `json:"ingestUri"`
-	DataToIngest         []ConfigData              `json:"data"`
-	AlterTable           bool                      `json:"alterTable"`
-	QueryData            bool                      `json:"queryData"`
-	IngestData           bool                      `json:"ingestData"`
-	AuthenticationMode   AuthenticationModeOptions `json:"authenticationMode"`
-	WaitForUser          bool                      `json:"waitForUser"`
-	IgnoreFirstRecord    bool                      `json:"ignoreFirstRecord"`
-	WaitForIngestSeconds int                       `json:"waitForIngestSeconds"`
-	BatchingPolicy       string                    `json:"batchingPolicy"`
+	UseExistingTable     bool                                     `json:"useExistingTable"`
+	DatabaseName         string                                   `json:"databaseName"`
+	TableName            string                                   `json:"tableName"`
+	TableSchema          string                                   `json:"tableSchema"`
+	KustoUri             string                                   `json:"kustoUri"`
+	IngestUri            string                                   `json:"ingestUri"`
+	DataToIngest         []ConfigData                             `json:"data"`
+	AlterTable           bool                                     `json:"alterTable"`
+	QueryData            bool                                     `json:"queryData"`
+	IngestData           bool                                     `json:"ingestData"`
+	AuthenticationMode   authentication.AuthenticationModeOptions `json:"authenticationMode"`
+	WaitForUser          bool                                     `json:"waitForUser"`
+	IgnoreFirstRecord    bool                                     `json:"ignoreFirstRecord"`
+	WaitForIngestSeconds int                                      `json:"waitForIngestSeconds"`
+	BatchingPolicy       string                                   `json:"batchingPolicy"`
 }
 
 type ConfigData struct {
@@ -220,18 +211,14 @@ func main() {
 	const configFileName = "kusto/quickstart/kusto_sample_config.json"
 	var config = loadConfigs(configFileName)
 	waitForUser = config.WaitForUser
-	if config.AuthenticationMode == UserPrompt {
+	if config.AuthenticationMode == authentication.UserPrompt {
 		waitForUserToProceed("You will be prompted *twice* for credentials during this script. Please return to the console after authenticating.")
 	}
 
-	azAuthorizer, err := auth.NewAuthorizerFromCLIWithResource(config.KustoUri) // Temp az cli connection
-
-	if err != nil {
-		fmt.Println("Failed to acquire auth token from az-cli" + err.Error())
-		return
-	}
-
-	kustoClient, err := kusto.New(config.KustoUri, kusto.Authorization{Authorizer: azAuthorizer})
+	//azAuthorizer, err := auth.NewAuthorizerFromCLIWithResource(config.KustoUri) // Temp az cli connection
+	//kustoClient, err := kusto.New(config.KustoUri, kusto.Authorization{Authorizer: azAuthorizer})
+	var clientKcs = authentication.GenerateConnectionString(config.KustoUri, config.AuthenticationMode)
+	kustoClient, err := kusto.New(clientKcs)
 	if err != nil {
 		utils.ErrorHandler("Couldn't create Kusto client. Please validate your URIs in the configuration file.", err)
 	}
