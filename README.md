@@ -6,7 +6,8 @@
 This is a data plane SDK (it is for interacting with Azure Data Explorer service). For the control plane (resource administration), go [here](https://github.com/Azure/azure-sdk-for-go/tree/master/services/kusto/mgmt)
 
 ## What's New
-
+### Version 0.10.2
+* Fixed issue with managed identity parameters
 ### Version 0.10.1
 * Fixed issue with queued ingestion to other clouds
 ### Version 0.10.0
