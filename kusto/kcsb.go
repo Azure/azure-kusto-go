@@ -290,13 +290,13 @@ func (kcsb *ConnectionStringBuilder) newTokenProvider() (*TokenProvider, error) 
 	switch {
 	case kcsb.InteractiveLogin:
 		init = func(ci *CloudInfo, cliOpts *azcore.ClientOptions, appClientId string) (azcore.TokenCredential, error) {
-			inOps := &azidentity.InteractiveBrowserCredentialOptions{}
-			inOps.ClientID = ci.KustoClientAppID
-			inOps.TenantID = kcsb.AuthorityId
-			inOps.RedirectURL = ci.KustoClientRedirectURI
-			inOps.ClientOptions = *cliOpts
+			inOpts := &azidentity.InteractiveBrowserCredentialOptions{}
+			inOpts.ClientID = ci.KustoClientAppID
+			inOpts.TenantID = kcsb.AuthorityId
+			inOpts.RedirectURL = ci.KustoClientRedirectURI
+			inOpts.ClientOptions = *cliOpts
 
-			cred, err := azidentity.NewInteractiveBrowserCredential(inOps)
+			cred, err := azidentity.NewInteractiveBrowserCredential(inOpts)
 			if err != nil {
 				return nil, kustoErrors.E(kustoErrors.OpTokenProvider, kustoErrors.KOther,
 					fmt.Errorf("error: Couldn't retrieve client credentials using Interactive Login. "+
@@ -307,9 +307,9 @@ func (kcsb *ConnectionStringBuilder) newTokenProvider() (*TokenProvider, error) 
 		}
 	case !isEmpty(kcsb.AadUserID) && !isEmpty(kcsb.Password):
 		init = func(ci *CloudInfo, cliOpts *azcore.ClientOptions, appClientId string) (azcore.TokenCredential, error) {
-			ops := &azidentity.UsernamePasswordCredentialOptions{ClientOptions: *cliOpts}
+			opts := &azidentity.UsernamePasswordCredentialOptions{ClientOptions: *cliOpts}
 
-			cred, err := azidentity.NewUsernamePasswordCredential(kcsb.AuthorityId, appClientId, kcsb.AadUserID, kcsb.Password, ops)
+			cred, err := azidentity.NewUsernamePasswordCredential(kcsb.AuthorityId, appClientId, kcsb.AadUserID, kcsb.Password, opts)
 
 			if err != nil {
 				return nil, kustoErrors.E(kustoErrors.OpTokenProvider, kustoErrors.KOther,
@@ -326,9 +326,9 @@ func (kcsb *ConnectionStringBuilder) newTokenProvider() (*TokenProvider, error) 
 				authorityId = ci.FirstPartyAuthorityURL
 			}
 
-			ops := &azidentity.ClientSecretCredentialOptions{ClientOptions: *cliOpts}
+			opts := &azidentity.ClientSecretCredentialOptions{ClientOptions: *cliOpts}
 
-			cred, err := azidentity.NewClientSecretCredential(authorityId, appClientId, kcsb.ApplicationKey, ops)
+			cred, err := azidentity.NewClientSecretCredential(authorityId, appClientId, kcsb.ApplicationKey, opts)
 
 			if err != nil {
 				return nil, kustoErrors.E(kustoErrors.OpTokenProvider, kustoErrors.KOther,
@@ -339,14 +339,14 @@ func (kcsb *ConnectionStringBuilder) newTokenProvider() (*TokenProvider, error) 
 		}
 	case !isEmpty(kcsb.ApplicationCertificate):
 		init = func(ci *CloudInfo, cliOpts *azcore.ClientOptions, appClientId string) (azcore.TokenCredential, error) {
-			ops := &azidentity.ClientCertificateCredentialOptions{ClientOptions: *cliOpts}
-			ops.SendCertificateChain = kcsb.SendCertificateChain
+			opts := &azidentity.ClientCertificateCredentialOptions{ClientOptions: *cliOpts}
+			opts.SendCertificateChain = kcsb.SendCertificateChain
 
 			cert, thumprintKey, err := azidentity.ParseCertificates([]byte(kcsb.ApplicationCertificate), []byte(kcsb.ApplicationCertificateThumbprint))
 			if err != nil {
 				return nil, kustoErrors.E(kustoErrors.OpTokenProvider, kustoErrors.KOther, err)
 			}
-			cred, err := azidentity.NewClientCertificateCredential(kcsb.AuthorityId, appClientId, cert, thumprintKey, ops)
+			cred, err := azidentity.NewClientCertificateCredential(kcsb.AuthorityId, appClientId, cert, thumprintKey, opts)
 
 			if err != nil {
 				return nil, kustoErrors.E(kustoErrors.OpTokenProvider, kustoErrors.KOther,
@@ -356,20 +356,20 @@ func (kcsb *ConnectionStringBuilder) newTokenProvider() (*TokenProvider, error) 
 			return cred, nil
 		}
 	case kcsb.MsiAuthentication:
-		{
-			opts := &azidentity.ManagedIdentityCredentialOptions{}
-			if kcsb.ClientOptions != nil {
-				opts.ClientOptions = *kcsb.ClientOptions
-			}
+		init = func(ci *CloudInfo, cliOpts *azcore.ClientOptions, appClientId string) (azcore.TokenCredential, error) {
+			opts := &azidentity.ManagedIdentityCredentialOptions{ClientOptions: *cliOpts}
 			if !isEmpty(kcsb.ManagedServiceIdentity) {
 				opts.ID = azidentity.ClientID(kcsb.ManagedServiceIdentity)
 			}
 
 			cred, err := azidentity.NewManagedIdentityCredential(opts)
+
 			if err != nil {
-				return nil, fmt.Errorf("error: Couldn't retrieve client credentials using Managed Identity: %s", err)
+				return nil, kustoErrors.E(kustoErrors.OpTokenProvider, kustoErrors.KOther,
+					fmt.Errorf("error: Couldn't retrieve client credentials using Managed Identity: %s", err))
 			}
-			tkp.tokenCred = cred
+
+			return cred, nil
 		}
 	case !isEmpty(kcsb.UserToken):
 		{
