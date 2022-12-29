@@ -20,9 +20,6 @@ import (
 	v1 "github.com/Azure/azure-kusto-go/kusto/internal/frames/v1"
 	v2 "github.com/Azure/azure-kusto-go/kusto/internal/frames/v2"
 	"github.com/Azure/azure-kusto-go/kusto/internal/response"
-	"github.com/Azure/azure-kusto-go/kusto/internal/version"
-
-	"github.com/google/uuid"
 )
 
 var validURL = regexp.MustCompile(`https://([a-zA-Z0-9_-]+\.){1,2}.*`)
@@ -39,10 +36,11 @@ type conn struct {
 	auth                           Authorization
 	endMgmt, endQuery, streamQuery *url.URL
 	client                         *http.Client
+	application, user, version     string
 }
 
 // newConn returns a new conn object with an injected http.Client
-func newConn(endpoint string, auth Authorization, client *http.Client) (*conn, error) {
+func newConn(endpoint string, auth Authorization, client *http.Client, application, user, version string) (*conn, error) {
 	if !validURL.MatchString(endpoint) {
 		return nil, errors.ES(errors.OpServConn, errors.KClientArgs, "endpoint is not valid(%s), should be https://<cluster name>.*", endpoint).SetNoRetry()
 	}
@@ -58,6 +56,9 @@ func newConn(endpoint string, auth Authorization, client *http.Client) (*conn, e
 		endQuery:    &url.URL{Scheme: "https", Host: u.Host, Path: "/v2/rest/query"},
 		streamQuery: &url.URL{Scheme: "https", Host: u.Host, Path: "/v1/rest/ingest/"},
 		client:      client,
+		application: application,
+		user:        user,
+		version:     version,
 	}
 
 	return c, nil
@@ -141,20 +142,7 @@ func (c *conn) doRequest(ctx context.Context, execType int, db string, query Stm
 		op = errors.OpMgmt
 	}
 
-	header := http.Header{}
-	header.Add("Accept", "application/json")
-	header.Add("Accept-Encoding", "gzip")
-	header.Add("x-ms-client-version", "Kusto.Go.Client: "+version.Kusto)
-	header.Add("Content-Type", "application/json; charset=utf-8")
-	header.Add("x-ms-client-request-id", "KGC.execute;"+uuid.New().String())
-
-	if properties.Application != "" {
-		header.Add("x-ms-app", properties.Application)
-	}
-
-	if properties.User != "" {
-		header.Add("x-ms-user", properties.User)
-	}
+	header := c.getHeaders(properties)
 
 	var endpoint *url.URL
 	buff := bufferPool.Get().(*bytes.Buffer)
@@ -216,6 +204,29 @@ func (c *conn) doRequest(ctx context.Context, execType int, db string, query Stm
 		return 0, nil, nil, nil, errors.HTTP(op, resp.Status, resp.StatusCode, body, fmt.Sprintf("error from Kusto endpoint for query %q: ", query.String()))
 	}
 	return op, header, resp.Header, body, nil
+}
+
+func (c *conn) getHeaders(properties requestProperties) http.Header {
+	header := http.Header{}
+	header.Add("Accept", "application/json")
+	header.Add("Accept-Encoding", "gzip")
+	header.Add("Content-Type", "application/json; charset=utf-8")
+	header.Add("x-ms-version", "2019-02-13")
+
+	if properties.Application != "" {
+		header.Add("x-ms-app", properties.Application)
+	} else {
+		header.Add("x-ms-app", c.application)
+	}
+
+	if properties.User != "" {
+		header.Add("x-ms-user", properties.User)
+	} else {
+		header.Add("x-ms-user", c.user)
+	}
+
+	header.Add("x-ms-client-version", c.version)
+	return header
 }
 
 func (c *conn) Close() error {

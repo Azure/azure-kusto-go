@@ -72,7 +72,7 @@ func New(kcsb *ConnectionStringBuilder, options ...Option) (*Client, error) {
 		client.http = &http.Client{}
 	}
 
-	conn, err := newConn(endpoint, *auth, client.http)
+	conn, err := newConn(endpoint, *auth, client.http, kcsb.ApplicationForTracing, kcsb.UserForTracing, kcsb.versionForTracing)
 	if err != nil {
 		return nil, err
 	}
@@ -340,7 +340,12 @@ func (c *Client) getConn(callType callType, options connOptions) (queryer, error
 			u, _ := url.Parse(c.endpoint) // Don't care about the error
 			u.Host = "ingest-" + u.Host
 			auth := c.auth
-			iconn, err := newConn(u.String(), auth, c.http)
+			application, user, version := "", "", ""
+			if innerConn, ok := c.conn.(*conn); ok {
+				application, user, version = innerConn.application, innerConn.user, innerConn.version
+			}
+
+			iconn, err := newConn(u.String(), auth, c.http, application, user, version)
 			if err != nil {
 				return nil, err
 			}
@@ -379,6 +384,27 @@ func contextSetup(ctx context.Context, mgmtCall bool) (context.Context, context.
 
 func (c *Client) HttpClient() *http.Client {
 	return c.http
+}
+
+func (c *Client) Application() string {
+	if conn, ok := c.conn.(*conn); ok {
+		return conn.application
+	}
+	return ""
+}
+
+func (c *Client) User() string {
+	if conn, ok := c.conn.(*conn); ok {
+		return conn.user
+	}
+	return ""
+}
+
+func (c *Client) Version() string {
+	if conn, ok := c.conn.(*conn); ok {
+		return conn.version
+	}
+	return ""
 }
 
 func (c *Client) Close() error {
