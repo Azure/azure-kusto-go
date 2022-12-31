@@ -8,6 +8,7 @@ import (
 	"context"
 	"encoding/json"
 	"fmt"
+	"github.com/google/uuid"
 	"io"
 	"net/http"
 	"net/url"
@@ -212,6 +213,7 @@ func (c *conn) getHeaders(properties requestProperties) http.Header {
 	header.Add("Accept-Encoding", "gzip")
 	header.Add("Content-Type", "application/json; charset=utf-8")
 	header.Add("x-ms-version", "2019-02-13")
+	header.Add("x-ms-client-request-id", "KGC.execute;"+uuid.New().String())
 
 	if properties.Application != "" {
 		header.Add("x-ms-app", properties.Application)
