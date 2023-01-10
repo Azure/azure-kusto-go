@@ -1,16 +1,12 @@
 package kql
 
 import (
+	"errors"
 	"fmt"
 	"github.com/google/uuid"
 	"github.com/shopspring/decimal"
 	"strings"
 	"time"
-)
-
-const (
-	declare   = "declare query_parameters("
-	closeStmt = ");\n"
 )
 
 type Builder interface {
@@ -44,32 +40,38 @@ func (s stringConstant) String() string {
 	return string(s)
 }
 
-type builder struct {
+type statementBuilder struct {
 	builder strings.Builder
 }
 
-func NewBuilder(value stringConstant) Builder {
-	return (&builder{
+// String implements fmt.Stringer.
+func (b *statementBuilder) String() string {
+	return b.builder.String()
+}
+
+func NewStatementBuilder(value stringConstant) Builder {
+	return (&statementBuilder{
 		builder: strings.Builder{},
 	}).AddLiteral(value)
 }
 
-func (b *builder) AddLiteral(value stringConstant) Builder {
+func (b *statementBuilder) AddLiteral(value stringConstant) Builder {
 	return b.addBase(value)
 }
 
-func (b *builder) addBase(value fmt.Stringer) Builder {
+func (b *statementBuilder) addBase(value fmt.Stringer) Builder {
 	b.builder.WriteString(value.String())
 	return b
 }
 
-func (b *builder) addString(value string) Builder {
-	b.builder.WriteString(value)
-	return b
-}
-
-func (b *builder) Build() Query {
+func (b *statementBuilder) Build() Query {
 	return &query{
 		query: b.builder.String(),
 	}
+}
+func (b *statementBuilder) GetParameters() (map[string]string, error) {
+	return nil, errors.New("this option does not support Parameters")
+}
+func (b *statementBuilder) SupportsParameters() bool {
+	return false
 }

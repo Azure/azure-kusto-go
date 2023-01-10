@@ -7,19 +7,19 @@ type Identifier struct {
 	wrappingFunction string
 }
 
-func (b *builder) AddDatabase(database string) Builder {
+func (b *statementBuilder) AddDatabase(database string) Builder {
 	return b.addBase(Identifier{wrappingFunction: "database", name: database})
 }
 
-func (b *builder) AddTable(table string) Builder {
+func (b *statementBuilder) AddTable(table string) Builder {
 	return b.addBase(Identifier{name: table})
 }
 
-func (b *builder) AddColumn(column string) Builder {
+func (b *statementBuilder) AddColumn(column string) Builder {
 	return b.addBase(Identifier{name: column})
 }
 
-func (b *builder) AddFunction(function string) Builder {
+func (b *statementBuilder) AddFunction(function string) Builder {
 	return b.addBase(Identifier{name: function})
 }
 

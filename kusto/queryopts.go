@@ -4,6 +4,7 @@ package kusto
 // it clogs up the main kusto.go file.
 
 import (
+	"github.com/Azure/azure-kusto-go/kusto/kql"
 	"time"
 
 	"github.com/Azure/azure-kusto-go/kusto/data/errors"
@@ -14,10 +15,11 @@ import (
 // For more information please look at: https://docs.microsoft.com/en-us/azure/kusto/api/netfx/request-properties
 // Not all of the documented options are implemented.
 type requestProperties struct {
-	Options     map[string]interface{}
-	Parameters  map[string]string
-	Application string
-	User        string
+	Options         map[string]interface{}
+	Parameters      map[string]string
+	Application     string
+	User            string
+	QueryParameters kql.StatementQueryParameters `json:"-"`
 }
 
 type queryOptions struct {
@@ -79,6 +81,15 @@ const ValidatePermissionsValue = "validate_permissions"
 func Application(appName string) QueryOption {
 	return func(q *queryOptions) error {
 		q.requestProperties.Application = appName
+		return nil
+	}
+}
+
+// QueryParameters sets the
+func QueryParameters(queryParameters kql.StatementQueryParameters) QueryOption {
+	return func(q *queryOptions) error {
+		q.requestProperties.QueryParameters = queryParameters
+		q.requestProperties.Parameters = queryParameters.ToParameterCollection()
 		return nil
 	}
 }
