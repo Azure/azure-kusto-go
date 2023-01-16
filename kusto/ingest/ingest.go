@@ -8,10 +8,10 @@ import (
 	"sync"
 
 	"github.com/Azure/azure-kusto-go/kusto/data/errors"
-	"github.com/Azure/azure-kusto-go/kusto/ingest/internal/conn"
 	"github.com/Azure/azure-kusto-go/kusto/ingest/internal/properties"
 	"github.com/Azure/azure-kusto-go/kusto/ingest/internal/queued"
 	"github.com/Azure/azure-kusto-go/kusto/ingest/internal/resources"
+	"github.com/Azure/azure-kusto-go/kusto/ingest/internal/streaming_ingest"
 	"github.com/google/uuid"
 )
 
@@ -233,8 +233,7 @@ func (i *Ingestion) getStreamConn() (*conn.Conn, error) {
 		return i.streamConn, nil
 	}
 
-	sc, err := conn.New(i.client.Endpoint(), i.client.Auth(), i.client.HttpClient(),
-		i.client.Application(), i.client.User(), i.client.Version())
+	sc, err := conn.New(i.client.Endpoint(), i.client.Auth(), i.client.HttpClient(), i.client.ClientDetails())
 	if err != nil {
 		return nil, err
 	}

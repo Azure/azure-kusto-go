@@ -59,7 +59,6 @@ func TestGetConnectionStringBuilder(t *testing.T) {
 				actual := NewConnectionStringBuilder(test.connectionString)
 				actual.ApplicationForTracing = ""
 				actual.UserForTracing = ""
-				actual.versionForTracing = ""
 				assert.EqualValues(t, test.want, *actual)
 			} else {
 				assert.Panics(t, func() { NewConnectionStringBuilder(test.connectionString) }, test.wantErr)
@@ -80,7 +79,6 @@ func TestWithAadUserPassAuth(t *testing.T) {
 	actual := NewConnectionStringBuilder("endpoint").WithAadUserPassAuth("userid", "password", "authorityID")
 	actual.ApplicationForTracing = ""
 	actual.UserForTracing = ""
-	actual.versionForTracing = ""
 
 	assert.EqualValues(t, want, *actual)
 }
@@ -106,7 +104,6 @@ func TestWitAadUserToken(t *testing.T) {
 	actual := NewConnectionStringBuilder("endpoint").WitAadUserToken("token")
 	actual.ApplicationForTracing = ""
 	actual.UserForTracing = ""
-	actual.versionForTracing = ""
 	assert.EqualValues(t, want, *actual)
 }
 

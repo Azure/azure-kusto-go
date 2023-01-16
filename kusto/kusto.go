@@ -35,6 +35,7 @@ type Client struct {
 	auth             Authorization
 	mgmtConnMu       sync.Mutex
 	http             *http.Client
+	clientDetails    *ClientDetails
 }
 
 // Option is an optional argument type for New().
@@ -63,7 +64,7 @@ func New(kcsb *ConnectionStringBuilder, options ...Option) (*Client, error) {
 		)
 	}
 
-	client := &Client{auth: *auth, endpoint: endpoint}
+	client := &Client{auth: *auth, endpoint: endpoint, clientDetails: NewClientDetails(kcsb.ApplicationForTracing, kcsb.UserForTracing)}
 	for _, o := range options {
 		o(client)
 	}
@@ -72,7 +73,7 @@ func New(kcsb *ConnectionStringBuilder, options ...Option) (*Client, error) {
 		client.http = &http.Client{}
 	}
 
-	conn, err := newConn(endpoint, *auth, client.http, kcsb.ApplicationForTracing, kcsb.UserForTracing, kcsb.versionForTracing)
+	conn, err := newConn(endpoint, *auth, client.http, client.clientDetails)
 	if err != nil {
 		return nil, err
 	}
@@ -340,12 +341,12 @@ func (c *Client) getConn(callType callType, options connOptions) (queryer, error
 			u, _ := url.Parse(c.endpoint) // Don't care about the error
 			u.Host = "ingest-" + u.Host
 			auth := c.auth
-			application, user, version := "", "", ""
+			var details *ClientDetails
 			if innerConn, ok := c.conn.(*conn); ok {
-				application, user, version = innerConn.application, innerConn.user, innerConn.version
+				details = innerConn.clientDetails
 			}
 
-			iconn, err := newConn(u.String(), auth, c.http, application, user, version)
+			iconn, err := newConn(u.String(), auth, c.http, details)
 			if err != nil {
 				return nil, err
 			}
@@ -386,25 +387,8 @@ func (c *Client) HttpClient() *http.Client {
 	return c.http
 }
 
-func (c *Client) Application() string {
-	if conn, ok := c.conn.(*conn); ok {
-		return conn.application
-	}
-	return ""
-}
-
-func (c *Client) User() string {
-	if conn, ok := c.conn.(*conn); ok {
-		return conn.user
-	}
-	return ""
-}
-
-func (c *Client) Version() string {
-	if conn, ok := c.conn.(*conn); ok {
-		return conn.version
-	}
-	return ""
+func (c *Client) ClientDetails() *ClientDetails {
+	return c.clientDetails
 }
 
 func (c *Client) Close() error {

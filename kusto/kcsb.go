@@ -3,14 +3,8 @@ package kusto
 import (
 	"fmt"
 	kustoErrors "github.com/Azure/azure-kusto-go/kusto/data/errors"
-	"github.com/Azure/azure-kusto-go/kusto/internal/version"
 	"github.com/Azure/azure-sdk-for-go/sdk/azcore"
 	"github.com/Azure/azure-sdk-for-go/sdk/azidentity"
-	"os"
-	"os/user"
-	"path/filepath"
-	"regexp"
-	"runtime"
 	"strconv"
 	"strings"
 )
@@ -36,11 +30,6 @@ type ConnectionStringBuilder struct {
 	ClientOptions                    *azcore.ClientOptions
 	ApplicationForTracing            string
 	UserForTracing                   string
-	versionForTracing                string
-}
-
-func (kcsb *ConnectionStringBuilder) VersionForTracing() string {
-	return kcsb.versionForTracing
 }
 
 const (
@@ -152,8 +141,6 @@ func NewConnectionStringBuilder(connStr string) *ConnectionStringBuilder {
 		}
 	}
 
-	kcsb.setDefaultTracingValues()
-
 	return &kcsb
 }
 
@@ -175,35 +162,6 @@ func (kcsb *ConnectionStringBuilder) resetConnectionString() {
 	kcsb.RedirectURL = ""
 	kcsb.ClientOptions = nil
 	kcsb.DefaultAuth = false
-
-	kcsb.setDefaultTracingValues()
-}
-
-func (kcsb *ConnectionStringBuilder) setDefaultTracingValues() {
-	kcsb.ApplicationForTracing = filepath.Base(os.Args[0])
-	kcsb.UserForTracing = getOsUser()
-	kcsb.versionForTracing = buildHeaderFormat(StringPair{Key: "Kusto.Go.Client", Value: version.Kusto}, StringPair{Key: "Go", Value: runtime.Version()})
-}
-
-func getOsUser() string {
-	var final string
-	current, err := user.Current()
-	if err != nil || current.Username == "" {
-		// get from env and try domain too
-		final = os.Getenv("USERNAME")
-		domain := os.Getenv("USERDOMAIN")
-		if !isEmpty(domain) && !isEmpty(final) {
-			final = domain + "\\" + final
-		}
-	} else {
-		final = current.Username
-	}
-
-	if isEmpty(final) {
-		final = "[none]"
-	}
-
-	return final
 }
 
 // WithAadUserPassAuth Creates a Kusto Connection string builder that will authenticate with AAD user name and password.
@@ -472,51 +430,8 @@ func isEmpty(str string) bool {
 	return strings.TrimSpace(str) == ""
 }
 
-type StringPair struct {
-	Key   string
-	Value string
-}
-
-func buildHeaderFormat(args ...StringPair) string {
-	re, err := regexp.Compile("[\\r\\n\\s{}|]+")
-	if err != nil {
-		return ""
-	}
-
-	var headerFormat string
-	for i, arg := range args {
-		if i > 0 {
-			headerFormat += "|"
-		}
-		headerFormat += fmt.Sprintf("%s:{%s}", arg.Key, re.ReplaceAllString(arg.Value, "_"))
-	}
-	return headerFormat
-}
-
 func (kcsb *ConnectionStringBuilder) SetConnectorDetails(name, version string, sendUser bool, overrideUser, appName, appVersion string, additionalFields ...StringPair) {
-	var additionalFieldsList []StringPair
-
-	additionalFieldsList = append(additionalFieldsList, StringPair{Key: "Kusto." + name, Value: version})
-
-	if appName == "" {
-		appName = kcsb.ApplicationForTracing
-	}
-	if appVersion == "" {
-		appVersion = "[none]"
-	}
-
-	additionalFieldsList = append(additionalFieldsList, StringPair{Key: "App.{" + appName + "}", Value: appVersion})
-	if additionalFields != nil {
-		additionalFieldsList = append(additionalFieldsList, additionalFields...)
-	}
-
-	kcsb.ApplicationForTracing = buildHeaderFormat(additionalFieldsList...)
-
-	if sendUser {
-		if overrideUser != "" {
-			kcsb.UserForTracing = overrideUser
-		}
-	} else {
-		kcsb.UserForTracing = "[none]"
-	}
+	app, user := setConnectorDetails(name, version, sendUser, overrideUser, appName, appVersion, additionalFields...)
+	kcsb.ApplicationForTracing = app
+	kcsb.UserForTracing = user
 }

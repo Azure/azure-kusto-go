@@ -8,7 +8,6 @@ import (
 	"context"
 	"encoding/json"
 	"fmt"
-	"github.com/google/uuid"
 	"io"
 	"net/http"
 	"net/url"
@@ -21,6 +20,7 @@ import (
 	v1 "github.com/Azure/azure-kusto-go/kusto/internal/frames/v1"
 	v2 "github.com/Azure/azure-kusto-go/kusto/internal/frames/v2"
 	"github.com/Azure/azure-kusto-go/kusto/internal/response"
+	"github.com/google/uuid"
 )
 
 var validURL = regexp.MustCompile(`https://([a-zA-Z0-9_-]+\.){1,2}.*`)
@@ -37,11 +37,11 @@ type conn struct {
 	auth                           Authorization
 	endMgmt, endQuery, streamQuery *url.URL
 	client                         *http.Client
-	application, user, version     string
+	clientDetails                  *ClientDetails
 }
 
 // newConn returns a new conn object with an injected http.Client
-func newConn(endpoint string, auth Authorization, client *http.Client, application, user, version string) (*conn, error) {
+func newConn(endpoint string, auth Authorization, client *http.Client, clientDetails *ClientDetails) (*conn, error) {
 	if !validURL.MatchString(endpoint) {
 		return nil, errors.ES(errors.OpServConn, errors.KClientArgs, "endpoint is not valid(%s), should be https://<cluster name>.*", endpoint).SetNoRetry()
 	}
@@ -52,14 +52,12 @@ func newConn(endpoint string, auth Authorization, client *http.Client, applicati
 	}
 
 	c := &conn{
-		auth:        auth,
-		endMgmt:     &url.URL{Scheme: "https", Host: u.Host, Path: "/v1/rest/mgmt"},
-		endQuery:    &url.URL{Scheme: "https", Host: u.Host, Path: "/v2/rest/query"},
-		streamQuery: &url.URL{Scheme: "https", Host: u.Host, Path: "/v1/rest/ingest/"},
-		client:      client,
-		application: application,
-		user:        user,
-		version:     version,
+		auth:          auth,
+		endMgmt:       &url.URL{Scheme: "https", Host: u.Host, Path: "/v1/rest/mgmt"},
+		endQuery:      &url.URL{Scheme: "https", Host: u.Host, Path: "/v2/rest/query"},
+		streamQuery:   &url.URL{Scheme: "https", Host: u.Host, Path: "/v1/rest/ingest/"},
+		client:        client,
+		clientDetails: clientDetails,
 	}
 
 	return c, nil
@@ -213,21 +211,26 @@ func (c *conn) getHeaders(properties requestProperties) http.Header {
 	header.Add("Accept-Encoding", "gzip")
 	header.Add("Content-Type", "application/json; charset=utf-8")
 	header.Add("x-ms-version", "2019-02-13")
-	header.Add("x-ms-client-request-id", "KGC.execute;"+uuid.New().String())
+
+	if properties.ClientRequestID != "" {
+		header.Add("x-ms-client-request-id", properties.ClientRequestID)
+	} else {
+		header.Add("x-ms-client-request-id", "KGC.execute;"+uuid.New().String())
+	}
 
 	if properties.Application != "" {
 		header.Add("x-ms-app", properties.Application)
 	} else {
-		header.Add("x-ms-app", c.application)
+		header.Add("x-ms-app", c.clientDetails.ApplicationForTracing())
 	}
 
 	if properties.User != "" {
 		header.Add("x-ms-user", properties.User)
 	} else {
-		header.Add("x-ms-user", c.user)
+		header.Add("x-ms-user", c.clientDetails.UserNameForTracing())
 	}
 
-	header.Add("x-ms-client-version", c.version)
+	header.Add("x-ms-client-version", c.clientDetails.ClientVersionForTracing())
 	return header
 }
 

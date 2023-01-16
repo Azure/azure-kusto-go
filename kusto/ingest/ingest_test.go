@@ -18,18 +18,9 @@ type mockClient struct {
 	onMgmt   func(ctx context.Context, db string, query kusto.Stmt, options ...kusto.MgmtOption) (*kusto.RowIterator, error)
 }
 
-func (m mockClient) Application() string {
-	return "test"
+func (m mockClient) ClientDetails() *kusto.ClientDetails {
+	return kusto.NewClientDetails("test", "test")
 }
-
-func (m mockClient) User() string {
-	return "test"
-}
-
-func (m mockClient) Version() string {
-	return "test"
-}
-
 func (m mockClient) HttpClient() *http.Client {
 	return &http.Client{}
 }
