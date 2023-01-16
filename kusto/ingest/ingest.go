@@ -4,14 +4,15 @@ import (
 	"bytes"
 	"context"
 	"fmt"
+	"github.com/Azure/azure-kusto-go/kusto"
 	"io"
+	"strings"
 	"sync"
 
 	"github.com/Azure/azure-kusto-go/kusto/data/errors"
 	"github.com/Azure/azure-kusto-go/kusto/ingest/internal/properties"
 	"github.com/Azure/azure-kusto-go/kusto/ingest/internal/queued"
 	"github.com/Azure/azure-kusto-go/kusto/ingest/internal/resources"
-	"github.com/Azure/azure-kusto-go/kusto/ingest/internal/streaming_ingest"
 	"github.com/google/uuid"
 )
 
@@ -32,7 +33,7 @@ type Ingestion struct {
 	fs queued.Queued
 
 	connMu     sync.Mutex
-	streamConn *conn.Conn
+	streamConn streamIngestor
 
 	bufferSize int
 	maxBuffers int
@@ -225,7 +226,7 @@ func (i *Ingestion) Stream(ctx context.Context, payload []byte, format DataForma
 	return err
 }
 
-func (i *Ingestion) getStreamConn() (*conn.Conn, error) {
+func (i *Ingestion) getStreamConn() (streamIngestor, error) {
 	i.connMu.Lock()
 	defer i.connMu.Unlock()
 
@@ -233,7 +234,7 @@ func (i *Ingestion) getStreamConn() (*conn.Conn, error) {
 		return i.streamConn, nil
 	}
 
-	sc, err := conn.New(i.client.Endpoint(), i.client.Auth(), i.client.HttpClient(), i.client.ClientDetails())
+	sc, err := kusto.NewConn(strings.Replace(i.client.Endpoint(), "ingest-", "", 1), i.client.Auth(), i.client.HttpClient(), i.client.ClientDetails())
 	if err != nil {
 		return nil, err
 	}

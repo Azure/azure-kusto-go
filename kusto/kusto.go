@@ -73,7 +73,7 @@ func New(kcsb *ConnectionStringBuilder, options ...Option) (*Client, error) {
 		client.http = &http.Client{}
 	}
 
-	conn, err := newConn(endpoint, *auth, client.http, client.clientDetails)
+	conn, err := NewConn(endpoint, *auth, client.http, client.clientDetails)
 	if err != nil {
 		return nil, err
 	}
@@ -346,7 +346,7 @@ func (c *Client) getConn(callType callType, options connOptions) (queryer, error
 				details = innerConn.clientDetails
 			}
 
-			iconn, err := newConn(u.String(), auth, c.http, details)
+			iconn, err := NewConn(u.String(), auth, c.http, details)
 			if err != nil {
 				return nil, err
 			}

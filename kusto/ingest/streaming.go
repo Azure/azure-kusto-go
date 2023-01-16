@@ -2,20 +2,21 @@ package ingest
 
 import (
 	"context"
+	"github.com/Azure/azure-kusto-go/kusto"
 	"io"
 	"os"
+	"strings"
 
 	"github.com/Azure/azure-kusto-go/kusto/data/errors"
 	"github.com/Azure/azure-kusto-go/kusto/ingest/internal/gzip"
 	"github.com/Azure/azure-kusto-go/kusto/ingest/internal/properties"
 	"github.com/Azure/azure-kusto-go/kusto/ingest/internal/queued"
-	"github.com/Azure/azure-kusto-go/kusto/ingest/internal/streaming_ingest"
 	"github.com/google/uuid"
 )
 
 type streamIngestor interface {
 	io.Closer
-	StreamIngest(ctx context.Context, db, table string, payload io.Reader, format properties.DataFormat, mappingName string, clientRequestId string) error
+	StreamIngest(ctx context.Context, db, table string, payload io.Reader, format kusto.DataFormatForStreaming, mappingName string, clientRequestId string) error
 }
 
 // Streaming provides data ingestion from external sources into Kusto.
@@ -32,7 +33,7 @@ var FileIsBlobErr = errors.ES(errors.OpIngestStream, errors.KClientArgs, "blobst
 // More information can be found here:
 // https://docs.microsoft.com/en-us/azure/kusto/management/create-ingestion-mapping-command
 func NewStreaming(client QueryClient, db, table string) (*Streaming, error) {
-	streamConn, err := conn.New(client.Endpoint(), client.Auth(), client.HttpClient(), client.ClientDetails())
+	streamConn, err := kusto.NewConn(strings.Replace(client.Endpoint(), "ingest-", "", 1), client.Auth(), client.HttpClient(), client.ClientDetails())
 	if err != nil {
 		return nil, err
 	}

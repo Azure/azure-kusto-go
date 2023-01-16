@@ -40,8 +40,8 @@ type conn struct {
 	clientDetails                  *ClientDetails
 }
 
-// newConn returns a new conn object with an injected http.Client
-func newConn(endpoint string, auth Authorization, client *http.Client, clientDetails *ClientDetails) (*conn, error) {
+// NewConn returns a new conn object with an injected http.Client
+func NewConn(endpoint string, auth Authorization, client *http.Client, clientDetails *ClientDetails) (*conn, error) {
 	if !validURL.MatchString(endpoint) {
 		return nil, errors.ES(errors.OpServConn, errors.KClientArgs, "endpoint is not valid(%s), should be https://<cluster name>.*", endpoint).SetNoRetry()
 	}
@@ -90,7 +90,7 @@ func (c *conn) mgmt(ctx context.Context, db string, query Stmt, options *mgmtOpt
 }
 
 func (c *conn) queryToJson(ctx context.Context, db string, query Stmt, options *queryOptions) (string, error) {
-	_, _, _, body, e := c.doRequest(ctx, execQuery, db, query, *options.requestProperties)
+	_, _, _, body, e := c.doRequestFromType(ctx, execQuery, db, query, *options.requestProperties)
 	if e != nil {
 		return "", e
 	}
@@ -112,7 +112,7 @@ type execResp struct {
 }
 
 func (c *conn) execute(ctx context.Context, execType int, db string, query Stmt, properties requestProperties) (execResp, error) {
-	op, reqHeader, respHeader, body, e := c.doRequest(ctx, execType, db, query, properties)
+	op, reqHeader, respHeader, body, e := c.doRequestFromType(ctx, execType, db, query, properties)
 	if e != nil {
 		return execResp{}, e
 	}
@@ -132,7 +132,7 @@ func (c *conn) execute(ctx context.Context, execType int, db string, query Stmt,
 	return execResp{reqHeader: reqHeader, respHeader: respHeader, frameCh: frameCh}, nil
 }
 
-func (c *conn) doRequest(ctx context.Context, execType int, db string, query Stmt, properties requestProperties) (errors.Op, http.Header, http.Header,
+func (c *conn) doRequestFromType(ctx context.Context, execType int, db string, query Stmt, properties requestProperties) (errors.Op, http.Header, http.Header,
 	io.ReadCloser, error) {
 	var op errors.Op
 	if execType == execQuery {
@@ -141,9 +141,8 @@ func (c *conn) doRequest(ctx context.Context, execType int, db string, query Stm
 		op = errors.OpMgmt
 	}
 
-	header := c.getHeaders(properties)
-
 	var endpoint *url.URL
+
 	buff := bufferPool.Get().(*bytes.Buffer)
 	buff.Reset()
 	defer bufferPool.Put(buff)
@@ -170,20 +169,33 @@ func (c *conn) doRequest(ctx context.Context, execType int, db string, query Stm
 		return 0, nil, nil, nil, errors.ES(op, errors.KInternal, "internal error: did not understand the type of execType: %d", execType)
 	}
 
+	headers := c.getHeaders(properties)
+	responseHeaders, closer, err := c.doRequest(ctx, op, endpoint, io.NopCloser(buff), headers, fmt.Sprintf("With query: %s", query.String()))
+	return op, headers, responseHeaders, closer, err
+}
+
+func (c *conn) doRequest(
+	ctx context.Context,
+	op errors.Op,
+	endpoint *url.URL,
+	buff io.ReadCloser,
+	headers http.Header,
+	errorContext string) (http.Header, io.ReadCloser, error) {
+
 	if c.auth.TokenProvider != nil && c.auth.TokenProvider.AuthorizationRequired() {
 		c.auth.TokenProvider.SetHttp(c.client)
 		token, tokenType, tkerr := c.auth.TokenProvider.AcquireToken(ctx)
 		if tkerr != nil {
-			return 0, nil, nil, nil, errors.ES(op, errors.KInternal, "Error while getting token : %s", tkerr)
+			return nil, nil, errors.ES(op, errors.KInternal, "Error while getting token : %s", tkerr)
 		}
-		header.Add("Authorization", fmt.Sprintf("%s %s", tokenType, token))
+		headers.Add("Authorization", fmt.Sprintf("%s %s", tokenType, token))
 	}
 
 	req := &http.Request{
 		Method: http.MethodPost,
 		URL:    endpoint,
-		Header: header,
-		Body:   io.NopCloser(buff),
+		Header: headers,
+		Body:   buff,
 	}
 
 	var err error
@@ -191,18 +203,18 @@ func (c *conn) doRequest(ctx context.Context, execType int, db string, query Stm
 	resp, err := c.client.Do(req.WithContext(ctx))
 	if err != nil {
 		// TODO(jdoak): We need a http error unwrap function that pulls out an *errors.Error.
-		return 0, nil, nil, nil, errors.E(op, errors.KHTTPError, fmt.Errorf("with query %q: %w", query.String(), err))
+		return nil, nil, errors.E(op, errors.KHTTPError, fmt.Errorf("%v, %w", errorContext, err))
 	}
 
 	body, err := response.TranslateBody(resp, op)
 	if err != nil {
-		return 0, nil, nil, nil, err
+		return nil, nil, err
 	}
 
 	if resp.StatusCode != http.StatusOK {
-		return 0, nil, nil, nil, errors.HTTP(op, resp.Status, resp.StatusCode, body, fmt.Sprintf("error from Kusto endpoint for query %q: ", query.String()))
+		return nil, nil, errors.HTTP(op, resp.Status, resp.StatusCode, body, fmt.Sprintf("error from Kusto endpoint, %v", errorContext))
 	}
-	return op, header, resp.Header, body, nil
+	return resp.Header, body, nil
 }
 
 func (c *conn) getHeaders(properties requestProperties) http.Header {
