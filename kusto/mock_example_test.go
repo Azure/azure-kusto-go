@@ -23,7 +23,7 @@ import (
 // querier provides a single method, Query(), which is used to query Kusto for some information.
 // This can be substituted for our fake during tests.
 type querier interface {
-	Query(context.Context, string, kusto.Stmt, ...kusto.QueryOption) (*kusto.RowIterator, error)
+	Query(context.Context, string, kusto.Statement, ...kusto.QueryOption) (*kusto.RowIterator, error)
 }
 
 // NodeRec represents our Kusto data that will be returned.
@@ -90,7 +90,7 @@ type fakeQuerier struct {
 }
 
 // Query implements querier.querier.
-func (f *fakeQuerier) Query(_ context.Context, _ string, passedQuery kusto.Stmt, _ ...kusto.QueryOption) (*kusto.RowIterator, error) {
+func (f *fakeQuerier) Query(_ context.Context, _ string, passedQuery kusto.Statement, _ ...kusto.QueryOption) (*kusto.RowIterator, error) {
 	if passedQuery.String() != f.expectQuery {
 		panic("we expect the query to be " + f.expectQuery)
 	}
