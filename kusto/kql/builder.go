@@ -27,6 +27,10 @@ type Builder interface {
 	AddColumn(column string) Builder
 	AddFunction(function string) Builder
 
+	String() string
+	GetParameters() (map[string]string, error)
+	SupportsParameters() bool
+
 	Build() Query
 }
 

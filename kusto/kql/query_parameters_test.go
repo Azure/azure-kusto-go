@@ -15,7 +15,7 @@ func TestQueryParameters(t *testing.T) {
 	}{
 		{"Test empty", NewStatementBuilder(""), NewStatementQueryParameters(), "\n"},
 		{"Test add literal", NewStatementBuilder(""), NewStatementQueryParameters().AddLiteral("foo", "string", "bar"), "declare query_parameters(foo:string=bar);\n"},
-		{"Test add identifiers",
+		{"Test add identifiers", // test might fail at times due to the pseudo-random nature of map that will sometimes change the order of the declaration string.
 			NewStatementBuilder("").
 				AddDatabase("database").AddLiteral(".").
 				AddTable("table").AddLiteral(" | where ").

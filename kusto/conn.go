@@ -76,7 +76,7 @@ type connOptions struct {
 
 // query makes a query for the purpose of extracting data from Kusto. Context can be used to set
 // a timeout or cancel the query. Queries cannot take longer than 5 minutes.
-func (c *conn) query(ctx context.Context, db string, query Stmt, options *queryOptions) (execResp, error) {
+func (c *conn) query(ctx context.Context, db string, query Statement, options *queryOptions) (execResp, error) {
 	if strings.HasPrefix(strings.TrimSpace(query.String()), ".") {
 		return execResp{}, errors.ES(errors.OpQuery, errors.KClientArgs, "a Stmt to Query() cannot begin with a period(.), only Mgmt() calls can do that").SetNoRetry()
 	}
@@ -89,7 +89,7 @@ func (c *conn) mgmt(ctx context.Context, db string, query Stmt, options *mgmtOpt
 	return c.execute(ctx, execMgmt, db, query, *options.requestProperties)
 }
 
-func (c *conn) queryToJson(ctx context.Context, db string, query Stmt, options *queryOptions) (string, error) {
+func (c *conn) queryToJson(ctx context.Context, db string, query Statement, options *queryOptions) (string, error) {
 	_, _, _, body, e := c.doRequest(ctx, execQuery, db, query, *options.requestProperties)
 	if e != nil {
 		return "", e
@@ -111,7 +111,7 @@ type execResp struct {
 	frameCh    chan frames.Frame
 }
 
-func (c *conn) execute(ctx context.Context, execType int, db string, query Stmt, properties requestProperties) (execResp, error) {
+func (c *conn) execute(ctx context.Context, execType int, db string, query Statement, properties requestProperties) (execResp, error) {
 	op, reqHeader, respHeader, body, e := c.doRequest(ctx, execType, db, query, properties)
 	if e != nil {
 		return execResp{}, e
@@ -132,7 +132,7 @@ func (c *conn) execute(ctx context.Context, execType int, db string, query Stmt,
 	return execResp{reqHeader: reqHeader, respHeader: respHeader, frameCh: frameCh}, nil
 }
 
-func (c *conn) doRequest(ctx context.Context, execType int, db string, query Stmt, properties requestProperties) (errors.Op, http.Header, http.Header,
+func (c *conn) doRequest(ctx context.Context, execType int, db string, query Statement, properties requestProperties) (errors.Op, http.Header, http.Header,
 	io.ReadCloser, error) {
 	var op errors.Op
 	if execType == execQuery {
@@ -164,10 +164,16 @@ func (c *conn) doRequest(ctx context.Context, execType int, db string, query Stm
 	switch execType {
 	case execQuery, execMgmt:
 		var err error
+		var csl string
+		if query.SupportsParameters() {
+			csl = query.String()
+		} else {
+			csl = fmt.Sprintf("%s\n%s", properties.QueryParameters.ToDeclarationString(), query.String())
+		}
 		err = json.NewEncoder(buff).Encode(
 			queryMsg{
 				DB:         db,
-				CSL:        query.String(),
+				CSL:        csl,
 				Properties: properties,
 			},
 		)

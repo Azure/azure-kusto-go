@@ -32,6 +32,8 @@ func (q *StatementQueryParameters) addBase(key string, paramType fmt.Stringer, v
 	return q
 }
 
+// note - due to the psuedo-random nature of maps, the declaration string might be ordered differently for different runs.
+// might crash the test in those times.
 func (q *StatementQueryParameters) ToDeclarationString() string {
 	const (
 		declare   = "declare query_parameters("
@@ -52,8 +54,6 @@ func (q *StatementQueryParameters) ToDeclarationString() string {
 		build.WriteString(key)
 		build.WriteString(":")
 		build.WriteString(paramVals.paramType)
-		build.WriteString("=")
-		build.WriteString(paramVals.value)
 		build.WriteString(", ")
 	}
 	build.WriteString(closeStmt)

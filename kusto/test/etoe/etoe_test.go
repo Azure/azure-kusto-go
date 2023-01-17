@@ -4,6 +4,7 @@ import (
 	"context"
 	"encoding/csv"
 	"fmt"
+	"github.com/Azure/azure-kusto-go/kusto/kql"
 	"go.uber.org/goleak"
 	"io"
 	"math/rand"
@@ -93,11 +94,11 @@ func (lr LogRow) CSVMarshal() []string {
 	}
 }
 
-type queryFunc func(ctx context.Context, db string, query kusto.Stmt, options ...kusto.QueryOption) (*kusto.RowIterator, error)
+type queryFunc func(ctx context.Context, db string, query kusto.Statement, options ...kusto.QueryOption) (*kusto.RowIterator, error)
 
 type mgmtFunc func(ctx context.Context, db string, query kusto.Stmt, options ...kusto.MgmtOption) (*kusto.RowIterator, error)
 
-type queryJsonFunc func(ctx context.Context, db string, query kusto.Stmt, options ...kusto.QueryOption) (string, error)
+type queryJsonFunc func(ctx context.Context, db string, query kusto.Statement, options ...kusto.QueryOption) (string, error)
 
 func TestQueries(t *testing.T) {
 	t.Parallel()
@@ -558,6 +559,118 @@ func TestQueries(t *testing.T) {
 
 				require.Equal(t, test.want, json)
 				return
+
+			default:
+				require.Fail(t, "test setup failure")
+			}
+
+			defer iter.Stop()
+
+			var got = test.gotInit()
+			err = iter.DoOnRowOrError(func(row *table.Row, e *errors.Error) error {
+				return test.doer(row, got)
+			})
+
+			require.Nilf(t, err, "TestQueries(%s): had iter.Do() error: %s", test.desc, err)
+
+			require.Equal(t, test.want, got)
+		})
+	}
+}
+
+func TestStatment(t *testing.T) {
+	t.Parallel()
+
+	if skipETOE || testing.Short() {
+		t.Skipf("end to end tests disabled: missing config.json file in etoe directory")
+	}
+
+	_, cancel := context.WithCancel(context.Background())
+	defer cancel()
+
+	client, err := kusto.New(testConfig.kcsb)
+	if err != nil {
+		panic(err)
+	}
+
+	t.Cleanup(func() {
+		t.Log("Closing client")
+		require.NoError(t, client.Close())
+		t.Log("Closed client")
+	})
+
+	allDataTypesTable := fmt.Sprintf("goe2e_all_data_types_%d_%d", time.Now().UnixNano(), rand.Int())
+	require.NoError(t, createIngestionTable(t, client, allDataTypesTable, true))
+
+	tests := []struct {
+		// desc is a description of a test.
+		desc string
+		// stmt is the Kusot Stmt that will be sent.
+		stmt kusto.Statement
+		// setup is a function that will be called before the test runs.
+		setup func() error
+		// teardown is a functiont that will be called before the test ends.
+		teardown func() error
+		qcall    queryFunc
+		mcall    mgmtFunc
+		qjcall   queryJsonFunc
+		options  interface{} // either []kusto.QueryOption or []kusto.MgmtOption
+		// doer is called from within the function passed to RowIterator.Do(). It allows us to collect the data we receive.
+		doer func(row *table.Row, update interface{}) error
+		// gotInit creates the variable that will be used by doer's update argument.
+		gotInit func() interface{}
+		// want is the data we want to receive from the query.
+		want interface{}
+	}{
+		{
+			desc: "New query method",
+			stmt: kql.NewStatementBuilder("database(database).table(table) | where xtext == txt"),
+			options: []kusto.QueryOption{kusto.QueryParameters(*kql.NewStatementQueryParameters().
+				AddLiteral("database", "string", "MyDatabase").
+				AddLiteral("table", "string", "SampleTable").
+				AddLiteral("txt", "string", "One"))},
+			qcall: client.Query,
+			doer: func(row *table.Row, update interface{}) error {
+				if row.Replace {
+					fmt.Println("---") // Replace flag indicates that the query result should be cleared and replaced with this row
+				}
+				fmt.Println(row) // As a convenience, printing a *table.Row will output csv
+				return nil
+			},
+			gotInit: func() interface{} {
+				return nil
+			},
+		},
+	}
+
+	for _, test := range tests {
+		test := test // capture
+		t.Run(test.desc, func(t *testing.T) {
+			t.Parallel()
+			if test.setup != nil {
+				if err := test.setup(); err != nil {
+					panic(err)
+				}
+			}
+			if test.teardown != nil {
+				defer func() {
+					if err := test.teardown(); err != nil {
+						panic(err)
+					}
+				}()
+			}
+
+			var iter *kusto.RowIterator
+			var err error
+			switch {
+			case test.qcall != nil:
+				var options []kusto.QueryOption
+				if test.options != nil {
+					options = test.options.([]kusto.QueryOption)
+				}
+				iter, err = test.qcall(context.Background(), testConfig.Database, test.stmt, options...)
+
+				require.Nilf(t, err, "TestQueries(%s): had test.qcall error: %s", test.desc, err)
 
 			default:
 				require.Fail(t, "test setup failure")
