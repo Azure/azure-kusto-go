@@ -621,6 +621,8 @@ func TestStatment(t *testing.T) {
 		gotInit func() interface{}
 		// want is the data we want to receive from the query.
 		want interface{}
+		// should the test fail
+		failFlag bool
 	}{
 		{
 			desc: "New query method",
@@ -640,6 +642,47 @@ func TestStatment(t *testing.T) {
 			gotInit: func() interface{} {
 				return nil
 			},
+			failFlag: false,
+		},
+		{
+			desc: "query different type (bool)",
+			stmt: kql.NewStatementBuilder("database(database).table(table) | where xbool == txt"),
+			options: []kusto.QueryOption{kusto.QueryParameters(*kql.NewStatementQueryParameters().
+				AddLiteral("database", "string", "MyDatabase").
+				AddLiteral("table", "string", "SampleTable").
+				AddLiteral("txt", "bool", "false"))},
+			qcall: client.Query,
+			doer: func(row *table.Row, update interface{}) error {
+				if row.Replace {
+					fmt.Println("---") // Replace flag indicates that the query result should be cleared and replaced with this row
+				}
+				fmt.Println(row) // As a convenience, printing a *table.Row will output csv
+				return nil
+			},
+			gotInit: func() interface{} {
+				return nil
+			},
+			failFlag: false,
+		},
+		{
+			desc: "Fail - inject",
+			stmt: kql.NewStatementBuilder("database(database).table(table) | where xtext == txt"),
+			options: []kusto.QueryOption{kusto.QueryParameters(*kql.NewStatementQueryParameters().
+				AddLiteral("database", "string", "MyDatabase").
+				AddLiteral("table", "string", "SampleTable\"").
+				AddLiteral("txt", "string", "One"))},
+			qcall: client.Query,
+			doer: func(row *table.Row, update interface{}) error {
+				if row.Replace {
+					fmt.Println("---") // Replace flag indicates that the query result should be cleared and replaced with this row
+				}
+				fmt.Println(row) // As a convenience, printing a *table.Row will output csv
+				return nil
+			},
+			gotInit: func() interface{} {
+				return nil
+			},
+			failFlag: true,
 		},
 	}
 
@@ -669,21 +712,24 @@ func TestStatment(t *testing.T) {
 					options = test.options.([]kusto.QueryOption)
 				}
 				iter, err = test.qcall(context.Background(), testConfig.Database, test.stmt, options...)
-
-				require.Nilf(t, err, "TestQueries(%s): had test.qcall error: %s", test.desc, err)
+				if (!test.failFlag && err != nil) || (test.failFlag && err == nil) {
+					require.Nilf(t, err, "TestQueries(%s): had iter.Do() error: %s.", test.desc, err)
+				}
 
 			default:
 				require.Fail(t, "test setup failure")
 			}
 
-			defer iter.Stop()
-
 			var got = test.gotInit()
-			err = iter.DoOnRowOrError(func(row *table.Row, e *errors.Error) error {
-				return test.doer(row, got)
-			})
-
-			require.Nilf(t, err, "TestQueries(%s): had iter.Do() error: %s", test.desc, err)
+			if iter != nil {
+				defer iter.Stop()
+				err = iter.DoOnRowOrError(func(row *table.Row, e *errors.Error) error {
+					return test.doer(row, got)
+				})
+				if (!test.failFlag && err != nil) || (test.failFlag && err == nil) {
+					require.Nilf(t, err, "TestQueries(%s): had iter.Do() error: %s.", test.desc, err)
+				}
+			}
 
 			require.Equal(t, test.want, got)
 		})

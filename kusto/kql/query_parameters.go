@@ -28,8 +28,21 @@ func (q *StatementQueryParameters) AddLiteral(key string, paramType stringConsta
 	return q.addBase(key, paramType, value)
 }
 func (q *StatementQueryParameters) addBase(key string, paramType fmt.Stringer, value fmt.Stringer) *StatementQueryParameters {
-	q.parameters[key] = ParamVals{paramType.String(), value.String()}
+	q.parameters[key] = ParamVals{NormalizeName(paramType.String()), NormalizeName(value.String())}
 	return q
+}
+
+// NormalizeName normalizes a string in order to be used safely in the engine - given "query" will produce [\"query\"].
+func NormalizeName(val string) string {
+	if val == "" {
+		return val
+	}
+
+	if !RequiresQuoting(val) {
+		return val
+	}
+
+	return "[" + QuoteString(val, false) + "]"
 }
 
 // note - due to the psuedo-random nature of maps, the declaration string might be ordered differently for different runs.
