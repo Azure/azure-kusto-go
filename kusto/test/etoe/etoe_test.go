@@ -626,10 +626,10 @@ func TestStatment(t *testing.T) {
 	}{
 		{
 			desc: "New query method",
-			stmt: kql.NewStatementBuilder("table(table) | where xtext == txt"),
+			stmt: kql.NewStatementBuilder("table(table) | where vstr == txt"),
 			options: []kusto.QueryOption{kusto.QueryParameters(*kql.NewStatementQueryParameters().
-				AddLiteral("table", "string", "SampleTable").
-				AddLiteral("txt", "string", "One"))},
+				AddLiteral("table", "string", "goe2e_all_data_types").
+				AddLiteral("txt", "string", "asdf"))},
 			qcall: client.Query,
 			doer: func(row *table.Row, update interface{}) error {
 				if row.Replace {
@@ -645,10 +645,10 @@ func TestStatment(t *testing.T) {
 		},
 		{
 			desc: "query different type (bool)",
-			stmt: kql.NewStatementBuilder("table(table) | where xbool == txt"),
+			stmt: kql.NewStatementBuilder("table(table) | where vnum == txt"),
 			options: []kusto.QueryOption{kusto.QueryParameters(*kql.NewStatementQueryParameters().
-				AddLiteral("table", "string", "SampleTable").
-				AddLiteral("txt", "bool", "false"))},
+				AddLiteral("table", "string", "goe2e_all_data_types").
+				AddLiteral("txt", "int", "1"))},
 			qcall: client.Query,
 			doer: func(row *table.Row, update interface{}) error {
 				if row.Replace {
@@ -664,10 +664,10 @@ func TestStatment(t *testing.T) {
 		},
 		{
 			desc: "Fail - inject",
-			stmt: kql.NewStatementBuilder("table(table) | where xtext == txt"),
+			stmt: kql.NewStatementBuilder("table(table) | where vstr == txt"),
 			options: []kusto.QueryOption{kusto.QueryParameters(*kql.NewStatementQueryParameters().
-				AddLiteral("table", "string", "SampleTable\"").
-				AddLiteral("txt", "string", "One"))},
+				AddLiteral("table", "string", "goe2e_all_data_types\"").
+				AddLiteral("txt", "string", "asdf"))},
 			qcall: client.Query,
 			doer: func(row *table.Row, update interface{}) error {
 				if row.Replace {
