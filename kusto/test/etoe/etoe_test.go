@@ -626,9 +626,8 @@ func TestStatment(t *testing.T) {
 	}{
 		{
 			desc: "New query method",
-			stmt: kql.NewStatementBuilder("database(database).table(table) | where xtext == txt"),
+			stmt: kql.NewStatementBuilder("table(table) | where xtext == txt"),
 			options: []kusto.QueryOption{kusto.QueryParameters(*kql.NewStatementQueryParameters().
-				AddLiteral("database", "string", "MyDatabase").
 				AddLiteral("table", "string", "SampleTable").
 				AddLiteral("txt", "string", "One"))},
 			qcall: client.Query,
@@ -646,9 +645,8 @@ func TestStatment(t *testing.T) {
 		},
 		{
 			desc: "query different type (bool)",
-			stmt: kql.NewStatementBuilder("database(database).table(table) | where xbool == txt"),
+			stmt: kql.NewStatementBuilder("table(table) | where xbool == txt"),
 			options: []kusto.QueryOption{kusto.QueryParameters(*kql.NewStatementQueryParameters().
-				AddLiteral("database", "string", "MyDatabase").
 				AddLiteral("table", "string", "SampleTable").
 				AddLiteral("txt", "bool", "false"))},
 			qcall: client.Query,
@@ -666,9 +664,8 @@ func TestStatment(t *testing.T) {
 		},
 		{
 			desc: "Fail - inject",
-			stmt: kql.NewStatementBuilder("database(database).table(table) | where xtext == txt"),
+			stmt: kql.NewStatementBuilder("table(table) | where xtext == txt"),
 			options: []kusto.QueryOption{kusto.QueryParameters(*kql.NewStatementQueryParameters().
-				AddLiteral("database", "string", "MyDatabase").
 				AddLiteral("table", "string", "SampleTable\"").
 				AddLiteral("txt", "string", "One"))},
 			qcall: client.Query,
