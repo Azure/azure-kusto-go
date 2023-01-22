@@ -30,7 +30,7 @@ func createInstance() *TrustedEndpoints {
 	wellKnownData := WellKnownKustoEndpointsData{}
 	byteValue, _ := ioutil.ReadFile("wellKnownKustoEndpoints.json")
 
-	json.Unmarshal(byteValue, wellKnownData)
+	json.Unmarshal(byteValue, &wellKnownData)
 	for key, value := range wellKnownData.AllowedEndpointsByLogin {
 		rules := []MatchRule{}
 		for _, suf := range value.AllowedKustoSuffixes {
@@ -50,7 +50,7 @@ func createInstance() *TrustedEndpoints {
 	return &TrustedEndpoints{matchers: matchers}
 }
 
-func (trusted *TrustedEndpoints) setOverridePolicy(matcher func(string) bool) {
+func (trusted *TrustedEndpoints) SetOverridePolicy(matcher func(string) bool) {
 	trusted.overrideMatcher = matcher
 }
 
@@ -117,7 +117,7 @@ func NewFastSuffixMatcher(rules []MatchRule) (*FastSuffixMatcher, error) {
 	for _, rule := range rules {
 		suffix := tailLowerCase(rule.suffix, minSufLen)
 		if lst, ok := processedRules[suffix]; !ok {
-			processedRules[suffix] = []MatchRule{}
+			processedRules[suffix] = []MatchRule{rule}
 		} else {
 			processedRules[suffix] = append(lst, rule)
 		}
