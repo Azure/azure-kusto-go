@@ -60,6 +60,7 @@ func newConn(endpoint string, auth Authorization, client *http.Client) (*conn, e
 		endQuery:    &url.URL{Scheme: "https", Host: u.Host, Path: "/v2/rest/query"},
 		streamQuery: &url.URL{Scheme: "https", Host: u.Host, Path: "/v1/rest/ingest/"},
 		client:      client,
+		endpoint:    endpoint,
 	}
 
 	return c, nil
@@ -223,7 +224,9 @@ func (c *conn) validateEndpoint() error {
 		var err error
 		if cloud, err := GetMetadata(c.endpoint, c.client); err == nil {
 			err = truestedEndpoints.Instance.ValidateTrustedEndpoint(c.endpoint, cloud.LoginEndpoint)
-			c.endpointValidated = true
+			if err == nil {
+				c.endpointValidated = true
+			}
 		}
 
 		return err

@@ -3,7 +3,6 @@ package truestedEndpoints
 import (
 	"encoding/json"
 	"fmt"
-	"io/ioutil"
 	"math"
 	"net/url"
 	"strings"
@@ -21,16 +20,15 @@ type AllowedEndpoints struct {
 	AllowedKustoHostnames []string
 }
 
-type WellKnownKustoEndpointsData struct {
+type WellKnownKustoEndpointsDataStruct struct {
 	AllowedEndpointsByLogin map[string]AllowedEndpoints
 }
 
 func createInstance() *TrustedEndpoints {
 	matchers := map[string]*FastSuffixMatcher{}
-	wellKnownData := WellKnownKustoEndpointsData{}
-	byteValue, _ := ioutil.ReadFile("wellKnownKustoEndpoints.json")
+	wellKnownData := WellKnownKustoEndpointsDataStruct{}
 
-	json.Unmarshal(byteValue, &wellKnownData)
+	json.Unmarshal([]byte(WellKnownKustoEndpointsJson), &wellKnownData)
 	for key, value := range wellKnownData.AllowedEndpointsByLogin {
 		rules := []MatchRule{}
 		for _, suf := range value.AllowedKustoSuffixes {
