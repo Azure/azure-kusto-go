@@ -45,15 +45,15 @@ var defaultTracingValuesOnce = utils.NewOnceWithInit[ClientDetails](func() (Clie
 func getOsUser() string {
 	var final string
 	current, err := user.Current()
-	if err != nil || current.Username == "" {
+	if err == nil && current.Username != "" {
+		final = current.Username
+	} else {
 		// get from env and try domain too
 		final = os.Getenv("USERNAME")
 		domain := os.Getenv("USERDOMAIN")
 		if !isEmpty(domain) && !isEmpty(final) {
 			final = domain + "\\" + final
 		}
-	} else {
-		final = current.Username
 	}
 
 	if isEmpty(final) {
