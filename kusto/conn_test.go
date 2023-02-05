@@ -120,7 +120,7 @@ func TestSetConnectorDetails(t *testing.T) {
 		t.Run(tt.testName, func(t *testing.T) {
 			t.Parallel()
 			kcsb := NewConnectionStringBuilder("https://test.kusto.windows.net")
-			kcsb.SetConnectorDetails(tt.name, tt.version, tt.sendUser, tt.overrideUser, tt.appName, tt.appVersion, tt.additionalFields...)
+			kcsb.SetConnectorDetails(tt.name, tt.version, tt.appName, tt.appVersion, tt.sendUser, tt.overrideUser, tt.additionalFields...)
 
 			if tt.appPrefix {
 				assert.True(t, strings.HasPrefix(kcsb.ApplicationForTracing, tt.expectedApp))
