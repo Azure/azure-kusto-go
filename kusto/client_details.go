@@ -98,7 +98,7 @@ func buildHeaderFormat(args ...StringPair) string {
 	}), "|")
 }
 
-func setConnectorDetails(name, version string, sendUser bool, overrideUser, appName, appVersion string, additionalFields ...StringPair) (string, string) {
+func setConnectorDetails(name, version, appName, appVersion string, sendUser bool, overrideUser string, additionalFields ...StringPair) (string, string) {
 	var additionalFieldsList []StringPair
 
 	additionalFieldsList = append(additionalFieldsList, StringPair{Key: "Kusto." + name, Value: version})

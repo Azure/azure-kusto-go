@@ -430,8 +430,8 @@ func isEmpty(str string) bool {
 	return strings.TrimSpace(str) == ""
 }
 
-func (kcsb *ConnectionStringBuilder) SetConnectorDetails(name, version string, sendUser bool, overrideUser, appName, appVersion string, additionalFields ...StringPair) {
-	app, user := setConnectorDetails(name, version, sendUser, overrideUser, appName, appVersion, additionalFields...)
+func (kcsb *ConnectionStringBuilder) SetConnectorDetails(name, version, appName, appVersion string, sendUser bool, overrideUser string, additionalFields ...StringPair) {
+	app, user := setConnectorDetails(name, version, appName, appVersion, sendUser, overrideUser, additionalFields...)
 	kcsb.ApplicationForTracing = app
 	kcsb.UserForTracing = user
 }
