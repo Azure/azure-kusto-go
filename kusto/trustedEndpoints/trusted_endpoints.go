@@ -1,6 +1,7 @@
 package truestedEndpoints
 
 import (
+	_ "embed"
 	"encoding/json"
 	"fmt"
 	"math"
@@ -13,6 +14,8 @@ import (
 
 var (
 	Instance = createInstance()
+	//go:embed well_known_kusto_endpoints.json
+	jsonFile []byte
 )
 
 type AllowedEndpoints struct {
@@ -28,7 +31,7 @@ func createInstance() *TrustedEndpoints {
 	matchers := map[string]*FastSuffixMatcher{}
 	wellKnownData := WellKnownKustoEndpointsDataStruct{}
 
-	err := json.Unmarshal([]byte(WellKnownKustoEndpointsJson), &wellKnownData)
+	err := json.Unmarshal(jsonFile, &wellKnownData)
 	if err != nil {
 		panic(err.Error())
 	}
