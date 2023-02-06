@@ -100,7 +100,7 @@ type mgmtFunc func(ctx context.Context, db string, query kusto.Stmt, options ...
 
 type queryJsonFunc func(ctx context.Context, db string, query kusto.Stmt, options ...kusto.QueryOption) (string, error)
 
-func TestQueries(t *testing.T) { // running
+func TestQueries(t *testing.T) {
 	t.Parallel()
 
 	if skipETOE || testing.Short() {

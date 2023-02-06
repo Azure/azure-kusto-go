@@ -28,7 +28,11 @@ func createInstance() *TrustedEndpoints {
 	matchers := map[string]*FastSuffixMatcher{}
 	wellKnownData := WellKnownKustoEndpointsDataStruct{}
 
-	json.Unmarshal([]byte(WellKnownKustoEndpointsJson), &wellKnownData)
+	err := json.Unmarshal([]byte(WellKnownKustoEndpointsJson), &wellKnownData)
+	if err != nil {
+		panic(err.Error())
+	}
+
 	for key, value := range wellKnownData.AllowedEndpointsByLogin {
 		rules := []MatchRule{}
 		for _, suf := range value.AllowedKustoSuffixes {
@@ -38,7 +42,7 @@ func createInstance() *TrustedEndpoints {
 			rules = append(rules, MatchRule{suffix: host, exact: true})
 		}
 
-		f, err := NewFastSuffixMatcher(rules)
+		f, err := newFastSuffixMatcher(rules)
 		if err != nil {
 			panic(err.Error())
 		}
@@ -48,6 +52,7 @@ func createInstance() *TrustedEndpoints {
 	return &TrustedEndpoints{matchers: matchers}
 }
 
+// Set a policy to override all other trusted rules
 func (trusted *TrustedEndpoints) SetOverridePolicy(matcher func(string) bool) {
 	trusted.overrideMatcher = matcher
 }
@@ -97,7 +102,7 @@ func (matcher *FastSuffixMatcher) isMatch(candidate string) bool {
 	return false
 }
 
-func NewFastSuffixMatcher(rules []MatchRule) (*FastSuffixMatcher, error) {
+func newFastSuffixMatcher(rules []MatchRule) (*FastSuffixMatcher, error) {
 	minSufLen := len(lo.MinBy(rules, func(a MatchRule, cur MatchRule) bool {
 		return len(a.suffix) < len(cur.suffix)
 	}).suffix)
@@ -136,9 +141,9 @@ func values[T comparable, R any](m map[T]R) []R {
 	return l
 }
 
-func CreateFastSuffixMatcherFromExisting(rules []MatchRule, existing *FastSuffixMatcher) (*FastSuffixMatcher, error) {
+func createFastSuffixMatcherFromExisting(rules []MatchRule, existing *FastSuffixMatcher) (*FastSuffixMatcher, error) {
 	if existing == nil || len(existing.rules) == 0 {
-		return NewFastSuffixMatcher(rules)
+		return newFastSuffixMatcher(rules)
 	}
 
 	if rules == nil || len(rules) == 0 {
@@ -151,9 +156,10 @@ func CreateFastSuffixMatcherFromExisting(rules []MatchRule, existing *FastSuffix
 		list = append(list, elem...)
 	}
 
-	return NewFastSuffixMatcher(list)
+	return newFastSuffixMatcher(list)
 }
 
+// Add or set a list of trusted endpoints rules
 func (trusted *TrustedEndpoints) AddTrustedHosts(rules []MatchRule, replace bool) error {
 	if rules == nil || len(rules) == 0 {
 		if replace {
@@ -166,18 +172,12 @@ func (trusted *TrustedEndpoints) AddTrustedHosts(rules []MatchRule, replace bool
 		trusted.additionalMatcher = nil
 	}
 
-	matcher, err := CreateFastSuffixMatcherFromExisting(rules, trusted.additionalMatcher)
+	matcher, err := createFastSuffixMatcherFromExisting(rules, trusted.additionalMatcher)
 	trusted.additionalMatcher = matcher
 	return err
 }
 
-/**
- * Is the endpoint uri trusted?
- *
- * @param uri           The endpoint to inspect.
- * @param loginEndpoint The login endpoint to check against.
- * @throws KustoClientInvalidConnectionStringException - Endpoint is not a trusted Kusto endpoint
- */
+// Validates the endpoint uri trusted
 func (trusted *TrustedEndpoints) ValidateTrustedEndpoint(endpoint string, loginEndpoint string) error {
 	u, err := url.Parse(endpoint)
 	if err != nil {
