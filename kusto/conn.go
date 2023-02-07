@@ -14,6 +14,7 @@ import (
 	"regexp"
 	"strings"
 	"sync"
+	"sync/atomic"
 
 	"github.com/Azure/azure-kusto-go/kusto/data/errors"
 	"github.com/Azure/azure-kusto-go/kusto/internal/frames"
@@ -40,7 +41,7 @@ type conn struct {
 	auth                           Authorization
 	endMgmt, endQuery, streamQuery *url.URL
 	client                         *http.Client
-	endpointValidated              bool
+	endpointValidated              atomic.Bool
 }
 
 // newConn returns a new conn object with an injected http.Client
@@ -60,7 +61,6 @@ func newConn(endpoint string, auth Authorization, client *http.Client) (*conn, e
 		endQuery:    &url.URL{Scheme: "https", Host: u.Host, Path: "/v2/rest/query"},
 		streamQuery: &url.URL{Scheme: "https", Host: u.Host, Path: "/v1/rest/ingest/"},
 		client:      client,
-		endpoint:    endpoint,
 	}
 
 	return c, nil
@@ -220,12 +220,12 @@ func (c *conn) doRequest(ctx context.Context, execType int, db string, query Stm
 }
 
 func (c *conn) validateEndpoint() error {
-	if !c.endpointValidated {
+	if !c.endpointValidated.Load() {
 		var err error
 		if cloud, err := GetMetadata(c.endpoint, c.client); err == nil {
 			err = truestedEndpoints.Instance.ValidateTrustedEndpoint(c.endpoint, cloud.LoginEndpoint)
 			if err == nil {
-				c.endpointValidated = true
+				c.endpointValidated.Store(true)
 			}
 		}
 
