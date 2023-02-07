@@ -17,7 +17,6 @@ import (
 	"github.com/Azure/azure-kusto-go/kusto/data/errors"
 	"github.com/Azure/azure-kusto-go/kusto/ingest/internal/properties"
 	"github.com/Azure/azure-kusto-go/kusto/internal/response"
-	"github.com/Azure/azure-kusto-go/kusto/internal/version"
 	"github.com/google/uuid"
 )
 
@@ -32,17 +31,18 @@ var BuffPool = sync.Pool{
 
 // Conn provides connectivity to the Kusto streaming ingestion service.
 type Conn struct {
-	auth       kusto.Authorization
-	baseURL    *url.URL
-	reqHeaders http.Header
-	client     *http.Client
-	done       chan struct{}
+	auth          kusto.Authorization
+	baseURL       *url.URL
+	reqHeaders    http.Header
+	client        *http.Client
+	done          chan struct{}
+	clientDetails kusto.ClientDetails
 
 	inTest bool
 }
 
 // New returns a new Conn object.
-func New(endpoint string, auth kusto.Authorization, client *http.Client) (*Conn, error) {
+func New(endpoint string, auth kusto.Authorization, client *http.Client, clientDetails *kusto.ClientDetails) (*Conn, error) {
 	if !validURL.MatchString(endpoint) {
 		return nil, errors.ES(
 			errors.OpServConn,
@@ -51,15 +51,20 @@ func New(endpoint string, auth kusto.Authorization, client *http.Client) (*Conn,
 		).SetNoRetry()
 	}
 
-	return newWithoutValidation(endpoint, auth, client)
+	return newWithoutValidation(endpoint, auth, client, clientDetails)
 }
 
-func newWithoutValidation(endpoint string, auth kusto.Authorization, client *http.Client) (*Conn, error) {
+func newWithoutValidation(endpoint string, auth kusto.Authorization, client *http.Client, clientDetails *kusto.ClientDetails) (*Conn, error) {
 	headers := http.Header{}
 	headers.Add("Accept", "application/json")
 	headers.Add("Accept-Encoding", "gzip,deflate")
-	headers.Add("x-ms-client-version", "Kusto.Go.Client: "+version.Kusto)
 	headers.Add("Connection", "Keep-Alive")
+	headers.Add("x-ms-version", "2019-02-13")
+	if clientDetails != nil {
+		headers.Add("x-ms-app", clientDetails.ApplicationForTracing())
+		headers.Add("x-ms-user", clientDetails.UserNameForTracing())
+		headers.Add("x-ms-client-version", clientDetails.ClientVersionForTracing())
+	}
 
 	// TODO(daniel/jdoak): Get rid of this Replace stuff. I mean, its just hacky.
 	u, err := url.Parse(strings.Replace(endpoint, "ingest-", "", 1))
