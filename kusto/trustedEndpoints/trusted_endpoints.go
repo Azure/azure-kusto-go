@@ -55,7 +55,7 @@ func createInstance() *TrustedEndpoints {
 	return &TrustedEndpoints{matchers: matchers}
 }
 
-// Set a policy to override all other trusted rules
+// SetOverridePolicy Set a policy to override all other trusted rules
 func (trusted *TrustedEndpoints) SetOverridePolicy(matcher func(string) bool) {
 	trusted.overrideMatcher = matcher
 }
@@ -153,16 +153,14 @@ func createFastSuffixMatcherFromExisting(rules []MatchRule, existing *FastSuffix
 		return existing, nil
 	}
 
-	list := rules[:]
-
-	for _, elem := range values(existing.rules) {
-		list = append(list, elem...)
+	for _, elem := range existing.rules {
+		rules = append(rules, elem...)
 	}
 
-	return newFastSuffixMatcher(list)
+	return newFastSuffixMatcher(rules)
 }
 
-// Add or set a list of trusted endpoints rules
+// AddTrustedHosts Add or set a list of trusted endpoints rules
 func (trusted *TrustedEndpoints) AddTrustedHosts(rules []MatchRule, replace bool) error {
 	if rules == nil || len(rules) == 0 {
 		if replace {
@@ -180,7 +178,7 @@ func (trusted *TrustedEndpoints) AddTrustedHosts(rules []MatchRule, replace bool
 	return err
 }
 
-// Validates the endpoint uri trusted
+// ValidateTrustedEndpoint Validates the endpoint uri trusted
 func (trusted *TrustedEndpoints) ValidateTrustedEndpoint(endpoint string, loginEndpoint string) error {
 	u, err := url.Parse(endpoint)
 	if err != nil {
