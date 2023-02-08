@@ -114,7 +114,7 @@ func assignValue(kcsb *ConnectionStringBuilder, rawKey string, value string) err
 
 // NewConnectionStringBuilder Creates new Kusto ConnectionStringBuilder.
 // Params takes kusto connection string connStr: string.  Kusto connection string should be of the format:
-// https://<clusterName>.kusto.windows.net;AAD User ID="user@microsoft.com";Password=P@ssWord
+// https://<clusterName>.<location>.kusto.windows.net;AAD User ID="user@microsoft.com";Password=P@ssWord
 // For more information please look at:
 // https://docs.microsoft.com/azure/data-explorer/kusto/api/connection-strings/kusto
 func NewConnectionStringBuilder(connStr string) *ConnectionStringBuilder {
