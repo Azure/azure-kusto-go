@@ -41,7 +41,7 @@ func (c *conn) StreamIngest(ctx context.Context, db, table string, payload io.Re
 	headers.Add("Content-Type", "application/json; charset=utf-8")
 	headers.Add("Content-Encoding", "gzip")
 
-	_, body, err := c.doRequest(ctx, errors.OpIngestStream, streamUrl, closeablePayload, headers, fmt.Sprintf("With db: %s, table: %s, mappingName: %s, clientRequestId: %s", db, table, mappingName, clientRequestId))
+	_, body, err := c.doRequestImpl(ctx, errors.OpIngestStream, streamUrl, closeablePayload, headers, fmt.Sprintf("With db: %s, table: %s, mappingName: %s, clientRequestId: %s", db, table, mappingName, clientRequestId))
 	if body != nil {
 		body.Close()
 	}
