@@ -4,7 +4,6 @@ import (
 	"context"
 	"encoding/csv"
 	"fmt"
-	"go.uber.org/goleak"
 	"io"
 	"math/rand"
 	"os"
@@ -13,6 +12,8 @@ import (
 	"testing"
 	"time"
 	"unicode"
+
+	"go.uber.org/goleak"
 
 	"github.com/Azure/azure-kusto-go/kusto"
 	"github.com/Azure/azure-kusto-go/kusto/data/errors"
@@ -580,7 +581,7 @@ func TestQueries(t *testing.T) {
 	}
 }
 
-func TestFileIngestion(t *testing.T) {
+func TestFileIngestion(t *testing.T) { //ok
 	t.Parallel()
 
 	if skipETOE || testing.Short() {
@@ -956,7 +957,7 @@ func TestFileIngestion(t *testing.T) {
 	}
 }
 
-func TestReaderIngestion(t *testing.T) {
+func TestReaderIngestion(t *testing.T) { // ok
 	t.Parallel()
 
 	if skipETOE || testing.Short() {
@@ -1296,7 +1297,7 @@ func TestReaderIngestion(t *testing.T) {
 	}
 }
 
-func TestMultipleClusters(t *testing.T) {
+func TestMultipleClusters(t *testing.T) { //ok
 	t.Parallel()
 
 	if skipETOE || testing.Short() {
@@ -1506,7 +1507,7 @@ func TestMultipleClusters(t *testing.T) {
 	}
 }
 
-func TestStreamingIngestion(t *testing.T) {
+func TestStreamingIngestion(t *testing.T) { //OK
 	t.Parallel()
 
 	if skipETOE || testing.Short() {
