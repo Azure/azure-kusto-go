@@ -14,12 +14,14 @@ import (
 	"regexp"
 	"strings"
 	"sync"
+	"sync/atomic"
 
 	"github.com/Azure/azure-kusto-go/kusto/data/errors"
 	"github.com/Azure/azure-kusto-go/kusto/internal/frames"
 	v1 "github.com/Azure/azure-kusto-go/kusto/internal/frames/v1"
 	v2 "github.com/Azure/azure-kusto-go/kusto/internal/frames/v2"
 	"github.com/Azure/azure-kusto-go/kusto/internal/response"
+	truestedEndpoints "github.com/Azure/azure-kusto-go/kusto/trusted_endpoints"
 	"github.com/google/uuid"
 )
 
@@ -37,6 +39,7 @@ type conn struct {
 	auth                           Authorization
 	endMgmt, endQuery, streamQuery *url.URL
 	client                         *http.Client
+	endpointValidated              atomic.Bool
 	clientDetails                  *ClientDetails
 }
 
@@ -134,6 +137,7 @@ func (c *conn) execute(ctx context.Context, execType int, db string, query Stmt,
 
 func (c *conn) doRequestFromType(ctx context.Context, execType int, db string, query Stmt, properties requestProperties) (errors.Op, http.Header, http.Header,
 	io.ReadCloser, error) {
+	err := c.validateEndpoint()
 	var op errors.Op
 	if execType == execQuery {
 		op = errors.OpQuery
@@ -149,7 +153,6 @@ func (c *conn) doRequestFromType(ctx context.Context, execType int, db string, q
 
 	switch execType {
 	case execQuery, execMgmt:
-		var err error
 		err = json.NewEncoder(buff).Encode(
 			queryMsg{
 				DB:         db,
@@ -198,8 +201,6 @@ func (c *conn) doRequest(
 		Body:   buff,
 	}
 
-	var err error
-
 	resp, err := c.client.Do(req.WithContext(ctx))
 	if err != nil {
 		// TODO(jdoak): We need a http error unwrap function that pulls out an *errors.Error.
@@ -215,6 +216,22 @@ func (c *conn) doRequest(
 		return nil, nil, errors.HTTP(op, resp.Status, resp.StatusCode, body, fmt.Sprintf("error from Kusto endpoint, %v", errorContext))
 	}
 	return resp.Header, body, nil
+}
+
+func (c *conn) validateEndpoint() error {
+	if !c.endpointValidated.Load() {
+		var err error
+		if cloud, err := GetMetadata(c.endpoint, c.client); err == nil {
+			err = truestedEndpoints.Instance.ValidateTrustedEndpoint(c.endpoint, cloud.LoginEndpoint)
+			if err == nil {
+				c.endpointValidated.Store(true)
+			}
+		}
+
+		return err
+	}
+
+	return nil
 }
 
 func (c *conn) getHeaders(properties requestProperties) http.Header {
