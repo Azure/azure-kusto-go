@@ -3,15 +3,13 @@ package ingest
 import (
 	"context"
 	"github.com/Azure/azure-kusto-go/kusto"
-	"io"
-	"os"
-	"strings"
-
 	"github.com/Azure/azure-kusto-go/kusto/data/errors"
 	"github.com/Azure/azure-kusto-go/kusto/ingest/internal/gzip"
 	"github.com/Azure/azure-kusto-go/kusto/ingest/internal/properties"
 	"github.com/Azure/azure-kusto-go/kusto/ingest/internal/queued"
 	"github.com/google/uuid"
+	"io"
+	"os"
 )
 
 type streamIngestor interface {
@@ -33,7 +31,7 @@ var FileIsBlobErr = errors.ES(errors.OpIngestStream, errors.KClientArgs, "blobst
 // More information can be found here:
 // https://docs.microsoft.com/en-us/azure/kusto/management/create-ingestion-mapping-command
 func NewStreaming(client QueryClient, db, table string) (*Streaming, error) {
-	streamConn, err := kusto.NewConn(strings.Replace(client.Endpoint(), "ingest-", "", 1), client.Auth(), client.HttpClient(), client.ClientDetails())
+	streamConn, err := kusto.NewConn(removeIngestPrefix(client.Endpoint()), client.Auth(), client.HttpClient(), client.ClientDetails())
 	if err != nil {
 		return nil, err
 	}

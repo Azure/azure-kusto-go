@@ -6,7 +6,6 @@ import (
 	"fmt"
 	"github.com/Azure/azure-kusto-go/kusto"
 	"io"
-	"strings"
 	"sync"
 
 	"github.com/Azure/azure-kusto-go/kusto/data/errors"
@@ -234,7 +233,7 @@ func (i *Ingestion) getStreamConn() (streamIngestor, error) {
 		return i.streamConn, nil
 	}
 
-	sc, err := kusto.NewConn(strings.Replace(i.client.Endpoint(), "ingest-", "", 1), i.client.Auth(), i.client.HttpClient(), i.client.ClientDetails())
+	sc, err := kusto.NewConn(removeIngestPrefix(i.client.Endpoint()), i.client.Auth(), i.client.HttpClient(), i.client.ClientDetails())
 	if err != nil {
 		return nil, err
 	}
