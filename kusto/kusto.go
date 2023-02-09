@@ -342,7 +342,7 @@ func (c *Client) getConn(callType callType, options connOptions) (queryer, error
 			u.Host = "ingest-" + u.Host
 			auth := c.auth
 			var details *ClientDetails
-			if innerConn, ok := c.conn.(*conn); ok {
+			if innerConn, ok := c.conn.(*Conn); ok {
 				details = innerConn.clientDetails
 			}
 

@@ -66,7 +66,7 @@ func TestHeaders(t *testing.T) {
 			client, err := New(kcsb)
 			require.NoError(t, err)
 
-			headers := client.conn.(*conn).getHeaders(*opts.requestProperties)
+			headers := client.conn.(*Conn).getHeaders(*opts.requestProperties)
 
 			if tt.expectedApplication != "" {
 				assert.Equal(t, tt.expectedApplication, headers.Get("x-ms-app"))

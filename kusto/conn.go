@@ -1,6 +1,6 @@
 package kusto
 
-// conn.go holds the connection to the Kusto server and provides methods to do queries
+// Conn.go holds the connection to the Kusto server and provides methods to do queries
 // and receive Kusto frames back.
 
 import (
@@ -33,18 +33,18 @@ var bufferPool = sync.Pool{
 	},
 }
 
-// conn provides connectivity to a Kusto instance.
-type conn struct {
-	endpoint                       string
-	auth                           Authorization
-	endMgmt, endQuery, streamQuery *url.URL
-	client                         *http.Client
-	endpointValidated              atomic.Bool
-	clientDetails                  *ClientDetails
+// Conn provides connectivity to a Kusto instance.
+type Conn struct {
+	endpoint                           string
+	auth                               Authorization
+	endMgmt, endQuery, endStreamIngest *url.URL
+	client                             *http.Client
+	endpointValidated                  atomic.Bool
+	clientDetails                      *ClientDetails
 }
 
-// NewConn returns a new conn object with an injected http.Client
-func NewConn(endpoint string, auth Authorization, client *http.Client, clientDetails *ClientDetails) (*conn, error) {
+// NewConn returns a new Conn object with an injected http.Client
+func NewConn(endpoint string, auth Authorization, client *http.Client, clientDetails *ClientDetails) (*Conn, error) {
 	if !validURL.MatchString(endpoint) {
 		return nil, errors.ES(errors.OpServConn, errors.KClientArgs, "endpoint is not valid(%s), should be https://<cluster name>.*", endpoint).SetNoRetry()
 	}
@@ -54,13 +54,13 @@ func NewConn(endpoint string, auth Authorization, client *http.Client, clientDet
 		return nil, errors.ES(errors.OpServConn, errors.KClientArgs, "could not parse the endpoint(%s): %s", endpoint, err).SetNoRetry()
 	}
 
-	c := &conn{
-		auth:          auth,
-		endMgmt:       &url.URL{Scheme: "https", Host: u.Host, Path: "/v1/rest/mgmt"},
-		endQuery:      &url.URL{Scheme: "https", Host: u.Host, Path: "/v2/rest/query"},
-		streamQuery:   &url.URL{Scheme: "https", Host: u.Host, Path: "/v1/rest/ingest/"},
-		client:        client,
-		clientDetails: clientDetails,
+	c := &Conn{
+		auth:            auth,
+		endMgmt:         &url.URL{Scheme: "https", Host: u.Host, Path: "/v1/rest/mgmt"},
+		endQuery:        &url.URL{Scheme: "https", Host: u.Host, Path: "/v2/rest/query"},
+		endStreamIngest: &url.URL{Scheme: "https", Host: u.Host, Path: "/v1/rest/ingest/"},
+		client:          client,
+		clientDetails:   clientDetails,
 	}
 
 	return c, nil
@@ -79,7 +79,7 @@ type connOptions struct {
 
 // query makes a query for the purpose of extracting data from Kusto. Context can be used to set
 // a timeout or cancel the query. Queries cannot take longer than 5 minutes.
-func (c *conn) query(ctx context.Context, db string, query Stmt, options *queryOptions) (execResp, error) {
+func (c *Conn) query(ctx context.Context, db string, query Stmt, options *queryOptions) (execResp, error) {
 	if strings.HasPrefix(strings.TrimSpace(query.String()), ".") {
 		return execResp{}, errors.ES(errors.OpQuery, errors.KClientArgs, "a Stmt to Query() cannot begin with a period(.), only Mgmt() calls can do that").SetNoRetry()
 	}
@@ -88,11 +88,11 @@ func (c *conn) query(ctx context.Context, db string, query Stmt, options *queryO
 }
 
 // mgmt is used to do management queries to Kusto.
-func (c *conn) mgmt(ctx context.Context, db string, query Stmt, options *mgmtOptions) (execResp, error) {
+func (c *Conn) mgmt(ctx context.Context, db string, query Stmt, options *mgmtOptions) (execResp, error) {
 	return c.execute(ctx, execMgmt, db, query, *options.requestProperties)
 }
 
-func (c *conn) queryToJson(ctx context.Context, db string, query Stmt, options *queryOptions) (string, error) {
+func (c *Conn) queryToJson(ctx context.Context, db string, query Stmt, options *queryOptions) (string, error) {
 	_, _, _, body, e := c.doRequest(ctx, execQuery, db, query, *options.requestProperties)
 	if e != nil {
 		return "", e
@@ -114,7 +114,7 @@ type execResp struct {
 	frameCh    chan frames.Frame
 }
 
-func (c *conn) execute(ctx context.Context, execType int, db string, query Stmt, properties requestProperties) (execResp, error) {
+func (c *Conn) execute(ctx context.Context, execType int, db string, query Stmt, properties requestProperties) (execResp, error) {
 	op, reqHeader, respHeader, body, e := c.doRequest(ctx, execType, db, query, properties)
 	if e != nil {
 		return execResp{}, e
@@ -135,7 +135,7 @@ func (c *conn) execute(ctx context.Context, execType int, db string, query Stmt,
 	return execResp{reqHeader: reqHeader, respHeader: respHeader, frameCh: frameCh}, nil
 }
 
-func (c *conn) doRequest(ctx context.Context, execType int, db string, query Stmt, properties requestProperties) (errors.Op, http.Header, http.Header,
+func (c *Conn) doRequest(ctx context.Context, execType int, db string, query Stmt, properties requestProperties) (errors.Op, http.Header, http.Header,
 	io.ReadCloser, error) {
 	err := c.validateEndpoint()
 	var op errors.Op
@@ -177,7 +177,7 @@ func (c *conn) doRequest(ctx context.Context, execType int, db string, query Stm
 	return op, headers, responseHeaders, closer, err
 }
 
-func (c *conn) doRequestImpl(
+func (c *Conn) doRequestImpl(
 	ctx context.Context,
 	op errors.Op,
 	endpoint *url.URL,
@@ -218,7 +218,7 @@ func (c *conn) doRequestImpl(
 	return resp.Header, body, nil
 }
 
-func (c *conn) validateEndpoint() error {
+func (c *Conn) validateEndpoint() error {
 	if !c.endpointValidated.Load() {
 		var err error
 		if cloud, err := GetMetadata(c.endpoint, c.client); err == nil {
@@ -234,11 +234,12 @@ func (c *conn) validateEndpoint() error {
 	return nil
 }
 
-func (c *conn) getHeaders(properties requestProperties) http.Header {
+func (c *Conn) getHeaders(properties requestProperties) http.Header {
 	header := http.Header{}
 	header.Add("Accept", "application/json")
-	header.Add("Accept-Encoding", "gzip")
+	header.Add("Accept-Encoding", "gzip, deflate")
 	header.Add("Content-Type", "application/json; charset=utf-8")
+	header.Add("Connection", "Keep-Alive")
 	header.Add("x-ms-version", "2019-02-13")
 
 	if properties.ClientRequestID != "" {
@@ -263,7 +264,7 @@ func (c *conn) getHeaders(properties requestProperties) http.Header {
 	return header
 }
 
-func (c *conn) Close() error {
+func (c *Conn) Close() error {
 	c.client.CloseIdleConnections()
 	return nil
 }
