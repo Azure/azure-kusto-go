@@ -175,7 +175,7 @@ func (d DataFormat) CamelCase() string {
 	return ""
 }
 
-func (d DataFormat) ForceDefault() kusto.DataFormatForStreaming {
+func (d DataFormat) KnownOrDefault() kusto.DataFormatForStreaming {
 	if d == DFUnknown {
 		return CSV
 	}

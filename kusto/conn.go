@@ -234,6 +234,11 @@ func (c *Conn) validateEndpoint() error {
 	return nil
 }
 
+const ClientRequestIdHeader = "x-ms-client-request-id"
+const ApplicationHeader = "x-ms-app"
+const UserHeader = "x-ms-user"
+const ClientVersionHeader = "x-ms-client-version"
+
 func (c *Conn) getHeaders(properties requestProperties) http.Header {
 	header := http.Header{}
 	header.Add("Accept", "application/json")
@@ -243,24 +248,24 @@ func (c *Conn) getHeaders(properties requestProperties) http.Header {
 	header.Add("x-ms-version", "2019-02-13")
 
 	if properties.ClientRequestID != "" {
-		header.Add("x-ms-client-request-id", properties.ClientRequestID)
+		header.Add(ClientRequestIdHeader, properties.ClientRequestID)
 	} else {
-		header.Add("x-ms-client-request-id", "KGC.execute;"+uuid.New().String())
+		header.Add(ClientRequestIdHeader, "KGC.execute;"+uuid.New().String())
 	}
 
 	if properties.Application != "" {
-		header.Add("x-ms-app", properties.Application)
+		header.Add(ApplicationHeader, properties.Application)
 	} else {
-		header.Add("x-ms-app", c.clientDetails.ApplicationForTracing())
+		header.Add(ApplicationHeader, c.clientDetails.ApplicationForTracing())
 	}
 
 	if properties.User != "" {
-		header.Add("x-ms-user", properties.User)
+		header.Add(UserHeader, properties.User)
 	} else {
-		header.Add("x-ms-user", c.clientDetails.UserNameForTracing())
+		header.Add(UserHeader, c.clientDetails.UserNameForTracing())
 	}
 
-	header.Add("x-ms-client-version", c.clientDetails.ClientVersionForTracing())
+	header.Add(ClientVersionHeader, c.clientDetails.ClientVersionForTracing())
 	return header
 }
 

@@ -4,13 +4,14 @@ import (
 	"context"
 	"fmt"
 	"github.com/Azure/azure-kusto-go/kusto/data/errors"
+	"github.com/google/uuid"
 	"io"
 	"net/url"
 )
 
 type DataFormatForStreaming interface {
 	CamelCase() string
-	ForceDefault() DataFormatForStreaming
+	KnownOrDefault() DataFormatForStreaming
 }
 
 func (c *Conn) StreamIngest(ctx context.Context, db, table string, payload io.Reader, format DataFormatForStreaming, mappingName string, clientRequestId string) error {
@@ -28,7 +29,7 @@ func (c *Conn) StreamIngest(ctx context.Context, db, table string, payload io.Re
 	if mappingName != "" {
 		qv.Add("mappingName", mappingName)
 	}
-	qv.Add("streamFormat", format.ForceDefault().CamelCase())
+	qv.Add("streamFormat", format.KnownOrDefault().CamelCase())
 	streamUrl.RawQuery = qv.Encode()
 
 	var closeablePayload io.ReadCloser
@@ -37,7 +38,13 @@ func (c *Conn) StreamIngest(ctx context.Context, db, table string, payload io.Re
 		closeablePayload = io.NopCloser(payload)
 	}
 
-	headers := c.getHeaders(requestProperties{})
+	if clientRequestId == "" {
+		clientRequestId = "KGC.executeStreaming;" + uuid.New().String()
+	}
+
+	properties := requestProperties{}
+	properties.ClientRequestID = clientRequestId
+	headers := c.getHeaders(properties)
 
 	_, body, err := c.doRequestImpl(ctx, errors.OpIngestStream, streamUrl, closeablePayload, headers, fmt.Sprintf("With db: %s, table: %s, mappingName: %s, clientRequestId: %s", db, table, mappingName, clientRequestId))
 	if body != nil {
