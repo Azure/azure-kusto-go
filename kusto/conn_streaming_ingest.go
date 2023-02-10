@@ -45,6 +45,8 @@ func (c *Conn) StreamIngest(ctx context.Context, db, table string, payload io.Re
 	properties := requestProperties{}
 	properties.ClientRequestID = clientRequestId
 	headers := c.getHeaders(properties)
+	headers.Del("Content-Type")
+	headers.Add("Content-Encoding", "gzip")
 
 	_, body, err := c.doRequestImpl(ctx, errors.OpIngestStream, streamUrl, closeablePayload, headers, fmt.Sprintf("With db: %s, table: %s, mappingName: %s, clientRequestId: %s", db, table, mappingName, clientRequestId))
 	if body != nil {
