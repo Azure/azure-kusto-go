@@ -18,8 +18,8 @@ import (
 	"github.com/stretchr/testify/require"
 )
 
-type streamIngestFunc func(ctx context.Context, db, table string, payload io.Reader, format properties.DataFormat, mappingName string, clientRequestId string) error
-type testStreamIngestFunc func(t *testing.T, ctx context.Context, db, table string, payload io.Reader, format properties.DataFormat, mappingName string,
+type streamIngestFunc func(ctx context.Context, db, table string, payload io.Reader, format kusto.DataFormatForStreaming, mappingName string, clientRequestId string) error
+type testStreamIngestFunc func(t *testing.T, ctx context.Context, db, table string, payload io.Reader, format kusto.DataFormatForStreaming, mappingName string,
 	clientRequestId string) error
 
 type fakeStreamIngestor struct {
@@ -30,7 +30,7 @@ func (f fakeStreamIngestor) Close() error {
 	return nil
 }
 
-func (f fakeStreamIngestor) StreamIngest(ctx context.Context, db, table string, payload io.Reader, format properties.DataFormat, mappingName string, clientRequestId string) error {
+func (f fakeStreamIngestor) StreamIngest(ctx context.Context, db, table string, payload io.Reader, format kusto.DataFormatForStreaming, mappingName string, clientRequestId string) error {
 	return f.onStreamIngest(ctx, db, table, payload, format, mappingName, clientRequestId)
 }
 
@@ -99,7 +99,7 @@ func TestStreaming(t *testing.T) {
 		{
 			name:    "TestStreamingDefault",
 			options: []FileOption{},
-			onStreamIngest: func(t *testing.T, ctx context.Context, db, table string, payload io.Reader, format properties.DataFormat, mappingName string,
+			onStreamIngest: func(t *testing.T, ctx context.Context, db, table string, payload io.Reader, format kusto.DataFormatForStreaming, mappingName string,
 				clientRequestId string) error {
 				assert.Equal(t, "defaultDb", db)
 				assert.Equal(t, "defaultTable", table)
@@ -121,7 +121,7 @@ func TestStreaming(t *testing.T) {
 				Database("otherDb"),
 				Table("otherTable"),
 			},
-			onStreamIngest: func(t *testing.T, ctx context.Context, db, table string, payload io.Reader, format properties.DataFormat, mappingName string,
+			onStreamIngest: func(t *testing.T, ctx context.Context, db, table string, payload io.Reader, format kusto.DataFormatForStreaming, mappingName string,
 				clientRequestId string) error {
 				assert.Equal(t, "otherDb", db)
 				assert.Equal(t, "otherTable", table)
@@ -141,7 +141,7 @@ func TestStreaming(t *testing.T) {
 			options: []FileOption{
 				FileFormat(properties.JSON),
 			},
-			onStreamIngest: func(t *testing.T, ctx context.Context, db, table string, payload io.Reader, format properties.DataFormat, mappingName string,
+			onStreamIngest: func(t *testing.T, ctx context.Context, db, table string, payload io.Reader, format kusto.DataFormatForStreaming, mappingName string,
 				clientRequestId string) error {
 				assert.Equal(t, "defaultDb", db)
 				assert.Equal(t, "defaultTable", table)
@@ -162,7 +162,7 @@ func TestStreaming(t *testing.T) {
 				IngestionMappingRef("mapping", properties.CSV),
 				ClientRequestId("clientRequestId"),
 			},
-			onStreamIngest: func(t *testing.T, ctx context.Context, db, table string, payload io.Reader, format properties.DataFormat, mappingName string,
+			onStreamIngest: func(t *testing.T, ctx context.Context, db, table string, payload io.Reader, format kusto.DataFormatForStreaming, mappingName string,
 				clientRequestId string) error {
 				assert.Equal(t, "defaultDb", db)
 				assert.Equal(t, "defaultTable", table)
@@ -178,7 +178,7 @@ func TestStreaming(t *testing.T) {
 		{
 			name:    "TestStreamFailure",
 			options: []FileOption{},
-			onStreamIngest: func(t *testing.T, ctx context.Context, db, table string, payload io.Reader, format properties.DataFormat, mappingName string,
+			onStreamIngest: func(t *testing.T, ctx context.Context, db, table string, payload io.Reader, format kusto.DataFormatForStreaming, mappingName string,
 				clientRequestId string) error {
 				return errors.E(errors.OpIngestStream, errors.KHTTPError, fmt.Errorf("error"))
 			},
@@ -189,7 +189,7 @@ func TestStreaming(t *testing.T) {
 	for _, test := range tests {
 		t.Run(test.name, func(t *testing.T) {
 			streamIngestor := fakeStreamIngestor{
-				onStreamIngest: func(ctx context.Context, db, table string, payload io.Reader, format properties.DataFormat, mappingName string, clientRequestId string) error {
+				onStreamIngest: func(ctx context.Context, db, table string, payload io.Reader, format kusto.DataFormatForStreaming, mappingName string, clientRequestId string) error {
 					return test.onStreamIngest(t, ctx, db, table, payload, format, mappingName, clientRequestId)
 				},
 			}

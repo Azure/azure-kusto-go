@@ -274,6 +274,13 @@ if err := in.Stream(ctx, jsonEncodedData, ingest.JSON, "mappingName"); err != ni
 # Changelog
 
 ## What's New
+### Version 0.11.0
+* Breaking - Add validation for trusted endpoints by @ohadbitt
+    * There are now by default a limited number of valid endpoints for kusto
+    * If you are using a standard endpoint - this shouldn't matter
+    * The trusted_endpoint package is an api to modify them.
+* Send http headers under the new unified format
+* Internal Refactoring
 ### Version 0.10.2
 * Fixed issue with managed identity parameters
 ### Version 0.10.1
