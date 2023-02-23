@@ -26,7 +26,7 @@ func TestQueryParameters(t *testing.T) {
 				AddLiteral("table", "string", "_bar").
 				AddLiteral("column", "string", "_baz").
 				AddLiteral("function", "string", "func_"),
-			"declare query_parameters(database:string, table:string, column:string, function:string);\ndatabase(\"database\").table | where column == function() ;"},
+			"declare query_parameters(function:string, database:string, table:string, column:string);\ndatabase(\"database\").table | where column == function() ;"},
 	}
 	for _, test := range tests {
 		t.Run(test.name, func(t *testing.T) {
