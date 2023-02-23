@@ -20,6 +20,7 @@ type requestProperties struct {
 	Application     string
 	User            string
 	QueryParameters kql.StatementQueryParameters `json:"-"`
+	ClientRequestID string
 }
 
 type queryOptions struct {
@@ -76,6 +77,14 @@ const RequestUserValue = "request_user"
 const TruncationMaxRecordsValue = "truncation_max_records"
 const TruncationMaxSizeValue = "truncation_max_size"
 const ValidatePermissionsValue = "validate_permissions"
+
+// ClientRequestID sets the x-ms-client-request-id header, and can be used to identify the request in the `.show queries` output.
+func ClientRequestID(clientRequestID string) QueryOption {
+	return func(q *queryOptions) error {
+		q.requestProperties.ClientRequestID = clientRequestID
+		return nil
+	}
+}
 
 // Application sets the x-ms-app header, and can be used to identify the application making the request in the `.show queries` output.
 func Application(appName string) QueryOption {
