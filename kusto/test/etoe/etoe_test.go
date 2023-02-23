@@ -630,7 +630,7 @@ func TestStatment(t *testing.T) {
 			desc: "New query method",
 			stmt: kql.NewStatementBuilder("table(tableName) | where vstr == txt"),
 			options: []kusto.QueryOption{kusto.QueryParameters(*kql.NewStatementQueryParameters().
-				AddString("tableName", "string", "goe2e_all_data_types").
+				AddString("tableName", "string", allDataTypesTable).
 				AddString("txt", "string", "asdf"))},
 			qcall: client.Query,
 			doer: func(row *table.Row, update interface{}) error {
@@ -649,7 +649,7 @@ func TestStatment(t *testing.T) {
 			desc: "query different type (bool)",
 			stmt: kql.NewStatementBuilder("table(tableName) | where vnum == txt"),
 			options: []kusto.QueryOption{kusto.QueryParameters(*kql.NewStatementQueryParameters().
-				AddString("tableName", "string", "goe2e_all_data_types").
+				AddString("tableName", "string", allDataTypesTable).
 				AddInt("txt", "int", 1))},
 			qcall: client.Query,
 			doer: func(row *table.Row, update interface{}) error {

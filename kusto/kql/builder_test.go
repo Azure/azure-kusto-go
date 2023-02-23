@@ -78,14 +78,14 @@ func TestBuilder(t *testing.T) {
 			NewStatementBuilder(
 				"MyTable | where i != ",
 			).AddString("foo").AddLiteral(" ;"),
-			"MyTable | where i != \"foo\" ;",
+			"MyTable | where i != foo ;",
 		},
 		{
 			"Test add string with quote",
 			NewStatementBuilder(
 				"MyTable | where i != ",
 			).AddString("foo\"bar").AddLiteral(" ;"),
-			"MyTable | where i != \"foo\\\"bar\" ;",
+			"MyTable | where i != foo\"bar ;",
 		},
 		{"Test add identifiers",
 			NewStatementBuilder("").
