@@ -24,25 +24,12 @@ var buildPool = sync.Pool{
 func NewStatementQueryParameters() *StatementQueryParameters {
 	return &StatementQueryParameters{parameters: make(map[string]ParamVals)}
 }
-func (q *StatementQueryParameters) AddLiteral(key string, paramType stringConstant, value stringConstant) *StatementQueryParameters {
+func (q *StatementQueryParameters) AddLiteral(key string, paramType string, value stringConstant) *StatementQueryParameters {
 	return q.addBase(key, paramType, value)
 }
-func (q *StatementQueryParameters) addBase(key string, paramType fmt.Stringer, value fmt.Stringer) *StatementQueryParameters {
-	q.parameters[key] = ParamVals{NormalizeName(paramType.String()), NormalizeName(value.String())}
+func (q *StatementQueryParameters) addBase(key string, paramType string, value fmt.Stringer) *StatementQueryParameters {
+	q.parameters[key] = ParamVals{paramType, value.String()}
 	return q
-}
-
-// NormalizeName normalizes a string in order to be used safely in the engine - given "query" will produce [\"query\"].
-func NormalizeName(val string) string {
-	if val == "" {
-		return val
-	}
-
-	if !RequiresQuoting(val) {
-		return val
-	}
-
-	return "[" + QuoteString(val, false) + "]"
 }
 
 // note - due to the psuedo-random nature of maps, the declaration string might be ordered differently for different runs.

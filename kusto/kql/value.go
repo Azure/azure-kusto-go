@@ -31,7 +31,7 @@ func (v *kqlValue) String() string {
 	value := v.value
 	switch v.kustoType {
 	case types.String:
-		return QuoteString(value.(string), false)
+		return value.(string)
 	case types.DateTime:
 		value = FormatDatetime(value.(time.Time))
 	case types.Timespan:
@@ -91,41 +91,41 @@ func (b *statementBuilder) AddDecimal(value decimal.Decimal) Builder {
 }
 
 func (q *StatementQueryParameters) AddBool(key string, paramType string, value bool) *StatementQueryParameters {
-	return q.addBase(key, newValue(paramType, types.String), newValue(value, types.Bool))
+	return q.addBase(key, paramType, newValue(value, types.Bool))
 }
 
 func (q *StatementQueryParameters) AddDateTime(key string, paramType string, value time.Time) *StatementQueryParameters {
-	return q.addBase(key, newValue(paramType, types.String), newValue(value, types.DateTime))
+	return q.addBase(key, paramType, newValue(value, types.DateTime))
 }
 
 func (q *StatementQueryParameters) AddDynamic(key string, paramType string, value string) *StatementQueryParameters {
-	return q.addBase(key, newValue(paramType, types.String), newValue(value, types.Dynamic))
+	return q.addBase(key, paramType, newValue(value, types.Dynamic))
 }
 
 func (q *StatementQueryParameters) AddGUID(key string, paramType string, value uuid.UUID) *StatementQueryParameters {
-	return q.addBase(key, newValue(paramType, types.String), newValue(value, types.GUID))
+	return q.addBase(key, paramType, newValue(value, types.GUID))
 }
 
 func (q *StatementQueryParameters) AddInt(key string, paramType string, value int32) *StatementQueryParameters {
-	return q.addBase(key, newValue(paramType, types.String), newValue(value, types.Int))
+	return q.addBase(key, paramType, newValue(value, types.Int))
 }
 
 func (q *StatementQueryParameters) AddLong(key string, paramType string, value int64) *StatementQueryParameters {
-	return q.addBase(key, newValue(paramType, types.String), newValue(value, types.Long))
+	return q.addBase(key, paramType, newValue(value, types.Long))
 }
 
 func (q *StatementQueryParameters) AddReal(key string, paramType string, value float64) *StatementQueryParameters {
-	return q.addBase(key, newValue(paramType, types.String), newValue(value, types.Real))
+	return q.addBase(key, paramType, newValue(value, types.Real))
 }
 
 func (q *StatementQueryParameters) AddString(key string, paramType string, value string) *StatementQueryParameters {
-	return q.addBase(key, newValue(paramType, types.String), newValue(value, types.String))
+	return q.addBase(key, paramType, newValue(value, types.String))
 }
 
 func (q *StatementQueryParameters) AddTimespan(key string, paramType string, value time.Duration) *StatementQueryParameters {
-	return q.addBase(key, newValue(paramType, types.String), newValue(value, types.Timespan))
+	return q.addBase(key, paramType, newValue(value, types.Timespan))
 }
 
 func (q *StatementQueryParameters) AddDecimal(key string, paramType string, value decimal.Decimal) *StatementQueryParameters {
-	return q.addBase(key, newValue(paramType, types.String), newValue(value, types.Decimal))
+	return q.addBase(key, paramType, newValue(value, types.Decimal))
 }
