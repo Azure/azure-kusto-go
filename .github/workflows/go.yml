@@ -40,8 +40,9 @@ jobs:
       - name: Test
         run: |
           cd kusto
-          set -o pipefail
           go test -v -json -race -coverprofile=coverage.out -covermode=atomic ./... 2>&1 > tests.txt
+          set -o pipefail
+          cat tests.txt
           go-junit-report -parser gojson -set-exit-code -in tests.txt -iocopy -out report.xml
         env:
           ENGINE_CONNECTION_STRING: ${{ secrets.ENGINE_CONNECTION_STRING }}
