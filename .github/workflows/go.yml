@@ -37,25 +37,29 @@ jobs:
           go build -v ./...
 
       - name: Set up gotestfmt
-        run: go install github.com/gotesttools/gotestfmt/v2/cmd/gotestfmt@latest
+        run: go install github.com/mfridman/tparse@latest
 
       - name: Run tests
         run: |
           cd kusto
-          go test -json -v ./... 2>&1 | tee /tmp/gotest.log | gotestfmt
+          go test -json -v ./... 2>&1 > /tmp/gotest.log
+
+      - name: Display tests
+        if: always()
+        run: |
+          tparse -all -file=/tmp/gotest.log
 
       - name: Parse tests
         if: always()
         run: |
-          cd kusto
-          go-junit-report -in /tmp/gotest.log -out report.xml
+          go-junit-report < /tmp/gotest.log > report.xml
 
       - name: Upload Test Results
         if: always()
         uses: actions/upload-artifact@v2
         with:
           name: Unit Test Results
-          path: kusto/report.xml
+          path: report.xml
       - name: Upload coverage to Codecov
         uses: codecov/codecov-action@v2
 
