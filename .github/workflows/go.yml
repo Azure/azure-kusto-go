@@ -41,7 +41,8 @@ jobs:
         run: |
           cd kusto
           set -o pipefail
-          go test -v -race -coverprofile=coverage.out -covermode=atomic ./... 2>&1 | tee >(go-junit-report -iocopy -set-exit-code -out report.xml)
+          go test -v -json -race -coverprofile=coverage.out -covermode=atomic ./... 2>&1 > tests.txt
+          go-junit-report -parser gojson -set-exit-code -in tests.txt -iocopy -out report.xml
         env:
           ENGINE_CONNECTION_STRING: ${{ secrets.ENGINE_CONNECTION_STRING }}
           AZURE_CLIENT_ID: ${{ secrets.APP_ID }}

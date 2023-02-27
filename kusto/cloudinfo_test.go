@@ -132,6 +132,7 @@ func TestGetMetadata(t *testing.T) {
 	for _, test := range tests {
 		test := test
 		t.Run(test.name, func(t *testing.T) {
+			assert.Fail(t, "purposely failing")
 			s.code = test.code
 			s.payload = []byte(test.payload)
 			res, err := GetMetadata(s.urlStr()+"/"+test.name, &http.Client{}) // Adding test name to the path make sure multiple URL's can be cached
