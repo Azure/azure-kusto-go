@@ -40,8 +40,11 @@ jobs:
 
       - name: Test
         run: |
-          go test -v -json -race "-coverprofile=coverage.out" "-covermode=atomic" ./... 2>&1 > /tmp/tests
+          pwd
+          go test -json -race "-coverprofile=coverage.out" "-covermode=atomic" ./... 2>&1 > /tmp/tests
+          cat /tmp/tests
           go-junit-report -parser gojson -set-exit-code -in /tmp/tests -iocopy -out /tmp/report.xml
+          cat /tmp/report.xml
       - name: Upload Test Results
         if: always()
         uses: actions/upload-artifact@v2
