@@ -42,7 +42,7 @@ jobs:
       - name: Run tests
         run: |
           cd kusto
-          go test -json -v ./... 2>&1 > /tmp/gotest.log
+          go test -race -coverprofile=coverage.out -json -v ./... 2>&1 > /tmp/gotest.log
 
       - name: Display tests
         if: always()
@@ -52,7 +52,7 @@ jobs:
       - name: Parse tests
         if: always()
         run: |
-          go-junit-report < /tmp/gotest.log > report.xml
+          go-junit-report -parser gojson < /tmp/gotest.log > report.xml
 
       - name: Upload Test Results
         if: always()
