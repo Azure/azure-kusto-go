@@ -39,10 +39,8 @@ jobs:
 
       - name: Test
         run: |
-          cd kusto
           go test -v -json -race -coverprofile=coverage.out -covermode=atomic ./... 2>&1 > tests.txt
           go-junit-report -parser gojson -set-exit-code -in tests.txt -iocopy -out report.xml
-          cd ..
 
       - name: Upload Test Results
         if: always()
@@ -50,7 +48,7 @@ jobs:
         with:
           name: Unit Test Results
           path: |
-            kusto/report.xml
+            report.xml
       - name: Upload coverage to Codecov
         uses: codecov/codecov-action@v2
 
