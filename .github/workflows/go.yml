@@ -46,7 +46,11 @@ jobs:
           cd kusto
           set -euo pipefail
           go test -json -v ./... 2>&1 | tee /tmp/gotest.log | gotestfmt
-          go-junit-report -parser gojson -set-exit-code < /tmp/gotest.log > report.xml 
+          echo "starting"
+          wc -c /tmp/gotest.log
+          go-junit-report -parser gojson < /tmp/gotest.log > report.xml
+          wc -c report.xml
+          echo "done"
           
 
       - name: Upload Test Results
