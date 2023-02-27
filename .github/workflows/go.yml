@@ -47,7 +47,7 @@ jobs:
         uses: actions/upload-artifact@v2
         with:
           name: Unit Test Results
-          path: /tmp/report.xml
+          path: kusto/report.xml
       - name: Upload coverage to Codecov
         uses: codecov/codecov-action@v2
 
