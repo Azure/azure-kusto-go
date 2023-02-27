@@ -132,6 +132,7 @@ func TestGetMetadata(t *testing.T) {
 	for _, test := range tests {
 		test := test
 		t.Run(test.name, func(t *testing.T) {
+			t.Logf("balb balb: %s", test.desc)
 			assert.Fail(t, "purposely failing")
 			s.code = test.code
 			s.payload = []byte(test.payload)

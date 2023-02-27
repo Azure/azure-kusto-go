@@ -41,7 +41,7 @@ jobs:
       - name: Test
         run: |
           cd kusto
-          go test -json -v -race -coverprofile=coverage.out -covermode=atomic ./... 2>&1 | tee >(go-junit-report -parser gojson -iocopy -set-exit-code -out report.xml)
+          go test -v -race -coverprofile=coverage.out -covermode=atomic ./... | tee >(go-junit-report -iocopy -set-exit-code -out report.xml)
       - name: Upload Test Results
         if: always()
         uses: actions/upload-artifact@v2
