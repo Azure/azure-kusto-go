@@ -581,7 +581,7 @@ func TestQueries(t *testing.T) {
 	}
 }
 
-func TestFileIngestion(t *testing.T) { //ok
+func TestFileIngestion(t *testing.T) {
 	t.Parallel()
 
 	if skipETOE || testing.Short() {
@@ -1297,7 +1297,7 @@ func TestReaderIngestion(t *testing.T) { // ok
 	}
 }
 
-func TestMultipleClusters(t *testing.T) { //ok
+func TestMultipleClusters(t *testing.T) {
 	t.Parallel()
 
 	if skipETOE || testing.Short() {
@@ -1507,7 +1507,7 @@ func TestMultipleClusters(t *testing.T) { //ok
 	}
 }
 
-func TestStreamingIngestion(t *testing.T) { //OK
+func TestStreamingIngestion(t *testing.T) {
 	t.Parallel()
 
 	if skipETOE || testing.Short() {
@@ -1904,7 +1904,7 @@ func waitForIngest(t *testing.T, ctx context.Context, client *kusto.Client, data
 
 			if !assert.ObjectsAreEqualValues(want, got) {
 				failed = true
-				time.Sleep(100 * time.Millisecond)
+				time.Sleep(5 * time.Millisecond)
 				return true, nil
 			}
 
