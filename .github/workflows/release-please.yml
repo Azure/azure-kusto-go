@@ -12,3 +12,4 @@ jobs:
         with:
           release-type: go
           package-name: github.com/Azure/azure-kusto-go
+          default-branch: improve-errors
