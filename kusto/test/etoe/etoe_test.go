@@ -1811,7 +1811,7 @@ func createCsvFileFromData(t *testing.T, data []LogRow) string {
 	return fname
 }
 func fileFromString(t *testing.T, raw string) string {
-	fname := fmt.Sprintf("data_%d_%d.csv", time.Now().UnixNano(), rand.Int())
+	fname := fmt.Sprintf("data_%d_%d.csv ", time.Now().UnixNano(), rand.Int())
 	file, err := os.Create(fname)
 	if err != nil {
 		panic(err)
