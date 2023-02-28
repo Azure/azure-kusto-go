@@ -1,5 +1,16 @@
 # Changelog
 
+## [0.11.1](https://github.com/Azure/azure-kusto-go/compare/v0.11.0...v0.11.1) (2023-02-28)
+
+
+### Bug Fixes
+
+* dummy fix ([6e6b655](https://github.com/Azure/azure-kusto-go/commit/6e6b6551fcf83b46ec42b72ef5687a0c5d1c30c2))
+* dummy fix ([659ece4](https://github.com/Azure/azure-kusto-go/commit/659ece4fccd7a047df7093b18f4b6df79074141e))
+* dummy fix ([d4c6d80](https://github.com/Azure/azure-kusto-go/commit/d4c6d80d95ac11bde8f06e20eb7bfa4af929a460))
+
+## Changelog
+
 ## What's New
 ### Version 0.11.0
 * Breaking - Add validation for trusted endpoints by @ohadbitt
@@ -69,4 +80,4 @@
   This API was very limited - it required you to create a queued ingestion client, it only accepted a byte array, and had no customization options.
 * `RowIterator.Next` and `RowIterator.Do` are now deprecated and replaced by `RowIterator.NextRowOrError` and `RowIterator.DoOnRowOrError`.
   In previous versions, when encountering an error in-line with the results (also known as partial success), the SDK panicked. Now `RowIterator.Next` and `RowIterator.Do` will return the first error they encounter, including in-line errors or partials successes and finish.
-  This means that there could be extra data that will be skipped when using these APIs. Fixed #81 
+  This means that there could be extra data that will be skipped when using these APIs. Fixed #81
