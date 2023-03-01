@@ -275,7 +275,6 @@ func (i *Ingestion) upstreamContainer() (*azblob.Client, string, error) {
 	storageURI := mgrResources.Containers[rand.Intn(len(mgrResources.Containers))]
 	storageUrl := storageURI.URL()
 	serviceURL := fmt.Sprintf("%s://%s?%s", storageUrl.Scheme, storageUrl.Host, storageURI.SAS().Encode())
-	fmt.Printf("Uploading to %s\n", serviceURL)
 
 	client, err := azblob.NewClientWithNoCredential(serviceURL, &azblob.ClientOptions{
 		ClientOptions: azcore.ClientOptions{
