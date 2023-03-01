@@ -9,6 +9,7 @@ import (
 	"os"
 	"regexp"
 	"strings"
+	"sync"
 	"testing"
 	"time"
 	"unicode"
@@ -1458,51 +1459,82 @@ func TestMultipleClusters(t *testing.T) { //ok
 
 			fTable := fmt.Sprintf("%s_%d_%d", test.table, time.Now().UnixNano(), rand.Int())
 			fSecondaryTable := fmt.Sprintf("%s_%d_%d", test.secondaryTable, time.Now().UnixNano(), rand.Int())
-			require.NoError(t, createIngestionTableWithDB(t, client, testConfig.Database, fTable, false))
-			require.NoError(t, createIngestionTableWithDB(t, secondaryClient, testConfig.SecondaryDatabase, fSecondaryTable, false))
 
-			test.stmt = test.stmt.MustParameters(
-				kusto.NewParameters().Must(
-					kusto.QueryValues{"tableName": fTable},
-				))
-			secondaryStmt := test.stmt.MustParameters(
-				kusto.NewParameters().Must(
-					kusto.QueryValues{"tableName": fSecondaryTable},
-				))
+			var wg sync.WaitGroup
+			var primaryErr error
+			var secondaryErr error
 
-			var options []ingest.FileOption
-			if _, ok := test.ingestor.(*ingest.Ingestion); ok {
-				options = append(options, ingest.FlushImmediately(), ingest.ReportResultToTable())
+			// Run ingestion to primary database in a Goroutine
+			wg.Add(1)
+			go func() {
+				defer wg.Done()
+
+				require.NoError(t, createIngestionTableWithDB(t, client, testConfig.Database, fTable, false))
+
+				test.stmt = test.stmt.MustParameters(
+					kusto.NewParameters().Must(
+						kusto.QueryValues{"tableName": fTable},
+					))
+
+				var options []ingest.FileOption
+				if _, ok := test.ingestor.(*ingest.Ingestion); ok {
+					options = append(options, ingest.FlushImmediately(), ingest.ReportResultToTable())
+				}
+				firstOptions := append(options, ingest.Database(testConfig.Database), ingest.Table(fTable))
+
+				res, err := test.ingestor.FromFile(ctx, test.src, firstOptions...)
+				if err == nil {
+					err = <-res.Wait(ctx)
+				}
+
+				primaryErr = err
+
+				if !assertErrorsMatch(t, err, nil) {
+					t.Errorf("TestMultipleClusters(%s): ingestor.FromFile(): got err == %v, want err == %v", test.desc, err, nil)
+				}
+
+				require.NoError(t, waitForIngest(t, ctx, client, testConfig.Database, test.stmt, test.doer, test.want, test.gotInit))
+			}()
+
+			// Run ingestion to secondary database in a Goroutine
+			wg.Add(1)
+			go func() {
+				defer wg.Done()
+
+				require.NoError(t, createIngestionTableWithDB(t, secondaryClient, testConfig.SecondaryDatabase, fSecondaryTable, false))
+
+				secondaryStmt := test.stmt.MustParameters(
+					kusto.NewParameters().Must(
+						kusto.QueryValues{"tableName": fSecondaryTable},
+					))
+
+				var options []ingest.FileOption
+				if _, ok := test.secondaryIngestor.(*ingest.Ingestion); ok {
+					options = append(options, ingest.FlushImmediately(), ingest.ReportResultToTable())
+				}
+				secondaryOptions := append(options, ingest.Database(testConfig.SecondaryDatabase), ingest.Table(fSecondaryTable))
+
+				res, err := test.secondaryIngestor.FromFile(ctx, test.src, secondaryOptions...)
+				if err == nil {
+					err = <-res.Wait(ctx)
+				}
+
+				secondaryErr = err
+
+				if !assertErrorsMatch(t, err, nil) {
+					t.Errorf("TestMultipleClusters(%s): ingestor.FromFile(): got err == %v, want err == %v", test.desc, err, nil)
+				}
+
+				require.NoError(t, waitForIngest(t, ctx, secondaryClient, testConfig.SecondaryDatabase, secondaryStmt, test.doer, test.want, test.gotInit))
+			}()
+
+			// Wait for both Goroutines to finish
+			wg.Wait()
+
+			// Check if there were any errors during ingestion
+			if primaryErr != nil || secondaryErr != nil {
+				t.Errorf("TestMultipleClusters(%s): Got errors during ingestion. primaryErr: %v, secondaryErr: %v", test.desc, primaryErr, secondaryErr)
 			}
-			firstOptions := append(options, ingest.Database(testConfig.Database), ingest.Table(fTable))
-
-			res, err := test.ingestor.FromFile(ctx, test.src, firstOptions...)
-			if err == nil {
-				err = <-res.Wait(ctx)
-			}
-
-			if !assertErrorsMatch(t, err, nil) {
-				t.Errorf("TestMultipleClusters(%s): ingestor.FromFile(): got err == %v, want err == %v", test.desc, err, nil)
-				return
-			}
-
-			secondaryOptions := append(options, ingest.Database(testConfig.SecondaryDatabase), ingest.Table(fSecondaryTable))
-			res, err = test.secondaryIngestor.FromFile(ctx, test.src, secondaryOptions...)
-			if err == nil {
-				err = <-res.Wait(ctx)
-			}
-
-			if !assertErrorsMatch(t, err, nil) {
-				t.Errorf("TestMultipleClusters(%s): ingestor.FromFile(): got err == %v, want err == %v", test.desc, err, nil)
-				return
-			}
-
-			if err != nil {
-				return
-			}
-
-			require.NoError(t, waitForIngest(t, ctx, client, testConfig.Database, test.stmt, test.doer, test.want, test.gotInit))
-			require.NoError(t, waitForIngest(t, ctx, secondaryClient, testConfig.SecondaryDatabase, secondaryStmt, test.doer, test.want, test.gotInit))
 		})
 	}
 }
