@@ -12,7 +12,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ### Security
 * Bump golang.org/x/net from 0.4.0 to 0.7.0
 
-## [0.11.0] - 2023-10-15
+## [0.11.0] - 2023-02-14
 ### Changed
 - [BREAKING] Add validation for trusted endpoints by @ohadbitt
 - Send http headers under the new unified format
