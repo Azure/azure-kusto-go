@@ -63,7 +63,7 @@ func TestManaged(t *testing.T) {
 		{
 			name:    "TestManagedStreamingDefault",
 			options: []FileOption{},
-			onStreamIngest: func(t *testing.T, ctx context.Context, db, table string, payload io.Reader, format properties.DataFormat, mappingName string,
+			onStreamIngest: func(t *testing.T, ctx context.Context, db, table string, payload io.Reader, format kusto.DataFormatForStreaming, mappingName string,
 				clientRequestId string) error {
 				assert.Equal(t, "defaultDb", db)
 				assert.Equal(t, "defaultTable", table)
@@ -87,7 +87,7 @@ func TestManaged(t *testing.T) {
 				Database("otherDb"),
 				Table("otherTable"),
 			},
-			onStreamIngest: func(t *testing.T, ctx context.Context, db, table string, payload io.Reader, format properties.DataFormat, mappingName string,
+			onStreamIngest: func(t *testing.T, ctx context.Context, db, table string, payload io.Reader, format kusto.DataFormatForStreaming, mappingName string,
 				clientRequestId string) error {
 				assert.Equal(t, "otherDb", db)
 				assert.Equal(t, "otherTable", table)
@@ -109,7 +109,7 @@ func TestManaged(t *testing.T) {
 			options: []FileOption{
 				FileFormat(properties.JSON),
 			},
-			onStreamIngest: func(t *testing.T, ctx context.Context, db, table string, payload io.Reader, format properties.DataFormat, mappingName string,
+			onStreamIngest: func(t *testing.T, ctx context.Context, db, table string, payload io.Reader, format kusto.DataFormatForStreaming, mappingName string,
 				clientRequestId string) error {
 				assert.Equal(t, "defaultDb", db)
 				assert.Equal(t, "defaultTable", table)
@@ -132,7 +132,7 @@ func TestManaged(t *testing.T) {
 				IngestionMappingRef("mapping", properties.CSV),
 				ClientRequestId("clientRequestId"),
 			},
-			onStreamIngest: func(t *testing.T, ctx context.Context, db, table string, payload io.Reader, format properties.DataFormat, mappingName string,
+			onStreamIngest: func(t *testing.T, ctx context.Context, db, table string, payload io.Reader, format kusto.DataFormatForStreaming, mappingName string,
 				clientRequestId string) error {
 				assert.Equal(t, "defaultDb", db)
 				assert.Equal(t, "defaultTable", table)
@@ -150,7 +150,7 @@ func TestManaged(t *testing.T) {
 		{
 			name:    "TestPermanentError",
 			options: []FileOption{},
-			onStreamIngest: func(t *testing.T, ctx context.Context, db, table string, payload io.Reader, format properties.DataFormat, mappingName string,
+			onStreamIngest: func(t *testing.T, ctx context.Context, db, table string, payload io.Reader, format kusto.DataFormatForStreaming, mappingName string,
 				clientRequestId string) error {
 				assert.Equal(t, "defaultDb", db)
 				assert.Equal(t, "defaultTable", table)
@@ -172,7 +172,7 @@ func TestManaged(t *testing.T) {
 		{
 			name:    "TestPermanentErrorNotKusto",
 			options: []FileOption{},
-			onStreamIngest: func(t *testing.T, ctx context.Context, db, table string, payload io.Reader, format properties.DataFormat, mappingName string,
+			onStreamIngest: func(t *testing.T, ctx context.Context, db, table string, payload io.Reader, format kusto.DataFormatForStreaming, mappingName string,
 				clientRequestId string) error {
 				assert.Equal(t, "defaultDb", db)
 				assert.Equal(t, "defaultTable", table)
@@ -194,7 +194,7 @@ func TestManaged(t *testing.T) {
 		{
 			name:    "TestSingleTransientError",
 			options: []FileOption{},
-			onStreamIngest: func(t *testing.T, ctx context.Context, db, table string, payload io.Reader, format properties.DataFormat, mappingName string,
+			onStreamIngest: func(t *testing.T, ctx context.Context, db, table string, payload io.Reader, format kusto.DataFormatForStreaming, mappingName string,
 				clientRequestId string) error {
 				assert.Equal(t, "defaultDb", db)
 				assert.Equal(t, "defaultTable", table)
@@ -218,7 +218,7 @@ func TestManaged(t *testing.T) {
 		{
 			name:    "TestMultipleTransientErrors",
 			options: []FileOption{},
-			onStreamIngest: func(t *testing.T, ctx context.Context, db, table string, payload io.Reader, format properties.DataFormat, mappingName string,
+			onStreamIngest: func(t *testing.T, ctx context.Context, db, table string, payload io.Reader, format kusto.DataFormatForStreaming, mappingName string,
 				clientRequestId string) error {
 				assert.Equal(t, "defaultDb", db)
 				assert.Equal(t, "defaultTable", table)
@@ -261,7 +261,7 @@ func TestManaged(t *testing.T) {
 			name:      "TestBigFile",
 			options:   []FileOption{},
 			isBigFile: true,
-			onStreamIngest: func(t *testing.T, ctx context.Context, db, table string, payload io.Reader, format properties.DataFormat, mappingName string,
+			onStreamIngest: func(t *testing.T, ctx context.Context, db, table string, payload io.Reader, format kusto.DataFormatForStreaming, mappingName string,
 				clientRequestId string) error {
 				require.Fail(t, "Big file shouldn't try to stream")
 				return errors.E(errors.OpIngestStream, errors.KHTTPError, fmt.Errorf("error"))
@@ -294,7 +294,7 @@ func TestManaged(t *testing.T) {
 			name:     "TestBlob",
 			options:  []FileOption{},
 			blobPath: someBlobPath,
-			onStreamIngest: func(t *testing.T, ctx context.Context, db, table string, payload io.Reader, format properties.DataFormat, mappingName string,
+			onStreamIngest: func(t *testing.T, ctx context.Context, db, table string, payload io.Reader, format kusto.DataFormatForStreaming, mappingName string,
 				clientRequestId string) error {
 				require.Fail(t, "Big file shouldn't try to stream")
 				return errors.E(errors.OpIngestStream, errors.KHTTPError, fmt.Errorf("error"))
@@ -326,7 +326,7 @@ func TestManaged(t *testing.T) {
 	for _, test := range tests {
 		t.Run(test.name, func(t *testing.T) {
 			streamIngestor := fakeStreamIngestor{
-				onStreamIngest: func(ctx context.Context, db, table string, payload io.Reader, format properties.DataFormat, mappingName string, clientRequestId string) error {
+				onStreamIngest: func(ctx context.Context, db, table string, payload io.Reader, format kusto.DataFormatForStreaming, mappingName string, clientRequestId string) error {
 					err := test.onStreamIngest(t, ctx, db, table, payload, format, mappingName, clientRequestId)
 					counter++
 					return err

@@ -15,14 +15,16 @@ jobs:
       - name: Check out code into the Go module directory
         uses: actions/checkout@v2
 
-      - name: Set up Go 1.19
-        uses: actions/setup-go@v3
+      - name: Setup Golang with cache
+        uses: magnetikonline/action-golang-cache@v3
         with:
           go-version: '^1.19.0'
-        id: go
 
       - name: Setup JUnit Report
-        run: go install github.com/jstemmer/go-junit-report/v2@latest
+        run: go install github.com/jstemmer/go-junit-report/v2@bfac3ec
+
+      - name: Set up tparse
+        run: go install github.com/mfridman/tparse@latest
 
       - name: Check Format
         run: if [ "$(gofmt -d -s -l . | tee /dev/fd/2 | wc -l)" -gt 0 ]; then exit 1; fi
@@ -37,11 +39,10 @@ jobs:
           cd kusto
           go build -v ./...
 
-      - name: Test
+      - name: Run tests
         run: |
           cd kusto
-          set -o pipefail
-          go test -v -race -coverprofile=coverage.out -covermode=atomic ./... 2>&1 | tee >(go-junit-report -iocopy -set-exit-code -out report.xml)
+          go test -p 100 -race -coverprofile=coverage.out -json -v ./... 2>&1 > /tmp/gotest.log
         env:
           ENGINE_CONNECTION_STRING: ${{ secrets.ENGINE_CONNECTION_STRING }}
           AZURE_CLIENT_ID: ${{ secrets.APP_ID }}
@@ -50,13 +51,24 @@ jobs:
           TEST_DATABASE: ${{ secrets.TEST_DATABASE }}
           SECONDARY_ENGINE_CONNECTION_STRING: ${{ secrets.SECONDARY_ENGINE_CONNECTION_STRING }}
           SECONDARY_DATABASE: ${{ secrets.SECONDARY_DATABASE }}
+          GOMAXPROCS: 200
+
+      - name: Display tests
+        if: always()
+        run: |
+          tparse -all -file=/tmp/gotest.log
+
+      - name: Parse tests
+        if: always()
+        run: |
+          go-junit-report -parser gojson < /tmp/gotest.log > report.xml
+
       - name: Upload Test Results
         if: always()
         uses: actions/upload-artifact@v2
         with:
           name: Unit Test Results
-          path: |
-            kusto/report.xml
+          path: report.xml
       - name: Upload coverage to Codecov
         uses: codecov/codecov-action@v2
 
