@@ -17,10 +17,10 @@ import (
 type requestProperties struct {
 	Options         map[string]interface{}
 	Parameters      map[string]string
-	Application     string
-	User            string
+	Application     string                       `json:"-"`
+	User            string                       `json:"-"`
 	QueryParameters kql.StatementQueryParameters `json:"-"`
-	ClientRequestID string
+	ClientRequestID string                       `json:"-"`
 }
 
 type queryOptions struct {

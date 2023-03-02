@@ -282,11 +282,11 @@ func setQueryOptions(ctx context.Context, op errors.Op, query Statement, options
 	}
 	if query.SupportsParameters() {
 		if len(opt.requestProperties.QueryParameters.ToParameterCollection()) != 0 {
-			return nil, errors.ES(op, errors.KClientArgs, "Cannot use both Stmt and StatementQueryParameters. Please use statementBuilder instead of Stmt.").SetNoRetry()
+			return nil, errors.ES(op, errors.KClientArgs, "kusto.Stmt does not support the QueryParameters option. Construct your query using kql.Builder").SetNoRetry()
 		}
 		params, err := query.GetParameters()
 		if err != nil {
-			return nil, errors.ES(op, errors.KClientArgs, "QueryValues in the the Stmt were incorrect: %s", err).SetNoRetry()
+			return nil, errors.ES(op, errors.KClientArgs, "Parameter validation error: %s", err).SetNoRetry()
 		}
 
 		opt.requestProperties.Parameters = params

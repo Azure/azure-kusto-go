@@ -3,6 +3,7 @@ package kql
 import (
 	"fmt"
 	"github.com/Azure/azure-kusto-go/kusto/data/types"
+	"github.com/Azure/azure-kusto-go/kusto/data/value"
 	"github.com/google/uuid"
 	"github.com/shopspring/decimal"
 	"time"
@@ -28,19 +29,21 @@ func (v *kqlValue) Type() types.Column {
 }
 
 func (v *kqlValue) String() string {
-	value := v.value
+	val := v.value
 	switch v.kustoType {
 	case types.String:
-		return value.(string)
+		return val.(string)
 	case types.DateTime:
-		value = FormatDatetime(value.(time.Time))
+		val = FormatDatetime(val.(time.Time))
 	case types.Timespan:
-		value = FormatTimespan(value.(time.Duration))
+		val = FormatTimespan(val.(time.Duration))
 	case types.Dynamic:
-		value = QuoteString(value.(string), false)
+		got := value.Dynamic{}
+		_ = got.Unmarshal(val)
+		val = got
 	}
 
-	return fmt.Sprintf("%v(%v)", v.kustoType, value)
+	return fmt.Sprintf("%v(%v)", v.kustoType, val)
 }
 
 func newValue(value interface{}, kustoType types.Column) Value {
@@ -98,7 +101,7 @@ func (q *StatementQueryParameters) AddDateTime(key string, paramType string, val
 	return q.addBase(key, paramType, newValue(value, types.DateTime))
 }
 
-func (q *StatementQueryParameters) AddDynamic(key string, paramType string, value string) *StatementQueryParameters {
+func (q *StatementQueryParameters) AddDynamic(key string, paramType string, value interface{}) *StatementQueryParameters {
 	return q.addBase(key, paramType, newValue(value, types.Dynamic))
 }
 
@@ -126,6 +129,6 @@ func (q *StatementQueryParameters) AddTimespan(key string, paramType string, val
 	return q.addBase(key, paramType, newValue(value, types.Timespan))
 }
 
-func (q *StatementQueryParameters) AddDecimal(key string, paramType string, value decimal.Decimal) *StatementQueryParameters {
+func (q *StatementQueryParameters) AddDecimal(key string, paramType string, value value.Decimal) *StatementQueryParameters {
 	return q.addBase(key, paramType, newValue(value, types.Decimal))
 }

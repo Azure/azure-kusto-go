@@ -603,7 +603,9 @@ func TestStatment(t *testing.T) {
 
 	allDataTypesTable := fmt.Sprintf("goe2e_all_data_types_%d_%d", time.Now().UnixNano(), rand.Int())
 	require.NoError(t, createIngestionTable(t, client, allDataTypesTable, true))
-
+	dt, err := time.Parse(time.RFC3339Nano, "2020-03-04T14:05:01.3109965Z")
+	ts, err := time.ParseDuration("1h23m45.6789s")
+	guid, err := uuid.Parse("74be27de-1e4e-49d9-b579-fe0b331d3642")
 	tests := []struct {
 		// desc is a description of a test.
 		desc string
@@ -627,61 +629,493 @@ func TestStatment(t *testing.T) {
 		failFlag bool
 	}{
 		{
-			desc: "New query method",
+			desc: "Complex query with Statement Builder - with String parameters",
 			stmt: kql.NewStatementBuilder("table(tableName) | where vstr == txt"),
 			options: []kusto.QueryOption{kusto.QueryParameters(*kql.NewStatementQueryParameters().
 				AddString("tableName", "string", allDataTypesTable).
 				AddString("txt", "string", "asdf"))},
 			qcall: client.Query,
 			doer: func(row *table.Row, update interface{}) error {
-				if row.Replace {
-					fmt.Println("---") // Replace flag indicates that the query result should be cleared and replaced with this row
+				rec := AllDataType{}
+				if err := row.ToStruct(&rec); err != nil {
+					return err
 				}
-				fmt.Println(row) // As a convenience, printing a *table.Row will output csv
+
+				valuesRec := AllDataType{}
+
+				err := row.ExtractValues(&valuesRec.Vnum,
+					&valuesRec.Vdec,
+					&valuesRec.Vdate,
+					&valuesRec.Vspan,
+					&valuesRec.Vobj,
+					&valuesRec.Vb,
+					&valuesRec.Vreal,
+					&valuesRec.Vstr,
+					&valuesRec.Vlong,
+					&valuesRec.Vguid,
+				)
+
+				if err != nil {
+					return err
+				}
+
+				assert.Equal(t, rec, valuesRec)
+
+				recs := update.(*[]AllDataType)
+				*recs = append(*recs, rec)
 				return nil
 			},
 			gotInit: func() interface{} {
-				return nil
+				ad := []AllDataType{}
+				return &ad
 			},
 			failFlag: false,
+			want:     &[]AllDataType{getExpectedResult()},
 		},
 		{
-			desc: "query different type (bool)",
+			desc: "Complex query with Statement Builder - with Int parameters",
 			stmt: kql.NewStatementBuilder("table(tableName) | where vnum == txt"),
 			options: []kusto.QueryOption{kusto.QueryParameters(*kql.NewStatementQueryParameters().
 				AddString("tableName", "string", allDataTypesTable).
 				AddInt("txt", "int", 1))},
 			qcall: client.Query,
 			doer: func(row *table.Row, update interface{}) error {
-				if row.Replace {
-					fmt.Println("---") // Replace flag indicates that the query result should be cleared and replaced with this row
+				rec := AllDataType{}
+				if err := row.ToStruct(&rec); err != nil {
+					return err
 				}
-				fmt.Println(row) // As a convenience, printing a *table.Row will output csv
+
+				valuesRec := AllDataType{}
+
+				err := row.ExtractValues(&valuesRec.Vnum,
+					&valuesRec.Vdec,
+					&valuesRec.Vdate,
+					&valuesRec.Vspan,
+					&valuesRec.Vobj,
+					&valuesRec.Vb,
+					&valuesRec.Vreal,
+					&valuesRec.Vstr,
+					&valuesRec.Vlong,
+					&valuesRec.Vguid,
+				)
+
+				if err != nil {
+					return err
+				}
+
+				assert.Equal(t, rec, valuesRec)
+
+				recs := update.(*[]AllDataType)
+				*recs = append(*recs, rec)
 				return nil
 			},
 			gotInit: func() interface{} {
-				return nil
+				ad := []AllDataType{}
+				return &ad
 			},
 			failFlag: false,
+			want:     &[]AllDataType{getExpectedResult()},
 		},
 		{
-			desc: "Fail - inject",
+			desc: "Complex query with Statement Builder - with Decimal parameters",
+			stmt: kql.NewStatementBuilder("table(tableName) | where vdec == txt"),
+			options: []kusto.QueryOption{kusto.QueryParameters(*kql.NewStatementQueryParameters().
+				AddString("tableName", "string", allDataTypesTable).
+				AddDecimal("txt", "decimal", value.Decimal{
+					Value: "2.00000000000001",
+					Valid: true,
+				}))},
+			qcall: client.Query,
+			doer: func(row *table.Row, update interface{}) error {
+				rec := AllDataType{}
+				if err := row.ToStruct(&rec); err != nil {
+					return err
+				}
+
+				valuesRec := AllDataType{}
+
+				err := row.ExtractValues(&valuesRec.Vnum,
+					&valuesRec.Vdec,
+					&valuesRec.Vdate,
+					&valuesRec.Vspan,
+					&valuesRec.Vobj,
+					&valuesRec.Vb,
+					&valuesRec.Vreal,
+					&valuesRec.Vstr,
+					&valuesRec.Vlong,
+					&valuesRec.Vguid,
+				)
+
+				if err != nil {
+					return err
+				}
+
+				assert.Equal(t, rec, valuesRec)
+
+				recs := update.(*[]AllDataType)
+				*recs = append(*recs, rec)
+				return nil
+			},
+			gotInit: func() interface{} {
+				ad := []AllDataType{}
+				return &ad
+			},
+			failFlag: false,
+			want:     &[]AllDataType{getExpectedResult()},
+		},
+		{
+			desc: "Complex query with Statement Builder - with DateTime parameters",
+			stmt: kql.NewStatementBuilder("table(tableName) | where vdate == txt"),
+			options: []kusto.QueryOption{kusto.QueryParameters(*kql.NewStatementQueryParameters().
+				AddString("tableName", "string", allDataTypesTable).
+				AddDateTime("txt", "datetime", dt))},
+			qcall: client.Query,
+			doer: func(row *table.Row, update interface{}) error {
+				rec := AllDataType{}
+				if err := row.ToStruct(&rec); err != nil {
+					return err
+				}
+
+				valuesRec := AllDataType{}
+
+				err := row.ExtractValues(&valuesRec.Vnum,
+					&valuesRec.Vdec,
+					&valuesRec.Vdate,
+					&valuesRec.Vspan,
+					&valuesRec.Vobj,
+					&valuesRec.Vb,
+					&valuesRec.Vreal,
+					&valuesRec.Vstr,
+					&valuesRec.Vlong,
+					&valuesRec.Vguid,
+				)
+
+				if err != nil {
+					return err
+				}
+
+				assert.Equal(t, rec, valuesRec)
+
+				recs := update.(*[]AllDataType)
+				*recs = append(*recs, rec)
+				return nil
+			},
+			gotInit: func() interface{} {
+				ad := []AllDataType{}
+				return &ad
+			},
+			failFlag: false,
+			want:     &[]AllDataType{getExpectedResult()},
+		},
+		{
+			desc: "Complex query with Statement Builder - with TimeSpan parameters",
+			stmt: kql.NewStatementBuilder("table(tableName) | where vspan == txt"),
+			options: []kusto.QueryOption{kusto.QueryParameters(*kql.NewStatementQueryParameters().
+				AddString("tableName", "string", allDataTypesTable).
+				AddTimespan("txt", "timespan", ts))},
+			qcall: client.Query,
+			doer: func(row *table.Row, update interface{}) error {
+				rec := AllDataType{}
+				if err := row.ToStruct(&rec); err != nil {
+					return err
+				}
+
+				valuesRec := AllDataType{}
+
+				err := row.ExtractValues(&valuesRec.Vnum,
+					&valuesRec.Vdec,
+					&valuesRec.Vdate,
+					&valuesRec.Vspan,
+					&valuesRec.Vobj,
+					&valuesRec.Vb,
+					&valuesRec.Vreal,
+					&valuesRec.Vstr,
+					&valuesRec.Vlong,
+					&valuesRec.Vguid,
+				)
+
+				if err != nil {
+					return err
+				}
+
+				assert.Equal(t, rec, valuesRec)
+
+				recs := update.(*[]AllDataType)
+				*recs = append(*recs, rec)
+				return nil
+			},
+			gotInit: func() interface{} {
+				ad := []AllDataType{}
+				return &ad
+			},
+			failFlag: false,
+			want:     &[]AllDataType{getExpectedResult()},
+		},
+		{
+			desc: "Complex query with Statement Builder - with Dynamic parameters",
+			stmt: kql.NewStatementBuilder("table(tableName) | where tostring(vobj) == tostring(txt)"),
+			options: []kusto.QueryOption{kusto.QueryParameters(*kql.NewStatementQueryParameters().
+				AddString("tableName", "string", allDataTypesTable).
+				AddDynamic("txt", "dynamic", map[string]interface{}{
+					"moshe": "value",
+				}))},
+			qcall: client.Query,
+			doer: func(row *table.Row, update interface{}) error {
+				rec := AllDataType{}
+				if err := row.ToStruct(&rec); err != nil {
+					return err
+				}
+
+				valuesRec := AllDataType{}
+
+				err := row.ExtractValues(&valuesRec.Vnum,
+					&valuesRec.Vdec,
+					&valuesRec.Vdate,
+					&valuesRec.Vspan,
+					&valuesRec.Vobj,
+					&valuesRec.Vb,
+					&valuesRec.Vreal,
+					&valuesRec.Vstr,
+					&valuesRec.Vlong,
+					&valuesRec.Vguid,
+				)
+
+				if err != nil {
+					return err
+				}
+
+				assert.Equal(t, rec, valuesRec)
+
+				recs := update.(*[]AllDataType)
+				*recs = append(*recs, rec)
+				return nil
+			},
+			gotInit: func() interface{} {
+				ad := []AllDataType{}
+				return &ad
+			},
+			failFlag: false,
+			want:     &[]AllDataType{getExpectedResult()},
+		},
+		{
+			desc: "Complex query with Statement Builder - with bool parameters",
+			stmt: kql.NewStatementBuilder("table(tableName) | where vb == txt"),
+			options: []kusto.QueryOption{kusto.QueryParameters(*kql.NewStatementQueryParameters().
+				AddString("tableName", "string", allDataTypesTable).
+				AddBool("txt", "bool", true))},
+			qcall: client.Query,
+			doer: func(row *table.Row, update interface{}) error {
+				rec := AllDataType{}
+				if err := row.ToStruct(&rec); err != nil {
+					return err
+				}
+
+				valuesRec := AllDataType{}
+
+				err := row.ExtractValues(&valuesRec.Vnum,
+					&valuesRec.Vdec,
+					&valuesRec.Vdate,
+					&valuesRec.Vspan,
+					&valuesRec.Vobj,
+					&valuesRec.Vb,
+					&valuesRec.Vreal,
+					&valuesRec.Vstr,
+					&valuesRec.Vlong,
+					&valuesRec.Vguid,
+				)
+
+				if err != nil {
+					return err
+				}
+
+				assert.Equal(t, rec, valuesRec)
+
+				recs := update.(*[]AllDataType)
+				*recs = append(*recs, rec)
+				return nil
+			},
+			gotInit: func() interface{} {
+				ad := []AllDataType{}
+				return &ad
+			},
+			failFlag: false,
+			want:     &[]AllDataType{getExpectedResult()},
+		},
+		{
+			desc: "Complex query with Statement Builder - with real parameters",
+			stmt: kql.NewStatementBuilder("table(tableName) | where vreal == txt"),
+			options: []kusto.QueryOption{kusto.QueryParameters(*kql.NewStatementQueryParameters().
+				AddString("tableName", "string", allDataTypesTable).
+				AddReal("txt", "real", 0.01))},
+			qcall: client.Query,
+			doer: func(row *table.Row, update interface{}) error {
+				rec := AllDataType{}
+				if err := row.ToStruct(&rec); err != nil {
+					return err
+				}
+
+				valuesRec := AllDataType{}
+
+				err := row.ExtractValues(&valuesRec.Vnum,
+					&valuesRec.Vdec,
+					&valuesRec.Vdate,
+					&valuesRec.Vspan,
+					&valuesRec.Vobj,
+					&valuesRec.Vb,
+					&valuesRec.Vreal,
+					&valuesRec.Vstr,
+					&valuesRec.Vlong,
+					&valuesRec.Vguid,
+				)
+
+				if err != nil {
+					return err
+				}
+
+				assert.Equal(t, rec, valuesRec)
+
+				recs := update.(*[]AllDataType)
+				*recs = append(*recs, rec)
+				return nil
+			},
+			gotInit: func() interface{} {
+				ad := []AllDataType{}
+				return &ad
+			},
+			failFlag: false,
+			want:     &[]AllDataType{getExpectedResult()},
+		},
+		{
+			desc: "Complex query with Statement Builder - with long parameters",
+			stmt: kql.NewStatementBuilder("table(tableName) | where vlong == txt"),
+			options: []kusto.QueryOption{kusto.QueryParameters(*kql.NewStatementQueryParameters().
+				AddString("tableName", "string", allDataTypesTable).
+				AddLong("txt", "long", 9223372036854775807))},
+			qcall: client.Query,
+			doer: func(row *table.Row, update interface{}) error {
+				rec := AllDataType{}
+				if err := row.ToStruct(&rec); err != nil {
+					return err
+				}
+
+				valuesRec := AllDataType{}
+
+				err := row.ExtractValues(&valuesRec.Vnum,
+					&valuesRec.Vdec,
+					&valuesRec.Vdate,
+					&valuesRec.Vspan,
+					&valuesRec.Vobj,
+					&valuesRec.Vb,
+					&valuesRec.Vreal,
+					&valuesRec.Vstr,
+					&valuesRec.Vlong,
+					&valuesRec.Vguid,
+				)
+
+				if err != nil {
+					return err
+				}
+
+				assert.Equal(t, rec, valuesRec)
+
+				recs := update.(*[]AllDataType)
+				*recs = append(*recs, rec)
+				return nil
+			},
+			gotInit: func() interface{} {
+				ad := []AllDataType{}
+				return &ad
+			},
+			failFlag: false,
+			want:     &[]AllDataType{getExpectedResult()},
+		},
+		{
+			desc: "Complex query with Statement Builder - with guid parameters",
+			stmt: kql.NewStatementBuilder("table(tableName) | where vguid == txt"),
+			options: []kusto.QueryOption{kusto.QueryParameters(*kql.NewStatementQueryParameters().
+				AddString("tableName", "string", allDataTypesTable).
+				AddGUID("txt", "guid", guid))},
+			qcall: client.Query,
+			doer: func(row *table.Row, update interface{}) error {
+				rec := AllDataType{}
+				if err := row.ToStruct(&rec); err != nil {
+					return err
+				}
+
+				valuesRec := AllDataType{}
+
+				err := row.ExtractValues(&valuesRec.Vnum,
+					&valuesRec.Vdec,
+					&valuesRec.Vdate,
+					&valuesRec.Vspan,
+					&valuesRec.Vobj,
+					&valuesRec.Vb,
+					&valuesRec.Vreal,
+					&valuesRec.Vstr,
+					&valuesRec.Vlong,
+					&valuesRec.Vguid,
+				)
+
+				if err != nil {
+					return err
+				}
+
+				assert.Equal(t, rec, valuesRec)
+
+				recs := update.(*[]AllDataType)
+				*recs = append(*recs, rec)
+				return nil
+			},
+			gotInit: func() interface{} {
+				ad := []AllDataType{}
+				return &ad
+			},
+			failFlag: false,
+			want:     &[]AllDataType{getExpectedResult()},
+		},
+		{
+			desc: "Complex query with Statement Builder - Fail due to wrong table name (escaped)",
 			stmt: kql.NewStatementBuilder("table(tableName) | where vstr == txt"),
 			options: []kusto.QueryOption{kusto.QueryParameters(*kql.NewStatementQueryParameters().
 				AddString("tableName", "string", "goe2e_all_data_types\"").
 				AddString("txt", "string", "asdf"))},
 			qcall: client.Query,
 			doer: func(row *table.Row, update interface{}) error {
-				if row.Replace {
-					fmt.Println("---") // Replace flag indicates that the query result should be cleared and replaced with this row
+				rec := AllDataType{}
+				if err := row.ToStruct(&rec); err != nil {
+					return err
 				}
-				fmt.Println(row) // As a convenience, printing a *table.Row will output csv
+
+				valuesRec := AllDataType{}
+
+				err := row.ExtractValues(&valuesRec.Vnum,
+					&valuesRec.Vdec,
+					&valuesRec.Vdate,
+					&valuesRec.Vspan,
+					&valuesRec.Vobj,
+					&valuesRec.Vb,
+					&valuesRec.Vreal,
+					&valuesRec.Vstr,
+					&valuesRec.Vlong,
+					&valuesRec.Vguid,
+				)
+
+				if err != nil {
+					return err
+				}
+
+				assert.Equal(t, rec, valuesRec)
+
+				recs := update.(*[]AllDataType)
+				*recs = append(*recs, rec)
 				return nil
 			},
 			gotInit: func() interface{} {
-				return nil
+				ad := []AllDataType{}
+				return &ad
 			},
 			failFlag: true,
+			want:     &[]AllDataType{},
 		},
 	}
 
@@ -725,9 +1159,7 @@ func TestStatment(t *testing.T) {
 				err = iter.DoOnRowOrError(func(row *table.Row, e *errors.Error) error {
 					return test.doer(row, got)
 				})
-				if (!test.failFlag && err != nil) || (test.failFlag && err == nil) {
-					require.Nilf(t, err, "TestQueries(%s): had iter.Do() error: %s.", test.desc, err)
-				}
+				require.Nilf(t, err, "TestQueries(%s): had iter.Do() error: %s.", test.desc, err)
 			}
 
 			require.Equal(t, test.want, got)

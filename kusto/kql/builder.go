@@ -30,8 +30,6 @@ type Builder interface {
 	String() string
 	GetParameters() (map[string]string, error)
 	SupportsParameters() bool
-
-	Build() Query
 }
 
 // stringConstant is an internal type that cannot be created outside the package.  The only two ways to build
@@ -68,11 +66,6 @@ func (b *statementBuilder) addBase(value fmt.Stringer) Builder {
 	return b
 }
 
-func (b *statementBuilder) Build() Query {
-	return &query{
-		query: b.builder.String(),
-	}
-}
 func (b *statementBuilder) GetParameters() (map[string]string, error) {
 	return nil, errors.New("this option does not support Parameters")
 }

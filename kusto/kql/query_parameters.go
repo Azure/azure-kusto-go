@@ -24,9 +24,6 @@ var buildPool = sync.Pool{
 func NewStatementQueryParameters() *StatementQueryParameters {
 	return &StatementQueryParameters{parameters: make(map[string]ParamVals)}
 }
-func (q *StatementQueryParameters) AddLiteral(key string, paramType string, value stringConstant) *StatementQueryParameters {
-	return q.addBase(key, paramType, value)
-}
 func (q *StatementQueryParameters) addBase(key string, paramType string, value fmt.Stringer) *StatementQueryParameters {
 	q.parameters[key] = ParamVals{paramType, value.String()}
 	return q

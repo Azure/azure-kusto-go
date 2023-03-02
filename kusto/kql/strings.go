@@ -106,12 +106,12 @@ func FormatTimespan(duration time.Duration) string {
 	}
 
 	// Use the `fmt.Sprintf()` function to format the duration as a string
-	return fmt.Sprintf("%s%02d:%02d:%02d.%7.7d",
+	return fmt.Sprintf("%s%02d:%02d:%02d.%07d",
 		daysStr,
 		int(remaining.Hours()),
 		int(remaining.Minutes())%60,
 		int(remaining.Seconds())%60,
-		int(remaining.Nanoseconds())%1000000000)
+		int((remaining.Nanoseconds())%1000000000/100))
 }
 
 func FormatDatetime(datetime time.Time) string {

@@ -50,21 +50,21 @@ func TestBuilder(t *testing.T) {
 			NewStatementBuilder(
 				"MyTable | where i != ",
 			).AddTimespan(1*time.Hour + 2*time.Minute + 3*time.Second + 4*time.Microsecond).AddLiteral(" ;"),
-			"MyTable | where i != timespan(01:02:03.0004000) ;",
+			"MyTable | where i != timespan(01:02:03.0000040) ;",
 		},
 		{
 			"Test add duration with days",
 			NewStatementBuilder(
 				"MyTable | where i != ",
 			).AddTimespan(49*time.Hour + 2*time.Minute + 3*time.Second + 4*time.Microsecond).AddLiteral(" ;"),
-			"MyTable | where i != timespan(2.01:02:03.0004000) ;",
+			"MyTable | where i != timespan(2.01:02:03.0000040) ;",
 		},
 		{
 			"Test add dynamic",
 			NewStatementBuilder(
 				"MyTable | where i != ",
 			).AddDynamic(`{"a": 3, "b": 5.4}`).AddLiteral(" ;"),
-			`MyTable | where i != dynamic("{\"a\": 3, \"b\": 5.4}") ;`,
+			`MyTable | where i != dynamic({"a": 3, "b": 5.4}) ;`,
 		},
 		{
 			"Test add guid",
@@ -104,8 +104,8 @@ func TestBuilder(t *testing.T) {
 	}
 	for _, test := range tests {
 		t.Run(test.name, func(t *testing.T) {
-			actual := test.b.Build()
-			assert.Equal(t, test.expected, actual.Query())
+			actual := test.b.String()
+			assert.Equal(t, test.expected, actual)
 		})
 	}
 }
