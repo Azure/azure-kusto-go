@@ -580,7 +580,7 @@ func TestQueries(t *testing.T) {
 	}
 }
 
-func TestStatment(t *testing.T) {
+func TestStatement(t *testing.T) {
 	t.Parallel()
 
 	if skipETOE || testing.Short() {
@@ -629,12 +629,27 @@ func TestStatment(t *testing.T) {
 		failFlag bool
 	}{
 		{
-			desc: "Complex query with Statement Builder - with String parameters",
-			stmt: kql.NewStatementBuilder("table(tableName) | where vstr == txt"),
-			options: []kusto.QueryOption{kusto.QueryParameters(*kql.NewStatementQueryParameters().
-				AddString("tableName", "string", allDataTypesTable).
-				AddString("txt", "string", "asdf"))},
-			qcall: client.Query,
+			desc: "Complex query with Statement Builder",
+			stmt: kql.NewStatementBuilder("").
+				AddDatabase(testConfig.Database).AddLiteral(".").
+				AddTable(allDataTypesTable).AddLiteral(" | where ").
+				AddColumn("vnum").AddLiteral(" == ").AddInt(1).AddLiteral(" and ").
+				AddColumn("vdec").AddLiteral(" == ").AddDecimal(value.Decimal{
+				Value: "2.00000000000001",
+				Valid: true,
+			}).AddLiteral(" and ").
+				AddColumn("vdate").AddLiteral(" == ").AddDateTime(dt).AddLiteral(" and ").
+				AddColumn("vspan").AddLiteral(" == ").AddTimespan(ts).AddLiteral(" and ").
+				AddFunction("tostring").AddLiteral("(").AddColumn("vobj").AddLiteral(")").
+				AddLiteral(" == ").AddFunction("tostring").AddLiteral("(").
+				AddDynamic(map[string]interface{}{"moshe": "value"}).AddLiteral(")").AddLiteral(" and ").
+				AddColumn("vb").AddLiteral(" == ").AddBool(true).AddLiteral(" and ").
+				AddColumn("vreal").AddLiteral(" == ").AddReal(0.01).AddLiteral(" and ").
+				AddColumn("vstr").AddLiteral(" == ").AddString("asdf").AddLiteral(" and ").
+				AddColumn("vlong").AddLiteral(" == ").AddLong(9223372036854775807).AddLiteral(" and ").
+				AddColumn("vguid").AddLiteral(" == ").AddGUID(guid),
+			options: []kusto.QueryOption{},
+			qcall:   client.Query,
 			doer: func(row *table.Row, update interface{}) error {
 				rec := AllDataType{}
 				if err := row.ToStruct(&rec); err != nil {
@@ -673,368 +688,25 @@ func TestStatment(t *testing.T) {
 			want:     &[]AllDataType{getExpectedResult()},
 		},
 		{
-			desc: "Complex query with Statement Builder - with Int parameters",
-			stmt: kql.NewStatementBuilder("table(tableName) | where vnum == txt"),
+			desc: "Complex query with Statement Builder and parameters",
+			stmt: kql.NewStatementBuilder("table(tableName) | where vnum == num and vdec == dec and vdate == dt and vspan == span and tostring(vobj) == tostring(obj) and vb == b and vreal == rl and vstr == str and vlong == lg and vguid == guid"),
 			options: []kusto.QueryOption{kusto.QueryParameters(*kql.NewStatementQueryParameters().
-				AddString("tableName", "string", allDataTypesTable).
-				AddInt("txt", "int", 1))},
-			qcall: client.Query,
-			doer: func(row *table.Row, update interface{}) error {
-				rec := AllDataType{}
-				if err := row.ToStruct(&rec); err != nil {
-					return err
-				}
-
-				valuesRec := AllDataType{}
-
-				err := row.ExtractValues(&valuesRec.Vnum,
-					&valuesRec.Vdec,
-					&valuesRec.Vdate,
-					&valuesRec.Vspan,
-					&valuesRec.Vobj,
-					&valuesRec.Vb,
-					&valuesRec.Vreal,
-					&valuesRec.Vstr,
-					&valuesRec.Vlong,
-					&valuesRec.Vguid,
-				)
-
-				if err != nil {
-					return err
-				}
-
-				assert.Equal(t, rec, valuesRec)
-
-				recs := update.(*[]AllDataType)
-				*recs = append(*recs, rec)
-				return nil
-			},
-			gotInit: func() interface{} {
-				ad := []AllDataType{}
-				return &ad
-			},
-			failFlag: false,
-			want:     &[]AllDataType{getExpectedResult()},
-		},
-		{
-			desc: "Complex query with Statement Builder - with Decimal parameters",
-			stmt: kql.NewStatementBuilder("table(tableName) | where vdec == txt"),
-			options: []kusto.QueryOption{kusto.QueryParameters(*kql.NewStatementQueryParameters().
-				AddString("tableName", "string", allDataTypesTable).
-				AddDecimal("txt", "decimal", value.Decimal{
+				AddString("tableName", allDataTypesTable).
+				AddInt("num", 1).
+				AddDecimal("dec", value.Decimal{
 					Value: "2.00000000000001",
 					Valid: true,
-				}))},
-			qcall: client.Query,
-			doer: func(row *table.Row, update interface{}) error {
-				rec := AllDataType{}
-				if err := row.ToStruct(&rec); err != nil {
-					return err
-				}
-
-				valuesRec := AllDataType{}
-
-				err := row.ExtractValues(&valuesRec.Vnum,
-					&valuesRec.Vdec,
-					&valuesRec.Vdate,
-					&valuesRec.Vspan,
-					&valuesRec.Vobj,
-					&valuesRec.Vb,
-					&valuesRec.Vreal,
-					&valuesRec.Vstr,
-					&valuesRec.Vlong,
-					&valuesRec.Vguid,
-				)
-
-				if err != nil {
-					return err
-				}
-
-				assert.Equal(t, rec, valuesRec)
-
-				recs := update.(*[]AllDataType)
-				*recs = append(*recs, rec)
-				return nil
-			},
-			gotInit: func() interface{} {
-				ad := []AllDataType{}
-				return &ad
-			},
-			failFlag: false,
-			want:     &[]AllDataType{getExpectedResult()},
-		},
-		{
-			desc: "Complex query with Statement Builder - with DateTime parameters",
-			stmt: kql.NewStatementBuilder("table(tableName) | where vdate == txt"),
-			options: []kusto.QueryOption{kusto.QueryParameters(*kql.NewStatementQueryParameters().
-				AddString("tableName", "string", allDataTypesTable).
-				AddDateTime("txt", "datetime", dt))},
-			qcall: client.Query,
-			doer: func(row *table.Row, update interface{}) error {
-				rec := AllDataType{}
-				if err := row.ToStruct(&rec); err != nil {
-					return err
-				}
-
-				valuesRec := AllDataType{}
-
-				err := row.ExtractValues(&valuesRec.Vnum,
-					&valuesRec.Vdec,
-					&valuesRec.Vdate,
-					&valuesRec.Vspan,
-					&valuesRec.Vobj,
-					&valuesRec.Vb,
-					&valuesRec.Vreal,
-					&valuesRec.Vstr,
-					&valuesRec.Vlong,
-					&valuesRec.Vguid,
-				)
-
-				if err != nil {
-					return err
-				}
-
-				assert.Equal(t, rec, valuesRec)
-
-				recs := update.(*[]AllDataType)
-				*recs = append(*recs, rec)
-				return nil
-			},
-			gotInit: func() interface{} {
-				ad := []AllDataType{}
-				return &ad
-			},
-			failFlag: false,
-			want:     &[]AllDataType{getExpectedResult()},
-		},
-		{
-			desc: "Complex query with Statement Builder - with TimeSpan parameters",
-			stmt: kql.NewStatementBuilder("table(tableName) | where vspan == txt"),
-			options: []kusto.QueryOption{kusto.QueryParameters(*kql.NewStatementQueryParameters().
-				AddString("tableName", "string", allDataTypesTable).
-				AddTimespan("txt", "timespan", ts))},
-			qcall: client.Query,
-			doer: func(row *table.Row, update interface{}) error {
-				rec := AllDataType{}
-				if err := row.ToStruct(&rec); err != nil {
-					return err
-				}
-
-				valuesRec := AllDataType{}
-
-				err := row.ExtractValues(&valuesRec.Vnum,
-					&valuesRec.Vdec,
-					&valuesRec.Vdate,
-					&valuesRec.Vspan,
-					&valuesRec.Vobj,
-					&valuesRec.Vb,
-					&valuesRec.Vreal,
-					&valuesRec.Vstr,
-					&valuesRec.Vlong,
-					&valuesRec.Vguid,
-				)
-
-				if err != nil {
-					return err
-				}
-
-				assert.Equal(t, rec, valuesRec)
-
-				recs := update.(*[]AllDataType)
-				*recs = append(*recs, rec)
-				return nil
-			},
-			gotInit: func() interface{} {
-				ad := []AllDataType{}
-				return &ad
-			},
-			failFlag: false,
-			want:     &[]AllDataType{getExpectedResult()},
-		},
-		{
-			desc: "Complex query with Statement Builder - with Dynamic parameters",
-			stmt: kql.NewStatementBuilder("table(tableName) | where tostring(vobj) == tostring(txt)"),
-			options: []kusto.QueryOption{kusto.QueryParameters(*kql.NewStatementQueryParameters().
-				AddString("tableName", "string", allDataTypesTable).
-				AddDynamic("txt", "dynamic", map[string]interface{}{
+				}).
+				AddDateTime("dt", dt).
+				AddTimespan("span", ts).
+				AddDynamic("obj", map[string]interface{}{
 					"moshe": "value",
-				}))},
-			qcall: client.Query,
-			doer: func(row *table.Row, update interface{}) error {
-				rec := AllDataType{}
-				if err := row.ToStruct(&rec); err != nil {
-					return err
-				}
-
-				valuesRec := AllDataType{}
-
-				err := row.ExtractValues(&valuesRec.Vnum,
-					&valuesRec.Vdec,
-					&valuesRec.Vdate,
-					&valuesRec.Vspan,
-					&valuesRec.Vobj,
-					&valuesRec.Vb,
-					&valuesRec.Vreal,
-					&valuesRec.Vstr,
-					&valuesRec.Vlong,
-					&valuesRec.Vguid,
-				)
-
-				if err != nil {
-					return err
-				}
-
-				assert.Equal(t, rec, valuesRec)
-
-				recs := update.(*[]AllDataType)
-				*recs = append(*recs, rec)
-				return nil
-			},
-			gotInit: func() interface{} {
-				ad := []AllDataType{}
-				return &ad
-			},
-			failFlag: false,
-			want:     &[]AllDataType{getExpectedResult()},
-		},
-		{
-			desc: "Complex query with Statement Builder - with bool parameters",
-			stmt: kql.NewStatementBuilder("table(tableName) | where vb == txt"),
-			options: []kusto.QueryOption{kusto.QueryParameters(*kql.NewStatementQueryParameters().
-				AddString("tableName", "string", allDataTypesTable).
-				AddBool("txt", "bool", true))},
-			qcall: client.Query,
-			doer: func(row *table.Row, update interface{}) error {
-				rec := AllDataType{}
-				if err := row.ToStruct(&rec); err != nil {
-					return err
-				}
-
-				valuesRec := AllDataType{}
-
-				err := row.ExtractValues(&valuesRec.Vnum,
-					&valuesRec.Vdec,
-					&valuesRec.Vdate,
-					&valuesRec.Vspan,
-					&valuesRec.Vobj,
-					&valuesRec.Vb,
-					&valuesRec.Vreal,
-					&valuesRec.Vstr,
-					&valuesRec.Vlong,
-					&valuesRec.Vguid,
-				)
-
-				if err != nil {
-					return err
-				}
-
-				assert.Equal(t, rec, valuesRec)
-
-				recs := update.(*[]AllDataType)
-				*recs = append(*recs, rec)
-				return nil
-			},
-			gotInit: func() interface{} {
-				ad := []AllDataType{}
-				return &ad
-			},
-			failFlag: false,
-			want:     &[]AllDataType{getExpectedResult()},
-		},
-		{
-			desc: "Complex query with Statement Builder - with real parameters",
-			stmt: kql.NewStatementBuilder("table(tableName) | where vreal == txt"),
-			options: []kusto.QueryOption{kusto.QueryParameters(*kql.NewStatementQueryParameters().
-				AddString("tableName", "string", allDataTypesTable).
-				AddReal("txt", "real", 0.01))},
-			qcall: client.Query,
-			doer: func(row *table.Row, update interface{}) error {
-				rec := AllDataType{}
-				if err := row.ToStruct(&rec); err != nil {
-					return err
-				}
-
-				valuesRec := AllDataType{}
-
-				err := row.ExtractValues(&valuesRec.Vnum,
-					&valuesRec.Vdec,
-					&valuesRec.Vdate,
-					&valuesRec.Vspan,
-					&valuesRec.Vobj,
-					&valuesRec.Vb,
-					&valuesRec.Vreal,
-					&valuesRec.Vstr,
-					&valuesRec.Vlong,
-					&valuesRec.Vguid,
-				)
-
-				if err != nil {
-					return err
-				}
-
-				assert.Equal(t, rec, valuesRec)
-
-				recs := update.(*[]AllDataType)
-				*recs = append(*recs, rec)
-				return nil
-			},
-			gotInit: func() interface{} {
-				ad := []AllDataType{}
-				return &ad
-			},
-			failFlag: false,
-			want:     &[]AllDataType{getExpectedResult()},
-		},
-		{
-			desc: "Complex query with Statement Builder - with long parameters",
-			stmt: kql.NewStatementBuilder("table(tableName) | where vlong == txt"),
-			options: []kusto.QueryOption{kusto.QueryParameters(*kql.NewStatementQueryParameters().
-				AddString("tableName", "string", allDataTypesTable).
-				AddLong("txt", "long", 9223372036854775807))},
-			qcall: client.Query,
-			doer: func(row *table.Row, update interface{}) error {
-				rec := AllDataType{}
-				if err := row.ToStruct(&rec); err != nil {
-					return err
-				}
-
-				valuesRec := AllDataType{}
-
-				err := row.ExtractValues(&valuesRec.Vnum,
-					&valuesRec.Vdec,
-					&valuesRec.Vdate,
-					&valuesRec.Vspan,
-					&valuesRec.Vobj,
-					&valuesRec.Vb,
-					&valuesRec.Vreal,
-					&valuesRec.Vstr,
-					&valuesRec.Vlong,
-					&valuesRec.Vguid,
-				)
-
-				if err != nil {
-					return err
-				}
-
-				assert.Equal(t, rec, valuesRec)
-
-				recs := update.(*[]AllDataType)
-				*recs = append(*recs, rec)
-				return nil
-			},
-			gotInit: func() interface{} {
-				ad := []AllDataType{}
-				return &ad
-			},
-			failFlag: false,
-			want:     &[]AllDataType{getExpectedResult()},
-		},
-		{
-			desc: "Complex query with Statement Builder - with guid parameters",
-			stmt: kql.NewStatementBuilder("table(tableName) | where vguid == txt"),
-			options: []kusto.QueryOption{kusto.QueryParameters(*kql.NewStatementQueryParameters().
-				AddString("tableName", "string", allDataTypesTable).
-				AddGUID("txt", "guid", guid))},
+				}).
+				AddBool("b", true).
+				AddReal("rl", 0.01).
+				AddString("str", "asdf").
+				AddLong("lg", 9223372036854775807).
+				AddGUID("guid", guid))},
 			qcall: client.Query,
 			doer: func(row *table.Row, update interface{}) error {
 				rec := AllDataType{}
@@ -1077,8 +749,8 @@ func TestStatment(t *testing.T) {
 			desc: "Complex query with Statement Builder - Fail due to wrong table name (escaped)",
 			stmt: kql.NewStatementBuilder("table(tableName) | where vstr == txt"),
 			options: []kusto.QueryOption{kusto.QueryParameters(*kql.NewStatementQueryParameters().
-				AddString("tableName", "string", "goe2e_all_data_types\"").
-				AddString("txt", "string", "asdf"))},
+				AddString("tableName", "goe2e_all_data_types\"").
+				AddString("txt", "asdf"))},
 			qcall: client.Query,
 			doer: func(row *table.Row, update interface{}) error {
 				rec := AllDataType{}

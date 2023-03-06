@@ -5,7 +5,6 @@ import (
 	"github.com/Azure/azure-kusto-go/kusto/data/types"
 	"github.com/Azure/azure-kusto-go/kusto/data/value"
 	"github.com/google/uuid"
-	"github.com/shopspring/decimal"
 	"time"
 )
 
@@ -32,7 +31,7 @@ func (v *kqlValue) String() string {
 	val := v.value
 	switch v.kustoType {
 	case types.String:
-		return val.(string)
+		return QuoteString(val.(string), false)
 	case types.DateTime:
 		val = FormatDatetime(val.(time.Time))
 	case types.Timespan:
@@ -61,7 +60,7 @@ func (b *statementBuilder) AddDateTime(value time.Time) Builder {
 	return b.addBase(newValue(value, types.DateTime))
 }
 
-func (b *statementBuilder) AddDynamic(value string) Builder {
+func (b *statementBuilder) AddDynamic(value interface{}) Builder {
 	return b.addBase(newValue(value, types.Dynamic))
 }
 
@@ -89,46 +88,46 @@ func (b *statementBuilder) AddTimespan(value time.Duration) Builder {
 	return b.addBase(newValue(value, types.Timespan))
 }
 
-func (b *statementBuilder) AddDecimal(value decimal.Decimal) Builder {
+func (b *statementBuilder) AddDecimal(value value.Decimal) Builder {
 	return b.addBase(newValue(value, types.Decimal))
 }
 
-func (q *StatementQueryParameters) AddBool(key string, paramType string, value bool) *StatementQueryParameters {
-	return q.addBase(key, paramType, newValue(value, types.Bool))
+func (q *StatementQueryParameters) AddBool(key string, value bool) *StatementQueryParameters {
+	return q.addBase(key, string(types.Bool), newValue(value, types.Bool))
 }
 
-func (q *StatementQueryParameters) AddDateTime(key string, paramType string, value time.Time) *StatementQueryParameters {
-	return q.addBase(key, paramType, newValue(value, types.DateTime))
+func (q *StatementQueryParameters) AddDateTime(key string, value time.Time) *StatementQueryParameters {
+	return q.addBase(key, string(types.DateTime), newValue(value, types.DateTime))
 }
 
-func (q *StatementQueryParameters) AddDynamic(key string, paramType string, value interface{}) *StatementQueryParameters {
-	return q.addBase(key, paramType, newValue(value, types.Dynamic))
+func (q *StatementQueryParameters) AddDynamic(key string, value interface{}) *StatementQueryParameters {
+	return q.addBase(key, string(types.Dynamic), newValue(value, types.Dynamic))
 }
 
-func (q *StatementQueryParameters) AddGUID(key string, paramType string, value uuid.UUID) *StatementQueryParameters {
-	return q.addBase(key, paramType, newValue(value, types.GUID))
+func (q *StatementQueryParameters) AddGUID(key string, value uuid.UUID) *StatementQueryParameters {
+	return q.addBase(key, string(types.GUID), newValue(value, types.GUID))
 }
 
-func (q *StatementQueryParameters) AddInt(key string, paramType string, value int32) *StatementQueryParameters {
-	return q.addBase(key, paramType, newValue(value, types.Int))
+func (q *StatementQueryParameters) AddInt(key string, value int32) *StatementQueryParameters {
+	return q.addBase(key, string(types.Int), newValue(value, types.Int))
 }
 
-func (q *StatementQueryParameters) AddLong(key string, paramType string, value int64) *StatementQueryParameters {
-	return q.addBase(key, paramType, newValue(value, types.Long))
+func (q *StatementQueryParameters) AddLong(key string, value int64) *StatementQueryParameters {
+	return q.addBase(key, string(types.Long), newValue(value, types.Long))
 }
 
-func (q *StatementQueryParameters) AddReal(key string, paramType string, value float64) *StatementQueryParameters {
-	return q.addBase(key, paramType, newValue(value, types.Real))
+func (q *StatementQueryParameters) AddReal(key string, value float64) *StatementQueryParameters {
+	return q.addBase(key, string(types.Real), newValue(value, types.Real))
 }
 
-func (q *StatementQueryParameters) AddString(key string, paramType string, value string) *StatementQueryParameters {
-	return q.addBase(key, paramType, newValue(value, types.String))
+func (q *StatementQueryParameters) AddString(key string, value string) *StatementQueryParameters {
+	return q.addBase(key, string(types.String), newValue(value, types.String))
 }
 
-func (q *StatementQueryParameters) AddTimespan(key string, paramType string, value time.Duration) *StatementQueryParameters {
-	return q.addBase(key, paramType, newValue(value, types.Timespan))
+func (q *StatementQueryParameters) AddTimespan(key string, value time.Duration) *StatementQueryParameters {
+	return q.addBase(key, string(types.Timespan), newValue(value, types.Timespan))
 }
 
-func (q *StatementQueryParameters) AddDecimal(key string, paramType string, value value.Decimal) *StatementQueryParameters {
-	return q.addBase(key, paramType, newValue(value, types.Decimal))
+func (q *StatementQueryParameters) AddDecimal(key string, value value.Decimal) *StatementQueryParameters {
+	return q.addBase(key, string(types.Decimal), newValue(value, types.Decimal))
 }

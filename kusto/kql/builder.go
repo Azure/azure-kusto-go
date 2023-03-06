@@ -3,8 +3,8 @@ package kql
 import (
 	"errors"
 	"fmt"
+	"github.com/Azure/azure-kusto-go/kusto/data/value"
 	"github.com/google/uuid"
-	"github.com/shopspring/decimal"
 	"strings"
 	"time"
 )
@@ -12,14 +12,14 @@ import (
 type Builder interface {
 	AddBool(value bool) Builder
 	AddDateTime(value time.Time) Builder
-	AddDynamic(value string) Builder
+	AddDynamic(value interface{}) Builder
 	AddGUID(value uuid.UUID) Builder
 	AddInt(value int32) Builder
 	AddLong(value int64) Builder
 	AddReal(value float64) Builder
 	AddString(value string) Builder
 	AddTimespan(value time.Duration) Builder
-	AddDecimal(value decimal.Decimal) Builder
+	AddDecimal(value value.Decimal) Builder
 	AddLiteral(value stringConstant) Builder
 
 	AddDatabase(database string) Builder
@@ -30,6 +30,7 @@ type Builder interface {
 	String() string
 	GetParameters() (map[string]string, error)
 	SupportsParameters() bool
+	HasParameters() bool
 }
 
 // stringConstant is an internal type that cannot be created outside the package.  The only two ways to build
@@ -70,5 +71,9 @@ func (b *statementBuilder) GetParameters() (map[string]string, error) {
 	return nil, errors.New("this option does not support Parameters")
 }
 func (b *statementBuilder) SupportsParameters() bool {
+	return false
+}
+
+func (b *statementBuilder) HasParameters() bool {
 	return false
 }

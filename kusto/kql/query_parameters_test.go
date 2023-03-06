@@ -14,13 +14,13 @@ func TestQueryParameters(t *testing.T) {
 		expected string
 	}{
 		{"Test empty", NewStatementBuilder(""), NewStatementQueryParameters(), "\n"},
-		{"Test add string", NewStatementBuilder(""), NewStatementQueryParameters().AddString("foo", "string", "bar"), "declare query_parameters(foo:string);\n"},
+		{"Test add string", NewStatementBuilder(""), NewStatementQueryParameters().AddString("foo", "bar"), "declare query_parameters(foo:string);\n"},
 		{"Test add identifiers", // test might fail at times due to the pseudo-random nature of map that will sometimes change the order of the declaration string.
 			NewStatementBuilder("database(databaseName).table(tableName) | where column == txt ;"),
 			NewStatementQueryParameters().
-				AddString("databaseName", "string", "foo_1").
-				AddString("tableName", "string", "_bar").
-				AddString("txt", "string", "txt_"),
+				AddString("databaseName", "foo_1").
+				AddString("tableName", "_bar").
+				AddString("txt", "txt_"),
 			"declare query_parameters(databaseName:string, tableName:string, txt:string);\ndatabase(databaseName).table(tableName) | where column == txt ;"},
 	}
 	for _, test := range tests {
