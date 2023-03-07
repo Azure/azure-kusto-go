@@ -155,7 +155,7 @@ func (c *Conn) doRequest(ctx context.Context, execType int, db string, query Sta
 	case execQuery, execMgmt:
 		var err error
 		var csl string
-		if query.SupportsParameters() && query.HasParameters() {
+		if query.SupportsParameters() || len(properties.QueryParameters.ToParameterCollection()) == 0 {
 			csl = query.String()
 		} else {
 			csl = fmt.Sprintf("%s\n%s", properties.QueryParameters.ToDeclarationString(), query.String())

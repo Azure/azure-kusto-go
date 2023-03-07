@@ -4,6 +4,7 @@ import (
 	"context"
 	"encoding/csv"
 	"fmt"
+	"github.com/shopspring/decimal"
 	"io"
 	"math/rand"
 	"os"
@@ -637,10 +638,7 @@ func TestStatement(t *testing.T) {
 				AddDatabase(testConfig.Database).AddLiteral(".").
 				AddTable(allDataTypesTable).AddLiteral(" | where ").
 				AddColumn("vnum").AddLiteral(" == ").AddInt(1).AddLiteral(" and ").
-				AddColumn("vdec").AddLiteral(" == ").AddDecimal(value.Decimal{
-				Value: "2.00000000000001",
-				Valid: true,
-			}).AddLiteral(" and ").
+				AddColumn("vdec").AddLiteral(" == ").AddDecimal(decimal.RequireFromString("2.00000000000001")).AddLiteral(" and ").
 				AddColumn("vdate").AddLiteral(" == ").AddDateTime(dt).AddLiteral(" and ").
 				AddColumn("vspan").AddLiteral(" == ").AddTimespan(ts).AddLiteral(" and ").
 				AddFunction("tostring").AddLiteral("(").AddColumn("vobj").AddLiteral(")").
@@ -696,10 +694,7 @@ func TestStatement(t *testing.T) {
 			options: []kusto.QueryOption{kusto.QueryParameters(*kql.NewStatementQueryParameters().
 				AddString("tableName", allDataTypesTable).
 				AddInt("num", 1).
-				AddDecimal("dec", value.Decimal{
-					Value: "2.00000000000001",
-					Valid: true,
-				}).
+				AddDecimal("dec", decimal.RequireFromString("2.00000000000001")).
 				AddDateTime("dt", dt).
 				AddTimespan("span", ts).
 				AddDynamic("obj", map[string]interface{}{

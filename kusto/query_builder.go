@@ -478,7 +478,6 @@ type Statement interface {
 	fmt.Stringer
 	GetParameters() (map[string]string, error)
 	SupportsParameters() bool
-	HasParameters() bool
 }
 
 // Stmt is a Kusto Query statement. A Stmt is thread-safe, but methods on the Stmt are not.
@@ -500,11 +499,6 @@ func (s Stmt) GetParameters() (map[string]string, error) {
 }
 func (s Stmt) SupportsParameters() bool {
 	return true
-}
-
-func (s Stmt) HasParameters() bool {
-	params, _ := s.GetParameters()
-	return len(params) > 0
 }
 
 // UnsafeStmt enables unsafe actions on a Stmt and all Stmts derived from that Stmt.

@@ -2,44 +2,31 @@ package kql
 
 import "fmt"
 
-type Identifier struct {
-	name             string
-	wrappingFunction string
-}
-
 func (b *statementBuilder) AddDatabase(database string) Builder {
-	return b.addBase(Identifier{wrappingFunction: "database", name: database})
+	return b.addBase(stringConstant(fmt.Sprintf("%s(%s)", "database", QuoteString(database, false))))
 }
 
 func (b *statementBuilder) AddTable(table string) Builder {
-	return b.addBase(Identifier{name: table})
+	return b.addBase(stringConstant(NormalizeName(table)))
 }
 
 func (b *statementBuilder) AddColumn(column string) Builder {
-	return b.addBase(Identifier{name: column})
+	return b.addBase(stringConstant(NormalizeName(column)))
 }
 
 func (b *statementBuilder) AddFunction(function string) Builder {
-	return b.addBase(Identifier{name: function})
-}
-
-func (i Identifier) String() string {
-	return i.NormalizeName()
+	return b.addBase(stringConstant(NormalizeName(function)))
 }
 
 // NormalizeName normalizes a string in order to be used safely in the engine - given "query" will produce [\"query\"].
-func (i Identifier) NormalizeName() string {
-	if i.name == "" {
-		return i.name
+func NormalizeName(name string) string {
+	if name == "" {
+		return name
 	}
 
-	if i.wrappingFunction != "" {
-		return fmt.Sprintf("%s(%s)", i.wrappingFunction, QuoteString(i.name, false))
+	if !RequiresQuoting(name) {
+		return name
 	}
 
-	if !RequiresQuoting(i.name) {
-		return i.name
-	}
-
-	return "[" + QuoteString(i.name, false) + "]"
+	return "[" + QuoteString(name, false) + "]"
 }

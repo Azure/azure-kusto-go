@@ -3,8 +3,9 @@ package kql
 import (
 	"errors"
 	"fmt"
-	"github.com/Azure/azure-kusto-go/kusto/data/value"
+	"github.com/Azure/azure-kusto-go/kusto/data/types"
 	"github.com/google/uuid"
+	"github.com/shopspring/decimal"
 	"strings"
 	"time"
 )
@@ -19,7 +20,7 @@ type Builder interface {
 	AddReal(value float64) Builder
 	AddString(value string) Builder
 	AddTimespan(value time.Duration) Builder
-	AddDecimal(value value.Decimal) Builder
+	AddDecimal(value decimal.Decimal) Builder
 	AddLiteral(value stringConstant) Builder
 
 	AddDatabase(database string) Builder
@@ -30,7 +31,6 @@ type Builder interface {
 	String() string
 	GetParameters() (map[string]string, error)
 	SupportsParameters() bool
-	HasParameters() bool
 }
 
 // stringConstant is an internal type that cannot be created outside the package.  The only two ways to build
@@ -67,13 +67,49 @@ func (b *statementBuilder) addBase(value fmt.Stringer) Builder {
 	return b
 }
 
+func (b *statementBuilder) AddBool(value bool) Builder {
+	return b.addBase(newValue(value, types.Bool))
+}
+
+func (b *statementBuilder) AddDateTime(value time.Time) Builder {
+	return b.addBase(newValue(value, types.DateTime))
+}
+
+func (b *statementBuilder) AddDynamic(value interface{}) Builder {
+	return b.addBase(newValue(value, types.Dynamic))
+}
+
+func (b *statementBuilder) AddGUID(value uuid.UUID) Builder {
+	return b.addBase(newValue(value, types.GUID))
+}
+
+func (b *statementBuilder) AddInt(value int32) Builder {
+	return b.addBase(newValue(value, types.Int))
+}
+
+func (b *statementBuilder) AddLong(value int64) Builder {
+	return b.addBase(newValue(value, types.Long))
+}
+
+func (b *statementBuilder) AddReal(value float64) Builder {
+	return b.addBase(newValue(value, types.Real))
+}
+
+func (b *statementBuilder) AddString(value string) Builder {
+	return b.addBase(newValue(value, types.String))
+}
+
+func (b *statementBuilder) AddTimespan(value time.Duration) Builder {
+	return b.addBase(newValue(value, types.Timespan))
+}
+
+func (b *statementBuilder) AddDecimal(value decimal.Decimal) Builder {
+	return b.addBase(newValue(value, types.Decimal))
+}
+
 func (b *statementBuilder) GetParameters() (map[string]string, error) {
 	return nil, errors.New("this option does not support Parameters")
 }
 func (b *statementBuilder) SupportsParameters() bool {
-	return false
-}
-
-func (b *statementBuilder) HasParameters() bool {
 	return false
 }

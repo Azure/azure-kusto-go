@@ -122,7 +122,7 @@ type mockConn struct {
 }
 
 func (m mockConn) queryToJson(ctx context.Context, db string, query Statement, options *queryOptions) (string, error) {
-	return "[]]", nil
+	return "[]", nil
 }
 
 func (m mockConn) Close() error {

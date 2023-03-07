@@ -1,18 +1,16 @@
 package kql
 
 import (
-	"fmt"
+	"github.com/Azure/azure-kusto-go/kusto/data/types"
+	"github.com/google/uuid"
+	"github.com/shopspring/decimal"
 	"strings"
 	"sync"
+	"time"
 )
 
-type ParamVals struct {
-	paramType string
-	value     string
-}
-
 type StatementQueryParameters struct {
-	parameters map[string]ParamVals
+	parameters map[string]Value
 }
 
 var buildPool = sync.Pool{
@@ -22,11 +20,54 @@ var buildPool = sync.Pool{
 }
 
 func NewStatementQueryParameters() *StatementQueryParameters {
-	return &StatementQueryParameters{parameters: make(map[string]ParamVals)}
+	return &StatementQueryParameters{parameters: make(map[string]Value)}
 }
-func (q *StatementQueryParameters) addBase(key string, paramType string, value fmt.Stringer) *StatementQueryParameters {
-	q.parameters[key] = ParamVals{paramType, value.String()}
+func (q *StatementQueryParameters) addBase(key string, value Value) *StatementQueryParameters {
+	if RequiresQuoting(key) {
+		panic("Invalid parameter values. make sure to adhere to KQL entity name conventions and escaping rules.")
+	}
+	q.parameters[key] = value
 	return q
+}
+
+func (q *StatementQueryParameters) AddBool(key string, value bool) *StatementQueryParameters {
+	return q.addBase(key, newValue(value, types.Bool))
+}
+
+func (q *StatementQueryParameters) AddDateTime(key string, value time.Time) *StatementQueryParameters {
+	return q.addBase(key, newValue(value, types.DateTime))
+}
+
+func (q *StatementQueryParameters) AddDynamic(key string, value interface{}) *StatementQueryParameters {
+	return q.addBase(key, newValue(value, types.Dynamic))
+}
+
+func (q *StatementQueryParameters) AddGUID(key string, value uuid.UUID) *StatementQueryParameters {
+	return q.addBase(key, newValue(value, types.GUID))
+}
+
+func (q *StatementQueryParameters) AddInt(key string, value int32) *StatementQueryParameters {
+	return q.addBase(key, newValue(value, types.Int))
+}
+
+func (q *StatementQueryParameters) AddLong(key string, value int64) *StatementQueryParameters {
+	return q.addBase(key, newValue(value, types.Long))
+}
+
+func (q *StatementQueryParameters) AddReal(key string, value float64) *StatementQueryParameters {
+	return q.addBase(key, newValue(value, types.Real))
+}
+
+func (q *StatementQueryParameters) AddString(key string, value string) *StatementQueryParameters {
+	return q.addBase(key, newValue(value, types.String))
+}
+
+func (q *StatementQueryParameters) AddTimespan(key string, value time.Duration) *StatementQueryParameters {
+	return q.addBase(key, newValue(value, types.Timespan))
+}
+
+func (q *StatementQueryParameters) AddDecimal(key string, value decimal.Decimal) *StatementQueryParameters {
+	return q.addBase(key, newValue(value, types.Decimal))
 }
 
 // note - due to the psuedo-random nature of maps, the declaration string might be ordered differently for different runs.
@@ -46,22 +87,23 @@ func (q *StatementQueryParameters) ToDeclarationString() string {
 	defer buildPool.Put(build)
 
 	build.WriteString(declare)
-
+	comma := len(q.parameters)
 	for key, paramVals := range q.parameters {
 		build.WriteString(key)
 		build.WriteString(":")
-		build.WriteString(paramVals.paramType)
-		build.WriteString(", ")
+		build.WriteString(string(paramVals.Type()))
+		if comma > 1 {
+			build.WriteString(", ")
+		}
+		comma--
 	}
 	build.WriteString(closeStmt)
-	var cleaner = build.String()
-	var decStr = cleaner[:len(cleaner)-len(closeStmt)-2] + cleaner[len(cleaner)-len(closeStmt):]
-	return decStr
+	return build.String()
 }
 func (q *StatementQueryParameters) ToParameterCollection() map[string]string {
 	var parameters = make(map[string]string)
 	for key, paramVals := range q.parameters {
-		parameters[key] = paramVals.value
+		parameters[key] = paramVals.String()
 	}
 	return parameters
 }
