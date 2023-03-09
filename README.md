@@ -143,6 +143,37 @@ if err != nil {
 	panic("add error handling")
 }
 ```
+#### Querying with parameters
+
+Users will sometimes want to use query parameters (Read more here - https://learn.microsoft.com/en-us/azure/data-explorer/kusto/query/queryparametersstatement?pivots=azuredataexplorer).
+In this case, the StatementBuilder and QueryParameters structs should be used.
+
+```go
+dt, _ := time.Parse(time.RFC3339Nano, "2020-03-04T14:05:01.3109965Z")
+// Query our database table "systemNodes" for the CollectionTimes and the NodeIds.
+iter, err := client.Query(ctx, "database", kql.NewStatementBuilder("systemNodes | where CollectionTime == time and NodeId == id"),
+	[]kusto.QueryOption{kusto.QueryParameters(*kql.NewStatementQueryParameters().
+                        AddDateTime("time", dt).
+                        AddInt("id", 1)))
+if err != nil {
+	panic("add error handling")
+}
+defer iter.Stop()
+
+// .Do() will call the function for every row in the table.
+err = iter.Do(
+	func(row *table.Row) error {
+		if row.Replace {
+			fmt.Println("---") // Replace flag indicates that the query result should be cleared and replaced with this row
+		}
+		fmt.Println(row) // As a convenience, printing a *table.Row will output csv
+		return nil
+	},
+)
+if err != nil {
+	panic("add error handling")
+}
+```
 
 #### Query Into Structs
 

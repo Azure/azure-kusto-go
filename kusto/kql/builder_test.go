@@ -14,10 +14,22 @@ func TestBuilder(t *testing.T) {
 		b        Builder
 		expected string
 	}{
-		{"Test empty", NewStatementBuilder(""), ""},
-		{"Test simple literal", NewStatementBuilder("").AddLiteral("foo"), "foo"},
-		{"Test simple literal ctor", NewStatementBuilder("foo"), "foo"},
-		{"Test add literal", NewStatementBuilder("foo").AddLiteral("bar"), "foobar"},
+		{
+			"Test empty",
+			NewStatementBuilder(""),
+			""},
+		{
+			"Test simple literal",
+			NewStatementBuilder("").AddLiteral("foo"),
+			"foo"},
+		{
+			"Test simple literal ctor",
+			NewStatementBuilder("foo"),
+			"foo"},
+		{
+			"Test add literal",
+			NewStatementBuilder("foo").AddLiteral("bar"),
+			"foobar"},
 		{
 			"Test add int",
 			NewStatementBuilder("MyTable | where i != ").AddInt(32).AddLiteral(" ;"),
@@ -87,14 +99,16 @@ func TestBuilder(t *testing.T) {
 			).AddString("foo\"bar").AddLiteral(" ;"),
 			"MyTable | where i != \"foo\\\"bar\" ;",
 		},
-		{"Test add identifiers",
+		{
+			"Test add identifiers",
 			NewStatementBuilder("").
 				AddDatabase("foo_1").AddLiteral(".").
 				AddTable("_bar").AddLiteral(" | where ").
 				AddColumn("_baz").AddLiteral(" == ").
 				AddFunction("func_").AddLiteral("() ;"),
 			`database("foo_1")._bar | where _baz == func_() ;`},
-		{"Test add identifiers complex",
+		{
+			"Test add identifiers complex",
 			NewStatementBuilder("").
 				AddDatabase("f\"\"o").AddLiteral(".").
 				AddTable("b\\a\\r").AddLiteral(" | where ").
