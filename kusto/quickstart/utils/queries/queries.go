@@ -10,14 +10,7 @@ import (
 
 //Queries module of Utils - in charge of querying the data - either with management queries, or data queries
 
-// ExecuteCommand /**
-/**
- * Executes a Command using a premade client
- *
- * @param kustoClient  Premade client to run Commands.
- * @param databaseName DB name
- * @param command      The Command to execute
- */
+// ExecuteCommand Executes a Command using a premade client
 func ExecuteCommand(kustoClient *kusto.Client, databaseName string, command kusto.Stmt) {
 	ctx := context.Background()
 	var iter *kusto.RowIterator
