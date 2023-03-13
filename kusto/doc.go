@@ -56,12 +56,16 @@ and accepts only string constants for arguments.
 		panic("add error handling")
 	}
 
-# Querying with StatementBuilder
-One way to build your query is using the StatementBuilder struct. With this struct you build your query as a combination of literals and special entities:
+# Querying with parameters
+
+Users will sometimes want to use query parameters (Read more here - https://learn.microsoft.com/en-us/azure/data-explorer/kusto/query/queryparametersstatement?pivots=azuredataexplorer).
+In this case, the StatementBuilder and QueryParameters structs should be used.
 
 	dt, _ := time.Parse(time.RFC3339Nano, "2020-03-04T14:05:01.3109965Z")
 	// Query our database table "systemNodes" for the CollectionTimes and the NodeIds.
-	iter, err := client.Query(ctx, "database", kql.NewStatementBuilder("").AddTable("systemNodes").AddLiteral(" | where ").AddColumn("CollectionTime").AddLiteral(" == ").AddDateTime(dt).AddLiteral(" and ").AddColumn("NodeId").AddLiteral(" == ").AddInt(1),
+	statement := kql.NewStatementBuilder("systemNodes | where CollectionTime == time and NodeId == id")
+	params :=  kql.NewStatementQueryParameters().AddDateTime("time", dt).AddInt("id", 1)
+	iter, err := client.Query(ctx, "database", statement, params)
 	if err != nil {
 		panic("add error handling")
 	}
@@ -81,15 +85,15 @@ One way to build your query is using the StatementBuilder struct. With this stru
 		panic("add error handling")
 	}
 
-# Querying with parameters
-
-Users will sometimes want to use query parameters (Read more here - https://learn.microsoft.com/en-us/azure/data-explorer/kusto/query/queryparametersstatement?pivots=azuredataexplorer).
-In this case, the StatementBuilder and QueryParameters structs should be used.
+# Querying with StatementBuilder
+Another way to build your query is using the StatementBuilder struct. With this struct you build your query as a combination of literals and special entities.
+This is mostly applicable when your KQL commands which do not support query parameters, or for situations where Kusto entities like database, table, column or function need to be safely added from variables.
 
 	dt, _ := time.Parse(time.RFC3339Nano, "2020-03-04T14:05:01.3109965Z")
+	tableName := "systemNodes"
+	value := 1
 	// Query our database table "systemNodes" for the CollectionTimes and the NodeIds.
-	iter, err := client.Query(ctx, "database", kql.NewStatementBuilder("systemNodes | where CollectionTime == time and NodeId == id"),
-						kql.NewStatementQueryParameters().AddDateTime("time", dt).AddInt("id", 1))
+	iter, err := client.Query(ctx, "database", kql.NewStatementBuilder("").AddTable(tableName).AddLiteral(" | where ").AddColumn("CollectionTime").AddLiteral(" == ").AddDateTime(dt).AddLiteral(" and ").AddColumn("NodeId").AddLiteral(" == ").AddInt(value),
 	if err != nil {
 		panic("add error handling")
 	}

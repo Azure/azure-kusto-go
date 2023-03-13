@@ -30,7 +30,7 @@ type Builder interface {
 
 	String() string
 	GetParameters() (map[string]string, error)
-	SupportsParameters() bool
+	SupportsInlineParameters() bool
 }
 
 // stringConstant is an internal type that cannot be created outside the package.  The only two ways to build
@@ -47,24 +47,23 @@ type statementBuilder struct {
 	builder strings.Builder
 }
 
-// String implements fmt.Stringer.
-func (b *statementBuilder) String() string {
-	return b.builder.String()
-}
-
 func NewStatementBuilder(value stringConstant) Builder {
 	return (&statementBuilder{
 		builder: strings.Builder{},
 	}).AddLiteral(value)
 }
 
-func (b *statementBuilder) AddLiteral(value stringConstant) Builder {
-	return b.addBase(value)
+// String implements fmt.Stringer.
+func (b *statementBuilder) String() string {
+	return b.builder.String()
 }
-
 func (b *statementBuilder) addBase(value fmt.Stringer) Builder {
 	b.builder.WriteString(value.String())
 	return b
+}
+
+func (b *statementBuilder) AddLiteral(value stringConstant) Builder {
+	return b.addBase(value)
 }
 
 func (b *statementBuilder) AddBool(value bool) Builder {
@@ -110,6 +109,6 @@ func (b *statementBuilder) AddDecimal(value decimal.Decimal) Builder {
 func (b *statementBuilder) GetParameters() (map[string]string, error) {
 	return nil, errors.New("this option does not support Parameters")
 }
-func (b *statementBuilder) SupportsParameters() bool {
+func (b *statementBuilder) SupportsInlineParameters() bool {
 	return false
 }

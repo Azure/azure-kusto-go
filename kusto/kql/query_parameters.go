@@ -22,6 +22,10 @@ var buildPool = sync.Pool{
 func NewStatementQueryParameters() *StatementQueryParameters {
 	return &StatementQueryParameters{parameters: make(map[string]Value)}
 }
+
+func (q *StatementQueryParameters) Size() int {
+	return len(q.parameters)
+}
 func (q *StatementQueryParameters) addBase(key string, value Value) *StatementQueryParameters {
 	if RequiresQuoting(key) {
 		panic("Invalid parameter values. make sure to adhere to KQL entity name conventions and escaping rules.")

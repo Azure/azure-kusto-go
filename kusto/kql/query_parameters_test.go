@@ -110,9 +110,9 @@ func TestQueryParameters(t *testing.T) {
 				"txt:string",
 				");\ndatabase(databaseName).table(tableName) | where column == txt ;"},
 			map[string]string{
-				"databaseName": "\"f\\\"\\\"o\"",
-				"tableName":    "\"b\\a\\r\"",
-				"txt":          "\"f_u_n\\u1234c\"",
+				"databaseName": `"f\"\"o"`,
+				"tableName":    `"b\a\r"`,
+				"txt":          `"f_u_n\u1234c"`,
 			}},
 	}
 	for _, test := range tests {

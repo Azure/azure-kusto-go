@@ -477,7 +477,7 @@ func (q Parameters) validate(p Definitions) (Parameters, error) {
 type Statement interface {
 	fmt.Stringer
 	GetParameters() (map[string]string, error)
-	SupportsParameters() bool
+	SupportsInlineParameters() bool
 }
 
 // Stmt is a Kusto Query statement. A Stmt is thread-safe, but methods on the Stmt are not.
@@ -497,7 +497,7 @@ type StmtOption func(s *Stmt)
 func (s Stmt) GetParameters() (map[string]string, error) {
 	return s.params.toParameters(s.defs)
 }
-func (s Stmt) SupportsParameters() bool {
+func (s Stmt) SupportsInlineParameters() bool {
 	return true
 }
 
