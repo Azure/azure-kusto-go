@@ -43,4 +43,4 @@ require (
 )
 
 // Broke semver
-retract v0.99.9
+retract [v0.99.9, v0.99.10]
