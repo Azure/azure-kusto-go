@@ -67,7 +67,9 @@ In this case, the StatementBuilder and QueryParameters structs should be used.
 	params :=  kql.NewStatementQueryParameters().AddDateTime("time", dt).AddInt("id", 1)
 	iter, err := client.Query(ctx, "database", statement, params)
 	fmt.Println(fmt.Sprintf("%s\n%s", params.ToDeclarationString(), statement.String()))
-	// Will print declare query_parameters(time:datetime, id:int)\nsystemNodes | where CollectionTime == time and NodeId == id
+	// Will print:
+	// declare query_parameters(time:datetime, id:int);
+	// systemNodes | where CollectionTime == time and NodeId == id
 	if err != nil {
 		panic("add error handling")
 	}

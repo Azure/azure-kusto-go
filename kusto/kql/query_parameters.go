@@ -74,7 +74,7 @@ func (q *Parameters) ToDeclarationString() string {
 		declare   = "declare query_parameters("
 		closeStmt = ");"
 	)
-	var build = new(strings.Builder)
+	var build = strings.Builder{}
 
 	if len(q.parameters) == 0 {
 		return ""
