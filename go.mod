@@ -42,3 +42,6 @@ require (
 	golang.org/x/text v0.7.0 // indirect
 	gopkg.in/yaml.v3 v3.0.1 // indirect
 )
+
+// Broke semver
+retract [v0.99.9, v0.99.10]
