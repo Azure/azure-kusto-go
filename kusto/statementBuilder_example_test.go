@@ -7,15 +7,15 @@ import (
 
 var (
 	// rootStatement represents our root statementBuilder object in which we can derive other statementBuilders.
-	rootStatement = kql.NewStatementBuilder("").AddTable("systemNodes")
+	rootStatement = kql.NewBuilder("").AddTable("systemNodes")
 	// singleBasicStatement is derived from the rootStatement but includes a where clause to limit the query to a wanted result.
 	singleBasicStatement = rootStatement.AddLiteral(" | where ").
 				AddColumn("NodeId").AddLiteral(" == ").AddInt(1)
 
-	// We will also define a similar Statement, but this time with a StatementQueryParameters object as well to define the "NodeId" word in the
+	// We will also define a similar Statement, but this time with a Parameters object as well to define the "NodeId" word in the
 	// query as an int (aka, using KQL query parameters).
-	singleParameterStatement = kql.NewStatementBuilder("systemNodes").AddLiteral(" | where NodeId == id")
-	singleQueryParameter     = kql.NewStatementQueryParameters().AddInt("id", 1)
+	singleParameterStatement = kql.NewBuilder("systemNodes").AddLiteral(" | where NodeId == id")
+	singleQueryParameter     = kql.NewParameters().AddInt("id", 1)
 )
 
 func ExampleStatement() {

@@ -17,10 +17,10 @@ import (
 type requestProperties struct {
 	Options         map[string]interface{}
 	Parameters      map[string]string
-	Application     string                       `json:"-"`
-	User            string                       `json:"-"`
-	QueryParameters kql.StatementQueryParameters `json:"-"`
-	ClientRequestID string                       `json:"-"`
+	Application     string         `json:"-"`
+	User            string         `json:"-"`
+	QueryParameters kql.Parameters `json:"-"`
+	ClientRequestID string         `json:"-"`
 }
 
 type queryOptions struct {
@@ -95,7 +95,7 @@ func Application(appName string) QueryOption {
 }
 
 // QueryParameters sets the
-func QueryParameters(queryParameters kql.StatementQueryParameters) QueryOption {
+func QueryParameters(queryParameters kql.Parameters) QueryOption {
 	return func(q *queryOptions) error {
 		q.requestProperties.QueryParameters = queryParameters
 		q.requestProperties.Parameters = queryParameters.ToParameterCollection()

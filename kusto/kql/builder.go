@@ -10,29 +10,6 @@ import (
 	"time"
 )
 
-type Builder interface {
-	AddBool(value bool) Builder
-	AddDateTime(value time.Time) Builder
-	AddDynamic(value interface{}) Builder
-	AddGUID(value uuid.UUID) Builder
-	AddInt(value int32) Builder
-	AddLong(value int64) Builder
-	AddReal(value float64) Builder
-	AddString(value string) Builder
-	AddTimespan(value time.Duration) Builder
-	AddDecimal(value decimal.Decimal) Builder
-	AddLiteral(value stringConstant) Builder
-
-	AddDatabase(database string) Builder
-	AddTable(table string) Builder
-	AddColumn(column string) Builder
-	AddFunction(function string) Builder
-
-	String() string
-	GetParameters() (map[string]string, error)
-	SupportsInlineParameters() bool
-}
-
 // stringConstant is an internal type that cannot be created outside the package.  The only two ways to build
 // a stringConstant is to pass a string constant or use a local function to build the stringConstant.
 // This allows us to enforce the use of constants or strings built with injection protection.
@@ -43,72 +20,77 @@ func (s stringConstant) String() string {
 	return string(s)
 }
 
-type statementBuilder struct {
+type Builder struct {
 	builder strings.Builder
 }
 
-func NewStatementBuilder(value stringConstant) Builder {
-	return (&statementBuilder{
+func NewBuilder(value stringConstant) *Builder {
+	return (&Builder{
 		builder: strings.Builder{},
 	}).AddLiteral(value)
 }
 
 // String implements fmt.Stringer.
-func (b *statementBuilder) String() string {
+func (b *Builder) String() string {
 	return b.builder.String()
 }
-func (b *statementBuilder) addBase(value fmt.Stringer) Builder {
+func (b *Builder) addBase(value fmt.Stringer) *Builder {
 	b.builder.WriteString(value.String())
 	return b
 }
 
-func (b *statementBuilder) AddLiteral(value stringConstant) Builder {
+func (b *Builder) AddLiteral(value stringConstant) *Builder {
 	return b.addBase(value)
 }
 
-func (b *statementBuilder) AddBool(value bool) Builder {
+func (b *Builder) AddBool(value bool) *Builder {
 	return b.addBase(newValue(value, types.Bool))
 }
 
-func (b *statementBuilder) AddDateTime(value time.Time) Builder {
+func (b *Builder) AddDateTime(value time.Time) *Builder {
 	return b.addBase(newValue(value, types.DateTime))
 }
 
-func (b *statementBuilder) AddDynamic(value interface{}) Builder {
+func (b *Builder) AddDynamic(value interface{}) *Builder {
 	return b.addBase(newValue(value, types.Dynamic))
 }
 
-func (b *statementBuilder) AddGUID(value uuid.UUID) Builder {
+func (b *Builder) AddGUID(value uuid.UUID) *Builder {
 	return b.addBase(newValue(value, types.GUID))
 }
 
-func (b *statementBuilder) AddInt(value int32) Builder {
+func (b *Builder) AddInt(value int32) *Builder {
 	return b.addBase(newValue(value, types.Int))
 }
 
-func (b *statementBuilder) AddLong(value int64) Builder {
+func (b *Builder) AddLong(value int64) *Builder {
 	return b.addBase(newValue(value, types.Long))
 }
 
-func (b *statementBuilder) AddReal(value float64) Builder {
+func (b *Builder) AddReal(value float64) *Builder {
 	return b.addBase(newValue(value, types.Real))
 }
 
-func (b *statementBuilder) AddString(value string) Builder {
+func (b *Builder) AddString(value string) *Builder {
 	return b.addBase(newValue(value, types.String))
 }
 
-func (b *statementBuilder) AddTimespan(value time.Duration) Builder {
+func (b *Builder) AddTimespan(value time.Duration) *Builder {
 	return b.addBase(newValue(value, types.Timespan))
 }
 
-func (b *statementBuilder) AddDecimal(value decimal.Decimal) Builder {
+func (b *Builder) AddDecimal(value decimal.Decimal) *Builder {
 	return b.addBase(newValue(value, types.Decimal))
 }
 
-func (b *statementBuilder) GetParameters() (map[string]string, error) {
+func (b *Builder) GetParameters() (map[string]string, error) {
 	return nil, errors.New("this option does not support Parameters")
 }
-func (b *statementBuilder) SupportsInlineParameters() bool {
+func (b *Builder) SupportsInlineParameters() bool {
 	return false
+}
+
+// Reset resets the stringBuilder
+func (b *Builder) Reset() {
+	b.builder.Reset()
 }

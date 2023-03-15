@@ -5,28 +5,21 @@ import (
 	"github.com/google/uuid"
 	"github.com/shopspring/decimal"
 	"strings"
-	"sync"
 	"time"
 )
 
-type StatementQueryParameters struct {
+type Parameters struct {
 	parameters map[string]Value
 }
 
-var buildPool = sync.Pool{
-	New: func() interface{} {
-		return new(strings.Builder)
-	},
+func NewParameters() *Parameters {
+	return &Parameters{parameters: make(map[string]Value)}
 }
 
-func NewStatementQueryParameters() *StatementQueryParameters {
-	return &StatementQueryParameters{parameters: make(map[string]Value)}
-}
-
-func (q *StatementQueryParameters) Size() int {
+func (q *Parameters) Size() int {
 	return len(q.parameters)
 }
-func (q *StatementQueryParameters) addBase(key string, value Value) *StatementQueryParameters {
+func (q *Parameters) addBase(key string, value Value) *Parameters {
 	if RequiresQuoting(key) {
 		panic("Invalid parameter values. make sure to adhere to KQL entity name conventions and escaping rules.")
 	}
@@ -34,61 +27,58 @@ func (q *StatementQueryParameters) addBase(key string, value Value) *StatementQu
 	return q
 }
 
-func (q *StatementQueryParameters) AddBool(key string, value bool) *StatementQueryParameters {
+func (q *Parameters) AddBool(key string, value bool) *Parameters {
 	return q.addBase(key, newValue(value, types.Bool))
 }
 
-func (q *StatementQueryParameters) AddDateTime(key string, value time.Time) *StatementQueryParameters {
+func (q *Parameters) AddDateTime(key string, value time.Time) *Parameters {
 	return q.addBase(key, newValue(value, types.DateTime))
 }
 
-func (q *StatementQueryParameters) AddDynamic(key string, value interface{}) *StatementQueryParameters {
+func (q *Parameters) AddDynamic(key string, value interface{}) *Parameters {
 	return q.addBase(key, newValue(value, types.Dynamic))
 }
 
-func (q *StatementQueryParameters) AddGUID(key string, value uuid.UUID) *StatementQueryParameters {
+func (q *Parameters) AddGUID(key string, value uuid.UUID) *Parameters {
 	return q.addBase(key, newValue(value, types.GUID))
 }
 
-func (q *StatementQueryParameters) AddInt(key string, value int32) *StatementQueryParameters {
+func (q *Parameters) AddInt(key string, value int32) *Parameters {
 	return q.addBase(key, newValue(value, types.Int))
 }
 
-func (q *StatementQueryParameters) AddLong(key string, value int64) *StatementQueryParameters {
+func (q *Parameters) AddLong(key string, value int64) *Parameters {
 	return q.addBase(key, newValue(value, types.Long))
 }
 
-func (q *StatementQueryParameters) AddReal(key string, value float64) *StatementQueryParameters {
+func (q *Parameters) AddReal(key string, value float64) *Parameters {
 	return q.addBase(key, newValue(value, types.Real))
 }
 
-func (q *StatementQueryParameters) AddString(key string, value string) *StatementQueryParameters {
+func (q *Parameters) AddString(key string, value string) *Parameters {
 	return q.addBase(key, newValue(value, types.String))
 }
 
-func (q *StatementQueryParameters) AddTimespan(key string, value time.Duration) *StatementQueryParameters {
+func (q *Parameters) AddTimespan(key string, value time.Duration) *Parameters {
 	return q.addBase(key, newValue(value, types.Timespan))
 }
 
-func (q *StatementQueryParameters) AddDecimal(key string, value decimal.Decimal) *StatementQueryParameters {
+func (q *Parameters) AddDecimal(key string, value decimal.Decimal) *Parameters {
 	return q.addBase(key, newValue(value, types.Decimal))
 }
 
 // note - due to the psuedo-random nature of maps, the declaration string might be ordered differently for different runs.
 // might crash the test in those times.
-func (q *StatementQueryParameters) ToDeclarationString() string {
+func (q *Parameters) ToDeclarationString() string {
 	const (
 		declare   = "declare query_parameters("
 		closeStmt = ");"
 	)
+	var build = new(strings.Builder)
 
 	if len(q.parameters) == 0 {
 		return ""
 	}
-
-	build := buildPool.Get().(*strings.Builder)
-	build.Reset()
-	defer buildPool.Put(build)
 
 	build.WriteString(declare)
 	comma := len(q.parameters)
@@ -104,10 +94,15 @@ func (q *StatementQueryParameters) ToDeclarationString() string {
 	build.WriteString(closeStmt)
 	return build.String()
 }
-func (q *StatementQueryParameters) ToParameterCollection() map[string]string {
+func (q *Parameters) ToParameterCollection() map[string]string {
 	var parameters = make(map[string]string)
 	for key, paramVals := range q.parameters {
 		parameters[key] = paramVals.String()
 	}
 	return parameters
+}
+
+// Reset resets the parameters map
+func (q *Parameters) Reset() {
+	q.parameters = make(map[string]Value)
 }

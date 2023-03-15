@@ -154,6 +154,9 @@ dt, _ := time.Parse(time.RFC3339Nano, "2020-03-04T14:05:01.3109965Z")
 statement := kql.NewStatementBuilder("systemNodes | where CollectionTime == time and NodeId == id")
 params :=  kql.NewStatementQueryParameters().AddDateTime("time", dt).AddInt("id", 1) 
 iter, err := client.Query(ctx, "database", statement, params)
+
+fmt.Println(fmt.Sprintf("%s\n%s", params.ToDeclarationString(), statement.String()))
+// Will print declare query_parameters(time:datetime, id:int)\nsystemNodes | where CollectionTime == time and NodeId == id 
 if err != nil {
 	panic("add error handling")
 }

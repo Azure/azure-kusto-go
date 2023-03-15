@@ -634,7 +634,7 @@ func TestStatement(t *testing.T) {
 	}{
 		{
 			desc: "Complex query with Statement Builder",
-			stmt: kql.NewStatementBuilder("").
+			stmt: kql.NewBuilder("").
 				AddDatabase(testConfig.Database).AddLiteral(".").
 				AddTable(allDataTypesTable).AddLiteral(" | where ").
 				AddColumn("vnum").AddLiteral(" == ").AddInt(1).AddLiteral(" and ").
@@ -690,8 +690,8 @@ func TestStatement(t *testing.T) {
 		},
 		{
 			desc: "Complex query with Statement Builder and parameters",
-			stmt: kql.NewStatementBuilder("table(tableName) | where vnum == num and vdec == dec and vdate == dt and vspan == span and tostring(vobj) == tostring(obj) and vb == b and vreal == rl and vstr == str and vlong == lg and vguid == guid"),
-			options: []kusto.QueryOption{kusto.QueryParameters(*kql.NewStatementQueryParameters().
+			stmt: kql.NewBuilder("table(tableName) | where vnum == num and vdec == dec and vdate == dt and vspan == span and tostring(vobj) == tostring(obj) and vb == b and vreal == rl and vstr == str and vlong == lg and vguid == guid"),
+			options: []kusto.QueryOption{kusto.QueryParameters(*kql.NewParameters().
 				AddString("tableName", allDataTypesTable).
 				AddInt("num", 1).
 				AddDecimal("dec", decimal.RequireFromString("2.00000000000001")).
@@ -745,8 +745,8 @@ func TestStatement(t *testing.T) {
 		},
 		{
 			desc: "Complex query with Statement Builder - Fail due to wrong table name (escaped)",
-			stmt: kql.NewStatementBuilder("table(tableName) | where vstr == txt"),
-			options: []kusto.QueryOption{kusto.QueryParameters(*kql.NewStatementQueryParameters().
+			stmt: kql.NewBuilder("table(tableName) | where vstr == txt"),
+			options: []kusto.QueryOption{kusto.QueryParameters(*kql.NewParameters().
 				AddString("tableName", "goe2e_all_data_types\"").
 				AddString("txt", "asdf"))},
 			qcall: client.Query,

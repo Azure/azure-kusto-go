@@ -17,21 +17,21 @@ func TestQueryParameters(t *testing.T) {
 
 	tests := []struct {
 		name       string
-		b          Builder
-		qp         *StatementQueryParameters
+		b          *Builder
+		qp         *Parameters
 		dsExpected []string
 		pcExpected map[string]string
 	}{
 		{
 			"Test empty",
-			NewStatementBuilder(""),
-			NewStatementQueryParameters(),
+			NewBuilder(""),
+			NewParameters(),
 			[]string{"\n"},
 			map[string]string{}},
 		{
 			"Test single add",
-			NewStatementBuilder(""),
-			NewStatementQueryParameters().
+			NewBuilder(""),
+			NewParameters().
 				AddString("foo", "bar"),
 			[]string{"declare",
 				"query_parameters(",
@@ -40,8 +40,8 @@ func TestQueryParameters(t *testing.T) {
 			map[string]string{"foo": "\"bar\""}},
 		{
 			"Test standard",
-			NewStatementBuilder("database(databaseName).table(tableName) | where column == txt ;"),
-			NewStatementQueryParameters().
+			NewBuilder("database(databaseName).table(tableName) | where column == txt ;"),
+			NewParameters().
 				AddString("databaseName", "foo_1").
 				AddString("tableName", "_bar").
 				AddString("txt", "txt_"),
@@ -58,8 +58,8 @@ func TestQueryParameters(t *testing.T) {
 			}},
 		{
 			"Test complex",
-			NewStatementBuilder("where vnum == num and vdec == dec and vdate == dt and vspan == span and tostring(vobj) == tostring(obj) and vb == b and vreal == rl and vstr == str and vlong == lg and vguid == guid"),
-			NewStatementQueryParameters().
+			NewBuilder("where vnum == num and vdec == dec and vdate == dt and vspan == span and tostring(vobj) == tostring(obj) and vb == b and vreal == rl and vstr == str and vlong == lg and vguid == guid"),
+			NewParameters().
 				AddString("foo", "bar").
 				AddInt("num", 1).
 				AddDecimal("dec", decimal.RequireFromString("2.00000000000001")).
@@ -98,8 +98,8 @@ func TestQueryParameters(t *testing.T) {
 			}},
 		{
 			"Test unusual values",
-			NewStatementBuilder("database(databaseName).table(tableName) | where column == txt ;"),
-			NewStatementQueryParameters().
+			NewBuilder("database(databaseName).table(tableName) | where column == txt ;"),
+			NewParameters().
 				AddString("databaseName", "f\"\"o").
 				AddString("tableName", "b\a\r").
 				AddString("txt", "f_u_n\u1234c"),
