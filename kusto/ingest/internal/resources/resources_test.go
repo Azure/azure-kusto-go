@@ -53,6 +53,13 @@ func TestParse(t *testing.T) {
 			wantObjectType: "table",
 			wantObjectName: "objectname",
 		},
+		{
+			desc:           "success non-windows",
+			url:            "https://account.table.kusto.chinacloudapi.cn/objectname",
+			wantAccount:    "account",
+			wantObjectType: "table",
+			wantObjectName: "objectname",
+		},
 	}
 
 	for _, test := range tests {

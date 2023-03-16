@@ -8,6 +8,9 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 * Added kql.Builder struct for safe building of KQL statements from variables without use of 'Unsafe' mode.
 * Simpler handling of query parameters using kql.Parameters struct. 
 
+## [0.11.2] - 2023-03-14
+### Fixed
+* Fixed Queue Uri not being correct for different clouds
 ## [0.11.1] - 2023-03-01
 ### Changed
 * Bumped azblob to 1.0.0

@@ -304,7 +304,8 @@ func (i *Ingestion) upstreamQueue() (azqueue.MessagesURL, error) {
 	}
 
 	queue := mgrResources.Queues[rand.Intn(len(mgrResources.Queues))]
-	service, _ := url.Parse(fmt.Sprintf("https://%s.queue.core.windows.net?%s", queue.Account(), queue.SAS().Encode()))
+	queueUrl := queue.URL()
+	service, _ := url.Parse(fmt.Sprintf("%s://%s?%s", queueUrl.Scheme, queueUrl.Host, queue.SAS().Encode()))
 
 	p := createPipeline(i.http)
 
