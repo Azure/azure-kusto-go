@@ -214,7 +214,7 @@ func ingestData(dataSource ConfigData, dataFormat interface{}, ingestClient *ing
 		ingestion.IngestSource(ingestClient, filePath, ctx, options, databaseName, tableName, string(blobSource))
 	default:
 		err := errors.ES(errors.OpUnknown, errors.KOther, "Unknown source")
-		utils.ErrorHandler(fmt.Sprintf("Unknown source '%s' for file '%s'%n", sourceType, dataSource.DataSourceUri), err)
+		utils.ErrorHandler(fmt.Sprintf("Unknown source '%s' for file '%s'", sourceType, dataSource.DataSourceUri), err)
 	}
 }
 
