@@ -4,6 +4,7 @@ import (
 	"context"
 	"encoding/csv"
 	"fmt"
+	"github.com/shopspring/decimal"
 	"io"
 	"math/rand"
 	"os"
@@ -23,6 +24,7 @@ import (
 	"github.com/Azure/azure-kusto-go/kusto/data/value"
 	"github.com/Azure/azure-kusto-go/kusto/ingest"
 	"github.com/Azure/azure-kusto-go/kusto/internal/frames"
+	"github.com/Azure/azure-kusto-go/kusto/kql"
 	"github.com/Azure/azure-kusto-go/kusto/unsafe"
 	"github.com/google/uuid"
 	"github.com/stretchr/testify/assert"
@@ -95,11 +97,11 @@ func (lr LogRow) CSVMarshal() []string {
 	}
 }
 
-type queryFunc func(ctx context.Context, db string, query kusto.Stmt, options ...kusto.QueryOption) (*kusto.RowIterator, error)
+type queryFunc func(ctx context.Context, db string, query kusto.Statement, options ...kusto.QueryOption) (*kusto.RowIterator, error)
 
 type mgmtFunc func(ctx context.Context, db string, query kusto.Stmt, options ...kusto.MgmtOption) (*kusto.RowIterator, error)
 
-type queryJsonFunc func(ctx context.Context, db string, query kusto.Stmt, options ...kusto.QueryOption) (string, error)
+type queryJsonFunc func(ctx context.Context, db string, query kusto.Statement, options ...kusto.QueryOption) (string, error)
 
 func TestQueries(t *testing.T) {
 	t.Parallel()
@@ -576,6 +578,259 @@ func TestQueries(t *testing.T) {
 			})
 
 			require.Nilf(t, err, "TestQueries(%s): had iter.Do() error: %s", test.desc, err)
+
+			require.Equal(t, test.want, got)
+		})
+	}
+}
+
+func TestStatement(t *testing.T) {
+	t.Parallel()
+
+	if skipETOE || testing.Short() {
+		t.Skipf("end to end tests disabled: missing config.json file in etoe directory")
+	}
+
+	_, cancel := context.WithCancel(context.Background())
+	defer cancel()
+
+	client, err := kusto.New(testConfig.kcsb)
+	if err != nil {
+		panic(err)
+	}
+
+	t.Cleanup(func() {
+		t.Log("Closing client")
+		require.NoError(t, client.Close())
+		t.Log("Closed client")
+	})
+
+	allDataTypesTable := fmt.Sprintf("goe2e_all_data_types_%d_%d", time.Now().UnixNano(), rand.Int())
+	require.NoError(t, createIngestionTable(t, client, allDataTypesTable, true))
+	dt, err := time.Parse(time.RFC3339Nano, "2020-03-04T14:05:01.3109965Z")
+	ts, err := time.ParseDuration("1h23m45.6789s")
+	guid, err := uuid.Parse("74be27de-1e4e-49d9-b579-fe0b331d3642")
+	tests := []struct {
+		// desc is a description of a test.
+		desc string
+		// stmt is the Kusot Stmt that will be sent.
+		stmt kusto.Statement
+		// setup is a function that will be called before the test runs.
+		setup func() error
+		// teardown is a functiont that will be called before the test ends.
+		teardown func() error
+		qcall    queryFunc
+		mcall    mgmtFunc
+		qjcall   queryJsonFunc
+		options  interface{} // either []kusto.QueryOption or []kusto.MgmtOption
+		// doer is called from within the function passed to RowIterator.Do(). It allows us to collect the data we receive.
+		doer func(row *table.Row, update interface{}) error
+		// gotInit creates the variable that will be used by doer's update argument.
+		gotInit func() interface{}
+		// want is the data we want to receive from the query.
+		want interface{}
+		// should the test fail
+		failFlag bool
+	}{
+		{
+			desc: "Complex query with Statement Builder",
+			stmt: kql.NewBuilder("").
+				AddDatabase(testConfig.Database).AddLiteral(".").
+				AddTable(allDataTypesTable).AddLiteral(" | where ").
+				AddColumn("vnum").AddLiteral(" == ").AddInt(1).AddLiteral(" and ").
+				AddColumn("vdec").AddLiteral(" == ").AddDecimal(decimal.RequireFromString("2.00000000000001")).AddLiteral(" and ").
+				AddColumn("vdate").AddLiteral(" == ").AddDateTime(dt).AddLiteral(" and ").
+				AddColumn("vspan").AddLiteral(" == ").AddTimespan(ts).AddLiteral(" and ").
+				AddFunction("tostring").AddLiteral("(").AddColumn("vobj").AddLiteral(")").
+				AddLiteral(" == ").AddFunction("tostring").AddLiteral("(").
+				AddDynamic(map[string]interface{}{"moshe": "value"}).AddLiteral(")").AddLiteral(" and ").
+				AddColumn("vb").AddLiteral(" == ").AddBool(true).AddLiteral(" and ").
+				AddColumn("vreal").AddLiteral(" == ").AddReal(0.01).AddLiteral(" and ").
+				AddColumn("vstr").AddLiteral(" == ").AddString("asdf").AddLiteral(" and ").
+				AddColumn("vlong").AddLiteral(" == ").AddLong(9223372036854775807).AddLiteral(" and ").
+				AddColumn("vguid").AddLiteral(" == ").AddGUID(guid),
+			options: []kusto.QueryOption{},
+			qcall:   client.Query,
+			doer: func(row *table.Row, update interface{}) error {
+				rec := AllDataType{}
+				if err := row.ToStruct(&rec); err != nil {
+					return err
+				}
+
+				valuesRec := AllDataType{}
+
+				err := row.ExtractValues(&valuesRec.Vnum,
+					&valuesRec.Vdec,
+					&valuesRec.Vdate,
+					&valuesRec.Vspan,
+					&valuesRec.Vobj,
+					&valuesRec.Vb,
+					&valuesRec.Vreal,
+					&valuesRec.Vstr,
+					&valuesRec.Vlong,
+					&valuesRec.Vguid,
+				)
+
+				if err != nil {
+					return err
+				}
+
+				assert.Equal(t, rec, valuesRec)
+
+				recs := update.(*[]AllDataType)
+				*recs = append(*recs, rec)
+				return nil
+			},
+			gotInit: func() interface{} {
+				ad := []AllDataType{}
+				return &ad
+			},
+			failFlag: false,
+			want:     &[]AllDataType{getExpectedResult()},
+		},
+		{
+			desc: "Complex query with Statement Builder and parameters",
+			stmt: kql.NewBuilder("table(tableName) | where vnum == num and vdec == dec and vdate == dt and vspan == span and tostring(vobj) == tostring(obj) and vb == b and vreal == rl and vstr == str and vlong == lg and vguid == guid"),
+			options: []kusto.QueryOption{kusto.QueryParameters(*kql.NewParameters().
+				AddString("tableName", allDataTypesTable).
+				AddInt("num", 1).
+				AddDecimal("dec", decimal.RequireFromString("2.00000000000001")).
+				AddDateTime("dt", dt).
+				AddTimespan("span", ts).
+				AddDynamic("obj", map[string]interface{}{
+					"moshe": "value",
+				}).
+				AddBool("b", true).
+				AddReal("rl", 0.01).
+				AddString("str", "asdf").
+				AddLong("lg", 9223372036854775807).
+				AddGUID("guid", guid))},
+			qcall: client.Query,
+			doer: func(row *table.Row, update interface{}) error {
+				rec := AllDataType{}
+				if err := row.ToStruct(&rec); err != nil {
+					return err
+				}
+
+				valuesRec := AllDataType{}
+
+				err := row.ExtractValues(&valuesRec.Vnum,
+					&valuesRec.Vdec,
+					&valuesRec.Vdate,
+					&valuesRec.Vspan,
+					&valuesRec.Vobj,
+					&valuesRec.Vb,
+					&valuesRec.Vreal,
+					&valuesRec.Vstr,
+					&valuesRec.Vlong,
+					&valuesRec.Vguid,
+				)
+
+				if err != nil {
+					return err
+				}
+
+				assert.Equal(t, rec, valuesRec)
+
+				recs := update.(*[]AllDataType)
+				*recs = append(*recs, rec)
+				return nil
+			},
+			gotInit: func() interface{} {
+				ad := []AllDataType{}
+				return &ad
+			},
+			failFlag: false,
+			want:     &[]AllDataType{getExpectedResult()},
+		},
+		{
+			desc: "Complex query with Statement Builder - Fail due to wrong table name (escaped)",
+			stmt: kql.NewBuilder("table(tableName) | where vstr == txt"),
+			options: []kusto.QueryOption{kusto.QueryParameters(*kql.NewParameters().
+				AddString("tableName", "goe2e_all_data_types\"").
+				AddString("txt", "asdf"))},
+			qcall: client.Query,
+			doer: func(row *table.Row, update interface{}) error {
+				rec := AllDataType{}
+				if err := row.ToStruct(&rec); err != nil {
+					return err
+				}
+
+				valuesRec := AllDataType{}
+
+				err := row.ExtractValues(&valuesRec.Vnum,
+					&valuesRec.Vdec,
+					&valuesRec.Vdate,
+					&valuesRec.Vspan,
+					&valuesRec.Vobj,
+					&valuesRec.Vb,
+					&valuesRec.Vreal,
+					&valuesRec.Vstr,
+					&valuesRec.Vlong,
+					&valuesRec.Vguid,
+				)
+
+				if err != nil {
+					return err
+				}
+
+				assert.Equal(t, rec, valuesRec)
+
+				recs := update.(*[]AllDataType)
+				*recs = append(*recs, rec)
+				return nil
+			},
+			gotInit: func() interface{} {
+				ad := []AllDataType{}
+				return &ad
+			},
+			failFlag: true,
+			want:     &[]AllDataType{},
+		},
+	}
+
+	for _, test := range tests {
+		test := test // capture
+		t.Run(test.desc, func(t *testing.T) {
+			t.Parallel()
+			if test.setup != nil {
+				if err := test.setup(); err != nil {
+					panic(err)
+				}
+			}
+			if test.teardown != nil {
+				defer func() {
+					if err := test.teardown(); err != nil {
+						panic(err)
+					}
+				}()
+			}
+
+			var iter *kusto.RowIterator
+			var err error
+			switch {
+			case test.qcall != nil:
+				var options []kusto.QueryOption
+				if test.options != nil {
+					options = test.options.([]kusto.QueryOption)
+				}
+				iter, err = test.qcall(context.Background(), testConfig.Database, test.stmt, options...)
+				if (!test.failFlag && err != nil) || (test.failFlag && err == nil) {
+					require.Nilf(t, err, "TestQueries(%s): had iter.Do() error: %s.", test.desc, err)
+				}
+
+			default:
+				require.Fail(t, "test setup failure")
+			}
+
+			var got = test.gotInit()
+			if iter != nil {
+				defer iter.Stop()
+				err = iter.DoOnRowOrError(func(row *table.Row, e *errors.Error) error {
+					return test.doer(row, got)
+				})
+				require.Nilf(t, err, "TestQueries(%s): had iter.Do() error: %s.", test.desc, err)
+			}
 
 			require.Equal(t, test.want, got)
 		})
@@ -1936,7 +2191,7 @@ func waitForIngest(t *testing.T, ctx context.Context, client *kusto.Client, data
 
 			if !assert.ObjectsAreEqualValues(want, got) {
 				failed = true
-				time.Sleep(5 * time.Second)
+				time.Sleep(100 * time.Millisecond)
 				return true, nil
 			}
 
