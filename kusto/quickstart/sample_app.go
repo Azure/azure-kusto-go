@@ -137,6 +137,25 @@ func queryExistingNumberOfRows(kustoClient *kusto.Client, databaseName string, t
 
 }
 
+// queryFirstTwoRows Queries the first two rows of the table
+func queryFirstTwoRows(kustoClient *kusto.Client, databaseName string, tableName string) {
+	rootStmt := kusto.NewStmt("table(_table_name) | take 2").MustDefinitions(
+		kusto.NewDefinitions().Must(
+			kusto.ParamTypes{
+				"_table_name": kusto.ParamType{Type: types.String},
+			},
+		),
+	)
+
+	command, err := rootStmt.WithParameters(kusto.NewParameters().Must(kusto.QueryValues{"_table_name": tableName}))
+	if err != nil {
+		fmt.Println("Failed to build query: " + err.Error())
+		return
+	}
+	queries.ExecuteCommand(kustoClient, databaseName, command)
+
+}
+
 // createNewTable Creates a new table
 func createNewTable(kustoClient *kusto.Client, databaseName string, tableName string, tableSchema string) {
 	command := kusto.NewStmt(".create table ", kusto.UnsafeStmt(unsafe.Stmt{Add: true, SuppressWarning: true})).UnsafeAdd(tableName).Add(" ").UnsafeAdd(tableSchema)
@@ -199,6 +218,20 @@ func ingestData(dataSource ConfigData, dataFormat interface{}, ingestClient *ing
 	}
 }
 
+// postIngestionQuerying Third and final phase - simple queries to validate the hopefully successful run of the script
+func postIngestionQuerying(kustoClient *kusto.Client, databaseName string, tableName string, ingestDataFlag bool) {
+	optionalPostIngestionPrompt := ""
+	if ingestDataFlag {
+		optionalPostIngestionPrompt = "post-ingestion "
+	}
+
+	waitForUserToProceed(fmt.Sprintf("Get %srow count for '%s.%s':", optionalPostIngestionPrompt, databaseName, tableName))
+	queryExistingNumberOfRows(kustoClient, databaseName, tableName)
+
+	waitForUserToProceed(fmt.Sprintf("Get sample (2 records) of %sdata:", optionalPostIngestionPrompt))
+	queryFirstTwoRows(kustoClient, databaseName, tableName)
+}
+
 // waitForUserToProceed Handles UX on prompts and flow of program
 func waitForUserToProceed(promptMsg string) {
 	fmt.Println()
@@ -253,7 +286,7 @@ func main() {
 		ingestionPhase(config, ingestClient)
 	}
 	if config.QueryData {
-		//postIngestionQuerying(kustoClient, config.DatabaseName, config.TableName, config.IngestData)
+		postIngestionQuerying(kustoClient, config.DatabaseName, config.TableName, config.IngestData)
 	}
 
 	fmt.Println("\nKusto sample app done")
