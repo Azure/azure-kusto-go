@@ -121,15 +121,15 @@ func (m *MockRows) Error(err error) error {
 type mockConn struct {
 }
 
-func (m mockConn) queryToJson(ctx context.Context, db string, query Stmt, options *queryOptions) (string, error) {
-	return "[]]", nil
+func (m mockConn) queryToJson(ctx context.Context, db string, query Statement, options *queryOptions) (string, error) {
+	return "[]", nil
 }
 
 func (m mockConn) Close() error {
 	return nil
 }
 
-func (m mockConn) query(_ context.Context, _ string, _ Stmt, _ *queryOptions) (execResp, error) {
+func (m mockConn) query(_ context.Context, _ string, _ Statement, _ *queryOptions) (execResp, error) {
 	return execResp{}, nil
 }
 

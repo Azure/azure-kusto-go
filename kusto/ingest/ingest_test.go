@@ -37,7 +37,7 @@ func (m mockClient) Endpoint() string {
 	return m.endpoint
 }
 
-func (m mockClient) Query(context.Context, string, kusto.Stmt, ...kusto.QueryOption) (*kusto.RowIterator, error) {
+func (m mockClient) Query(context.Context, string, kusto.Statement, ...kusto.QueryOption) (*kusto.RowIterator, error) {
 	panic("not implemented")
 }
 
