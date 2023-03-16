@@ -16,7 +16,7 @@ func NewParameters() *Parameters {
 	return &Parameters{parameters: make(map[string]Value)}
 }
 
-func (q *Parameters) Size() int {
+func (q *Parameters) Count() int {
 	return len(q.parameters)
 }
 func (q *Parameters) addBase(key string, value Value) *Parameters {

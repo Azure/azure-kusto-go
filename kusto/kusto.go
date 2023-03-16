@@ -281,7 +281,7 @@ func setQueryOptions(ctx context.Context, op errors.Op, query Statement, options
 		}
 	}
 	if query.SupportsInlineParameters() {
-		if opt.requestProperties.QueryParameters.Size() != 0 {
+		if opt.requestProperties.QueryParameters.Count() != 0 {
 			return nil, errors.ES(op, errors.KClientArgs, "kusto.Stmt does not support the QueryParameters option. Construct your query using kql.Builder").SetNoRetry()
 		}
 		params, err := query.GetParameters()
