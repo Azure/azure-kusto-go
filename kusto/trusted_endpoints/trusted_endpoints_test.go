@@ -2,6 +2,7 @@ package truestedEndpoints
 
 import (
 	"fmt"
+	"github.com/samber/lo"
 	"strings"
 	"testing"
 
@@ -102,6 +103,7 @@ func TestTrustedEndpoints_RandomKustoClusters(t *testing.T) {
 		"https://kustowwqgogzpseg6o.eastus2.kusto.windows.net",
 		"https://kustor3gjpwqum3olw.canadacentral.kusto.windows.net",
 		"https://dflskfdslfkdslkdsfldfs.westeurope.kusto.data.microsoft.com",
+		"https://dflskfdslfkdslkdsfldfs.westeurope.kusto.fabric.microsoft.com",
 	} {
 		err := validateEndpoint(c, defaultPublicLoginUrl)
 		require.NoError(t, err)
@@ -111,15 +113,21 @@ func TestTrustedEndpoints_RandomKustoClusters(t *testing.T) {
 		err = validateEndpoint(clusterName, defaultPublicLoginUrl)
 		require.NoError(t, err)
 
+		specialUrls := []string{
+			"synapse",
+			"data.microsoft.com",
+			"fabric.microsoft.com",
+		}
+
 		// Test MFA endpoints
-		if strings.Contains(c, "synapse") && strings.Contains(c, "data.microsoft.com") {
+		if lo.NoneBy(specialUrls, func(s string) bool { return strings.Contains(c, s) }) {
 			clusterName = strings.Replace(c, ".kusto.", ".kustomfa.", 1)
 			err = validateEndpoint(clusterName, defaultPublicLoginUrl)
 			require.NoError(t, err)
 		}
 
 		// Test dev endpoints
-		if !strings.Contains(c, "synapse") && !strings.Contains(c, "data.microsoft.com") {
+		if lo.NoneBy(specialUrls, func(s string) bool { return strings.Contains(c, s) }) {
 			clusterName = strings.Replace(c, ".kusto.", ".kustodev.", 1)
 			err = validateEndpoint(clusterName, defaultPublicLoginUrl)
 			require.NoError(t, err)
