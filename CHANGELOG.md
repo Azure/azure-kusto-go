@@ -8,6 +8,9 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 * Added kql.Builder struct for safe building of KQL statements from variables without use of 'Unsafe' mode.
 * Simpler handling of query parameters using kql.Parameters struct. 
 
+## [0.11.3] - 2023-03-20
+### Added
+* Support for new trident url
 ## [0.11.2] - 2023-03-14
 ### Fixed
 * Fixed Queue Uri not being correct for different clouds
