@@ -1,3 +1,4 @@
+// Package ingestion - in charge of ingesting the given data - based on the configuration file.
 package ingestion
 
 import (

@@ -27,7 +27,7 @@ const (
 
 // mgmter is a private interface that allows us to write hermetic tests against the kusto.Client.Mgmt() method.
 type mgmter interface {
-	Mgmt(ctx context.Context, db string, query kusto.Stmt, options ...kusto.MgmtOption) (*kusto.RowIterator, error)
+	Mgmt(ctx context.Context, db string, query kusto.Statement, options ...kusto.MgmtOption) (*kusto.RowIterator, error)
 }
 
 var objectTypes = map[string]bool{

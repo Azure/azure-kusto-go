@@ -206,7 +206,7 @@ const (
 	SingleJSON DataFormat = properties.SingleJSON
 )
 
-// GetFormat Translates a given string to it's DataFormat object
+// GetFormat looks at the file name and tries to discern what the file format is
 func GetFormat(fName string) DataFormat {
 	return properties.DataFormatDiscovery(fName)
 }

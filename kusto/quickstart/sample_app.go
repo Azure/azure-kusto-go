@@ -8,6 +8,7 @@ import (
 	"github.com/Azure/azure-kusto-go/kusto/data/errors"
 	"github.com/Azure/azure-kusto-go/kusto/data/types"
 	"github.com/Azure/azure-kusto-go/kusto/ingest"
+	"github.com/Azure/azure-kusto-go/kusto/kql"
 	"github.com/Azure/azure-kusto-go/kusto/quickstart/utils"
 	"github.com/Azure/azure-kusto-go/kusto/quickstart/utils/authentication"
 	"github.com/Azure/azure-kusto-go/kusto/quickstart/utils/ingestion"
@@ -114,7 +115,7 @@ func preIngestionQuerying(config ConfigJson, kustoClient *kusto.Client) {
 
 // alterMergeExistingTableToProvidedSchema Alter-merges the given existing table to provided schema
 func alterMergeExistingTableToProvidedSchema(kustoClient *kusto.Client, databaseName string, tableName string, tableSchema string) {
-	command := kusto.NewStmt(".alter-merge table ", kusto.UnsafeStmt(unsafe.Stmt{Add: true, SuppressWarning: true})).UnsafeAdd(tableName).Add(" ").UnsafeAdd(tableSchema)
+	command := kql.NewBuilder(".alter-merge table ").AddTable(tableName).AddLiteral(" ").AddString(tableSchema) // TODO: change
 	queries.ExecuteCommand(kustoClient, databaseName, command)
 }
 

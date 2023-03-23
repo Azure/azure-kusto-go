@@ -99,7 +99,7 @@ func (lr LogRow) CSVMarshal() []string {
 
 type queryFunc func(ctx context.Context, db string, query kusto.Statement, options ...kusto.QueryOption) (*kusto.RowIterator, error)
 
-type mgmtFunc func(ctx context.Context, db string, query kusto.Stmt, options ...kusto.MgmtOption) (*kusto.RowIterator, error)
+type mgmtFunc func(ctx context.Context, db string, query kusto.Statement, options ...kusto.MgmtOption) (*kusto.RowIterator, error)
 
 type queryJsonFunc func(ctx context.Context, db string, query kusto.Statement, options ...kusto.QueryOption) (string, error)
 

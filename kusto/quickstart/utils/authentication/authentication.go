@@ -1,3 +1,4 @@
+// Package authentication - in charge of authenticating the user with the system
 package authentication
 
 import (

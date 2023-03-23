@@ -1,17 +1,17 @@
+// Package queries - in charge of querying the data - either with management queries, or data queries
 package queries
 
 import (
 	"context"
 	"fmt"
 	"github.com/Azure/azure-kusto-go/kusto"
+	kustoErrors "github.com/Azure/azure-kusto-go/kusto/data/errors"
 	"github.com/Azure/azure-kusto-go/kusto/data/table"
 	"strings"
 )
 
-//Queries module of Utils - in charge of querying the data - either with management queries, or data queries
-
 // ExecuteCommand Executes a Command using a premade client
-func ExecuteCommand(kustoClient *kusto.Client, databaseName string, command kusto.Stmt) {
+func ExecuteCommand(kustoClient *kusto.Client, databaseName string, command kusto.Statement) {
 	ctx := context.Background()
 	var iter *kusto.RowIterator
 	var err error
@@ -27,8 +27,8 @@ func ExecuteCommand(kustoClient *kusto.Client, databaseName string, command kust
 	defer iter.Stop()
 
 	// .Do() will call the function for every row in the table.
-	err = iter.Do(
-		func(row *table.Row) error {
+	err = iter.DoOnRowOrError(
+		func(row *table.Row, _ *kustoErrors.Error) error {
 			if row.Replace {
 				fmt.Println("---") // Replace flag indicates that the query result should be cleared and replaced with this row
 			}
