@@ -100,6 +100,13 @@ func TestBuilder(t *testing.T) {
 			"MyTable | where i != \"foo\\\"bar\"",
 		},
 		{
+			"Test add keyword",
+			NewBuilder(
+				"MyTable | where i != ",
+			).AddLiteral("(").AddKeyword("key").AddLiteral(")"),
+			"MyTable | where i != (key)",
+		},
+		{
 			"Test add identifiers",
 			NewBuilder("").
 				AddDatabase("foo_1").AddLiteral(".").

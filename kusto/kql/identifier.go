@@ -10,6 +10,13 @@ func (b *Builder) AddTable(table string) *Builder {
 	return b.addBase(stringConstant(NormalizeName(table)))
 }
 
+func (b *Builder) AddKeyword(keyword string) *Builder {
+	if RequiresQuoting(keyword) {
+		panic("Invalid keyword. Cannot add a keyword that requires escaping.")
+	}
+	return b.addBase(stringConstant(keyword))
+}
+
 func (b *Builder) AddColumn(column string) *Builder {
 	return b.addBase(stringConstant(NormalizeName(column)))
 }
