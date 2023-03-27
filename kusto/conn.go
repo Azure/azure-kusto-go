@@ -88,7 +88,7 @@ func (c *Conn) query(ctx context.Context, db string, query Statement, options *q
 }
 
 // mgmt is used to do management queries to Kusto.
-func (c *Conn) mgmt(ctx context.Context, db string, query Stmt, options *mgmtOptions) (execResp, error) {
+func (c *Conn) mgmt(ctx context.Context, db string, query Statement, options *mgmtOptions) (execResp, error) {
 	return c.execute(ctx, execMgmt, db, query, *options.requestProperties)
 }
 

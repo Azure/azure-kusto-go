@@ -115,6 +115,74 @@ client, err = kusto.New(kustoConnectionString)
 
 ### Querying
 
+#### Simple queries
+
+The simplest queries can be built using `kql.New`:
+
+```go
+query := kql.New("systemNodes | project CollectionTime, NodeId")
+```
+
+Queries can only be built using a string literals known at compile time, and special methods for specific parts of the query.  
+The reason for this is to discourage the use of string concatenation to build queries, which can lead to security vulnerabilities.
+
+#### Queries with parameters
+
+It is recommended to use parameters for queries that contain user input.  
+Management commands can not use parameters, and therefore should be built using the builder (see next section).
+
+Parameters can be implicitly referenced in a query:
+
+```go
+query := kql.New("systemNodes | project CollectionTime, NodeId | where CollectionTime > startTime and NodeId == nodeIdValue")
+```
+
+Here, `startTime` and `nodeIdValue` are parameters that can be passed to the query.
+
+To Pass the parameters values to the query, create `kql.Parameters`:
+
+```
+params :=  kql.NewParameters().AddDateTime("startTime", dt).AddInt("nodeIdValue", 1)
+```
+
+And then pass it to the `Query` method, as an option:
+```go
+results, err := client.Query(ctx, database, query, QueryParameters(params))
+if err != nil {
+    panic("add error handling")
+}
+
+// You can see the generated parameters using the ToDeclarationString() method:
+fmt.Println(params.ToDeclarationString()) // declare query_parameters(startTime:datetime, nodeIdValue:int);
+```
+
+#### Queries with runtime data
+
+Queries with runtime data can be built using `kql.New`.
+The builder will only accept the correct types for each part of the query, and will escape any special characters in the data.
+
+For example, here is a query that dynamically accepts values for the table name, and the comparison parameters for the columns:
+
+```go
+dt, _ := time.Parse(time.RFC3339Nano, "2020-03-04T14:05:01.3109965Z")
+tableName := "system nodes"
+value := 1
+
+query := kql.New("")
+            .AddTable(tableName)
+            .AddLiteral(" | where CollectionTime == ").AddDateTime(dt)
+            .AddLiteral(" and ")
+            .AddLiteral("NodeId == ").AddInt(value)
+
+// To view the query string, use the String() method:
+fmt.Println(query.String())
+// Output: ['system nodes'] | where CollectionTime == datetime(2020-03-04T14:05:01.3109965Z) and NodeId == int(1)
+```
+
+Building queries like this is useful for queries that are built from user input, or for queries that are built from a template, and are valid for management commands too.
+
+
+
 #### Query For Rows
 
 The kusto `table` package queries data into a ***table.Row** which can be printed or have the column data extracted.
@@ -123,90 +191,28 @@ The kusto `table` package queries data into a ***table.Row** which can be printe
 // table package is: github.com/Azure/azure-kusto-go/kusto/data/table
 
 // Query our database table "systemNodes" for the CollectionTimes and the NodeIds.
-iter, err := client.Query(ctx, "database", kusto.NewStmt("systemNodes | project CollectionTime, NodeId"))
+iter, err := client.Query(ctx, "database", query)
 if err != nil {
 	panic("add error handling")
 }
 defer iter.Stop()
 
 // .Do() will call the function for every row in the table.
-err = iter.Do(
-	func(row *table.Row) error {
-		if row.Replace {
-			fmt.Println("---") // Replace flag indicates that the query result should be cleared and replaced with this row
-		}
-		fmt.Println(row) // As a convenience, printing a *table.Row will output csv
-		return nil
+err = iter.DoOnRowOrError(
+    func(row *table.Row, e *kustoErrors.Error) error {
+        if e != nil {
+            return e
+        }
+        if row.Replace {
+            fmt.Println("---") // Replace flag indicates that the query result should be cleared and replaced with this row
+        }
+        fmt.Println(row) // As a convenience, printing a *table.Row will output csv
+        return nil
 	},
 )
 if err != nil {
 	panic("add error handling")
 }
-```
-#### Querying with parameters
-
-Users will sometimes want to use query parameters (Read more here - https://learn.microsoft.com/en-us/azure/data-explorer/kusto/query/queryparametersstatement?pivots=azuredataexplorer).
-In this case, the StatementBuilder and QueryParameters structs should be used.
-
-```go
-dt, _ := time.Parse(time.RFC3339Nano, "2020-03-04T14:05:01.3109965Z")
-// Query our database table "systemNodes" for the CollectionTimes and the NodeIds.
-statement := kql.NewStatementBuilder("systemNodes | where CollectionTime == time and NodeId == id")
-params :=  kql.NewStatementQueryParameters().AddDateTime("time", dt).AddInt("id", 1) 
-iter, err := client.Query(ctx, "database", statement, params)
-
-fmt.Println(fmt.Sprintf("%s\n%s", params.ToDeclarationString(), statement.String()))
-// Will print:
-// declare query_parameters(time:datetime, id:int);
-// systemNodes | where CollectionTime == time and NodeId == id
-if err != nil {
-	panic("add error handling")
-}
-defer iter.Stop()
-
-// .Do() will call the function for every row in the table.
-err = iter.Do(
-	func(row *table.Row) error {
-		if row.Replace {
-			fmt.Println("---") // Replace flag indicates that the query result should be cleared and replaced with this row
-		}
-		fmt.Println(row) // As a convenience, printing a *table.Row will output csv
-		return nil
-	},
-)
-if err != nil {
-	panic("add error handling")
-}
-```
-
-#### Querying with StatementBuilder
-Another way to build your query is using the StatementBuilder struct. With this struct you build your query as a combination of literals and special entities.
-This is mostly applicable when your KQL commands which do not support query parameters, or for situations where Kusto entities like database, table, column or function need to be safely added from variables.
-```go
-dt, _ := time.Parse(time.RFC3339Nano, "2020-03-04T14:05:01.3109965Z")
-tableName := "systemNodes"
-value := 1
-// Query our database table "systemNodes" for the CollectionTimes and the NodeIds.
-iter, err := client.Query(ctx, "database", kql.NewStatementBuilder("").AddTable(tableName).AddLiteral(" | where ").AddColumn("CollectionTime").AddLiteral(" == ").AddDateTime(dt).AddLiteral(" and ").AddColumn("NodeId").AddLiteral(" == ").AddInt(value),
-if err != nil {
-panic("add error handling")
-}
-defer iter.Stop()
-
-	// .Do() will call the function for every row in the table.
-	err = iter.Do(
-		func(row *table.Row) error {
-			if row.Replace {
-				fmt.Println("---") // Replace flag indicates that the query result should be cleared and replaced with this row
-			}
-			fmt.Println(row) // As a convenience, printing a *table.Row will output csv
-			return nil
-		},
-	)
-	if err != nil {
-		panic("add error handling")
-	}
-
 ```
 
 #### Query Into Structs
@@ -223,15 +229,18 @@ type NodeRec struct {
 	CollectionTime time.Time
 }
 
-iter, err := client.Query(ctx, "database", kusto.NewStmt("systemNodes | project CollectionTime, NodeId"))
+iter, err := client.Query(ctx, "database", query)
 if err != nil {
 	panic("add error handling")
 }
 defer iter.Stop()
 
 recs := []NodeRec{}
-err = iter.Do(
-	func(row *table.Row) error {
+err = iter.DoOnRowOrError(
+    func(row *table.Row, e *kustoErrors.Error) error {
+        if e != nil {
+        return e
+        }
 		rec := NodeRec{}
 		if err := row.ToStruct(&rec); err != nil {
 			return err
@@ -335,37 +344,6 @@ if err := in.Stream(ctx, jsonEncodedData, ingest.JSON, "mappingName"); err != ni
 	panic("add error handling")
 }
 ```
-
-#### Addtional Ingest Clients
-* `ingest.Streaming` and `ingest.Managed` were added to the SDK. Their interface is identical to `ingest.Ingestion` (in fact - they all share an interface `Ingestor`), and are created via `ingest.NewStreaming` and `ingest.NewManaged` respectively.
-`ingest.Streaming` uses [streaming ingestion](https://docs.microsoft.com/en-us/azure/data-explorer/ingest-data-streaming?tabs=azure-portal%2Ccsharp) to ingest data to kusto. It supports ingesting from a file or a `Reader`, but not a blob.
-`ingest.Managed` is a managed streaming ingest client. It will try to use streaming ingest, but on transient failures and other conditions will fall back to queued ingestion.
-
-#### New APIs for querying
-
-* As mentioned before, RowIterator.Next` and `RowIterator.Do` are now deprecated and replaced by `RowIterator.NextRowOrError` and `RowIterator.DoOnRowOrError`.  The new APIs will act the same as the old, with the following changes:
-`RowIterator.NextRowOrError` will return an additional `inlineError` value, when it's non-nil it indicates an inline error. After encountering it, the iteration doesn't end and you should continue consuming the iterator.
-`RowIterator.DoOnRowOrError` requires an additional parameter of type `*errors.Error`, which indicates an inline error. It can be ignored or handled, but while returning nil the iteration will continue.
-
-#### Addtional Features
-* Support extracting non-primary tables from a `RowIterator` using the following methods - `GetNonPrimary`, `GetExtendedProperties` and `GetQueryCompletionInformation`. Fixed #85 
-* Expose `TableFragmentType` via a Replace flag by @w1ndy in https://github.com/Azure/azure-kusto-go/pull/74
-* Refactor value converters and implement `ExtractValues` for `Row` by @w1ndy in https://github.com/Azure/azure-kusto-go/pull/75
-* Better Dynamic converter by @w1ndy in https://github.com/Azure/azure-kusto-go/pull/78
-* Support more forms of decimal type, and accept input of big.Int for it. Fixed #86 
-
-#### Fixes
-* Add support for gzipped errors,. Fixed #84
-* Moved from the old deprecated `azblob` to the new supported one. This should solve some issues in uploading blobs, specifically memory leaks.
-
-#### Internal Improvements
-* Added go-fmt gate check by @AsafMah in https://github.com/Azure/azure-kusto-go/pull/77
-* Parallelized tests and made them more robust
-
-### Version 0.5.2
-#### Fixes
-* **Critical bug** - When ingesting to multiple clusters all data is sent to one cluster.
-As always, we recommend re-using clients and ingestors whenever possible.
 
 ## Best Practices
 See the SDK [best practices guide](https://docs.microsoft.com/azure/data-explorer/kusto/api/netfx/kusto-ingest-best-practices), which though written for the .NET SDK, applies similarly here.

@@ -21,9 +21,9 @@ import (
 	"github.com/stretchr/testify/require"
 )
 
-type testMgmtFunc func(t *testing.T, ctx context.Context, db string, query kusto.Stmt, options ...kusto.MgmtOption) (*kusto.RowIterator, error)
+type testMgmtFunc func(t *testing.T, ctx context.Context, db string, query kusto.Statement, options ...kusto.MgmtOption) (*kusto.RowIterator, error)
 
-func failIfQueuedCalled(t *testing.T, _ context.Context, _ string, query kusto.Stmt, _ ...kusto.MgmtOption) (*kusto.RowIterator, error) {
+func failIfQueuedCalled(t *testing.T, _ context.Context, _ string, query kusto.Statement, _ ...kusto.MgmtOption) (*kusto.RowIterator, error) {
 	// .get ingestion resources is always called in the ctor
 	if query.String() == ".get ingestion resources" {
 		return nil, nil
@@ -233,7 +233,7 @@ func TestManaged(t *testing.T) {
 				assert.NoError(t, err)
 				return errors.E(errors.OpIngestStream, errors.KHTTPError, fmt.Errorf("error"))
 			},
-			onMgmt: func(t *testing.T, ctx context.Context, db string, query kusto.Stmt, options ...kusto.MgmtOption) (*kusto.RowIterator, error) {
+			onMgmt: func(t *testing.T, ctx context.Context, db string, query kusto.Statement, options ...kusto.MgmtOption) (*kusto.RowIterator, error) {
 				// .get ingestion resources is always called in the ctor
 				if query.String() == ".get ingestion resources" {
 					return resources.SuccessfulFakeResources().Mgmt(ctx, db, query, options...)
@@ -266,7 +266,7 @@ func TestManaged(t *testing.T) {
 				require.Fail(t, "Big file shouldn't try to stream")
 				return errors.E(errors.OpIngestStream, errors.KHTTPError, fmt.Errorf("error"))
 			},
-			onMgmt: func(t *testing.T, ctx context.Context, db string, query kusto.Stmt, options ...kusto.MgmtOption) (*kusto.RowIterator, error) {
+			onMgmt: func(t *testing.T, ctx context.Context, db string, query kusto.Statement, options ...kusto.MgmtOption) (*kusto.RowIterator, error) {
 				// .get ingestion resources is always called in the ctor
 				if query.String() == ".get ingestion resources" {
 					return resources.SuccessfulFakeResources().Mgmt(ctx, db, query, options...)
@@ -299,7 +299,7 @@ func TestManaged(t *testing.T) {
 				require.Fail(t, "Big file shouldn't try to stream")
 				return errors.E(errors.OpIngestStream, errors.KHTTPError, fmt.Errorf("error"))
 			},
-			onMgmt: func(t *testing.T, ctx context.Context, db string, query kusto.Stmt, options ...kusto.MgmtOption) (*kusto.RowIterator, error) {
+			onMgmt: func(t *testing.T, ctx context.Context, db string, query kusto.Statement, options ...kusto.MgmtOption) (*kusto.RowIterator, error) {
 				// .get ingestion resources is always called in the ctor
 				if query.String() == ".get ingestion resources" {
 					return resources.SuccessfulFakeResources().Mgmt(ctx, db, query, options...)
@@ -335,7 +335,7 @@ func TestManaged(t *testing.T) {
 			mockClient := mockClient{
 				endpoint: "https://test.kusto.windows.net",
 				auth:     kusto.Authorization{},
-				onMgmt: func(ctx context.Context, db string, query kusto.Stmt, options ...kusto.MgmtOption) (*kusto.RowIterator, error) {
+				onMgmt: func(ctx context.Context, db string, query kusto.Statement, options ...kusto.MgmtOption) (*kusto.RowIterator, error) {
 					if test.onMgmt == nil {
 						return nil, nil
 					}
