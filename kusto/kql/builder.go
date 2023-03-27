@@ -39,6 +39,14 @@ func (b *Builder) addBase(value fmt.Stringer) *Builder {
 	return b
 }
 
+// addUnsafe enables unsafe actions on a Builder - adds a string as is, no validation checking or escaping.
+// This turns off safety features that could allow a service client to compromise your data store.
+// USE AT YOUR OWN RISK!
+func (b *Builder) addUnsafe(value string) *Builder {
+	b.builder.WriteString(value)
+	return b
+}
+
 func (b *Builder) AddLiteral(value stringConstant) *Builder {
 	return b.addBase(value)
 }
