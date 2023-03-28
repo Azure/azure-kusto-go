@@ -42,7 +42,7 @@ var (
 	// This is needed because of a bug in the backend that sometimes causes the tables not to drop and get stuck.
 	clearStreamingCacheStatement = kql.New(".clear database cache streamingingestion schema")
 
-	countStatement = kql.New("table(tablename) | count()")
+	countStatement = kql.New("table(tableName) | count()")
 )
 
 type CountResult struct {
