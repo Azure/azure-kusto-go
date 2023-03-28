@@ -101,7 +101,7 @@ func Example_complex() {
 
 	// Query our database table "systemNodes" for our specific node. We are only doing a single query here as an example,
 	// normally you would take in requests of some type for different NodeIds.
-	iter, err := client.Query(ctx, "database", query, QueryParameters(*params))
+	iter, err := client.Query(ctx, "database", query, QueryParameters(params))
 	if err != nil {
 		panic("add error handling")
 	}

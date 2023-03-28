@@ -101,7 +101,7 @@ func TestBuilder(t *testing.T) {
 		},
 		{
 			"Test add keyword",
-			NewBuilder(
+			New(
 				"MyTable | where i != ",
 			).AddLiteral("(").AddKeyword("key").AddLiteral(")"),
 			"MyTable | where i != (key)",
