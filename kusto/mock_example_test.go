@@ -51,7 +51,7 @@ func New(client *kusto.Client) (*NodeInfo, error) {
 
 // Node queries the datastore for the Node with ID "id".
 func (n *NodeInfo) Node(ctx context.Context, id int64) (NodeRec, error) {
-	iter, err := n.querier.Query(ctx, "db", n.stmt, kusto.QueryParameters(*kql.NewParameters().AddLong("ParamNodeId", id)))
+	iter, err := n.querier.Query(ctx, "db", n.stmt, kusto.QueryParameters(kql.NewParameters().AddLong("ParamNodeId", id)))
 	if err != nil {
 		return NodeRec{}, err
 	}
