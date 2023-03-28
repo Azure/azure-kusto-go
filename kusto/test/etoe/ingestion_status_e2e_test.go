@@ -57,8 +57,8 @@ func TestIngestionStatus(t *testing.T) {
 	require.NoError(t, err, "failed to reduce the default batching time")
 
 	// Refresh policy cache on DM
-	batchingStmt2 := kql.New(".refresh database ").AddDatabase(testConfig.Database).AddLiteral(
-		" table ").AddTable(tableName).AddLiteral(" cache ingestionbatchingpolicy")
+	batchingStmt2 := kql.New(".refresh database '").AddKeyword(testConfig.Database).AddLiteral(
+		"' table '").AddTable(tableName).AddLiteral("' cache ingestionbatchingpolicy")
 	_, err = client.Mgmt(ctx, "NetDefaultDB", batchingStmt2, kusto.IngestionEndpoint())
 
 	require.NoError(t, err, "failed to refresh policy cache on DM")

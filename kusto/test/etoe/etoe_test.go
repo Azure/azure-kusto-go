@@ -42,7 +42,7 @@ var (
 	// This is needed because of a bug in the backend that sometimes causes the tables not to drop and get stuck.
 	clearStreamingCacheStatement = kql.New(".clear database cache streamingingestion schema")
 
-	countStatement = kql.New("table(tableName) | count()")
+	countStatement = kql.New("table(tableName) | count")
 )
 
 type CountResult struct {
@@ -143,7 +143,7 @@ func TestQueries(t *testing.T) {
 	}{
 		{
 			desc:  "Query: Retrieve count of the number of rows that match",
-			stmt:  countStatement,
+			stmt:  kql.New("").AddTable(allDataTypesTable).AddLiteral("| count"),
 			qcall: client.Query,
 			doer: func(row *table.Row, update interface{}) error {
 				rec := CountResult{}
@@ -309,7 +309,7 @@ func TestQueries(t *testing.T) {
 						"guid":      kusto.ParamType{Type: types.GUID},
 					})).
 				MustParameters(kusto.NewParameters().Must(kusto.
-					QueryValues{
+				QueryValues{
 					"tableName": allDataTypesTable,
 					"num":       int32(1),
 					"dec":       "2.00000000000001",
@@ -458,7 +458,7 @@ func TestQueries(t *testing.T) {
 		},
 		{
 			desc: "Query: Use many options",
-			stmt: countStatement,
+			stmt: kql.New("").AddTable(allDataTypesTable).AddLiteral("| count"),
 			options: []kusto.QueryOption{kusto.QueryNow(time.Now()), kusto.NoRequestTimeout(), kusto.NoTruncation(), kusto.RequestAppName("bd1e472c-a8e4-4c6e-859d-c86d72253197"),
 				kusto.RequestDescription("9bff424f-711d-48b8-9a6e-d3a618748334"), kusto.Application("aaa"), kusto.User("bbb"),
 				kusto.CustomQueryOption("additional", "additional")},
@@ -480,7 +480,7 @@ func TestQueries(t *testing.T) {
 		},
 		{
 			desc:   "Query: get json",
-			stmt:   countStatement,
+			stmt:   kql.New("").AddTable(allDataTypesTable).AddLiteral("| count"),
 			qjcall: client.QueryToJson,
 			want:   "[{\"FrameType\":\"DataSetHeader\",\"IsProgressive\":true,\"Version\":\"v2.0\"},{\"FrameType\":\"DataTable\",\"TableId\":<NUM>,\"TableKind\":\"QueryProperties\",\"TableName\":\"@ExtendedProperties\",\"Columns\":[{\"ColumnName\":\"TableId\",\"ColumnType\":\"int\"},{\"ColumnName\":\"Key\",\"ColumnType\":\"string\"},{\"ColumnName\":\"Value\",\"ColumnType\":\"dynamic\"}],\"Rows\":[[1,\"Visualization\",\"{\\\"Visualization\\\":null,\\\"Title\\\":null,\\\"XColumn\\\":null,\\\"Series\\\":null,\\\"YColumns\\\":null,\\\"AnomalyColumns\\\":null,\\\"XTitle\\\":null,\\\"YTitle\\\":null,\\\"XAxis\\\":null,\\\"YAxis\\\":null,\\\"Legend\\\":null,\\\"YSplit\\\":null,\\\"Accumulate\\\":false,\\\"IsQuerySorted\\\":false,\\\"Kind\\\":null,\\\"Ymin\\\":\\\"NaN\\\",\\\"Ymax\\\":\\\"NaN\\\",\\\"Xmin\\\":null,\\\"Xmax\\\":null}\"]]},{\"FrameType\":\"TableHeader\",\"TableId\":<NUM>,\"TableKind\":\"PrimaryResult\",\"TableName\":\"PrimaryResult\",\"Columns\":[{\"ColumnName\":\"Count\",\"ColumnType\":\"long\"}]},{\"FrameType\":\"TableFragment\",\"TableFragmentType\":\"DataAppend\",\"TableId\":<NUM>,\"Rows\":[[1]]},{\"FrameType\":\"TableProgress\",\"TableId\":<NUM>,\"TableProgress\"<TIME>},{\"FrameType\":\"TableCompletion\",\"TableId\":<NUM>,\"RowCount\":1},{\"FrameType\":\"DataTable\",\"TableId\":<NUM>,\"TableKind\":\"QueryCompletionInformation\",\"TableName\":\"QueryCompletionInformation\",\"Columns\":[{\"ColumnName\":\"Timestamp\",\"ColumnType\":\"datetime\"},{\"ColumnName\":\"ClientRequestId\",\"ColumnType\":\"string\"},{\"ColumnName\":\"ActivityId\",\"ColumnType\":\"guid\"},{\"ColumnName\":\"SubActivityId\",\"ColumnType\":\"guid\"},{\"ColumnName\":\"ParentActivityId\",\"ColumnType\":\"guid\"},{\"ColumnName\":\"Level\",\"ColumnType\":\"int\"},{\"ColumnName\":\"LevelName\",\"ColumnType\":\"string\"},{\"ColumnName\":\"StatusCode\",\"ColumnType\":\"int\"},{\"ColumnName\":\"StatusCodeName\",\"ColumnType\":\"string\"},{\"ColumnName\":\"EventType\",\"ColumnType\":\"int\"},{\"ColumnName\":\"EventTypeName\",\"ColumnType\":\"string\"},{\"ColumnName\":\"Payload\",\"ColumnType\":\"string\"}],\"Rows\":[[\"<TIME>\",\"KGC.execute;<GUID>\",\"<GUID>\",\"<GUID>\",\"<GUID>\",4,\"Info\",0,\"S_OK (0)\",4,\"QueryInfo\",\"{\\\"Count\\\":<NUM>,\\\"Text\\\":\\\"Query completed successfully\\\"}\"],[\"<TIME>\",\"KGC.execute;<GUID>\",\"<GUID>\",\"<GUID>\",\"<GUID>\",4,\"Info\",0,\"S_OK (0)\",5,\"WorkloadGroup\",\"{\\\"Count\\\":<NUM>,\\\"Text\\\":\\\"default\\\"}\"],[\"<TIME>\",\"KGC.execute;<GUID>\",\"<GUID>\",\"<GUID>\",\"<GUID>\",4,\"Info\",0,\"S_OK (0)\",6,\"EffectiveRequestOptions\",\"{\\\"Count\\\":<NUM>,\\\"Text\\\":\\\"{\\\\\\\"DataScope\\\\\\\":\\\\\\\"All\\\\\\\",\\\\\\\"QueryConsistency\\\\\\\":\\\\\\\"strongconsistency\\\\\\\",\\\\\\\"MaxMemoryConsumptionPerIterator\\\\\\\":<NUM>,\\\\\\\"MaxMemoryConsumptionPerQueryPerNode\\\\\\\":<NUM>,\\\\\\\"QueryFanoutNodesPercent\\\\\\\":<NUM>,\\\\\\\"QueryFanoutThreadsPercent\\\\\\\":100}\\\"}\"],[\"<TIME>\",\"KGC.execute;<GUID>\",\"<GUID>\",\"<GUID>\",\"<GUID>\",6,\"Stats\",0,\"S_OK (0)\",0,\"QueryResourceConsumption\",\"{\\\"ExecutionTime\\\"<TIME>,\\\"resource_usage\\\":{\\\"cache\\\":{\\\"memory\\\":{\\\"hits\\\":<NUM>,\\\"misses\\\":<NUM>,\\\"total\\\":0},\\\"disk\\\":{\\\"hits\\\":<NUM>,\\\"misses\\\":<NUM>,\\\"total\\\":0},\\\"shards\\\":{\\\"hot\\\":{\\\"hitbytes\\\":<NUM>,\\\"missbytes\\\":<NUM>,\\\"retrievebytes\\\":0},\\\"cold\\\":{\\\"hitbytes\\\":<NUM>,\\\"missbytes\\\":<NUM>,\\\"retrievebytes\\\":0},\\\"bypassbytes\\\":0}},\\\"cpu\\\":{\\\"user\\\":\\\"00:00:00\\\",\\\"kernel\\\":\\\"00:00:00\\\",\\\"total cpu\\\":\\\"00:00:00\\\"},\\\"memory\\\":{\\\"peak_per_node\\\":524384},\\\"network\\\":{\\\"inter_cluster_total_bytes\\\":<NUM>,\\\"cross_cluster_total_bytes\\\":0}},\\\"input_dataset_statistics\\\":{\\\"extents\\\":{\\\"total\\\":<NUM>,\\\"scanned\\\":<NUM>,\\\"scanned_min_datetime\\\":\\\"<TIME>\\\",\\\"scanned_max_datetime\\\":\\\"<TIME>\\\"},\\\"rows\\\":{\\\"total\\\":<NUM>,\\\"scanned\\\":0},\\\"rowstores\\\":{\\\"scanned_rows\\\":<NUM>,\\\"scanned_values_size\\\":0},\\\"shards\\\":{\\\"queries_generic\\\":<NUM>,\\\"queries_specialized\\\":0}},\\\"dataset_statistics\\\":[{\\\"table_row_count\\\":<NUM>,\\\"table_size\\\":9}],\\\"cross_cluster_resource_usage\\\":{}}\"]]},{\"FrameType\":\"DataSetCompletion\",\"HasErrors\":false,\"Cancelled\":false}]",
 		},
@@ -1010,7 +1010,7 @@ func TestFileIngestion(t *testing.T) { //ok
 			desc:     "Ingestion from local file test 2 queued",
 			ingestor: queuedIngestor,
 			src:      createCsvFileFromData(t, mockRows),
-			stmt:     kql.New("").AddTable(queuedTable).AddLiteral(" | order by header_api_version asc"),
+			stmt:     kql.New("table(tableName) | order by header_api_version asc"),
 			table:    queuedTable,
 			doer: func(row *table.Row, update interface{}) error {
 				rec := LogRow{}
@@ -1074,7 +1074,7 @@ func TestFileIngestion(t *testing.T) { //ok
 			desc:     "Ingestion from local file test 2 streaming",
 			ingestor: streamingIngestor,
 			src:      createCsvFileFromData(t, mockRows),
-			stmt:     kql.New("").AddTable(streamingTable).AddLiteral(" | order by header_api_version asc"),
+			stmt:     kql.New("table(tableName)  | order by header_api_version asc"),
 			table:    streamingTable,
 			doer: func(row *table.Row, update interface{}) error {
 				rec := LogRow{}
@@ -1337,7 +1337,7 @@ func TestReaderIngestion(t *testing.T) { // ok
 			options: []ingest.FileOption{
 				ingest.FileFormat(ingest.CSV),
 			},
-			stmt:  kql.New("").AddTable(queuedTable).AddLiteral(" | order by header_api_version asc"),
+			stmt:  kql.New("table(tableName) | order by header_api_version asc"),
 			table: queuedTable,
 			doer: func(row *table.Row, update interface{}) error {
 				rec := LogRow{}
@@ -1410,7 +1410,7 @@ func TestReaderIngestion(t *testing.T) { // ok
 				ingest.FileFormat(ingest.CSV),
 			},
 			src:   createCsvFileFromData(t, mockRows),
-			stmt:  kql.New("").AddTable(streamingTable).AddLiteral(" | order by header_api_version asc"),
+			stmt:  kql.New("table(tableName) | order by header_api_version asc"),
 			table: streamingTable,
 			doer: func(row *table.Row, update interface{}) error {
 				rec := LogRow{}
@@ -1462,8 +1462,9 @@ func TestReaderIngestion(t *testing.T) { // ok
 			ctx, cancel := context.WithCancel(context.Background())
 			defer cancel()
 
+			var fTable string
 			if test.table != "" {
-				fTable := fmt.Sprintf("%s_%d_%d", test.table, time.Now().UnixNano(), rand.Int())
+				fTable = fmt.Sprintf("%s_%d_%d", test.table, time.Now().UnixNano(), rand.Int())
 				require.NoError(t, createIngestionTable(t, client, fTable, false))
 				test.options = append(test.options, ingest.Table(fTable))
 			}
@@ -1516,7 +1517,7 @@ func TestReaderIngestion(t *testing.T) { // ok
 				return
 			}
 
-			require.NoError(t, waitForIngest(t, ctx, client, testConfig.Database, "", test.stmt, test.doer, test.want, test.gotInit))
+			require.NoError(t, waitForIngest(t, ctx, client, testConfig.Database, fTable, test.stmt, test.doer, test.want, test.gotInit))
 		})
 	}
 }
@@ -1875,7 +1876,8 @@ func TestError(t *testing.T) {
 		t.Log("Closed client")
 	})
 
-	_, err = client.Query(context.Background(), testConfig.Database, countStatement)
+	_, err = client.Query(context.Background(), testConfig.Database, kql.New("table(tableName) | count"),
+		kusto.QueryParameters(kql.NewParameters().AddString("tableName", uuid.NewString())))
 
 	kustoError, ok := errors.GetKustoError(err)
 	require.True(t, ok)
@@ -2131,7 +2133,6 @@ func waitForIngest(t *testing.T, ctx context.Context, client *kusto.Client, data
 			} else {
 				iter, err = client.Query(ctx, database, stmt)
 			}
-
 			if err != nil {
 				return false, err
 			}
