@@ -7,13 +7,17 @@ import (
 	"github.com/shopspring/decimal"
 	"io"
 	"math/rand"
+	"net/url"
 	"os"
+	"reflect"
 	"regexp"
+	"strconv"
 	"strings"
 	"sync"
 	"testing"
 	"time"
 	"unicode"
+	goUnsafe "unsafe"
 
 	"go.uber.org/goleak"
 
@@ -1965,6 +1969,52 @@ func assertErrorsMatch(t *testing.T, got, want error) bool {
 	}
 
 	return assert.Equal(t, want, got)
+}
+
+/**
+Translate:
+    def test_no_redirects(self):
+        redirect_codes = [301, 302, 303, 307, 308]
+        with KustoClient("https://httpstat.us/") as client:
+            for code in redirect_codes:
+                client._query_endpoint = f"https://httpstat.us/{code}"
+                with pytest.raises(KustoServiceError) as ex:
+                    client.execute("db", "table")
+                assert str(code) in str(ex)
+*/
+
+func TestNoRedirects(t *testing.T) {
+	redirectCodes := []int{301, 302, 303, 307, 308}
+	for _, code := range redirectCodes {
+		code := code
+		t.Run(strconv.Itoa(code), func(t *testing.T) {
+			t.Parallel()
+			client, err := kusto.New(kusto.NewConnectionStringBuilder("https://httpstat.us/"))
+			require.NoError(t, err)
+			t.Cleanup(func() {
+				t.Log("Closing client")
+				require.NoError(t, client.Close())
+				t.Log("Closed client")
+			})
+			urll, err := url.Parse(fmt.Sprintf("https://httpstat.us/%d", code))
+
+			// Change field using reflection.
+			endQuery := reflect.
+				ValueOf(client).
+				Elem().
+				FieldByName("conn").
+				Elem().
+				Elem().
+				FieldByName("endQuery")
+			reflect.NewAt(endQuery.Type(), goUnsafe.Pointer(endQuery.UnsafeAddr())).Elem().Set(reflect.ValueOf(urll))
+
+			_, err = client.Query(context.Background(), "db", kql.NewBuilder("table"))
+			require.Error(t, err)
+			convErr, ok := err.(*errors.HttpError)
+			require.True(t, ok)
+			assert.Equal(t, code, convErr.StatusCode)
+		})
+	}
 }
 
 func getExpectedResult() AllDataType {

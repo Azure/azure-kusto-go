@@ -70,7 +70,11 @@ func New(kcsb *ConnectionStringBuilder, options ...Option) (*Client, error) {
 	}
 
 	if client.http == nil {
-		client.http = &http.Client{}
+		client.http = &http.Client{
+			CheckRedirect: func(req *http.Request, via []*http.Request) error {
+				return http.ErrUseLastResponse
+			},
+		}
 	}
 
 	conn, err := NewConn(endpoint, *auth, client.http, client.clientDetails)
