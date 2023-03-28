@@ -309,7 +309,7 @@ func TestQueries(t *testing.T) {
 						"guid":      kusto.ParamType{Type: types.GUID},
 					})).
 				MustParameters(kusto.NewParameters().Must(kusto.
-				QueryValues{
+					QueryValues{
 					"tableName": allDataTypesTable,
 					"num":       int32(1),
 					"dec":       "2.00000000000001",
