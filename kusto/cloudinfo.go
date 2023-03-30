@@ -65,7 +65,7 @@ func GetMetadata(kustoUri string, httpClient *http.Client) (CloudInfo, error) {
 			return CloudInfo{}, err
 		}
 
-		u.Path = metadataPath
+		u.Path = u.JoinPath(metadataPath).Path
 		// TODO should we make this timeout configurable.
 		req, err := http.NewRequest("GET", u.String(), nil)
 
@@ -79,7 +79,7 @@ func GetMetadata(kustoUri string, httpClient *http.Client) (CloudInfo, error) {
 		}
 
 		// Handle internal server error as a special case and return as an error (to be consistent with other SDK's)
-		if resp.StatusCode >= http.StatusInternalServerError {
+		if resp.StatusCode >= 300 && resp.StatusCode != 404 {
 			return CloudInfo{}, kustoErrors.E(kustoErrors.OpCloudInfo, kustoErrors.KHTTPError, fmt.Errorf("error %s when querying endpoint %s",
 				resp.Status, u.String()),
 			)

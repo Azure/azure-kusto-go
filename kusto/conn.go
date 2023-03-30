@@ -56,9 +56,9 @@ func NewConn(endpoint string, auth Authorization, client *http.Client, clientDet
 
 	c := &Conn{
 		auth:            auth,
-		endMgmt:         &url.URL{Scheme: "https", Host: u.Host, Path: "/v1/rest/mgmt"},
-		endQuery:        &url.URL{Scheme: "https", Host: u.Host, Path: "/v2/rest/query"},
-		endStreamIngest: &url.URL{Scheme: "https", Host: u.Host, Path: "/v1/rest/ingest/"},
+		endMgmt:         &url.URL{Scheme: "https", Host: u.Host, Path: u.JoinPath("/v1/rest/mgmt").Path},
+		endQuery:        &url.URL{Scheme: "https", Host: u.Host, Path: u.JoinPath("/v2/rest/query").Path},
+		endStreamIngest: &url.URL{Scheme: "https", Host: u.Host, Path: u.JoinPath("/v1/rest/ingest").Path},
 		client:          client,
 		clientDetails:   clientDetails,
 	}
