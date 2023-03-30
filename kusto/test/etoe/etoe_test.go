@@ -132,7 +132,8 @@ func TestQueries(t *testing.T) {
 	)
 
 	allDataTypesTable := fmt.Sprintf("goe2e_all_data_types_%d_%d", time.Now().UnixNano(), rand.Int())
-	require.NoError(t, createIngestionTable(t, client, allDataTypesTable, true))
+	err = createIngestionTable(t, client, allDataTypesTable, true)
+	require.NoError(t, err)
 
 	tests := []struct {
 		// desc is a description of a test.
