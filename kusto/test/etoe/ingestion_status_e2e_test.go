@@ -3,6 +3,7 @@ package etoe
 import (
 	"context"
 	"fmt"
+	"github.com/Azure/azure-kusto-go/kusto/kql"
 	"io"
 	"os"
 	"strings"
@@ -11,7 +12,6 @@ import (
 
 	"github.com/Azure/azure-kusto-go/kusto"
 	"github.com/Azure/azure-kusto-go/kusto/ingest"
-	"github.com/Azure/azure-kusto-go/kusto/unsafe"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 )
@@ -51,14 +51,14 @@ func TestIngestionStatus(t *testing.T) {
 	require.NoError(t, err)
 
 	// Change the ingestion batching time
-	batchingStmt := kusto.NewStmt(".alter table ", kusto.UnsafeStmt(unsafe.Stmt{Add: true})).UnsafeAdd(tableName).Add(
+	batchingStmt := kql.New(".alter table ").AddTable(tableName).AddLiteral(
 		" policy ingestionbatching @'{ \"MaximumBatchingTimeSpan\": \"00:00:05\", \"MaximumNumberOfItems\": 500, \"MaximumRawDataSizeMB\": 1024 }' ")
 	_, err = client.Mgmt(ctx, testConfig.Database, batchingStmt)
 	require.NoError(t, err, "failed to reduce the default batching time")
 
 	// Refresh policy cache on DM
-	batchingStmt2 := kusto.NewStmt(".refresh database '", kusto.UnsafeStmt(unsafe.Stmt{Add: true})).UnsafeAdd(testConfig.Database).Add(
-		"' table '").UnsafeAdd(tableName).Add("' cache ingestionbatchingpolicy")
+	batchingStmt2 := kql.New(".refresh database '").AddKeyword(testConfig.Database).AddLiteral(
+		"' table '").AddTable(tableName).AddLiteral("' cache ingestionbatchingpolicy")
 	_, err = client.Mgmt(ctx, "NetDefaultDB", batchingStmt2, kusto.IngestionEndpoint())
 
 	require.NoError(t, err, "failed to refresh policy cache on DM")

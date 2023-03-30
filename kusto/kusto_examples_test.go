@@ -3,6 +3,7 @@ package kusto
 import (
 	"context"
 	"fmt"
+	"github.com/Azure/azure-kusto-go/kusto/kql"
 	"io"
 	"net/http"
 	"net/url"
@@ -12,7 +13,6 @@ import (
 	kustoErrors "github.com/Azure/azure-kusto-go/kusto/data/errors"
 
 	"github.com/Azure/azure-kusto-go/kusto/data/table"
-	"github.com/Azure/azure-kusto-go/kusto/data/types"
 )
 
 func Example_simple() {
@@ -38,7 +38,7 @@ func Example_simple() {
 	ctx := context.Background()
 
 	// Query our database table "systemNodes" for the CollectionTimes and the NodeIds.
-	iter, err := client.Query(ctx, "database", NewStmt("systemNodes | project CollectionTime, NodeId"))
+	iter, err := client.Query(ctx, "database", kql.New("systemNodes | project CollectionTime, NodeId"))
 	if err != nil {
 		panic("add error handling")
 	}
@@ -74,30 +74,14 @@ func Example_simple() {
 
 func Example_complex() {
 	// This example sets up a Query where we want to query for nodes that have a NodeId (a Kusto Long type) that has a
-	// particular NodeId. The will require inserting a value where ParamNodeId is in the query. We create the query
-	// and attach a Definition to it that indicates which words we will be substituing for and what the expected type will be.
-	// the MustDefinitions() will panic if the Definition is not valid. There is a non-panicing version that returns an
-	// error instead.
-	rootStmt := NewStmt("systemNodes | project CollectionTime, NodeId | where NodeId == ParamNodeId").MustDefinitions(
-		NewDefinitions().Must(
-			ParamTypes{
-				"ParamNodeId": ParamType{Type: types.Long},
-			},
-		),
-	)
-
-	// This takes our rootStmt and creates a new Stmt that will insert 100 where ParamNodeId is in the rootStmt.
-	// rootStmt will remain unchanged. The Must() will panic if the QueryValues{} passed is not valid. This can
-	// happen because you use a type that isn't valid, like a string or int32.
-	// There is a non-panicing version that returns an error instead.
-	stmt, err := rootStmt.WithParameters(NewParameters().Must(QueryValues{"ParamNodeId": int64(100)}))
-	if err != nil {
-		panic("add error handling")
-	}
+	// particular NodeId. The will require inserting a value where ParamNodeId is in the query.
+	// We will used a parameterized query to do this.
+	query := kql.New("systemNodes | project CollectionTime, NodeId | where NodeId == ParamNodeId")
+	params := kql.NewParameters()
 
 	// NodeRec represents our Kusto data that will be returned.
 	type NodeRec struct {
-		// ID is the table's NodeId. We use the field tag here to to instruct our client to convert NodeId in the Kusto
+		// ID is the table's NodeId. We use the field tag here to instruct our client to convert NodeId in the Kusto
 		// table to ID in our struct.
 		ID int64 `kusto:"NodeId"`
 		// CollectionTime is Go representation of the Kusto datetime type.
@@ -117,15 +101,18 @@ func Example_complex() {
 
 	// Query our database table "systemNodes" for our specific node. We are only doing a single query here as an example,
 	// normally you would take in requests of some type for different NodeIds.
-	iter, err := client.Query(ctx, "database", stmt)
+	iter, err := client.Query(ctx, "database", query, QueryParameters(params))
 	if err != nil {
 		panic("add error handling")
 	}
 	defer iter.Stop()
 
 	rec := NodeRec{} // We are assuming unique NodeId, so we will only get 1 row.
-	err = iter.Do(
-		func(row *table.Row) error {
+	err = iter.DoOnRowOrError(
+		func(row *table.Row, e *kustoErrors.Error) error {
+			if e != nil {
+				return e
+			}
 			return row.ToStruct(&rec)
 		},
 	)
@@ -172,7 +159,7 @@ func ExampleClient_Query_rows() {
 	ctx := context.Background()
 
 	// Query our database table "systemNodes" for the CollectionTimes and the NodeIds.
-	iter, err := client.Query(ctx, "database", NewStmt("systemNodes | project CollectionTime, NodeId"))
+	iter, err := client.Query(ctx, "database", kql.New("systemNodes | project CollectionTime, NodeId"))
 	if err != nil {
 		panic("add error handling")
 	}
@@ -181,7 +168,10 @@ func ExampleClient_Query_rows() {
 	// Iterate through the returned rows until we get an error or receive an io.EOF, indicating the end of
 	// the data being returned.
 	for {
-		row, err := iter.Next()
+		row, inlineErr, err := iter.NextRowOrError()
+		if inlineErr != nil {
+			panic("add error handling")
+		}
 		if err != nil {
 			if err == io.EOF {
 				break
@@ -215,7 +205,7 @@ func ExampleClient_Query_do() {
 	ctx := context.Background()
 
 	// Query our database table "systemNodes" for the CollectionTimes and the NodeIds.
-	iter, err := client.Query(ctx, "database", NewStmt("systemNodes | project CollectionTime, NodeId"))
+	iter, err := client.Query(ctx, "database", kql.New("systemNodes | project CollectionTime, NodeId"))
 	if err != nil {
 		panic("add error handling")
 	}
@@ -224,8 +214,11 @@ func ExampleClient_Query_do() {
 	// Iterate through the returned rows until we get an error or receive an io.EOF, indicating the end of
 	// the data being returned.
 
-	err = iter.Do(
-		func(row *table.Row) error {
+	err = iter.DoOnRowOrError(
+		func(row *table.Row, e *kustoErrors.Error) error {
+			if e != nil {
+				return e
+			}
 			if row.Replace {
 				fmt.Println("---") // Replace flag indicates that the query result should be cleared and replaced with this row
 			}
@@ -268,7 +261,7 @@ func ExampleClient_Query_struct() {
 	ctx := context.Background()
 
 	// Query our database table "systemNodes" for the CollectionTimes and the NodeIds.
-	iter, err := client.Query(ctx, "database", NewStmt("systemNodes | project CollectionTime, NodeId"))
+	iter, err := client.Query(ctx, "database", kql.New("systemNodes | project CollectionTime, NodeId"))
 	if err != nil {
 		panic("add error handling")
 	}
@@ -281,8 +274,11 @@ func ExampleClient_Query_struct() {
 	go func() {
 		// Note: we ignore the error here because we send it on a channel and an error will automatically
 		// end the iteration.
-		_ = iter.Do(
-			func(row *table.Row) error {
+		_ = iter.DoOnRowOrError(
+			func(row *table.Row, e *kustoErrors.Error) error {
+				if e != nil {
+					return e
+				}
 				rec := NodeRec{}
 				rec.err = row.ToStruct(&rec)
 				printCh <- rec

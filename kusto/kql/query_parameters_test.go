@@ -24,13 +24,13 @@ func TestQueryParameters(t *testing.T) {
 	}{
 		{
 			"Test empty",
-			NewBuilder(""),
+			New(""),
 			NewParameters(),
 			[]string{"\n"},
 			map[string]string{}},
 		{
 			"Test single add",
-			NewBuilder(""),
+			New(""),
 			NewParameters().
 				AddString("foo", "bar"),
 			[]string{"declare",
@@ -40,7 +40,7 @@ func TestQueryParameters(t *testing.T) {
 			map[string]string{"foo": "\"bar\""}},
 		{
 			"Test standard",
-			NewBuilder("database(databaseName).table(tableName) | where column == txt ;"),
+			New("database(databaseName).table(tableName) | where column == txt ;"),
 			NewParameters().
 				AddString("databaseName", "foo_1").
 				AddString("tableName", "_bar").
@@ -58,7 +58,7 @@ func TestQueryParameters(t *testing.T) {
 			}},
 		{
 			"Test complex",
-			NewBuilder("where vnum == num and vdec == dec and vdate == dt and vspan == span and tostring(vobj) == tostring(obj) and vb == b and vreal == rl and vstr == str and vlong == lg and vguid == guid"),
+			New("where vnum == num and vdec == dec and vdate == dt and vspan == span and tostring(vobj) == tostring(obj) and vb == b and vreal == rl and vstr == str and vlong == lg and vguid == guid"),
 			NewParameters().
 				AddString("foo", "bar").
 				AddInt("num", 1).
@@ -98,7 +98,7 @@ func TestQueryParameters(t *testing.T) {
 			}},
 		{
 			"Test unusual values",
-			NewBuilder("database(databaseName).table(tableName) | where column == txt ;"),
+			New("database(databaseName).table(tableName) | where column == txt ;"),
 			NewParameters().
 				AddString("databaseName", "f\"\"o").
 				AddString("tableName", "b\a\r").
