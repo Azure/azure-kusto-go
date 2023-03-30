@@ -117,6 +117,9 @@ client, err = kusto.New(kustoConnectionString)
 
 #### Simple queries
 
+* Work for all types of requests, including queries and management commands.
+* Limited to queries that can be built using a string literal known at compile time.
+
 The simplest queries can be built using `kql.New`:
 
 ```go
@@ -127,6 +130,8 @@ Queries can only be built using a string literals known at compile time, and spe
 The reason for this is to discourage the use of string concatenation to build queries, which can lead to security vulnerabilities.
 
 #### Queries with parameters
+
+* Only work for queries.
 
 It is recommended to use parameters for queries that contain user input.  
 Management commands can not use parameters, and therefore should be built using the builder (see next section).
@@ -156,7 +161,9 @@ if err != nil {
 fmt.Println(params.ToDeclarationString()) // declare query_parameters(startTime:datetime, nodeIdValue:int);
 ```
 
-#### Queries with runtime data
+#### Queries with inline parameters
+* Works for queries and management commands.
+* More involved building of queries, but allows for more flexibility.
 
 Queries with runtime data can be built using `kql.New`.
 The builder will only accept the correct types for each part of the query, and will escape any special characters in the data.
@@ -264,14 +271,11 @@ some prerequisite knowledge of acceptable data formats, mapping references, etc.
 
 That documentation can be found [here](https://docs.microsoft.com/en-us/azure/kusto/management/data-ingestion/)
 
-Kusto's ingestion service makes no guarantees on when the data will show up in the table and is optimized for
-large chunks of data and not small uploads at a high rate.
-
 If ingesting data from memory, it is suggested that you stream the data in via `FromReader()` passing in the reader
 from an `io.Pipe()`. The data will not begin ingestion until the writer closes.
 
 
-#### Setup an ingestion client
+#### Creating a queued ingestion client
 
 Setup is quite simple, simply pass a `*kusto.Client`, the name of the database and table you wish to ingest into.
 
@@ -284,7 +288,16 @@ if err != nil {
 defer in.Close()
 ```
 
-#### From a File
+#### Other Ingestion Clients
+
+There are other ingestion clients that can be used for different ingestion scenarios.  The `ingest` package provides
+the following clients:
+* Queued Ingest - `ingest.New()` - the default client, uses queues and batching to ingest data. Most reliable.
+* Streaming Ingest - `ingest.NewStreaming()` - Directly streams data into the engine. Fast, but is limited with size and can fail.
+* Managed Streaming Ingest - `ingest.NewManaged()` - Combines a streaming ingest client with a queued ingest client to provide a reliable ingestion method that is fast and can ingest large amounts of data. 
+ Managed Streaming will try to stream the data, and if it fails multiple times, it will fall back to a queued ingestion.
+
+#### Ingestion From a File
 
 Ingesting a local file requires simply passing the path to the file to be ingested:
 
@@ -297,7 +310,7 @@ if _, err := in.FromFile(ctx, "/path/to/a/local/file"); err != nil {
 `FromFile()` will accept Unix path names on Unix platforms and Windows path names on Windows platforms.
 The file will not be deleted after upload (there is an option that will allow that though).
 
-#### From a Blob Storage File
+#### Ingestion From a Blob Storage File
 
 This package will also accept ingestion from an Azure Blob Storage file:
 
@@ -334,16 +347,6 @@ if _, err := in.FromReader(ctx, r); err != nil {
 
 It is important to remember that `FromReader()` will terminate when it receives an `io.EOF` from the `io.Reader`.  Use `io.Readers` that won't
 return `io.EOF` until the `io.Writer` is closed (such as `io.Pipe`).
-
-#### From a Stream
-
-Ingestion from a stream commits blocks of fully formed data encodes (JSON, AVRO, ...) into Kusto:
-
-```go
-if err := in.Stream(ctx, jsonEncodedData, ingest.JSON, "mappingName"); err != nil {
-	panic("add error handling")
-}
-```
 
 ## Best Practices
 See the SDK [best practices guide](https://docs.microsoft.com/azure/data-explorer/kusto/api/netfx/kusto-ingest-best-practices), which though written for the .NET SDK, applies similarly here.
