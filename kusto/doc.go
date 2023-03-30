@@ -98,7 +98,8 @@ The reason for this is to discourage the use of string concatenation to build qu
 
 #### Queries with parameters
 
-* Only works for queries, management commands aren't supported.
+* Can re-use the same query with different parameters.
+* Only work for queries, management commands are not supported.
 
 It is recommended to use parameters for queries that contain user input.
 Management commands can not use parameters, and therefore should be built using the builder (see next section).

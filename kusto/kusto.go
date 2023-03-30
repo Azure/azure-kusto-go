@@ -296,13 +296,10 @@ func setQueryOptions(ctx context.Context, op errors.Op, query Statement, options
 }
 
 func setMgmtOptions(ctx context.Context, op errors.Op, query Statement, options ...MgmtOption) (*mgmtOptions, error) {
-	var params map[string]string
 	if stmt, ok := query.(Stmt); ok {
-		paramsTemp, err := stmt.params.toParameters(stmt.defs)
-		if err != nil {
-			return nil, errors.ES(op, errors.KClientArgs, "QueryValues in the the Stmt were incorrect: %s", err).SetNoRetry()
+		if !stmt.params.IsZero() {
+			return nil, errors.ES(op, errors.KClientArgs, "Parameters aren't compatible with management queries").SetNoRetry()
 		}
-		params = paramsTemp
 	}
 
 	// Match our server deadline to our context.Deadline. This should be set from withing kusto.Query() to always have a value.
@@ -316,8 +313,7 @@ func setMgmtOptions(ctx context.Context, op errors.Op, query Statement, options 
 
 	opt := &mgmtOptions{
 		requestProperties: &requestProperties{
-			Options:    map[string]interface{}{},
-			Parameters: params,
+			Options: map[string]interface{}{},
 		},
 	}
 	if op == errors.OpQuery {

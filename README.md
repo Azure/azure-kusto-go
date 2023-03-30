@@ -131,7 +131,8 @@ The reason for this is to discourage the use of string concatenation to build qu
 
 #### Queries with parameters
 
-* Only work for queries.
+* Can re-use the same query with different parameters.
+* Only work for queries, management commands are not supported.
 
 It is recommended to use parameters for queries that contain user input.  
 Management commands can not use parameters, and therefore should be built using the builder (see next section).
@@ -159,6 +160,10 @@ if err != nil {
 
 // You can see the generated parameters using the ToDeclarationString() method:
 fmt.Println(params.ToDeclarationString()) // declare query_parameters(startTime:datetime, nodeIdValue:int);
+
+// You can then use the same query with different parameters:
+params2 :=  kql.NewParameters().AddDateTime("startTime", dt).AddInt("nodeIdValue", 2)
+results, err = client.Query(ctx, database, query, QueryParameters(params2))
 ```
 
 #### Queries with inline parameters
