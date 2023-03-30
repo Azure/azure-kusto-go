@@ -18,7 +18,7 @@ import (
 type queryer interface {
 	io.Closer
 	query(ctx context.Context, db string, query Statement, options *queryOptions) (execResp, error)
-	mgmt(ctx context.Context, db string, query Stmt, options *mgmtOptions) (execResp, error)
+	mgmt(ctx context.Context, db string, query Statement, options *mgmtOptions) (execResp, error)
 	queryToJson(ctx context.Context, db string, query Statement, options *queryOptions) (string, error)
 }
 
@@ -214,10 +214,11 @@ func (c *Client) QueryToJson(ctx context.Context, db string, query Statement, op
 // Mgmt accepts a Stmt, but that Stmt cannot have any query parameters attached at this time.
 // Note that the server has a timeout of 10 minutes for a management call by default unless the context deadline is set.
 // There is a maximum of 1 hour.
-func (c *Client) Mgmt(ctx context.Context, db string, query Stmt, options ...MgmtOption) (*RowIterator, error) {
-
-	if !query.params.IsZero() || !query.defs.IsZero() {
-		return nil, errors.ES(errors.OpMgmt, errors.KClientArgs, "a Mgmt() call cannot accept a Stmt object that has Definitions or Parameters attached")
+func (c *Client) Mgmt(ctx context.Context, db string, query Statement, options ...MgmtOption) (*RowIterator, error) {
+	if stmt, ok := query.(Stmt); ok {
+		if !stmt.params.IsZero() || !stmt.defs.IsZero() {
+			return nil, errors.ES(errors.OpMgmt, errors.KClientArgs, "a Mgmt() call cannot accept a Stmt object that has Definitions or Parameters attached")
+		}
 	}
 
 	ctx, cancel, err := contextSetup(ctx, true) // Note: cancel is called when *RowIterator has Stop() called.
@@ -286,7 +287,7 @@ func setQueryOptions(ctx context.Context, op errors.Op, query Statement, options
 	}
 	if query.SupportsInlineParameters() {
 		if opt.requestProperties.QueryParameters.Count() != 0 {
-			return nil, errors.ES(op, errors.KClientArgs, "kusto.Stmt does not support the QueryParameters option. Construct your query using kql.Builder").SetNoRetry()
+			return nil, errors.ES(op, errors.KClientArgs, "kusto.Stmt does not support the QueryParameters option. Construct your query using `kql.New`").SetNoRetry()
 		}
 		params, err := query.GetParameters()
 		if err != nil {
@@ -298,10 +299,11 @@ func setQueryOptions(ctx context.Context, op errors.Op, query Statement, options
 	return opt, nil
 }
 
-func setMgmtOptions(ctx context.Context, op errors.Op, query Stmt, options ...MgmtOption) (*mgmtOptions, error) {
-	params, err := query.params.toParameters(query.defs)
-	if err != nil {
-		return nil, errors.ES(op, errors.KClientArgs, "QueryValues in the the Stmt were incorrect: %s", err).SetNoRetry()
+func setMgmtOptions(ctx context.Context, op errors.Op, query Statement, options ...MgmtOption) (*mgmtOptions, error) {
+	if stmt, ok := query.(Stmt); ok {
+		if !stmt.params.IsZero() {
+			return nil, errors.ES(op, errors.KClientArgs, "Parameters aren't compatible with management queries").SetNoRetry()
+		}
 	}
 
 	// Match our server deadline to our context.Deadline. This should be set from withing kusto.Query() to always have a value.
@@ -315,8 +317,7 @@ func setMgmtOptions(ctx context.Context, op errors.Op, query Stmt, options ...Mg
 
 	opt := &mgmtOptions{
 		requestProperties: &requestProperties{
-			Options:    map[string]interface{}{},
-			Parameters: params,
+			Options: map[string]interface{}{},
 		},
 	}
 	if op == errors.OpQuery {

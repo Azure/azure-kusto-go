@@ -67,8 +67,6 @@ func (q *Parameters) AddDecimal(key string, value decimal.Decimal) *Parameters {
 	return q.addBase(key, newValue(value, types.Decimal))
 }
 
-// note - due to the psuedo-random nature of maps, the declaration string might be ordered differently for different runs.
-// might crash the test in those times.
 func (q *Parameters) ToDeclarationString() string {
 	const (
 		declare   = "declare query_parameters("

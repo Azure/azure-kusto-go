@@ -511,6 +511,7 @@ func UnsafeStmt(options unsafe.Stmt) StmtOption {
 	}
 }
 
+// Deprecated: Use kql.New and kql.NewParameters instead.
 // NewStmt creates a Stmt from a string constant.
 func NewStmt(query stringConstant, options ...StmtOption) Stmt {
 	s := Stmt{queryStr: query.String()}
