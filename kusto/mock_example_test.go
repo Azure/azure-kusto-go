@@ -5,6 +5,7 @@ import (
 	"errors"
 	"fmt"
 	kustoErrors "github.com/Azure/azure-kusto-go/kusto/data/errors"
+	"github.com/Azure/azure-kusto-go/kusto/kql"
 	"testing"
 	"time"
 
@@ -36,7 +37,7 @@ type NodeRec struct {
 
 // NodeInfo is the type we are going to test.
 type NodeInfo struct {
-	stmt    kusto.Stmt
+	stmt    *kql.Builder
 	querier querier // This can be a fakeQuerier or *kusto.Client
 }
 
@@ -44,24 +45,13 @@ type NodeInfo struct {
 func New(client *kusto.Client) (*NodeInfo, error) {
 	return &NodeInfo{
 		querier: client,
-		stmt: kusto.NewStmt("systemNodes | project CollectionTime, NodeId | where NodeId == ParamNodeId").MustDefinitions(
-			kusto.NewDefinitions().Must(
-				kusto.ParamTypes{
-					"ParamNodeId": kusto.ParamType{Type: types.Long},
-				},
-			),
-		),
+		stmt:    kql.New("systemNodes | project CollectionTime, NodeId | where NodeId == ParamNodeId"),
 	}, nil
 }
 
 // Node queries the datastore for the Node with ID "id".
 func (n *NodeInfo) Node(ctx context.Context, id int64) (NodeRec, error) {
-	stmt, err := n.stmt.WithParameters(kusto.NewParameters().Must(kusto.QueryValues{"ParamNodeId": id}))
-	if err != nil {
-		return NodeRec{}, err
-	}
-
-	iter, err := n.querier.Query(ctx, "db", stmt)
+	iter, err := n.querier.Query(ctx, "db", n.stmt, kusto.QueryParameters(kql.NewParameters().AddLong("ParamNodeId", id)))
 	if err != nil {
 		return NodeRec{}, err
 	}

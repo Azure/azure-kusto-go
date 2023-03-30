@@ -24,10 +24,14 @@ type Builder struct {
 	builder strings.Builder
 }
 
-func NewBuilder(value stringConstant) *Builder {
+func New(value stringConstant) *Builder {
 	return (&Builder{
 		builder: strings.Builder{},
 	}).AddLiteral(value)
+}
+
+func FromBuilder(builder *Builder) *Builder {
+	return New(stringConstant(builder.String()))
 }
 
 // String implements fmt.Stringer.
@@ -36,6 +40,14 @@ func (b *Builder) String() string {
 }
 func (b *Builder) addBase(value fmt.Stringer) *Builder {
 	b.builder.WriteString(value.String())
+	return b
+}
+
+// AddUnsafe enables unsafe actions on a Builder - adds a string as is, no validation checking or escaping.
+// This turns off safety features that could allow a service client to compromise your data store.
+// USE AT YOUR OWN RISK!
+func (b *Builder) AddUnsafe(value string) *Builder {
+	b.builder.WriteString(value)
 	return b
 }
 

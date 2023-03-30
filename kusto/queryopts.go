@@ -94,10 +94,10 @@ func Application(appName string) QueryOption {
 	}
 }
 
-// QueryParameters sets the
-func QueryParameters(queryParameters kql.Parameters) QueryOption {
+// QueryParameters sets the parameters to be used in the query.
+func QueryParameters(queryParameters *kql.Parameters) QueryOption {
 	return func(q *queryOptions) error {
-		q.requestProperties.QueryParameters = queryParameters
+		q.requestProperties.QueryParameters = *queryParameters
 		q.requestProperties.Parameters = queryParameters.ToParameterCollection()
 		return nil
 	}
