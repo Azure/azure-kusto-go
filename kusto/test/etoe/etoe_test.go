@@ -1933,7 +1933,7 @@ func TestNoRedirects(t *testing.T) {
 				t.Log("Closed client")
 			})
 
-			_, err = client.Query(context.Background(), "db", kql.NewBuilder("table"))
+			_, err = client.Query(context.Background(), "db", kql.New("table"))
 			require.Error(t, err)
 			assert.Contains(t, err.Error(), fmt.Sprintf("%d", code))
 		})
@@ -1948,7 +1948,7 @@ func TestNoRedirects(t *testing.T) {
 				t.Log("Closed client")
 			})
 
-			_, err = client.Query(context.Background(), "db", kql.NewBuilder("table"))
+			_, err = client.Query(context.Background(), "db", kql.New("table"))
 			require.Error(t, err)
 			convErr, ok := err.(*errors.HttpError)
 			require.True(t, ok)
