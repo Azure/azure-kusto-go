@@ -11,14 +11,14 @@ import (
 )
 
 // ExecuteCommand Executes a Command using a premade client
-func ExecuteCommand(kustoClient *kusto.Client, databaseName string, command kusto.Statement) {
+func ExecuteCommand(kustoClient *kusto.Client, databaseName string, command kusto.Statement, options ...kusto.QueryOption) {
 	ctx := context.Background()
 	var iter *kusto.RowIterator
 	var err error
 	if strings.HasPrefix(command.String(), ".") {
 		iter, err = kustoClient.Mgmt(ctx, databaseName, command)
 	} else {
-		iter, err = kustoClient.Query(ctx, databaseName, command)
+		iter, err = kustoClient.Query(ctx, databaseName, command, options...)
 	}
 
 	if err != nil {

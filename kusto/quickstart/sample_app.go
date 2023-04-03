@@ -6,14 +6,12 @@ import (
 	"fmt"
 	"github.com/Azure/azure-kusto-go/kusto"
 	"github.com/Azure/azure-kusto-go/kusto/data/errors"
-	"github.com/Azure/azure-kusto-go/kusto/data/types"
 	"github.com/Azure/azure-kusto-go/kusto/ingest"
 	"github.com/Azure/azure-kusto-go/kusto/kql"
 	"github.com/Azure/azure-kusto-go/kusto/quickstart/utils"
 	"github.com/Azure/azure-kusto-go/kusto/quickstart/utils/authentication"
 	"github.com/Azure/azure-kusto-go/kusto/quickstart/utils/ingestion"
 	"github.com/Azure/azure-kusto-go/kusto/quickstart/utils/queries"
-	"github.com/Azure/azure-kusto-go/kusto/unsafe"
 	"io/ioutil"
 	"os"
 )
@@ -115,51 +113,32 @@ func preIngestionQuerying(config ConfigJson, kustoClient *kusto.Client) {
 
 // alterMergeExistingTableToProvidedSchema Alter-merges the given existing table to provided schema
 func alterMergeExistingTableToProvidedSchema(kustoClient *kusto.Client, databaseName string, tableName string, tableSchema string) {
-	command := kql.NewBuilder(".alter-merge table ").AddTable(tableName).AddLiteral(" ").AddString(tableSchema) // TODO: change
+	command := kql.New(".alter-merge table ").AddTable(tableName).AddLiteral(" ").AddUnsafe(tableSchema)
 	queries.ExecuteCommand(kustoClient, databaseName, command)
 }
 
 // queryExistingNumberOfRows Queries the data on the existing number of rows
 func queryExistingNumberOfRows(kustoClient *kusto.Client, databaseName string, tableName string) {
-	rootStmt := kusto.NewStmt("table(_table_name) | count").MustDefinitions(
-		kusto.NewDefinitions().Must(
-			kusto.ParamTypes{
-				"_table_name": kusto.ParamType{Type: types.String},
-			},
-		),
-	)
+	command := kql.New("table(_table_name) | count")
+	params := kql.NewParameters().AddString("_table_name", tableName)
+	queryOptions := []kusto.QueryOption{kusto.QueryParameters(params)}
 
-	command, err := rootStmt.WithParameters(kusto.NewParameters().Must(kusto.QueryValues{"_table_name": tableName}))
-	if err != nil {
-		fmt.Println("Failed to build query: " + err.Error())
-		return
-	}
-	queries.ExecuteCommand(kustoClient, databaseName, command)
-
+	queries.ExecuteCommand(kustoClient, databaseName, command, queryOptions...)
 }
 
 // queryFirstTwoRows Queries the first two rows of the table
 func queryFirstTwoRows(kustoClient *kusto.Client, databaseName string, tableName string) {
-	rootStmt := kusto.NewStmt("table(_table_name) | take 2").MustDefinitions(
-		kusto.NewDefinitions().Must(
-			kusto.ParamTypes{
-				"_table_name": kusto.ParamType{Type: types.String},
-			},
-		),
-	)
+	command := kql.New("table(_table_name) | take 2")
+	params := kql.NewParameters().AddString("_table_name", tableName)
+	queryOptions := []kusto.QueryOption{kusto.QueryParameters(params)}
 
-	command, err := rootStmt.WithParameters(kusto.NewParameters().Must(kusto.QueryValues{"_table_name": tableName}))
-	if err != nil {
-		fmt.Println("Failed to build query: " + err.Error())
-		return
-	}
-	queries.ExecuteCommand(kustoClient, databaseName, command)
+	queries.ExecuteCommand(kustoClient, databaseName, command, queryOptions...)
 
 }
 
 // createNewTable Creates a new table
 func createNewTable(kustoClient *kusto.Client, databaseName string, tableName string, tableSchema string) {
-	command := kusto.NewStmt(".create table ", kusto.UnsafeStmt(unsafe.Stmt{Add: true, SuppressWarning: true})).UnsafeAdd(tableName).Add(" ").UnsafeAdd(tableSchema)
+	command := kql.New(".create table ").AddTable(tableName).AddLiteral(" ").AddUnsafe(tableSchema)
 	queries.ExecuteCommand(kustoClient, databaseName, command)
 }
 
@@ -170,7 +149,7 @@ func alterBatchingPolicy(kustoClient *kusto.Client, databaseName string, tableNa
 	 * the default ingestion policy to ingest data after at most 10 seconds. Tip 2: This is generally a one-time configuration. Tip 3: You can also skip the
 	 * batching for some files using the Flush-Immediately property, though this option should be used with care as it is inefficient.
 	 */
-	command := kusto.NewStmt(".alter table ", kusto.UnsafeStmt(unsafe.Stmt{Add: true, SuppressWarning: true})).UnsafeAdd(tableName).Add(" policy ingestionbatching @'").UnsafeAdd(batchingPolicy).Add("'")
+	command := kql.New(".alter table ").AddTable(tableName).AddLiteral(" policy ingestionbatching @'").AddUnsafe(batchingPolicy).AddLiteral("'")
 	queries.ExecuteCommand(kustoClient, databaseName, command)
 	// If it failed to alter the ingestion policy - it could be the result of insufficient permissions. The sample will still run,
 	// though ingestion will be delayed for up to 5 minutes.
