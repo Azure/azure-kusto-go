@@ -6,7 +6,7 @@ import (
 	"fmt"
 	"github.com/Azure/azure-kusto-go/kusto/data/errors"
 	"github.com/Azure/azure-kusto-go/kusto/ingest"
-	"github.com/Azure/azure-kusto-go/kusto/quickstart/utils"
+	"github.com/Azure/azure-kusto-go/quickstart/utils"
 	"time"
 )
 
