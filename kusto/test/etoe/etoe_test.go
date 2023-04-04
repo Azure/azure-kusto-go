@@ -106,7 +106,6 @@ func TestQueries(t *testing.T) {
 
 	_, cancel := context.WithCancel(context.Background())
 	defer cancel()
-	testConfig.kcsb.UserForTracing = "GoLang_E2ETest_ø"
 	client, err := kusto.New(testConfig.kcsb)
 	if err != nil {
 		panic(err)
