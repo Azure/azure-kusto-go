@@ -15,6 +15,7 @@ import (
 	"strings"
 	"sync"
 	"sync/atomic"
+	"unicode"
 
 	"github.com/Azure/azure-kusto-go/kusto/data/errors"
 	"github.com/Azure/azure-kusto-go/kusto/internal/frames"
@@ -191,6 +192,21 @@ func (c *Conn) doRequestImpl(
 	buff io.ReadCloser,
 	headers http.Header,
 	errorContext string) (http.Header, io.ReadCloser, error) {
+
+	// Replace non-ascii chars in headers with '?'
+	for _, values := range headers {
+		var builder strings.Builder
+		for i := range values {
+			for _, char := range values[i] {
+				if char > unicode.MaxASCII {
+					builder.WriteRune('?')
+				} else {
+					builder.WriteRune(char)
+				}
+			}
+			values[i] = builder.String()
+		}
+	}
 
 	if c.auth.TokenProvider != nil && c.auth.TokenProvider.AuthorizationRequired() {
 		c.auth.TokenProvider.SetHttp(c.client)
