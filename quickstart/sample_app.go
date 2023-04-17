@@ -73,7 +73,7 @@ func loadConfigs(configFileName string) ConfigJson {
 		panic(fmt.Sprintf("Failed to parse configuration JSON: '%s'\n", uErr))
 	}
 	for i, dataSource := range config.DataToIngest {
-		config.DataToIngest[i].DataFormat = ingest.GetFormat(dataSource.DataSourceUri)
+		config.DataToIngest[i].DataFormat = ingest.InferFormatFromFileName(dataSource.DataSourceUri)
 	}
 	return config
 }
@@ -113,6 +113,7 @@ func preIngestionQuerying(config ConfigJson, kustoClient *kusto.Client) {
 
 // alterMergeExistingTableToProvidedSchema Alter-merges the given existing table to provided schema
 func alterMergeExistingTableToProvidedSchema(kustoClient *kusto.Client, databaseName string, tableName string, tableSchema string) {
+	// Note - we are using AddUnsafe here to maintain the structure of tableSchema without escaping. Use with caution!
 	command := kql.New(".alter-merge table ").AddTable(tableName).AddLiteral(" ").AddUnsafe(tableSchema)
 	queries.ExecuteCommand(kustoClient, databaseName, command)
 }
@@ -121,19 +122,16 @@ func alterMergeExistingTableToProvidedSchema(kustoClient *kusto.Client, database
 func queryExistingNumberOfRows(kustoClient *kusto.Client, databaseName string, tableName string) {
 	command := kql.New("table(_table_name) | count")
 	params := kql.NewParameters().AddString("_table_name", tableName)
-	queryOptions := []kusto.QueryOption{kusto.QueryParameters(params)}
 
-	queries.ExecuteCommand(kustoClient, databaseName, command, queryOptions...)
+	queries.ExecuteCommand(kustoClient, databaseName, command, kusto.QueryParameters(params))
 }
 
 // queryFirstTwoRows Queries the first two rows of the table
 func queryFirstTwoRows(kustoClient *kusto.Client, databaseName string, tableName string) {
 	command := kql.New("table(_table_name) | take 2")
 	params := kql.NewParameters().AddString("_table_name", tableName)
-	queryOptions := []kusto.QueryOption{kusto.QueryParameters(params)}
 
-	queries.ExecuteCommand(kustoClient, databaseName, command, queryOptions...)
-
+	queries.ExecuteCommand(kustoClient, databaseName, command, kusto.QueryParameters(params))
 }
 
 // createNewTable Creates a new table
@@ -181,7 +179,7 @@ func ingestData(dataSource ConfigData, dataFormat interface{}, ingestClient *ing
 	//	dataFormat = ingest.MultiJSON
 	//}
 	ctx := context.Background()
-	options := ingestion.CreateIngestionOptions(mappingName, dataFormat.(ingest.DataFormat))
+	options := []ingest.FileOption{ingest.IngestionMapping(mappingName, dataFormat.(ingest.DataFormat))}
 	filePath := fmt.Sprintf("kusto/quickstart/%s", dataSource.DataSourceUri)
 
 	// Note: No need to add "nosource" option as in that case the "ingestData" flag will be set to false, and it will be impossible to reach this code

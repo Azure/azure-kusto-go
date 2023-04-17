@@ -26,12 +26,6 @@ func WaitForIngestionToComplete(waitForIngestSeconds int) {
 	}
 }
 
-// CreateIngestionOptions creates ingestion options: ingestion mapping and anything else necessary
-func CreateIngestionOptions(mappingName string, dataFormat ingest.DataFormat) []ingest.FileOption {
-	options := []ingest.FileOption{ingest.IngestionMapping(mappingName, dataFormat)}
-	return options
-}
-
 // IngestSource Ingests both files and blob sources and handles error accordingly
 func IngestSource(ingestClient *ingest.Ingestion, DataSourceUri string, ctx context.Context, options []ingest.FileOption, databaseName string, tableName string, source string) {
 	_, err := ingestClient.FromFile(ctx, DataSourceUri, options...)

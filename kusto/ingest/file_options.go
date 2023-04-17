@@ -206,8 +206,8 @@ const (
 	SingleJSON DataFormat = properties.SingleJSON
 )
 
-// GetFormat looks at the file name and tries to discern what the file format is
-func GetFormat(fName string) DataFormat {
+// InferFormatFromFileName  looks at the file name and tries to discern what the file format is
+func InferFormatFromFileName(fName string) DataFormat {
 	return properties.DataFormatDiscovery(fName)
 }
 

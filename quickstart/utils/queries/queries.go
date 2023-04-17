@@ -26,9 +26,12 @@ func ExecuteCommand(kustoClient *kusto.Client, databaseName string, command kust
 	}
 	defer iter.Stop()
 
-	// .Do() will call the function for every row in the table.
+	// .DoOnRowOrError() will call the function for every row in the table and throw an error if occurred.
 	err = iter.DoOnRowOrError(
-		func(row *table.Row, _ *kustoErrors.Error) error {
+		func(row *table.Row, err *kustoErrors.Error) error {
+			if err != nil {
+				panic(fmt.Sprintf("Failed handling row: '%s'\n", err.Error()))
+			}
 			if row.Replace {
 				fmt.Println("---") // Replace flag indicates that the query result should be cleared and replaced with this row
 			}
