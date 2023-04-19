@@ -105,7 +105,6 @@ func TestQueries(t *testing.T) {
 
 	_, cancel := context.WithCancel(context.Background())
 	defer cancel()
-
 	client, err := kusto.New(testConfig.kcsb)
 	if err != nil {
 		panic(err)

@@ -9,6 +9,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 * Simpler handling of query parameters using kql.Parameters struct.
 ### Security
 * No redirects are allowed by default.
+### Fixed
+* Replace non-ascii characters in headers to be in line with the service.
 
 ## [0.11.3] - 2023-03-20
 ### Added
