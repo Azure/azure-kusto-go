@@ -54,12 +54,15 @@ func NewConn(endpoint string, auth Authorization, client *http.Client, clientDet
 	if err != nil {
 		return nil, errors.ES(errors.OpServConn, errors.KClientArgs, "could not parse the endpoint(%s): %s", endpoint, err).SetNoRetry()
 	}
+	if !strings.HasPrefix(u.Path, "/") {
+		u.Path = "/" + u.Path
+	}
 
 	c := &Conn{
 		auth:            auth,
-		endMgmt:         &url.URL{Scheme: "https", Host: u.Host, Path: "/v1/rest/mgmt"},
-		endQuery:        &url.URL{Scheme: "https", Host: u.Host, Path: "/v2/rest/query"},
-		endStreamIngest: &url.URL{Scheme: "https", Host: u.Host, Path: "/v1/rest/ingest/"},
+		endMgmt:         u.JoinPath("/v1/rest/mgmt"),
+		endQuery:        u.JoinPath("/v2/rest/query"),
+		endStreamIngest: u.JoinPath("/v1/rest/ingest"),
 		client:          client,
 		clientDetails:   clientDetails,
 	}

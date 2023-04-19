@@ -5,6 +5,7 @@ import (
 	"encoding/csv"
 	"fmt"
 	"github.com/shopspring/decimal"
+	"go.uber.org/goleak"
 	"io"
 	"math/rand"
 	"os"
@@ -14,8 +15,6 @@ import (
 	"testing"
 	"time"
 	"unicode"
-
-	"go.uber.org/goleak"
 
 	"github.com/Azure/azure-kusto-go/kusto"
 	"github.com/Azure/azure-kusto-go/kusto/data/errors"
@@ -118,7 +117,8 @@ func TestQueries(t *testing.T) {
 	})
 
 	allDataTypesTable := fmt.Sprintf("goe2e_all_data_types_%d_%d", time.Now().UnixNano(), rand.Int())
-	require.NoError(t, createIngestionTable(t, client, allDataTypesTable, true))
+	err = createIngestionTable(t, client, allDataTypesTable, true)
+	require.NoError(t, err)
 
 	tests := []struct {
 		// desc is a description of a test.
@@ -1916,6 +1916,44 @@ func assertErrorsMatch(t *testing.T, got, want error) bool {
 	}
 
 	return assert.Equal(t, want, got)
+}
+
+func TestNoRedirects(t *testing.T) {
+	redirectCodes := []int{301, 302, 307, 308}
+	for _, code := range redirectCodes {
+		code := code
+		t.Run(fmt.Sprintf("Fail at cloud %d", code), func(t *testing.T) {
+			t.Parallel()
+			client, err := kusto.New(kusto.NewConnectionStringBuilder(fmt.Sprintf("https://statusreturner.azurewebsites.net/nocloud/%d", code)).WithDefaultAzureCredential())
+			require.NoError(t, err)
+			t.Cleanup(func() {
+				t.Log("Closing client")
+				require.NoError(t, client.Close())
+				t.Log("Closed client")
+			})
+
+			_, err = client.Query(context.Background(), "db", kql.New("table"))
+			require.Error(t, err)
+			assert.Contains(t, err.Error(), fmt.Sprintf("%d", code))
+		})
+
+		t.Run(fmt.Sprintf("Fail at client %d", code), func(t *testing.T) {
+			t.Parallel()
+			client, err := kusto.New(kusto.NewConnectionStringBuilder(fmt.Sprintf("https://statusreturner.azurewebsites.net/%d", code)).WithDefaultAzureCredential())
+			require.NoError(t, err)
+			t.Cleanup(func() {
+				t.Log("Closing client")
+				require.NoError(t, client.Close())
+				t.Log("Closed client")
+			})
+
+			_, err = client.Query(context.Background(), "db", kql.New("table"))
+			require.Error(t, err)
+			convErr, ok := err.(*errors.HttpError)
+			require.True(t, ok)
+			assert.Equal(t, code, convErr.StatusCode)
+		})
+	}
 }
 
 func getExpectedResult() AllDataType {
