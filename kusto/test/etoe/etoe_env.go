@@ -89,5 +89,6 @@ func init() {
 	} else {
 		testConfig.kcsb = kusto.NewConnectionStringBuilder(testConfig.Endpoint).WithAadAppKey(testConfig.ClientID, testConfig.ClientSecret, testConfig.TenantID)
 	}
+	testConfig.kcsb.UserForTracing = "GoLang_E2ETest_ø"
 	skipETOE = false
 }
