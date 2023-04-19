@@ -1,6 +1,6 @@
 # Quickstart App
 
-The quickstart application is a **self-contained and runnable** example app that demonstrates authenticating, connecting to, administering, ingesting data into and querying Azure Data Explorer using the azure-kusto-java SDK.
+The quickstart application is a **self-contained and runnable** example app that demonstrates authenticating, connecting to, administering, ingesting data into and querying Azure Data Explorer using the azure-kusto-go SDK.
 You can use it as a baseline to write your own first kusto client application, altering the code as you go, or copy code sections out of it into your app.
 
 **Tip:** The app includes comments with tips on recommendations, coding best practices, links to reference materials and recommended TODO changes when adapting the code to your needs.
@@ -10,8 +10,11 @@ You can use it as a baseline to write your own first kusto client application, a
 
 ### Prerequisites
 
-1. Set up Java version 8 or higher on your machine. For instructions, consult a Java environment setup tutorial, like [this](https://www.tutorialspoint.com/java/java_environment_setup.htm).
-1. Set up [Apache Maven](https://maven.apache.org/install.html), which is the most popular Java dependency management tool.
+- Go, version 1.19 or higher
+- An [Azure subscription](https://azure.microsoft.com/free/)
+- An [Azure Data Explorer Cluster](https://learn.microsoft.com/en-us/azure/data-explorer/).
+- An Azure Data Explorer Database. You can create a Database in your Azure Data Explorer Cluster using the [Azure Portal](https://learn.microsoft.com/en-us/azure/data-explorer/create-cluster-database-portal).
+
 
 ### Retrieving the app from GitHub
 
@@ -30,8 +33,8 @@ You can use it as a baseline to write your own first kusto client application, a
 ### Run the app
 
 1. Open a command line window and navigate to the folder where you extracted the app.
-1. Run `mvn clean install` to compile the source code into a binary.
-1. Run the binary using `java -jar target\kusto-quickstart-[version]-jar-with-dependencies.jar`.
+1. Run `go build` to compile the source code and files into a binary.
+1. Run the binary using `.\quickstart.exe` or whichever name you provided.
 
 #### Troubleshooting
 

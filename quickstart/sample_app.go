@@ -228,7 +228,7 @@ var waitForUser bool
 
 func main() {
 	fmt.Println("Kusto sample app is starting...")
-	const configFileName = "kusto/quickstart/kusto_sample_config.json"
+	const configFileName = "kusto_sample_config.json"
 	var config = loadConfigs(configFileName)
 	waitForUser = config.WaitForUser
 	if config.AuthenticationMode == authentication.UserPrompt {
