@@ -2,7 +2,8 @@ module github.com/Azure/azure-kusto-go/quickstart
 
 go 1.19
 
-require github.com/Azure/azure-kusto-go v0.11.3
+require github.com/Azure/azure-kusto-go/ingest v0.11.3
+require github.com/Azure/azure-kusto-go/data v0.11.3
 
 require (
     github.com/Azure/azure-pipeline-go v0.1.8 // indirect
@@ -34,4 +35,5 @@ require (
     golang.org/x/text v0.7.0 // indirect
 )
 
-replace github.com/Azure/azure-kusto-go => ../
+replace github.com/Azure/azure-kusto-go/data => ../data
+replace github.com/Azure/azure-kusto-go/ingest => ../ingest
