@@ -4,15 +4,16 @@ package queries
 import (
 	"context"
 	"fmt"
-	kustoErrors "github.com/Azure/azure-kusto-go/data/errors"
-	"github.com/Azure/azure-kusto-go/data/table"
+	"github.com/Azure/azure-kusto-go/azkustodata"
+	kustoErrors "github.com/Azure/azure-kusto-go/azkustodata/errors"
+	"github.com/Azure/azure-kusto-go/azkustodata/table"
 	"strings"
 )
 
 // ExecuteCommand Executes a Command using a premade client
-func ExecuteCommand(kustoClient *kusto.Client, databaseName string, command kusto.Statement, options ...kusto.QueryOption) {
+func ExecuteCommand(kustoClient *azkustodata.Client, databaseName string, command azkustodata.Statement, options ...azkustodata.QueryOption) {
 	ctx := context.Background()
-	var iter *kusto.RowIterator
+	var iter *azkustodata.RowIterator
 	var err error
 	if strings.HasPrefix(command.String(), ".") {
 		iter, err = kustoClient.Mgmt(ctx, databaseName, command)

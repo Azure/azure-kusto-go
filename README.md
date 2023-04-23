@@ -41,7 +41,7 @@ go get github.com/Azure/azure-kusto-go
 
 ### Prerequisites
 
-- Go, version 1.19 or higher
+- Go, version 1.20 or higher
 - An [Azure subscription](https://azure.microsoft.com/free/)
 - An [Azure Data Explorer Cluster](https://learn.microsoft.com/en-us/azure/data-explorer/).
 - An Azure Data Explorer Database. You can create a Database in your Azure Data Explorer Cluster using the [Azure Portal](https://learn.microsoft.com/en-us/azure/data-explorer/create-cluster-database-portal).

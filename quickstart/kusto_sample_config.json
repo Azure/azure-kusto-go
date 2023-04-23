@@ -3,7 +3,7 @@
   "ingestUri": "https://ingest-help.kusto.windows.net",
   "databaseName": "MyDatabase",
   "tableName": "SampleTable",
-  "useExistingTable": true,
+  "useExistingTable": false,
   "alterTable": true,
   "queryData": true,
   "ingestData": true,

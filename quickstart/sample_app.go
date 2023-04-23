@@ -4,10 +4,10 @@ import (
 	"context"
 	"encoding/json"
 	"fmt"
-	"github.com/Azure/azure-kusto-go/data"
-	"github.com/Azure/azure-kusto-go/data/errors"
-	"github.com/Azure/azure-kusto-go/data/kql"
-	"github.com/Azure/azure-kusto-go/ingest"
+	"github.com/Azure/azure-kusto-go/azkustodata"
+	"github.com/Azure/azure-kusto-go/azkustodata/errors"
+	"github.com/Azure/azure-kusto-go/azkustodata/kql"
+	"github.com/Azure/azure-kusto-go/azkustoingest"
 	"github.com/Azure/azure-kusto-go/quickstart/utils"
 	"github.com/Azure/azure-kusto-go/quickstart/utils/authentication"
 	"github.com/Azure/azure-kusto-go/quickstart/utils/ingestion"
@@ -73,13 +73,13 @@ func loadConfigs(configFileName string) ConfigJson {
 		panic(fmt.Sprintf("Failed to parse configuration JSON: '%s'\n", uErr))
 	}
 	for i, dataSource := range config.DataToIngest {
-		config.DataToIngest[i].DataFormat = ingest.InferFormatFromFileName(dataSource.DataSourceUri)
+		config.DataToIngest[i].DataFormat = azkustoingest.InferFormatFromFileName(dataSource.DataSourceUri)
 	}
 	return config
 }
 
 // preIngestionQuerying -First phase, pre ingestion - will reach the provided DB with several control commands and a query based on the configuration File.
-func preIngestionQuerying(config ConfigJson, kustoClient *data.Client) {
+func preIngestionQuerying(config ConfigJson, kustoClient *azkustodata.Client) {
 	if config.UseExistingTable {
 		if config.AlterTable {
 			// Tip: Usually table was originally created with a schema appropriate for the data being ingested, so this wouldn't be needed.
@@ -112,36 +112,36 @@ func preIngestionQuerying(config ConfigJson, kustoClient *data.Client) {
 }
 
 // alterMergeExistingTableToProvidedSchema Alter-merges the given existing table to provided schema
-func alterMergeExistingTableToProvidedSchema(kustoClient *data.Client, databaseName string, tableName string, tableSchema string) {
+func alterMergeExistingTableToProvidedSchema(kustoClient *azkustodata.Client, databaseName string, tableName string, tableSchema string) {
 	// Note - we are using AddUnsafe here to maintain the structure of tableSchema without escaping. Use with caution!
 	command := kql.New(".alter-merge table ").AddTable(tableName).AddLiteral(" ").AddUnsafe(tableSchema)
 	queries.ExecuteCommand(kustoClient, databaseName, command)
 }
 
 // queryExistingNumberOfRows Queries the data on the existing number of rows
-func queryExistingNumberOfRows(kustoClient *data.Client, databaseName string, tableName string) {
+func queryExistingNumberOfRows(kustoClient *azkustodata.Client, databaseName string, tableName string) {
 	command := kql.New("table(_table_name) | count")
 	params := kql.NewParameters().AddString("_table_name", tableName)
 
-	queries.ExecuteCommand(kustoClient, databaseName, command, data.QueryParameters(params))
+	queries.ExecuteCommand(kustoClient, databaseName, command, azkustodata.QueryParameters(params))
 }
 
 // queryFirstTwoRows Queries the first two rows of the table
-func queryFirstTwoRows(kustoClient *data.Client, databaseName string, tableName string) {
+func queryFirstTwoRows(kustoClient *azkustodata.Client, databaseName string, tableName string) {
 	command := kql.New("table(_table_name) | take 2")
 	params := kql.NewParameters().AddString("_table_name", tableName)
 
-	queries.ExecuteCommand(kustoClient, databaseName, command, data.QueryParameters(params))
+	queries.ExecuteCommand(kustoClient, databaseName, command, azkustodata.QueryParameters(params))
 }
 
 // createNewTable Creates a new table
-func createNewTable(kustoClient *data.Client, databaseName string, tableName string, tableSchema string) {
+func createNewTable(kustoClient *azkustodata.Client, databaseName string, tableName string, tableSchema string) {
 	command := kql.New(".create table ").AddTable(tableName).AddLiteral(" ").AddUnsafe(tableSchema)
 	queries.ExecuteCommand(kustoClient, databaseName, command)
 }
 
 // alterBatchingPolicy Alters the batching policy based on BatchingPolicy in configuration
-func alterBatchingPolicy(kustoClient *data.Client, databaseName string, tableName string, batchingPolicy string) {
+func alterBatchingPolicy(kustoClient *azkustodata.Client, databaseName string, tableName string, batchingPolicy string) {
 	/*
 	 * Tip 1: Though most users should be fine with the defaults, to speed up ingestion, such as during development and in this sample app, we opt to modify
 	 * the default ingestion policy to ingest data after at most 10 seconds. Tip 2: This is generally a one-time configuration. Tip 3: You can also skip the
@@ -154,7 +154,7 @@ func alterBatchingPolicy(kustoClient *data.Client, databaseName string, tableNam
 }
 
 // ingestionPhase - Second phase - The ingestion process
-func ingestionPhase(config ConfigJson, ingestClient *ingest.Ingestion) {
+func ingestionPhase(config ConfigJson, ingestClient *azkustoingest.Ingestion) {
 	for _, dataSource := range config.DataToIngest {
 		// Learn More: For more information about ingesting data to Kusto in Java, see:
 		// https://docs.microsoft.com/azure/data-explorer/java-ingest-data
@@ -170,17 +170,17 @@ func ingestionPhase(config ConfigJson, ingestClient *ingest.Ingestion) {
 }
 
 // ingestData Ingest data from given source
-func ingestData(dataSource ConfigData, dataFormat interface{}, ingestClient *ingest.Ingestion, databaseName string, tableName string, mappingName string) {
+func ingestData(dataSource ConfigData, dataFormat interface{}, ingestClient *azkustoingest.Ingestion, databaseName string, tableName string, mappingName string) {
 	sourceType := dataSource.SourceType
 	waitForUserToProceed(fmt.Sprintf("Ingest '%s' from '%s'", dataSource.DataSourceUri, sourceType))
 	// Tip: When ingesting json files, if each line represents a single-line json, use MULTIJSON format even if the file only contains one line.
 	// If the json contains whitespace formatting, use SINGLEJSON. In this case, only one data row json object is allowed per file.
-	//if dataFormat == ingest.JSON {
-	//	dataFormat = ingest.MultiJSON
+	//if dataFormat == azkustoingest.JSON {
+	//	dataFormat = azkustoingest.MultiJSON
 	//}
 	ctx := context.Background()
-	options := []ingest.FileOption{ingest.IngestionMapping(mappingName, dataFormat.(ingest.DataFormat))}
-	filePath := fmt.Sprintf("kusto/quickstart/%s", dataSource.DataSourceUri)
+	options := []azkustoingest.FileOption{azkustoingest.IngestionMapping(mappingName, dataFormat.(azkustoingest.DataFormat))}
+	filePath := fmt.Sprintf("./%s", dataSource.DataSourceUri)
 
 	// Note: No need to add "nosource" option as in that case the "ingestData" flag will be set to false, and it will be impossible to reach this code
 	// segment.
@@ -197,7 +197,7 @@ func ingestData(dataSource ConfigData, dataFormat interface{}, ingestClient *ing
 }
 
 // postIngestionQuerying Third and final phase - simple queries to validate the hopefully successful run of the script
-func postIngestionQuerying(kustoClient *data.Client, databaseName string, tableName string, ingestDataFlag bool) {
+func postIngestionQuerying(kustoClient *azkustodata.Client, databaseName string, tableName string, ingestDataFlag bool) {
 	optionalPostIngestionPrompt := ""
 	if ingestDataFlag {
 		optionalPostIngestionPrompt = "post-ingestion "
@@ -228,7 +228,7 @@ var waitForUser bool
 
 func main() {
 	fmt.Println("Kusto sample app is starting...")
-	const configFileName = "kusto/quickstart/kusto_sample_config.json"
+	const configFileName = "./kusto_sample_config.json"
 	var config = loadConfigs(configFileName)
 	waitForUser = config.WaitForUser
 	if config.AuthenticationMode == authentication.UserPrompt {
@@ -236,11 +236,11 @@ func main() {
 	}
 
 	var kustoKcs = authentication.GenerateConnectionString(config.KustoUri, config.AuthenticationMode)
-	kustoClient, err := data.New(kustoKcs)
+	kustoClient, err := azkustodata.New(kustoKcs)
 	if err != nil {
 		utils.ErrorHandler("Couldn't create Kusto client. Please validate your URIs in the configuration file.", err)
 	}
-	defer func(client *data.Client) {
+	defer func(client *azkustodata.Client) {
 		err := client.Close()
 		if err != nil {
 			utils.ErrorHandler("Couldn't close client.", err)
@@ -249,11 +249,11 @@ func main() {
 
 	preIngestionQuerying(config, kustoClient)
 
-	ingestClient, err := ingest.New(kustoClient, config.DatabaseName, config.TableName)
+	ingestClient, err := azkustoingest.New(kustoClient, config.DatabaseName, config.TableName)
 	if err != nil {
 		utils.ErrorHandler("Couldn't create Ingestion client. Please validate your URIs in the configuration file.", err)
 	}
-	defer func(client *ingest.Ingestion) {
+	defer func(client *azkustoingest.Ingestion) {
 		err := client.Close()
 		if err != nil {
 			utils.ErrorHandler("Couldn't close client.", err)
