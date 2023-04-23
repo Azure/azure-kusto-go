@@ -1,5 +1,3 @@
-github.com/Azure/azure-kusto-go v0.11.4-0.20230330134018-302957036361 h1:UJVZ9i0S8rIdLicjCQgshhhPUMIW1TJNLZ89XHbN5vI=
-github.com/Azure/azure-kusto-go v0.11.4-0.20230330134018-302957036361/go.mod h1:AyWTO0r50y7rAkxkTveLtn80njNyXpJP5WADvoSZ/P4=
 github.com/Azure/azure-pipeline-go v0.1.8 h1:KmVRa8oFMaargVesEuuEoiLCQ4zCCwQ8QX/xg++KS20=
 github.com/Azure/azure-pipeline-go v0.1.8/go.mod h1:XA1kFWRVhSK+KNFiOhfv83Fv8L9achrP7OxIzeTn1Yg=
 github.com/Azure/azure-sdk-for-go v67.1.0+incompatible h1:oziYcaopbnIKfM69DL05wXdypiqfrUKdxUKrKpynJTw=

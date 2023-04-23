@@ -4,10 +4,10 @@ import (
 	"context"
 	"encoding/json"
 	"fmt"
-	"github.com/Azure/azure-kusto-go/kusto"
-	"github.com/Azure/azure-kusto-go/kusto/data/errors"
-	"github.com/Azure/azure-kusto-go/kusto/ingest"
-	"github.com/Azure/azure-kusto-go/kusto/kql"
+	"github.com/Azure/azure-kusto-go/data"
+	"github.com/Azure/azure-kusto-go/data/errors"
+	"github.com/Azure/azure-kusto-go/data/kql"
+	"github.com/Azure/azure-kusto-go/ingest"
 	"github.com/Azure/azure-kusto-go/quickstart/utils"
 	"github.com/Azure/azure-kusto-go/quickstart/utils/authentication"
 	"github.com/Azure/azure-kusto-go/quickstart/utils/ingestion"
@@ -79,7 +79,7 @@ func loadConfigs(configFileName string) ConfigJson {
 }
 
 // preIngestionQuerying -First phase, pre ingestion - will reach the provided DB with several control commands and a query based on the configuration File.
-func preIngestionQuerying(config ConfigJson, kustoClient *kusto.Client) {
+func preIngestionQuerying(config ConfigJson, kustoClient *data.Client) {
 	if config.UseExistingTable {
 		if config.AlterTable {
 			// Tip: Usually table was originally created with a schema appropriate for the data being ingested, so this wouldn't be needed.
@@ -112,36 +112,36 @@ func preIngestionQuerying(config ConfigJson, kustoClient *kusto.Client) {
 }
 
 // alterMergeExistingTableToProvidedSchema Alter-merges the given existing table to provided schema
-func alterMergeExistingTableToProvidedSchema(kustoClient *kusto.Client, databaseName string, tableName string, tableSchema string) {
+func alterMergeExistingTableToProvidedSchema(kustoClient *data.Client, databaseName string, tableName string, tableSchema string) {
 	// Note - we are using AddUnsafe here to maintain the structure of tableSchema without escaping. Use with caution!
 	command := kql.New(".alter-merge table ").AddTable(tableName).AddLiteral(" ").AddUnsafe(tableSchema)
 	queries.ExecuteCommand(kustoClient, databaseName, command)
 }
 
 // queryExistingNumberOfRows Queries the data on the existing number of rows
-func queryExistingNumberOfRows(kustoClient *kusto.Client, databaseName string, tableName string) {
+func queryExistingNumberOfRows(kustoClient *data.Client, databaseName string, tableName string) {
 	command := kql.New("table(_table_name) | count")
 	params := kql.NewParameters().AddString("_table_name", tableName)
 
-	queries.ExecuteCommand(kustoClient, databaseName, command, kusto.QueryParameters(params))
+	queries.ExecuteCommand(kustoClient, databaseName, command, data.QueryParameters(params))
 }
 
 // queryFirstTwoRows Queries the first two rows of the table
-func queryFirstTwoRows(kustoClient *kusto.Client, databaseName string, tableName string) {
+func queryFirstTwoRows(kustoClient *data.Client, databaseName string, tableName string) {
 	command := kql.New("table(_table_name) | take 2")
 	params := kql.NewParameters().AddString("_table_name", tableName)
 
-	queries.ExecuteCommand(kustoClient, databaseName, command, kusto.QueryParameters(params))
+	queries.ExecuteCommand(kustoClient, databaseName, command, data.QueryParameters(params))
 }
 
 // createNewTable Creates a new table
-func createNewTable(kustoClient *kusto.Client, databaseName string, tableName string, tableSchema string) {
+func createNewTable(kustoClient *data.Client, databaseName string, tableName string, tableSchema string) {
 	command := kql.New(".create table ").AddTable(tableName).AddLiteral(" ").AddUnsafe(tableSchema)
 	queries.ExecuteCommand(kustoClient, databaseName, command)
 }
 
 // alterBatchingPolicy Alters the batching policy based on BatchingPolicy in configuration
-func alterBatchingPolicy(kustoClient *kusto.Client, databaseName string, tableName string, batchingPolicy string) {
+func alterBatchingPolicy(kustoClient *data.Client, databaseName string, tableName string, batchingPolicy string) {
 	/*
 	 * Tip 1: Though most users should be fine with the defaults, to speed up ingestion, such as during development and in this sample app, we opt to modify
 	 * the default ingestion policy to ingest data after at most 10 seconds. Tip 2: This is generally a one-time configuration. Tip 3: You can also skip the
@@ -197,7 +197,7 @@ func ingestData(dataSource ConfigData, dataFormat interface{}, ingestClient *ing
 }
 
 // postIngestionQuerying Third and final phase - simple queries to validate the hopefully successful run of the script
-func postIngestionQuerying(kustoClient *kusto.Client, databaseName string, tableName string, ingestDataFlag bool) {
+func postIngestionQuerying(kustoClient *data.Client, databaseName string, tableName string, ingestDataFlag bool) {
 	optionalPostIngestionPrompt := ""
 	if ingestDataFlag {
 		optionalPostIngestionPrompt = "post-ingestion "
@@ -236,11 +236,11 @@ func main() {
 	}
 
 	var kustoKcs = authentication.GenerateConnectionString(config.KustoUri, config.AuthenticationMode)
-	kustoClient, err := kusto.New(kustoKcs)
+	kustoClient, err := data.New(kustoKcs)
 	if err != nil {
 		utils.ErrorHandler("Couldn't create Kusto client. Please validate your URIs in the configuration file.", err)
 	}
-	defer func(client *kusto.Client) {
+	defer func(client *data.Client) {
 		err := client.Close()
 		if err != nil {
 			utils.ErrorHandler("Couldn't close client.", err)

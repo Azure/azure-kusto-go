@@ -4,9 +4,8 @@ package queries
 import (
 	"context"
 	"fmt"
-	"github.com/Azure/azure-kusto-go/kusto"
-	kustoErrors "github.com/Azure/azure-kusto-go/kusto/data/errors"
-	"github.com/Azure/azure-kusto-go/kusto/data/table"
+	kustoErrors "github.com/Azure/azure-kusto-go/data/errors"
+	"github.com/Azure/azure-kusto-go/data/table"
 	"strings"
 )
 

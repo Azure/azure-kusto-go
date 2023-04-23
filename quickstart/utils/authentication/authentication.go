@@ -3,7 +3,6 @@ package authentication
 
 import (
 	"fmt"
-	"github.com/Azure/azure-kusto-go/kusto"
 	"github.com/Azure/azure-kusto-go/quickstart/utils"
 	"os"
 )
