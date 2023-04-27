@@ -13,7 +13,7 @@ You can use it as a baseline to write your own first kusto client application, a
 - Go, version 1.19 or higher
 - An [Azure subscription](https://azure.microsoft.com/free/)
 - An [Azure Data Explorer Cluster](https://learn.microsoft.com/en-us/azure/data-explorer/).
-- An Azure Data Explorer Database. You can create a Database in your Azure Data Explorer Cluster using the [Azure Portal](https://learn.microsoft.com/en-us/azure/data-explorer/create-cluster-database-portal).
+- An Azure Data Explorer Database. You can create a Database in a free cluster - [Link](https://learn.microsoft.com/en-us/azure/data-explorer/start-for-free-web-ui), or your Azure Data Explorer Cluster using the [Azure Portal](https://learn.microsoft.com/en-us/azure/data-explorer/create-cluster-database-portal).
 
 
 ### Retrieving the app from GitHub
