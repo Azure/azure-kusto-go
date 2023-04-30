@@ -3,6 +3,7 @@ package etoe
 import (
 	"encoding/json"
 	"fmt"
+	"github.com/Azure/azure-kusto-go/azkustodata"
 	"os"
 	"path/filepath"
 	"runtime"
@@ -25,7 +26,7 @@ type Config struct {
 	// TenantID is the tenant on which the principal exists
 	TenantID string
 	// Connection string builder to get a new kusto client
-	kcsb *kusto.ConnectionStringBuilder
+	kcsb *azkustodata.ConnectionStringBuilder
 }
 
 func (c *Config) validate() error {
@@ -83,9 +84,9 @@ func init() {
 	}
 
 	if testConfig.ClientID == "" {
-		testConfig.kcsb = kusto.NewConnectionStringBuilder(testConfig.Endpoint).WithAzCli()
+		testConfig.kcsb = azkustodata.NewConnectionStringBuilder(testConfig.Endpoint).WithAzCli()
 	} else {
-		testConfig.kcsb = kusto.NewConnectionStringBuilder(testConfig.Endpoint).WithAadAppKey(testConfig.ClientID, testConfig.ClientSecret, testConfig.TenantID)
+		testConfig.kcsb = azkustodata.NewConnectionStringBuilder(testConfig.Endpoint).WithAadAppKey(testConfig.ClientID, testConfig.ClientSecret, testConfig.TenantID)
 	}
 	testConfig.kcsb.UserForTracing = "GoLang_E2ETest_ø"
 	skipETOE = false

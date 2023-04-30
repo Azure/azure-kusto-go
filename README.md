@@ -55,7 +55,7 @@ Examples for various scenarios can be found on [pkg.go.dev](https://pkg.go.dev/g
 Azure Data Explorer (Kusto) connection strings are created using a connection string builder for an existing Azure Data Explorer (Kusto) cluster endpoint of the form `https://<cluster name>.<location>.kusto.windows.net`.
 
 ```go
-kustoConnectionStringBuilder := kusto.NewConnectionStringBuilder(endpoint)
+kustoConnectionStringBuilder := azkustodata.NewConnectionStringBuilder(endpoint)
 ```
 
 ### Create and authenticate the client
@@ -70,7 +70,7 @@ You can also authenticate a client using a system- or user-assigned managed iden
 
 // Initialize a new kusto client using the default Azure credential
 kustoConnectionString := kustoConnectionStringBuilder.WithDefaultAzureCredential()
-client, err = kusto.New(kustoConnectionString)
+client, err = azkustodata.New(kustoConnectionString)
 if err != nil {
 	panic("add error handling")
 }
@@ -82,42 +82,42 @@ defer client.Close()
 
 ```go
 kustoConnectionString := kustoConnectionStringBuilder.WithAzCli()
-client, err = kusto.New(kustoConnectionString)
+client, err = azkustodata.New(kustoConnectionString)
 ```
 
 #### Using a system-assigned managed identity
 
 ```go
 kustoConnectionString := kustoConnectionStringBuilder.WithSystemManagedIdentity()
-client, err = kusto.New(kustoConnectionString)
+client, err = azkustodata.New(kustoConnectionString)
 ```
 
 #### Using a user-assigned managed identity
 
 ```go
 kustoConnectionString := kustoConnectionStringBuilder.WithUserManagedIdentity(clientID)
-client, err = kusto.New(kustoConnectionString)
+client, err = azkustodata.New(kustoConnectionString)
 ```
 
 #### Using a bearer token
 
 ```go
 kustoConnectionString := kustoConnectionStringBuilder.WithApplicationToken(appId, token)
-client, err = kusto.New(kustoConnectionString)
+client, err = azkustodata.New(kustoConnectionString)
 ```
 
 #### Using an app id and secret
 
 ```go
 kustoConnectionString := kustoConnectionStringBuilder.WithAadAppKey(clientID, clientSecret, tenantID)
-client, err = kusto.New(kustoConnectionString)
+client, err = azkustodata.New(kustoConnectionString)
 ```
 
 #### Using an application certificate
 
 ```go
 kustoConnectionString := kustoConnectionStringBuilder.WithAppCertificate(appId, certificate, thumbprint, sendCertChain, authorityID)
-client, err = kusto.New(kustoConnectionString)
+client, err = azkustodata.New(kustoConnectionString)
 ```
 
 ### Querying
