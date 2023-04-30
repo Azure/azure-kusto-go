@@ -6,8 +6,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ## [Unreleased]
 ### Added
 * [BREAKING] [MAJOR] Split the main module into two packages:
-  * azkustodata
-  * azkustoingest
+  * azkustodata - contains querying, management and commands.
+  * azkustoingest - contains ingestion in all its forms.
 * [BREAKING] Minimum Go version is now 1.20.
 
 ## [Unreleased]

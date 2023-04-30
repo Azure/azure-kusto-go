@@ -5,7 +5,7 @@
 
 This is a data plane SDK (it is for interacting with Azure Data Explorer (Kusto) service). For the control plane (resource administration), go [here](https://github.com/Azure/azure-sdk-for-go/tree/master/services/kusto/mgmt).
 
-Use the data plane SDK `github.com/Azure/azure-kusto-go/data` in your application to:
+Use the data plane SDK `github.com/Azure/azure-kusto-go/azkustodata` in your application to:
 
 - Query Kusto/Azure Data Explorer clusters for rows, optionally into structs.
 - Import data into Kusto from local file, Azure Blob Storage file, Stream, or an `io.Reader`.
@@ -66,7 +66,7 @@ You can also authenticate a client using a system- or user-assigned managed iden
 #### Using the `DefaultAzureCredential`
 
 ```go
-// kusto package is: github.com/Azure/azure-kusto-go/data
+// kusto package is: github.com/Azure/azure-kusto-go/azkustodata
 
 // Initialize a new kusto client using the default Azure credential
 kustoConnectionString := kustoConnectionStringBuilder.WithDefaultAzureCredential()
@@ -200,7 +200,7 @@ Building queries like this is useful for queries that are built from user input,
 The kusto `table` package queries data into a ***table.Row** which can be printed or have the column data extracted.
 
 ```go
-// table package is: github.com/Azure/azure-kusto-go/data/table
+// table package is: github.com/Azure/azure-kusto-go/azkustodata/table
 
 // Query our database table "systemNodes" for the CollectionTimes and the NodeIds.
 iter, err := client.Query(ctx, "database", query)
@@ -271,7 +271,7 @@ if err != nil {
 
 ### Ingestion
 
-The `ingest` package provides access to Kusto's ingestion service for importing data into Kusto. This requires
+The `azkustoingest` package provides access to Kusto's ingestion service for importing data into Kusto. This requires
 some prerequisite knowledge of acceptable data formats, mapping references, etc.
 
 That documentation can be found [here](https://docs.microsoft.com/en-us/azure/kusto/management/data-ingestion/)
@@ -295,7 +295,7 @@ defer in.Close()
 
 #### Other Ingestion Clients
 
-There are other ingestion clients that can be used for different ingestion scenarios.  The `ingest` package provides
+There are other ingestion clients that can be used for different ingestion scenarios.  The `azkustoingest` package provides
 the following clients:
 * Queued Ingest - `ingest.New()` - the default client, uses queues and batching to ingest data. Most reliable.
 * Streaming Ingest - `ingest.NewStreaming()` - Directly streams data into the engine. Fast, but is limited with size and can fail.
