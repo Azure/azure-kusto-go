@@ -80,7 +80,7 @@ jobs:
       - name: Display tests data
         if: always()
         run: |
-          tparse -all -file=/tmp/gotest.log
+          tparse -all -file=/tmp/gotest-data.log
 
       - name: Parse tests data
         if: always()
@@ -90,7 +90,7 @@ jobs:
       - name: Display tests ingest
         if: always()
         run: |
-          tparse -all -file=/tmp/gotest.log
+          tparse -all -file=/tmp/gotest-ingest.log
 
       - name: Parse tests ingest
         if: always()
