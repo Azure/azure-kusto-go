@@ -29,6 +29,10 @@ func GenerateConnectionString(clusterUrl string, authenticationMode Authenticati
 	case ManagedIdentity:
 		// Authenticate using a System-Assigned managed identity provided to an azure service, or using a User-Assigned managed identity.
 		// For more information, see https://docs.microsoft.com/en-us/azure/active-directory/managed-identities-azure-resources/overview
+		var clientID = os.Getenv("MANAGED_IDENTITY_CLIENT_ID")
+		if clientID != "" {
+			return kcs.WithUserManagedIdentity(clientID)
+		}
 		return kcs.WithSystemManagedIdentity()
 	case AppKey:
 		// Learn More: For information about how to procure an AAD Application,
