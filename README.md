@@ -99,10 +99,17 @@ kustoConnectionString := kustoConnectionStringBuilder.WithUserManagedIdentity(cl
 client, err = kusto.New(kustoConnectionString)
 ```
 
-#### Using an application token
+#### Using a bearer token
 
 ```go
-kustoConnectionString := kustoConnectionStringBuilder.WithApplicationToken(appId, appToken)
+kustoConnectionString := kustoConnectionStringBuilder.WithApplicationToken(appId, token)
+client, err = kusto.New(kustoConnectionString)
+```
+
+#### Using an app id and secret
+
+```go
+kustoConnectionString := kustoConnectionStringBuilder.WithAadAppKey(clientID, clientSecret, tenantID)
 client, err = kusto.New(kustoConnectionString)
 ```
 
