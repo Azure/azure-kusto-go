@@ -2255,7 +2255,7 @@ func waitForIngest(t *testing.T, ctx context.Context, client *azkustodata.Client
 				return false, err
 			}
 
-			assert.Equal(t, "QueryProperties", properties.TableKind)
+			assert.Equal(t, "QueryProperties", string(properties.TableKind))
 			assert.Equal(t, "TableId", properties.Columns[0].Name)
 			assert.Equal(t, "Key", properties.Columns[1].Name)
 			assert.Equal(t, "Value", properties.Columns[2].Name)
@@ -2265,7 +2265,7 @@ func waitForIngest(t *testing.T, ctx context.Context, client *azkustodata.Client
 				return false, err
 			}
 
-			assert.Equal(t, "QueryCompletionInformation", completion.TableKind)
+			assert.Equal(t, "QueryCompletionInformation", string(completion.TableKind))
 			assert.Equal(t, "Timestamp", completion.Columns[0].Name)
 			assert.Equal(t, "ClientRequestId", completion.Columns[1].Name)
 			assert.Equal(t, "ActivityId", completion.Columns[2].Name)
