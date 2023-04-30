@@ -18,6 +18,7 @@ import (
 	"go.uber.org/goleak"
 	"io"
 	"math/rand"
+	"net/http"
 	"os"
 	"regexp"
 	"strings"
@@ -93,6 +94,61 @@ type queryFunc func(ctx context.Context, db string, query azkustodata.Statement,
 type mgmtFunc func(ctx context.Context, db string, query azkustodata.Statement, options ...azkustodata.MgmtOption) (*azkustodata.RowIterator, error)
 
 type queryJsonFunc func(ctx context.Context, db string, query azkustodata.Statement, options ...azkustodata.QueryOption) (string, error)
+
+func TestAuth(t *testing.T) {
+	t.Parallel()
+	transporter := utils.Transporter{ // using custom transporter to make sure it closes
+		Http: &http.Client{
+			Transport: &http.Transport{
+				IdleConnTimeout:   0,
+				DisableKeepAlives: true,
+			},
+		},
+	}
+	defaultCred, err := azidentity.NewDefaultAzureCredential(&azidentity.DefaultAzureCredentialOptions{
+		ClientOptions: azcore.ClientOptions{
+			Transport: &transporter,
+		},
+	})
+	credential, err := azidentity.NewChainedTokenCredential([]azcore.TokenCredential{
+		defaultCred,
+	}, &azidentity.ChainedTokenCredentialOptions{})
+	require.NoError(t, err)
+
+	tests := []struct {
+		desc string
+		kcsb *kusto.ConnectionStringBuilder
+	}{
+		{
+			desc: "Default",
+			kcsb: kusto.NewConnectionStringBuilder(testConfig.Endpoint).WithDefaultAzureCredential(),
+		},
+		{
+			desc: "With TokenCredential",
+			kcsb: kusto.NewConnectionStringBuilder(testConfig.Endpoint).WithTokenCredential(credential),
+		},
+	}
+
+	for _, test := range tests {
+		test := test
+		t.Run(test.desc, func(t *testing.T) {
+			t.Parallel()
+			client, err := kusto.New(test.kcsb)
+			require.NoError(t, err)
+			defer client.Close()
+
+			query, err := client.Query(context.Background(), testConfig.Database, kql.New("print 1"))
+			require.NoError(t, err)
+
+			row, inlineError, err := query.NextRowOrError()
+			defer query.Stop()
+			require.NoError(t, err)
+			require.Nil(t, inlineError)
+			assert.Equal(t, "1\n", row.String())
+		})
+	}
+
+}
 
 func TestQueries(t *testing.T) {
 	t.Parallel()
