@@ -42,7 +42,7 @@ jobs:
       - name: Run tests data
         run: |
           cd azkustodata
-          go test -p 100 -race -coverprofile=coverage.out -json -v ./... 2>&1 > /tmp/gotest.log
+          go test -p 100 -race -coverprofile=coverage.out -json -v ./... 2>&1 > /tmp/gotest-data.log
         env:
           ENGINE_CONNECTION_STRING: ${{ secrets.ENGINE_CONNECTION_STRING }}
           AZURE_CLIENT_ID: ${{ secrets.APP_ID }}
@@ -52,7 +52,7 @@ jobs:
           SECONDARY_ENGINE_CONNECTION_STRING: ${{ secrets.SECONDARY_ENGINE_CONNECTION_STRING }}
           SECONDARY_DATABASE: ${{ secrets.SECONDARY_DATABASE }}
           GOMAXPROCS: 200
-          
+
       - name: Get dependencies ingest
         run: |
           cd azkustoingest
@@ -66,7 +66,7 @@ jobs:
       - name: Run tests ingest
         run: |
           cd azkustoingest
-          go test -p 100 -race -coverprofile=coverage.out -json -v ./... 2>&1 >> /tmp/gotest.log
+          go test -p 100 -race -coverprofile=coverage.out -json -v ./... 2>&1 > /tmp/gotest-ingest.log
         env:
           ENGINE_CONNECTION_STRING: ${{ secrets.ENGINE_CONNECTION_STRING }}
           AZURE_CLIENT_ID: ${{ secrets.APP_ID }}
@@ -76,23 +76,33 @@ jobs:
           SECONDARY_ENGINE_CONNECTION_STRING: ${{ secrets.SECONDARY_ENGINE_CONNECTION_STRING }}
           SECONDARY_DATABASE: ${{ secrets.SECONDARY_DATABASE }}
           GOMAXPROCS: 200
-          
-      - name: Display tests
+
+      - name: Display tests data
         if: always()
         run: |
           tparse -all -file=/tmp/gotest.log
 
-      - name: Parse tests
+      - name: Parse tests data
         if: always()
         run: |
-          go-junit-report -parser gojson < /tmp/gotest.log > report.xml
+          go-junit-report -parser gojson < /tmp/gotest-data.log > report-data.xml
+
+      - name: Display tests ingest
+        if: always()
+        run: |
+          tparse -all -file=/tmp/gotest.log
+
+      - name: Parse tests ingest
+        if: always()
+        run: |
+          go-junit-report -parser gojson < /tmp/gotest-ingest.log > report-ingest.xml
 
       - name: Upload Test Results
         if: always()
         uses: actions/upload-artifact@v2
         with:
           name: Unit Test Results
-          path: report.xml
+          path: report*.xml
       - name: Upload coverage to Codecov
         uses: codecov/codecov-action@v2
 
