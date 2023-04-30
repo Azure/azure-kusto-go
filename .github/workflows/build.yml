@@ -29,19 +29,19 @@ jobs:
       - name: Check Format
         run: if [ "$(gofmt -d -s -l . | tee /dev/fd/2 | wc -l)" -gt 0 ]; then exit 1; fi
 
-      - name: Get dependencies
+      - name: Get dependencies data
         run: |
-          cd kusto
+          cd azkustodata
           go get -v -t -d ./...
 
-      - name: Build
+      - name: Build data
         run: |
-          cd kusto
+          cd azkustodata
           go build -v ./...
 
-      - name: Run tests
+      - name: Run tests data
         run: |
-          cd kusto
+          cd azkustodata
           go test -p 100 -race -coverprofile=coverage.out -json -v ./... 2>&1 > /tmp/gotest.log
         env:
           ENGINE_CONNECTION_STRING: ${{ secrets.ENGINE_CONNECTION_STRING }}
@@ -52,7 +52,31 @@ jobs:
           SECONDARY_ENGINE_CONNECTION_STRING: ${{ secrets.SECONDARY_ENGINE_CONNECTION_STRING }}
           SECONDARY_DATABASE: ${{ secrets.SECONDARY_DATABASE }}
           GOMAXPROCS: 200
+          
+      - name: Get dependencies ingest
+        run: |
+          cd azkustoingest
+          go get -v -t -d ./...
 
+      - name: Build ingest
+        run: |
+          cd azkustoingest
+          go build -v ./...
+
+      - name: Run tests ingest
+        run: |
+          cd azkustoingest
+          go test -p 100 -race -coverprofile=coverage.out -json -v ./... 2>&1 >> /tmp/gotest.log
+        env:
+          ENGINE_CONNECTION_STRING: ${{ secrets.ENGINE_CONNECTION_STRING }}
+          AZURE_CLIENT_ID: ${{ secrets.APP_ID }}
+          AZURE_CLIENT_SECRET: ${{ secrets.APP_KEY }}
+          AZURE_TENANT_ID: ${{ secrets.AUTH_ID }}
+          TEST_DATABASE: ${{ secrets.TEST_DATABASE }}
+          SECONDARY_ENGINE_CONNECTION_STRING: ${{ secrets.SECONDARY_ENGINE_CONNECTION_STRING }}
+          SECONDARY_DATABASE: ${{ secrets.SECONDARY_DATABASE }}
+          GOMAXPROCS: 200
+          
       - name: Display tests
         if: always()
         run: |
