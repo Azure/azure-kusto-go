@@ -104,8 +104,8 @@ func TestAuth(t *testing.T) {
 	t.Parallel()
 	transporter := utils.Transporter{ // using custom transporter to make sure it closes
 		Http: &http.Client{
-			Transport : &http.Transport{
-			    IdleConnTimeout: 0,
+			Transport: &http.Transport{
+				IdleConnTimeout:   0,
 				DisableKeepAlives: true,
 			},
 		},
