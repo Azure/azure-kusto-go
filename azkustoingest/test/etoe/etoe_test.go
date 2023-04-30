@@ -9,8 +9,11 @@ import (
 	"github.com/Azure/azure-kusto-go/azkustodata/kql"
 	"github.com/Azure/azure-kusto-go/azkustodata/table"
 	"github.com/Azure/azure-kusto-go/azkustodata/types"
+	"github.com/Azure/azure-kusto-go/azkustodata/utils"
 	"github.com/Azure/azure-kusto-go/azkustodata/value"
 	"github.com/Azure/azure-kusto-go/azkustoingest"
+	"github.com/Azure/azure-sdk-for-go/sdk/azcore"
+	"github.com/Azure/azure-sdk-for-go/sdk/azidentity"
 	"github.com/google/uuid"
 	"github.com/shopspring/decimal"
 	"github.com/stretchr/testify/assert"
@@ -117,15 +120,15 @@ func TestAuth(t *testing.T) {
 
 	tests := []struct {
 		desc string
-		kcsb *kusto.ConnectionStringBuilder
+		kcsb *azkustodata.ConnectionStringBuilder
 	}{
 		{
 			desc: "Default",
-			kcsb: kusto.NewConnectionStringBuilder(testConfig.Endpoint).WithDefaultAzureCredential(),
+			kcsb: azkustodata.NewConnectionStringBuilder(testConfig.Endpoint).WithDefaultAzureCredential(),
 		},
 		{
 			desc: "With TokenCredential",
-			kcsb: kusto.NewConnectionStringBuilder(testConfig.Endpoint).WithTokenCredential(credential),
+			kcsb: azkustodata.NewConnectionStringBuilder(testConfig.Endpoint).WithTokenCredential(credential),
 		},
 	}
 
@@ -133,7 +136,7 @@ func TestAuth(t *testing.T) {
 		test := test
 		t.Run(test.desc, func(t *testing.T) {
 			t.Parallel()
-			client, err := kusto.New(test.kcsb)
+			client, err := azkustodata.New(test.kcsb)
 			require.NoError(t, err)
 			defer client.Close()
 
@@ -186,7 +189,7 @@ func TestQueries(t *testing.T) {
 		qcall    queryFunc
 		mcall    mgmtFunc
 		qjcall   queryJsonFunc
-		options  interface{} // either []kusto.QueryOption or []kusto.MgmtOption
+		options  interface{} // either []azkustodata.QueryOption or []azkustodata.MgmtOption
 		// doer is called from within the function passed to RowIterator.Do(). It allows us to collect the data we receive.
 		doer func(row *table.Row, update interface{}) error
 		// gotInit creates the variable that will be used by doer's update argument.
@@ -654,7 +657,7 @@ func TestStatement(t *testing.T) {
 		qcall    queryFunc
 		mcall    mgmtFunc
 		qjcall   queryJsonFunc
-		options  interface{} // either []kusto.QueryOption or []kusto.MgmtOption
+		options  interface{} // either []azkustodata.QueryOption or []azkustodata.MgmtOption
 		// doer is called from within the function passed to RowIterator.Do(). It allows us to collect the data we receive.
 		doer func(row *table.Row, update interface{}) error
 		// gotInit creates the variable that will be used by doer's update argument.
