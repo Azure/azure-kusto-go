@@ -409,8 +409,9 @@ func (kcsb *ConnectionStringBuilder) newTokenProvider() (*TokenProvider, error) 
 		init = func(ci *CloudInfo, cliOpts *azcore.ClientOptions, appClientId string) (azcore.TokenCredential, error) {
 			//Default Azure authentication
 			opts := &azidentity.DefaultAzureCredentialOptions{}
+			opts.ClientOptions = *cliOpts
 			if kcsb.ClientOptions != nil {
-				opts.ClientOptions = *cliOpts
+				opts.ClientOptions = *kcsb.ClientOptions
 			}
 			if !isEmpty(kcsb.AuthorityId) {
 				opts.TenantID = kcsb.AuthorityId

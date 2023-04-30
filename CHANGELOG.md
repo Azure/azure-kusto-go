@@ -12,6 +12,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 * No redirects are allowed by default.
 ### Fixed
 * Replace non-ascii characters in headers to be in line with the service.
+* DefaultCredential now uses the same HTTP client as the rest of the SDK.
 
 ## [0.11.3] - 2023-03-20
 ### Added

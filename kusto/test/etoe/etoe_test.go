@@ -4,12 +4,14 @@ import (
 	"context"
 	"encoding/csv"
 	"fmt"
+	"github.com/Azure/azure-kusto-go/kusto/utils"
 	"github.com/Azure/azure-sdk-for-go/sdk/azcore"
 	"github.com/Azure/azure-sdk-for-go/sdk/azidentity"
 	"github.com/shopspring/decimal"
 	"go.uber.org/goleak"
 	"io"
 	"math/rand"
+	"net/http"
 	"os"
 	"regexp"
 	"strings"
@@ -100,7 +102,19 @@ type queryJsonFunc func(ctx context.Context, db string, query kusto.Statement, o
 
 func TestAuth(t *testing.T) {
 	t.Parallel()
-	defaultCred, err := azidentity.NewDefaultAzureCredential(&azidentity.DefaultAzureCredentialOptions{})
+	transporter := utils.Transporter{ // using custom transporter to make sure it closes
+		Http: &http.Client{
+			Transport : &http.Transport{
+			    IdleConnTimeout: 0,
+				DisableKeepAlives: true,
+			},
+		},
+	}
+	defaultCred, err := azidentity.NewDefaultAzureCredential(&azidentity.DefaultAzureCredentialOptions{
+		ClientOptions: azcore.ClientOptions{
+			Transport: &transporter,
+		},
+	})
 	credential, err := azidentity.NewChainedTokenCredential([]azcore.TokenCredential{
 		defaultCred,
 	}, &azidentity.ChainedTokenCredentialOptions{})
