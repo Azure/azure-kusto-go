@@ -3,10 +3,14 @@ All notable changes to this project will be documented in this file.
 
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
-## [Unreleased]
+
+## [0.12.0] - 2023-05-01
 ### Added
 * Added kql.Builder struct for safe building of KQL statements from variables without use of 'Unsafe' mode.
-* Simpler handling of query parameters using kql.Parameters struct.
+  * Simpler handling of query parameters using kql.Parameters struct.
+  * All of the docs and examples have been updated to use it
+  * [DEPRECATED] The old query builder
+* Added Quickstart app
 * TokenCredential support for authentication.
 ### Security
 * No redirects are allowed by default.
