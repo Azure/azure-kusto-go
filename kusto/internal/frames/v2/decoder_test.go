@@ -465,9 +465,9 @@ func TestErrorDecode(t *testing.T) {
 			Op: errors.OpQuery,
 		},
 		DataSetCompletion{
-			Base:         Base{FrameType: "DataSetCompletion"},
-			HasErrors:    true,
-			Cancelled:    false,
+			Base:      Base{FrameType: "DataSetCompletion"},
+			HasErrors: true,
+			Cancelled: false,
 			OneAPIErrors: []interface{}{
 				map[string]interface{}{
 					"error": map[string]interface{}{
