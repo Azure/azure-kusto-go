@@ -3,6 +3,21 @@ All notable changes to this project will be documented in this file.
 
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
+## Unreleased
+### Added
+- `ServerTimeout` Query Option
+
+### Changed
+- `MgmtOption` is deprecated. From now on both `Query` and `Mgmt` accept `QueryOption`, `MgmtOption` will remain as an alias until the next version.
+-
+
+### Fixed
+
+### Removed
+- `AllowWrite` has been a no-op for a while. It is now finally removed.
+
+### Security
+
 ## [0.12.1] - 2023-05-01
 ### Fixed
 * Fixed parsing of errors in queries
