@@ -15,7 +15,6 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 - `MgmtOption` is deprecated. From now on both `Query` and `Mgmt` accept `QueryOption`, `MgmtOption` will remain as an
   alias until the next version.
--
 
 ### Fixed
 
