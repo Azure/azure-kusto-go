@@ -28,6 +28,12 @@ type Authorization struct {
 	TokenProvider *TokenProvider
 }
 
+const (
+	defaultMgmtTimeout  = time.Hour
+	defaultQueryTimeout = 4 * time.Minute
+	clientServerDelta   = 30 * time.Second
+)
+
 // Client is a client to a Kusto instance.
 type Client struct {
 	conn, ingestConn queryer
@@ -130,7 +136,7 @@ func (c *Client) Query(ctx context.Context, db string, query Statement, options 
 		return nil, err
 	}
 
-	opts, err := setQueryOptions(errors.OpQuery, query, options...)
+	opts, err := setQueryOptions(ctx, errors.OpQuery, query, queryCall, options...)
 	if err != nil {
 		return nil, err
 	}
@@ -190,7 +196,7 @@ func (c *Client) QueryToJson(ctx context.Context, db string, query Statement, op
 		return "", err
 	}
 
-	opts, err := setQueryOptions(errors.OpQuery, query, options...)
+	opts, err := setQueryOptions(ctx, errors.OpQuery, query, queryCall, options...)
 	if err != nil {
 		return "", err
 	}
@@ -226,7 +232,7 @@ func (c *Client) Mgmt(ctx context.Context, db string, query Statement, options .
 		return nil, err
 	}
 
-	opts, err := setQueryOptions(errors.OpMgmt, query, options...)
+	opts, err := setQueryOptions(ctx, errors.OpQuery, query, mgmtCall, options...)
 	if err != nil {
 		return nil, err
 	}
@@ -258,7 +264,7 @@ func (c *Client) Mgmt(ctx context.Context, db string, query Statement, options .
 	return iter, nil
 }
 
-func setQueryOptions(op errors.Op, query Statement, options ...QueryOption) (*queryOptions, error) {
+func setQueryOptions(ctx context.Context, op errors.Op, query Statement, queryType int, options ...QueryOption) (*queryOptions, error) {
 	opt := &queryOptions{
 		requestProperties: &requestProperties{
 			Options: map[string]interface{}{},
@@ -268,7 +274,7 @@ func setQueryOptions(op errors.Op, query Statement, options ...QueryOption) (*qu
 	if op == errors.OpQuery {
 		// We want progressive frames by default for Query(), but not Mgmt() because it uses v1 framing and ingestion endpoints
 		// do not support it.
-		opt.requestProperties.Options["results_progressive_enabled"] = true
+		opt.requestProperties.Options[RequestProgressiveEnabledValue] = true
 	}
 
 	for _, o := range options {
@@ -276,6 +282,9 @@ func setQueryOptions(op errors.Op, query Statement, options ...QueryOption) (*qu
 			return nil, errors.ES(op, errors.KClientArgs, "QueryValues in the the Stmt were incorrect: %s", err).SetNoRetry()
 		}
 	}
+
+	CalculateTimeout(ctx, opt, queryType)
+
 	if query.SupportsInlineParameters() {
 		if opt.requestProperties.QueryParameters.Count() != 0 {
 			return nil, errors.ES(op, errors.KClientArgs, "kusto.Stmt does not support the QueryParameters option. Construct your query using `kql.New`").SetNoRetry()
@@ -288,6 +297,31 @@ func setQueryOptions(op errors.Op, query Statement, options ...QueryOption) (*qu
 		opt.requestProperties.Parameters = params
 	}
 	return opt, nil
+}
+
+func CalculateTimeout(ctx context.Context, opt *queryOptions, queryType int) {
+	// If the user has specified a timeout, use that.
+	if val, ok := opt.requestProperties.Options[NoRequestTimeoutValue]; ok && val.(bool) {
+		return
+	}
+	if _, ok := opt.requestProperties.Options[ServerTimeoutValue]; ok {
+		return
+	}
+
+	// Otherwise use the context deadline, if it exists. If it doesn't, use the default timeout.
+	if deadline, ok := ctx.Deadline(); ok {
+		opt.requestProperties.Options[ServerTimeoutValue] = deadline.Sub(time.Now())
+		return
+	}
+
+	var timeout time.Duration
+	switch queryType {
+	case queryCall:
+		timeout = defaultQueryTimeout
+	case mgmtCall:
+		timeout = defaultMgmtTimeout
+	}
+	opt.requestProperties.Options[ServerTimeoutValue] = timeout + clientServerDelta
 }
 
 func (c *Client) getConn(callType callType, options connOptions) (queryer, error) {

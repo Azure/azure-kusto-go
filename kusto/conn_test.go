@@ -1,6 +1,7 @@
 package kusto
 
 import (
+	"context"
 	"github.com/Azure/azure-kusto-go/kusto/data/errors"
 	"github.com/Azure/azure-kusto-go/kusto/kql"
 	"github.com/stretchr/testify/assert"
@@ -60,7 +61,7 @@ func TestHeaders(t *testing.T) {
 			queryOptions = append(queryOptions, Application(tt.propApplication))
 			queryOptions = append(queryOptions, User(tt.propUser))
 
-			opts, err := setQueryOptions(errors.OpQuery, kql.New("test"), queryOptions...)
+			opts, err := setQueryOptions(context.Background(), errors.OpQuery, kql.New("test"), queryCall, queryOptions...)
 			require.NoError(t, err)
 
 			client, err := New(kcsb)

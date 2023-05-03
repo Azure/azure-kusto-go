@@ -10,7 +10,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ### Added
 
 - `ServerTimeout` Query Option
- Support for IgnoreFirstRecord ingestion option
+  - The timeout to the server will be set to the value of this option, or to none if `RequestNoTimeout` is set to true.
+  - If it is not provided, the timeout will be set by the context (the old behaviour).
+  - If a context timeout is not provided, it will fall back to a default value by the type of request.
+- Support for `IgnoreFirstRecord` ingestion option
 
 ### Changed
 
@@ -24,7 +27,6 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ### Removed
 
 - `AllowWrite` has been a no-op for a while. It is now finally removed.
-- Context will no longer change the server timeout. Use the ServerTimeout option instead.
 
 ### Security
 

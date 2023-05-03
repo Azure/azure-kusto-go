@@ -27,6 +27,7 @@ type queryOptions struct {
 	queryIngestion    bool
 }
 
+const RequestProgressiveEnabledValue = "results_progressive_enabled"
 const NoRequestTimeoutValue = "norequesttimeout"
 const NoTruncationValue = "notruncation"
 const ServerTimeoutValue = "servertimeout"
@@ -130,7 +131,7 @@ func NoTruncation() QueryOption {
 // ResultsProgressiveDisable disables the progressive query stream.
 func ResultsProgressiveDisable() QueryOption {
 	return func(q *queryOptions) error {
-		delete(q.requestProperties.Options, "results_progressive_enabled")
+		delete(q.requestProperties.Options, RequestProgressiveEnabledValue)
 		return nil
 	}
 }
