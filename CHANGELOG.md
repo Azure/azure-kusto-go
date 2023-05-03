@@ -23,6 +23,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ### Removed
 
 - `AllowWrite` has been a no-op for a while. It is now finally removed.
+- Context will no longer change the server timeout. Use the ServerTimeout option instead.
 
 ### Security
 
