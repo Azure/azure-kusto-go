@@ -996,7 +996,7 @@ func TestFileIngestion(t *testing.T) { //ok
 			desc:     "Ingest from csv with ignore first record",
 			ingestor: queuedIngestor,
 			src:      csvFileFromString(t),
-			options:  []ingest.FileOption{ingest.IgnoreFirstRecord()},
+			options:  []azkustoingest.FileOption{azkustoingest.IgnoreFirstRecord()},
 			stmt:     countStatement,
 			table:    queuedTable,
 			doer: func(row *table.Row, update interface{}) error {
