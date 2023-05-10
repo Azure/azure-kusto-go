@@ -993,6 +993,28 @@ func TestFileIngestion(t *testing.T) { //ok
 			want: &[]CountResult{{Count: 500}},
 		},
 		{
+			desc:     "Ingest from csv with ignore first record",
+			ingestor: queuedIngestor,
+			src:      csvFileFromString(t),
+			options:  []ingest.FileOption{ingest.IgnoreFirstRecord()},
+			stmt:     countStatement,
+			table:    queuedTable,
+			doer: func(row *table.Row, update interface{}) error {
+				rec := CountResult{}
+				if err := row.ToStruct(&rec); err != nil {
+					return err
+				}
+				recs := update.(*[]CountResult)
+				*recs = append(*recs, rec)
+				return nil
+			},
+			gotInit: func() interface{} {
+				v := []CountResult{}
+				return &v
+			},
+			want: &[]CountResult{{Count: 2}},
+		},
+		{
 			desc:     "Ingest from blob with existing mapping managed",
 			ingestor: managedIngestor,
 			src:      "https://adxingestiondemo.blob.core.windows.net/data/demo.json",

@@ -2,9 +2,9 @@ module github.com/Azure/azure-kusto-go/quickstart
 
 go 1.20
 
-require github.com/Azure/azure-kusto-go/azkustodata v0.11.3
+require github.com/Azure/azure-kusto-go/azkustodata v0.13.0
 
-require github.com/Azure/azure-kusto-go/azkustoingest v0.11.3
+require github.com/Azure/azure-kusto-go/azkustoingest v0.13.0
 
 require (
 	github.com/Azure/azure-pipeline-go v0.1.8 // indirect

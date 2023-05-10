@@ -157,6 +157,19 @@ func FlushImmediately() FileOption {
 	}
 }
 
+// IgnoreFirstRecord tells Kusto to flush on write.
+func IgnoreFirstRecord() FileOption {
+	return option{
+		run: func(p *properties.All) error {
+			p.Ingestion.Additional.IgnoreFirstRecord = true
+			return nil
+		},
+		clientScopes: QueuedClient | ManagedClient,
+		sourceScope:  FromFile | FromReader | FromBlob,
+		name:         "IgnoreFirstRecord",
+	}
+}
+
 // DataFormat indicates what type of encoding format was used for source data.
 // Not all options can be used in every method.
 type DataFormat = properties.DataFormat
