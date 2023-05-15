@@ -60,8 +60,12 @@ func (o *onceWithInit[Out]) Result() (bool, Out, error) {
 func (o *once[Out]) Do(f func() (Out, error)) (Out, error) {
 	o.inner.Do(func() {
 		o.result, o.err = f()
-		o.done = true
+		o.done = o.err == nil
 	})
+	if o.err != nil {
+		o.inner = sync.Once{}
+	}
+
 	return o.result, o.err
 }
 
