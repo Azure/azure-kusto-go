@@ -13,7 +13,7 @@ func Test(t *testing.T) {
 	tests := []struct {
 		name     string
 		withInit bool
-		useTwice bool
+		failOnce bool
 		err      error
 	}{
 		{
@@ -37,11 +37,13 @@ func Test(t *testing.T) {
 		{
 			name:     "Test Twice",
 			withInit: false,
+			failOnce: true,
 			err:      errors.New("test"),
 		},
 		{
 			name:     "Test Twice With Init",
 			withInit: true,
+			failOnce: true,
 			err:      errors.New("test"),
 		},
 	}
@@ -50,23 +52,15 @@ func Test(t *testing.T) {
 		test := test // Capture
 		t.Run(test.name, func(t *testing.T) {
 			t.Parallel()
-			var f func() (int, error)
-			if test.useTwice {
-				counter := 0
-				f = func() (int, error) {
-					if counter == 0 {
-						counter++
-						return 0, errors.New("test")
-					} else {
-						return 1, nil
-					}
-				}
-			} else if test.err != nil {
-				f = func() (int, error) {
+			counter := 0
+			funErr := test.err
+			funFailOnce := test.failOnce
+
+			f := func() (int, error) {
+				counter++
+				if (funFailOnce && counter == 1) || (!funFailOnce && funErr != nil) {
 					return 0, errors.New("test")
-				}
-			} else {
-				f = func() (int, error) {
+				} else {
 					return 1, nil
 				}
 			}
@@ -76,40 +70,41 @@ func Test(t *testing.T) {
 			var once Once[int]
 			if test.withInit {
 				once = NewOnce[int]()
-				result, err = once.Do(f)
 			} else {
-				onceWithInit := NewOnceWithInit[int](f)
-				result, err = onceWithInit.DoWithInit()
-				once = onceWithInit
+				once = NewOnceWithInit[int](f)
 			}
 
-			if test.useTwice {
-				isDone, onceResult, onceErr := once.Result()
-				assert.False(t, isDone)
-				assert.Equal(t, 0, onceResult)
-				assert.Equal(t, test.err, onceErr)
-				assert.Equal(t, test.err, err)
-				if test.withInit {
-					result, err = once.Do(f)
+			expectedOnSuccess := 1
+
+			for i := 0; i < 10; i++ {
+				if withInit, ok := once.(OnceWithInit[int]); ok {
+					result, err = withInit.DoWithInit()
 				} else {
-					result, err = once.(OnceWithInit[int]).DoWithInit()
+					result, err = once.Do(f)
 				}
-				test.err = nil
+
+				isDone, onceResult, onceErr := once.Result()
+				if test.err != nil {
+					assert.Equal(t, i+1, counter)
+					assert.False(t, isDone)
+					assert.Equal(t, 0, onceResult)
+					assert.Equal(t, test.err, onceErr)
+					assert.Equal(t, test.err, err)
+				} else {
+					assert.Equal(t, counter, expectedOnSuccess)
+					assert.True(t, once.Done())
+					assert.True(t, isDone)
+					assert.Equal(t, 1, onceResult)
+					require.NoError(t, err)
+					assert.Equal(t, 1, result)
+				}
+
+				if test.failOnce {
+					test.err = nil
+					expectedOnSuccess = 2
+				}
 			}
 
-			isDone, onceResult, onceErr := once.Result()
-			if test.err != nil {
-				assert.False(t, isDone)
-				assert.Equal(t, 0, onceResult)
-				assert.Equal(t, test.err, onceErr)
-				assert.Equal(t, test.err, err)
-			} else {
-				assert.True(t, once.Done())
-				assert.True(t, isDone)
-				assert.Equal(t, 1, onceResult)
-				require.NoError(t, err)
-				assert.Equal(t, 1, result)
-			}
 		})
 	}
 }
