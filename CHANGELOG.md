@@ -12,6 +12,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
     * azkustodata - contains querying, management and commands.
     * azkustoingest - contains ingestion in all its forms.
 * [BREAKING] Minimum Go version is now 1.20.
+### Fixed
+- Modified `once.go` to reset `sync.Once` instance when an error occurs
 
 ## [0.13.0] - 2023-05-09
 
