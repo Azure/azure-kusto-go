@@ -8,6 +8,3 @@ use (
 replace github.com/Azure/azure-kusto-go/azkustodata v0.0.0-00010101000000-000000000000 => ./azkustodata
 replace github.com/Azure/azure-kusto-go/azkustoingest v0.0.0-00010101000000-000000000000 => ./azkustoingest
 replace github.com/Azure/azure-kusto-go/quickstart v0.0.0-00010101000000-000000000000 => ./quickstart
-replace github.com/Azure/azure-kusto-go/azkustodata v0.13.0 => ./azkustodata
-replace github.com/Azure/azure-kusto-go/azkustoingest v0.13.0 => ./azkustoingest
-replace github.com/Azure/azure-kusto-go/quickstart v0.13.0 => ./quickstart

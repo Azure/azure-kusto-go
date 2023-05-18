@@ -29,3 +29,6 @@ require (
 	golang.org/x/net v0.5.0 // indirect
 	golang.org/x/text v0.6.0 // indirect
 )
+
+replace github.com/Azure/azure-kusto-go/azkustodata v0.13.0 => ../azkustodata
+replace github.com/Azure/azure-kusto-go/azkustoingest v0.13.0 => ../azkustoingest
