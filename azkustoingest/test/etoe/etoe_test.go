@@ -141,10 +141,13 @@ func TestAuth(t *testing.T) {
 			defer client.Close()
 
 			query, err := client.Query(context.Background(), testConfig.Database, kql.New("print 1"))
+			defer func() {
+				query.Stop()
+				_, _ = query.GetQueryCompletionInformation() // make sure it stops
+			}()
 			require.NoError(t, err)
 
 			row, inlineError, err := query.NextRowOrError()
-			defer query.Stop()
 			require.NoError(t, err)
 			require.Nil(t, inlineError)
 			assert.Equal(t, "1\n", row.String())
