@@ -37,7 +37,7 @@ type NodeRec struct {
 // NodeInfo is the type we are going to test.
 type NodeInfo struct {
 	stmt    *kql.Builder
-	querier querier // This can be a fakeQuerier or *azkustoazkustodata.Client
+	querier querier // This can be a fakeQuerier or *azkustodata.Client
 }
 
 // New is the constructor for NodeInfo.

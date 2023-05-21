@@ -2088,8 +2088,7 @@ func createIngestionTableWithDBAndScheme(t *testing.T, client *azkustodata.Clien
 		createUnsafe = kql.New(".set ").AddTable(tableName).AddLiteral(" <| datatable(vnum:int, vdec:decimal, vdate:datetime, vspan:timespan, vobj:dynamic, vb:bool, vreal:real, vstr:string, vlong:long, vguid:guid)\n[\n    1, decimal(2.00000000000001), datetime(2020-03-04T14:05:01.3109965Z), time(01:23:45.6789000), dynamic({\n  \"moshe\": \"value\"\n}), true, 0.01, \"asdf\", 9223372036854775807, guid(74be27de-1e4e-49d9-b579-fe0b331d3642), \n]")
 	} else {
 		createUnsafe = kql.New(".create table ").AddTable(tableName).AddUnsafe(" " + scheme + " ")
-	} // Appending text to the end of the user's prompt
-	fmt.Print("Please confirm if you want to proceed with creating the ingestion table (Y/N): ")
+	}
 
 	addMappingUnsafe := kql.New(".create table ").AddTable(tableName).AddLiteral(" ingestion json mapping 'Logs_mapping' '[{\"column\":\"header_time\",\"path\":\"$.header.time\",\"datatype\":\"datetime\"},{\"column\":\"header_id\",\"path\":\"$.header.id\",\"datatype\":\"guid\"},{\"column\":\"header_api_version\",\"path\":\"$.header.api_version\",\"datatype\":\"string\"},{\"column\":\"payload_data\",\"path\":\"$.payload.data\",\"datatype\":\"string\"},{\"column\":\"payload_user\",\"path\":\"$.payload.user\",\"datatype\":\"string\"}]'")
 
