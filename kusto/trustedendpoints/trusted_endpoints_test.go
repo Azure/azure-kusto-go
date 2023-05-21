@@ -1,4 +1,4 @@
-package truestedEndpoints
+package trustedendpoints
 
 import (
 	"fmt"
