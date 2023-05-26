@@ -6,12 +6,13 @@ import (
 	"context"
 	"errors"
 	"fmt"
-	"github.com/Azure/azure-kusto-go/kusto/kql"
 	"net/url"
 	"strings"
 	"sync"
 	"sync/atomic"
 	"time"
+
+	"github.com/Azure/azure-kusto-go/kusto/kql"
 
 	"github.com/Azure/azure-kusto-go/kusto"
 	kustoErrors "github.com/Azure/azure-kusto-go/kusto/data/errors"
@@ -63,12 +64,23 @@ func parse(uri string) (*URI, error) {
 		return nil, fmt.Errorf("error: Storage URI (%s) is invalid'", uri)
 	}
 
-	v := &URI{
-		u:          u,
-		account:    hostSplit[0],
-		objectType: hostSplit[1],
-		objectName: strings.TrimLeft(u.EscapedPath(), "/"),
-		sas:        u.Query(),
+	var v *URI
+	if len(hostSplit) == 5 {
+		v = &URI{
+			u:          u,
+			account:    hostSplit[0],
+			objectType: hostSplit[1],
+			objectName: strings.TrimLeft(u.EscapedPath(), "/"),
+			sas:        u.Query(),
+		}
+	} else {
+		v = &URI{
+			u:          u,
+			account:    hostSplit[0] + "." + hostSplit[1],
+			objectType: hostSplit[2],
+			objectName: strings.TrimLeft(u.EscapedPath(), "/"),
+			sas:        u.Query(),
+		}
 	}
 
 	if err := v.validate(); err != nil {
