@@ -64,7 +64,7 @@ func TestParse(t *testing.T) {
 		{
 			desc:           "success dns zone",
 			url:            "https://account.zone1.blob.storage.azure.net/objectname",
-			wantAccount:    "account",
+			wantAccount:    "account.zone1",
 			wantObjectType: "blob",
 			wantObjectName: "objectname",
 		},

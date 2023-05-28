@@ -117,7 +117,7 @@ func (u *URI) ObjectType() string {
 	return u.objectType
 }
 
-// ObjectName returns the object name that will be ingested???
+// ObjectName returns the object name of the resource, i.e container name.
 func (u *URI) ObjectName() string {
 	return u.objectName
 }
