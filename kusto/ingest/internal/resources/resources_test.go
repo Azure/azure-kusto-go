@@ -2,8 +2,9 @@ package resources
 
 import (
 	"context"
-	"github.com/stretchr/testify/assert"
 	"testing"
+
+	"github.com/stretchr/testify/assert"
 
 	"github.com/Azure/azure-kusto-go/kusto/data/table"
 	"github.com/Azure/azure-kusto-go/kusto/data/types"
@@ -54,10 +55,17 @@ func TestParse(t *testing.T) {
 			wantObjectName: "objectname",
 		},
 		{
-			desc:           "success non-windows",
+			desc:           "success non-public",
 			url:            "https://account.table.kusto.chinacloudapi.cn/objectname",
 			wantAccount:    "account",
 			wantObjectType: "table",
+			wantObjectName: "objectname",
+		},
+		{
+			desc:           "success dns zone",
+			url:            "https://account.zone1.blob.storage.azure.net/objectname",
+			wantAccount:    "account.zone1",
+			wantObjectType: "blob",
 			wantObjectName: "objectname",
 		},
 	}
