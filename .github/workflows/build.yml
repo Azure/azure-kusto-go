@@ -28,9 +28,8 @@ jobs:
       - name: Check Format
         run: if [ "$(gofmt -d -s -l . | tee /dev/fd/2 | wc -l)" -gt 0 ]; then exit 1; fi
 
-      - name: Get dependencies data
+      - name: Get dependencies
         run: |
-          cd azkustodata
           go get -v -t -d ./...
 
       - name: Build data
@@ -51,11 +50,6 @@ jobs:
           SECONDARY_ENGINE_CONNECTION_STRING: ${{ secrets.SECONDARY_ENGINE_CONNECTION_STRING }}
           SECONDARY_DATABASE: ${{ secrets.SECONDARY_DATABASE }}
           GOMAXPROCS: 200
-
-      - name: Get dependencies ingest
-        run: |
-          cd azkustoingest
-          go get -v -t -d ./...
 
       - name: Build ingest
         run: |
