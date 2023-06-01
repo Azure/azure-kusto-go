@@ -5,8 +5,3 @@ use (
 	./azkustoingest
 	./quickstart
 )
-
-replace (
-	github.com/Azure/azure-kusto-go/azkustodata v1.0.0 => ./azkustodata
-	github.com/Azure/azure-kusto-go/azkustoingest v1.0.0 => ./azkustoingest
-)
