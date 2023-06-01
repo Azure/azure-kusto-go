@@ -3,6 +3,7 @@ module github.com/Azure/azure-kusto-go/azkustoingest
 go 1.20
 
 require (
+	github.com/Azure/azure-kusto-go/azkustodata v1.0.0
 	github.com/Azure/azure-pipeline-go v0.1.8
 	github.com/Azure/azure-sdk-for-go v67.1.0+incompatible
 	github.com/Azure/azure-sdk-for-go/sdk/azcore v1.3.0
@@ -19,7 +20,6 @@ require (
 )
 
 require (
-	github.com/Azure/azure-kusto-go/azkustodata v0.0.0-20230521102813-e2ba4309c5fd // indirect
 	github.com/Azure/azure-sdk-for-go/sdk/internal v1.1.1 // indirect
 	github.com/Azure/go-autorest v14.2.0+incompatible // indirect
 	github.com/Azure/go-autorest/autorest v0.11.28 // indirect
@@ -34,9 +34,7 @@ require (
 	github.com/kr/text v0.2.0 // indirect
 	github.com/pkg/browser v0.0.0-20210115035449-ce105d075bb4 // indirect
 	github.com/pmezard/go-difflib v1.0.0 // indirect
-	github.com/samber/lo v1.37.0 // indirect
 	golang.org/x/crypto v0.0.0-20220722155217-630584e8d5aa // indirect
-	golang.org/x/exp v0.0.0-20220303212507-bbda1eaf7a17 // indirect
 	golang.org/x/net v0.5.0 // indirect
 	golang.org/x/sys v0.4.0 // indirect
 	golang.org/x/text v0.6.0 // indirect

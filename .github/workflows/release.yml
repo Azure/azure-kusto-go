@@ -1,5 +1,6 @@
 name: release
-
+env:
+  GOWORK: off
 on:
   push:
     tags:
