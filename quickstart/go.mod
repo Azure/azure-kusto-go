@@ -2,10 +2,7 @@ module github.com/Azure/azure-kusto-go/quickstart
 
 go 1.20
 
-require (
-	github.com/Azure/azure-kusto-go/azkustodata v1.0.0
-	github.com/Azure/azure-kusto-go/azkustoingest v1.0.0
-)
+require github.com/Azure/azure-kusto-go/azkustodata v0.0.0-20230601105621-25ff51d13bbc
 
 require (
 	github.com/Azure/azure-sdk-for-go/sdk/azcore v1.3.0 // indirect
@@ -23,9 +20,4 @@ require (
 	golang.org/x/net v0.5.0 // indirect
 	golang.org/x/sys v0.4.0 // indirect
 	golang.org/x/text v0.6.0 // indirect
-)
-
-replace (
-	github.com/Azure/azure-kusto-go/azkustodata => ../azkustodata
-	github.com/Azure/azure-kusto-go/azkustoingest => ../azkustodata
 )
