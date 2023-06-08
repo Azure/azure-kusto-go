@@ -5,6 +5,7 @@ import (
 	"fmt"
 	"github.com/Azure/azure-kusto-go/azkustodata"
 	"github.com/Azure/azure-kusto-go/azkustodata/kql"
+	"github.com/Azure/azure-kusto-go/azkustodata/testshared"
 	"io"
 	"os"
 	"strings"
@@ -47,7 +48,7 @@ func TestIngestionStatus(t *testing.T) {
 		t.Log("Closed ingestor")
 	})
 
-	err = createIngestionTableWithDBAndScheme(t, client, testConfig.Database, tableName, false, scheme)
+	err = testshared.CreateTestTableWithDBAndScheme(t, client, testConfig.Database, tableName, false, scheme)
 	require.NoError(t, err)
 
 	// Change the ingestion batching time
