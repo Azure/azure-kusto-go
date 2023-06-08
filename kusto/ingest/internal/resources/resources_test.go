@@ -74,7 +74,7 @@ func TestParse(t *testing.T) {
 		test := test
 		t.Run(test.desc, func(t *testing.T) {
 			t.Parallel()
-			got, err := parse(test.url)
+			got, err := Parse(test.url)
 
 			if test.err {
 				assert.Error(t, err)
@@ -186,7 +186,7 @@ func TestAuthContext(t *testing.T) {
 }
 
 func mustParse(s string) *URI {
-	u, err := parse(s)
+	u, err := Parse(s)
 	if err != nil {
 		panic(err)
 	}

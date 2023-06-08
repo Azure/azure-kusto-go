@@ -6,17 +6,21 @@ import (
 	"context"
 	"errors"
 	"fmt"
+	"net/http"
 	"net/url"
 	"strings"
 	"sync"
 	"sync/atomic"
 	"time"
 
-	"github.com/Azure/azure-kusto-go/kusto/kql"
+	"github.com/Azure/azure-sdk-for-go/sdk/azcore"
+	"github.com/Azure/azure-sdk-for-go/sdk/storage/azblob"
+	"github.com/Azure/azure-sdk-for-go/sdk/storage/azblob/blob"
 
 	"github.com/Azure/azure-kusto-go/kusto"
 	kustoErrors "github.com/Azure/azure-kusto-go/kusto/data/errors"
 	"github.com/Azure/azure-kusto-go/kusto/data/table"
+	"github.com/Azure/azure-kusto-go/kusto/kql"
 	"github.com/cenkalti/backoff/v4"
 )
 
@@ -45,8 +49,8 @@ type URI struct {
 	sas                             url.Values
 }
 
-// parse parses a string representing a Kutso resource URI.
-func parse(uri string) (*URI, error) {
+// Parse parses a string representing a Kutso resource URI.
+func Parse(uri string) (*URI, error) {
 	// Example for a valid url:
 	// https://fkjsalfdks.blob.core.windows.com/sdsadsadsa?sas=asdasdasd
 
@@ -275,7 +279,7 @@ type Ingestion struct {
 var errDoNotCare = errors.New("don't care about this")
 
 func (i *Ingestion) importRec(rec ingestResc) error {
-	u, err := parse(rec.Root)
+	u, err := Parse(rec.Root)
 	if err != nil {
 		return fmt.Errorf("the StorageRoot URI received(%s) has an error: %s", rec.Root, err)
 	}
@@ -394,4 +398,27 @@ func InitBackoff() backoff.BackOff {
 	exp.InitialInterval = defaultInitialInterval
 	exp.Multiplier = defaultMultiplier
 	return backoff.WithMaxRetries(exp, retryCount)
+}
+
+func FetchBlobSize(fPath string, ctx context.Context, client *http.Client) (size int64, err error) {
+	parsed, err := Parse(fPath)
+	if err != nil {
+		return 0, err
+	}
+
+	service := fmt.Sprintf("%s://%s?%s", parsed.URL().Scheme, parsed.URL().Host, parsed.SAS().Encode())
+	blobClient, err := azblob.NewClientWithNoCredential(service, &azblob.ClientOptions{
+		ClientOptions: azcore.ClientOptions{
+			Transport: client,
+		},
+	})
+
+	objectNameSplit := strings.SplitN(parsed.ObjectName(), "/", 2)
+	blobCli := blobClient.ServiceClient().NewContainerClient(objectNameSplit[0]).NewBlobClient(objectNameSplit[1])
+	properties, err := blobCli.GetProperties(ctx, &blob.GetPropertiesOptions{})
+	if err != nil {
+		return 0, err
+	}
+
+	return *properties.ContentLength, nil
 }

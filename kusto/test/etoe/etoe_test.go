@@ -967,13 +967,6 @@ func TestFileIngestion(t *testing.T) { //ok
 			}),
 		},
 		{
-			desc:     "Ingest from blob with streaming ingestion should fail",
-			ingestor: streamingIngestor,
-			src:      "https://adxingestiondemo.blob.core.windows.net/data/demo.json",
-			options:  []ingest.FileOption{ingest.IngestionMappingRef("Logs_mapping", ingest.JSON)},
-			wantErr:  ingest.FileIsBlobErr,
-		},
-		{
 			desc:     "Ingest from blob with existing mapping",
 			ingestor: queuedIngestor,
 			src:      "https://adxingestiondemo.blob.core.windows.net/data/demo.json",
@@ -1215,6 +1208,50 @@ func TestFileIngestion(t *testing.T) { //ok
 				return &v
 			},
 			want: &[]CountResult{{Count: 3}},
+		},
+		{
+			desc:     "Streaming ingest from blob",
+			ingestor: streamingIngestor,
+			src:      "https://adxingestiondemo.blob.core.windows.net/data/demo.json",
+			options:  []ingest.FileOption{ingest.IngestionMappingRef("Logs_mapping", ingest.JSON)},
+			stmt:     countStatement,
+			table:    streamingTable,
+			doer: func(row *table.Row, update interface{}) error {
+				rec := CountResult{}
+				if err := row.ToStruct(&rec); err != nil {
+					return err
+				}
+				recs := update.(*[]CountResult)
+				*recs = append(*recs, rec)
+				return nil
+			},
+			gotInit: func() interface{} {
+				v := []CountResult{}
+				return &v
+			},
+			want: &[]CountResult{{Count: 500}},
+		},
+		{
+			desc:     "Managed streaming ingest from blob",
+			ingestor: managedIngestor,
+			src:      "https://adxingestiondemo.blob.core.windows.net/data/demo.json",
+			options:  []ingest.FileOption{ingest.IngestionMappingRef("Logs_mapping", ingest.JSON)},
+			stmt:     countStatement,
+			table:    managedTable,
+			doer: func(row *table.Row, update interface{}) error {
+				rec := CountResult{}
+				if err := row.ToStruct(&rec); err != nil {
+					return err
+				}
+				recs := update.(*[]CountResult)
+				*recs = append(*recs, rec)
+				return nil
+			},
+			gotInit: func() interface{} {
+				v := []CountResult{}
+				return &v
+			},
+			want: &[]CountResult{{Count: 500}},
 		},
 	}
 

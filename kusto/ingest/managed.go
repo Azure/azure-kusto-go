@@ -10,6 +10,8 @@ import (
 	"github.com/Azure/azure-kusto-go/kusto/data/errors"
 	"github.com/Azure/azure-kusto-go/kusto/ingest/internal/gzip"
 	"github.com/Azure/azure-kusto-go/kusto/ingest/internal/properties"
+	"github.com/Azure/azure-kusto-go/kusto/ingest/internal/resources"
+
 	"github.com/cenkalti/backoff/v4"
 	"github.com/google/uuid"
 )
@@ -44,11 +46,72 @@ func NewManaged(client QueryClient, db, table string, options ...Option) (*Manag
 	}, nil
 }
 
+// Attempts to stream with retries, on success - return res,nil.
+// If failed permanently - return err,nil.
+// If failed transiently - return nil,nil.
+func (m *Managed) streamWithRetries(ctx context.Context, payloadProvider func() io.Reader, props properties.All, isBlobUri bool) (*Result, error) {
+	var result *Result
+
+	hasCustomId := props.Streaming.ClientRequestId != ""
+	i := 0
+	managedUuid := uuid.New().String()
+
+	actualBackoff := backoff.WithContext(backoff.WithMaxRetries(props.ManagedStreaming.Backoff, retryCount), ctx)
+
+	var err error = nil
+	err = backoff.Retry(func() error {
+		if !hasCustomId {
+			props.Streaming.ClientRequestId = fmt.Sprintf("KGC.executeManagedStreamingIngest;%s;%d", managedUuid, i)
+		}
+		result, err = streamImpl(m.streaming.streamConn, ctx, payloadProvider(), props, isBlobUri)
+		i++
+		if err != nil {
+			if e, ok := err.(*errors.Error); ok {
+				if errors.Retry(e) {
+					return err
+				} else {
+					return backoff.Permanent(err)
+				}
+			} else {
+				return backoff.Permanent(err)
+			}
+		}
+		return nil
+	}, actualBackoff)
+
+	if err == nil {
+		return result, nil
+	}
+
+	if errors.Retry(err) {
+		// Caller should fallback to queued
+		return nil, nil
+	}
+
+	return nil, err
+}
+
 func (m *Managed) FromFile(ctx context.Context, fPath string, options ...FileOption) (*Result, error) {
 	props := m.newProp()
 	file, err := prepFileAndProps(fPath, &props, options, ManagedClient)
 
-	if err == FileIsBlobErr { // Non-local file - fallback to queued
+	if file == nil {
+		if props.Ingestion.RawDataSize == 0 {
+			size, err := resources.FetchBlobSize(fPath, ctx, m.queued.client.HttpClient())
+			if err != nil {
+				// Failed fetch blob properties
+				return nil, err
+			}
+			props.Ingestion.RawDataSize = size
+		}
+
+		if props.Ingestion.RawDataSize <= maxStreamingSize {
+			res, err := m.streamWithRetries(ctx, func() io.Reader { return generateBlobUriPayloadReader(fPath) }, props, true)
+			if err != nil || res != nil {
+				return res, err
+			}
+		}
+
 		return m.queued.fromFile(ctx, fPath, []FileOption{}, props)
 	}
 
@@ -78,6 +141,7 @@ func (m *Managed) managedStreamImpl(ctx context.Context, payload io.Reader, prop
 		payload = gzip.Compress(payload)
 		props.Source.DontCompress = true
 	}
+
 	maxSize := maxStreamingSize
 
 	buf, err := io.ReadAll(io.LimitReader(payload, int64(maxSize+1)))
@@ -91,44 +155,12 @@ func (m *Managed) managedStreamImpl(ctx context.Context, payload io.Reader, prop
 		return m.queued.fromReader(ctx, combinedBuf, []FileOption{}, props)
 	}
 
-	var result *Result
-
-	hasCustomId := props.Streaming.ClientRequestId != ""
-	i := 0
-	managedUuid := uuid.New().String()
-
-	actualBackoff := backoff.WithContext(backoff.WithMaxRetries(props.ManagedStreaming.Backoff, retryCount), ctx)
-
-	err = backoff.Retry(func() error {
-		if !hasCustomId {
-			props.Streaming.ClientRequestId = fmt.Sprintf("KGC.executeManagedStreamingIngest;%s;%d", managedUuid, i)
-		}
-		result, err = streamImpl(m.streaming.streamConn, ctx, bytes.NewReader(buf), props)
-		i++
-		if err != nil {
-			if e, ok := err.(*errors.Error); ok {
-				if errors.Retry(e) {
-					return err
-				} else {
-					return backoff.Permanent(err)
-				}
-			} else {
-				return backoff.Permanent(err)
-			}
-		}
-		return nil
-	}, actualBackoff)
-
-	if err == nil {
-		return result, nil
+	res, err := m.streamWithRetries(ctx, func() io.Reader { return bytes.NewReader(buf) }, props, false)
+	if err != nil || res != nil {
+		return res, err
 	}
 
-	// Fallback to queued
-	if errors.Retry(err) {
-		return m.queued.fromReader(ctx, bytes.NewReader(buf), []FileOption{}, props)
-	}
-
-	return nil, err
+	return m.queued.fromReader(ctx, bytes.NewReader(buf), []FileOption{}, props)
 }
 
 func (m *Managed) newProp() properties.All {

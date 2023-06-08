@@ -18,9 +18,9 @@ import (
 	"github.com/stretchr/testify/require"
 )
 
-type streamIngestFunc func(ctx context.Context, db, table string, payload io.Reader, format kusto.DataFormatForStreaming, mappingName string, clientRequestId string) error
+type streamIngestFunc func(ctx context.Context, db, table string, payload io.Reader, format kusto.DataFormatForStreaming, mappingName string, clientRequestId string, isBlobUri bool) error
 type testStreamIngestFunc func(t *testing.T, ctx context.Context, db, table string, payload io.Reader, format kusto.DataFormatForStreaming, mappingName string,
-	clientRequestId string) error
+	clientRequestId string, isBlobUri bool) error
 
 type fakeStreamIngestor struct {
 	onStreamIngest streamIngestFunc
@@ -30,8 +30,8 @@ func (f fakeStreamIngestor) Close() error {
 	return nil
 }
 
-func (f fakeStreamIngestor) StreamIngest(ctx context.Context, db, table string, payload io.Reader, format kusto.DataFormatForStreaming, mappingName string, clientRequestId string) error {
-	return f.onStreamIngest(ctx, db, table, payload, format, mappingName, clientRequestId)
+func (f fakeStreamIngestor) StreamIngest(ctx context.Context, db, table string, payload io.Reader, format kusto.DataFormatForStreaming, mappingName string, clientRequestId string, isBlobUri bool) error {
+	return f.onStreamIngest(ctx, db, table, payload, format, mappingName, clientRequestId, isBlobUri)
 }
 
 func bigCsvFileAndReader() (string, *bytes.Reader) {
@@ -100,7 +100,7 @@ func TestStreaming(t *testing.T) {
 			name:    "TestStreamingDefault",
 			options: []FileOption{},
 			onStreamIngest: func(t *testing.T, ctx context.Context, db, table string, payload io.Reader, format kusto.DataFormatForStreaming, mappingName string,
-				clientRequestId string) error {
+				clientRequestId string, isBlobUri bool) error {
 				assert.Equal(t, "defaultDb", db)
 				assert.Equal(t, "defaultTable", table)
 				payloadBytes, err := io.ReadAll(payload)
@@ -122,7 +122,7 @@ func TestStreaming(t *testing.T) {
 				Table("otherTable"),
 			},
 			onStreamIngest: func(t *testing.T, ctx context.Context, db, table string, payload io.Reader, format kusto.DataFormatForStreaming, mappingName string,
-				clientRequestId string) error {
+				clientRequestId string, isBlobUri bool) error {
 				assert.Equal(t, "otherDb", db)
 				assert.Equal(t, "otherTable", table)
 				payloadBytes, err := io.ReadAll(payload)
@@ -142,7 +142,7 @@ func TestStreaming(t *testing.T) {
 				FileFormat(properties.JSON),
 			},
 			onStreamIngest: func(t *testing.T, ctx context.Context, db, table string, payload io.Reader, format kusto.DataFormatForStreaming, mappingName string,
-				clientRequestId string) error {
+				clientRequestId string, isBlobUri bool) error {
 				assert.Equal(t, "defaultDb", db)
 				assert.Equal(t, "defaultTable", table)
 				payloadBytes, err := io.ReadAll(payload)
@@ -163,7 +163,7 @@ func TestStreaming(t *testing.T) {
 				ClientRequestId("clientRequestId"),
 			},
 			onStreamIngest: func(t *testing.T, ctx context.Context, db, table string, payload io.Reader, format kusto.DataFormatForStreaming, mappingName string,
-				clientRequestId string) error {
+				clientRequestId string, isBlobUri bool) error {
 				assert.Equal(t, "defaultDb", db)
 				assert.Equal(t, "defaultTable", table)
 				payloadBytes, err := io.ReadAll(payload)
@@ -179,7 +179,7 @@ func TestStreaming(t *testing.T) {
 			name:    "TestStreamFailure",
 			options: []FileOption{},
 			onStreamIngest: func(t *testing.T, ctx context.Context, db, table string, payload io.Reader, format kusto.DataFormatForStreaming, mappingName string,
-				clientRequestId string) error {
+				clientRequestId string, isBlobUri bool) error {
 				return errors.E(errors.OpIngestStream, errors.KHTTPError, fmt.Errorf("error"))
 			},
 			expectedError: errors.E(errors.OpIngestStream, errors.KHTTPError, fmt.Errorf("error")),
@@ -189,8 +189,8 @@ func TestStreaming(t *testing.T) {
 	for _, test := range tests {
 		t.Run(test.name, func(t *testing.T) {
 			streamIngestor := fakeStreamIngestor{
-				onStreamIngest: func(ctx context.Context, db, table string, payload io.Reader, format kusto.DataFormatForStreaming, mappingName string, clientRequestId string) error {
-					return test.onStreamIngest(t, ctx, db, table, payload, format, mappingName, clientRequestId)
+				onStreamIngest: func(ctx context.Context, db, table string, payload io.Reader, format kusto.DataFormatForStreaming, mappingName string, clientRequestId string, isBlobUri bool) error {
+					return test.onStreamIngest(t, ctx, db, table, payload, format, mappingName, clientRequestId, isBlobUri)
 				},
 			}
 

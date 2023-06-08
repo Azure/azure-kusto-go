@@ -5,8 +5,6 @@ package queued
 import (
 	"context"
 	"fmt"
-	"github.com/Azure/azure-pipeline-go/pipeline"
-	"github.com/Azure/azure-sdk-for-go/sdk/azcore"
 	"io"
 	"math/rand"
 	"net/http"
@@ -21,8 +19,10 @@ import (
 	"github.com/Azure/azure-kusto-go/kusto/ingest/internal/gzip"
 	"github.com/Azure/azure-kusto-go/kusto/ingest/internal/properties"
 	"github.com/Azure/azure-kusto-go/kusto/ingest/internal/resources"
-	"github.com/google/uuid"
 
+	"github.com/google/uuid"
+	"github.com/Azure/azure-pipeline-go/pipeline"
+	"github.com/Azure/azure-sdk-for-go/sdk/azcore"
 	"github.com/Azure/azure-sdk-for-go/sdk/storage/azblob"
 	"github.com/Azure/azure-storage-queue-go/azqueue"
 )
