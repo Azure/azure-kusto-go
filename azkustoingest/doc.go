@@ -7,7 +7,7 @@ For more information on Kusto Data Ingestion, please see: https://docs.microsoft
 
 Creating a client simply requires a *azkustodata.Client, the name of the database and the name of the table to be ingested into.
 
-	in, err := ingest.New(kustoClient, "database", "table")
+	in, err := azkustoingest.New(kustoClient, "database", "table")
 	if err != nil {
 		panic("add error handling")
 	}
@@ -61,7 +61,7 @@ return io.EOF until the io.Writer is closed (such as io.Pipe).
 
 Instestion from a stream commits blocks of fully formed data encodes (JSON, AVRO, ...) into Kusto:
 
-	if err := in.Stream(ctx , jsonEncodedData, ingest.JSON, "mappingName"); err != nil {
+	if err := in.Stream(ctx , jsonEncodedData, azkustoingest.JSON, "mappingName"); err != nil {
 		panic("add error handling")
 	}
 
@@ -75,7 +75,7 @@ If the error is nil and Table Status Reporting option was used, the SDK user can
 Note!
 This feature is not suitable for users running ingestion at high rates, and may slow down the ingestion operation.
 
-	status, err := ingestor.FromFile(ctx, "/path/to/file", ingest.ReportResultToTable())
+	status, err := ingestor.FromFile(ctx, "/path/to/file", azkustoingest.ReportResultToTable())
 	if err != nil {
 		// The ingestion command failed to be sent, Do something
 	}
@@ -83,12 +83,12 @@ This feature is not suitable for users running ingestion at high rates, and may 
 	err = <-status.Wait(ctx)
 	if err != nil {
 		// the operation complete with an error
-		if ingest.IsRetryable(err) {
+		if azkustoingest.IsRetryable(err) {
 			// Handle retries
 		} else {
 			// inspect the failure
-			// statusCode, _ := ingest.GetIngestionStatus(err)
-			// failureStatus, _ := ingest.GetIngestionFailureStatus(err)
+			// statusCode, _ := azkustoingest.GetIngestionStatus(err)
+			// failureStatus, _ := azkustoingest.GetIngestionFailureStatus(err)
 		}
 	}
 */

@@ -1,8 +1,25 @@
-# Microsoft Azure Data Explorer Public Preview (Kusto) [![GoDoc](https://godoc.org/github.com/Azure/azure-kusto-go?status.svg)](https://godoc.org/github.com/Azure/azure-kusto-go)
+# Microsoft Azure Data Explorer Public Preview (Kusto) [![GoDoc](https://godoc.org/github.com/Azure/azure-kusto-go?status.svg)](https://pkg.go.dev/github.com/Azure/azure-kusto-go/azkustodata) [![GoDoc](https://godoc.org/github.com/Azure/azure-kusto-go?status.svg)](https://pkg.go.dev/github.com/Azure/azure-kusto-go/azkustoingest)
 
 - [About Azure Data Explorer](https://azure.microsoft.com/en-us/services/data-explorer/)
-- [Go Client documentation](https://godoc.org/github.com/Azure/azure-kusto-go)
+- [Data Client documentation](https://godoc.org/github.com/Azure/azure-kusto-go/azkustodata)
+- [Ingest Client documentation](https://godoc.org/github.com/Azure/azure-kusto-go/azkustoingest)
 
+# BREAKING - 1.0.0 - Please read
+In 1.0.0 there is a massive change to the package structure.  
+The main package, `github.com/Azure/azure-kusto-go` is no longer supported. 
+Instead, there are two new packages:
+- `github.com/Azure/azure-kusto-go/azkustodata` - for interacting with the data plane (querying data)
+- `github.com/Azure/azure-kusto-go/azkustoingest` - for interacting with the ingest plane (importing data)
+
+The old package `github.com/Azure/azure-kusto-go` will only be available in versions 0.x.x.
+
+The changes you need to make in your code are:
+- Replace your `github.com/Azure/azure-kusto-go` imports with `github.com/Azure/azure-kusto-go/azkustodata` or `github.com/Azure/azure-kusto-go/azkustoingest` depending on your use case (Use tools or IDEs to do this)
+- Replace the `kusto` qualifier with `azkustodata`
+- Replace the `ingest` qualifier with `azkustoingest`
+
+
+## Intro
 This is a data plane SDK (it is for interacting with Azure Data Explorer (Kusto) service). For the control plane (resource administration), go [here](https://github.com/Azure/azure-sdk-for-go/tree/master/services/kusto/mgmt).
 
 Use the data plane SDK `github.com/Azure/azure-kusto-go/azkustodata` in your application to:
@@ -10,7 +27,6 @@ Use the data plane SDK `github.com/Azure/azure-kusto-go/azkustodata` in your app
 - Query Kusto/Azure Data Explorer clusters for rows, optionally into structs.
 - Import data into Kusto from local file, Azure Blob Storage file, Stream, or an `io.Reader`.
 
-**NOTE**: This library is currently a beta. There may be breaking changes until it reaches semantic version `v1.0.0`.
 
 Key links:
 - [Source code](https://github.com/Azure/azure-kusto-go)
@@ -292,7 +308,7 @@ from an `io.Pipe()`. The data will not begin ingestion until the writer closes.
 Setup is quite simple, simply pass a `*kusto.Client`, the name of the database and table you wish to ingest into.
 
 ```go
-in, err := ingest.New(kustoClient, "database", "table")
+in, err :=azkustoingest.New(kustoClient, "database", "table")
 if err != nil {
 	panic("add error handling")
 }

@@ -252,7 +252,7 @@ func IngestionMapping(mapping interface{}, mappingKind DataFormat) FileOption {
 					return errors.ES(
 						errors.OpUnknown,
 						errors.KClientArgs,
-						"IngestMapping option was passed to an Ingest.Ingestion call that was not a string, []byte or could be JSON encoded: %s", err,
+						"IngestMapping option was passed to an azkustoingest.Ingestion call that was not a string, []byte or could be JSON encoded: %s", err,
 					).SetNoRetry()
 				}
 				j = string(b)
