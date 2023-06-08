@@ -2,6 +2,7 @@ package kusto
 
 import (
 	"context"
+	"github.com/Azure/azure-kusto-go/kusto/utils"
 	"io"
 	"net/http"
 	"net/url"
@@ -131,6 +132,7 @@ const (
 // Note that the server has a timeout of 4 minutes for a query by default unless the context deadline is set. Queries can
 // take a maximum of 1 hour.
 func (c *Client) Query(ctx context.Context, db string, query Statement, options ...QueryOption) (*RowIterator, error) {
+	logger := utils.Logger.With().Str("db", db).Logger()
 	ctx, cancel, err := contextSetup(ctx, false) // Note: cancel is called when *RowIterator has Stop() called.
 	if err != nil {
 		return nil, err
@@ -146,13 +148,18 @@ func (c *Client) Query(ctx context.Context, db string, query Statement, options 
 		return nil, err
 	}
 
+	logger.Info().Msg("Query called")
 	execResp, err := conn.query(ctx, db, query, opts)
 	if err != nil {
 		cancel()
 		return nil, err
 	}
 
+	logger.Info().Msg("Query returned")
+
 	var header v2.DataSetHeader
+
+	logger.Info().Msg("Waiting for header")
 
 	ff := <-execResp.frameCh
 	switch v := ff.(type) {
@@ -183,9 +190,13 @@ func (c *Client) Query(ctx context.Context, db string, query Statement, options 
 			wg:   &sync.WaitGroup{},
 		}
 	}
+
+	logger.Info().Msg("Starting state machine")
+
 	go runSM(sm)
 
 	<-columnsReady
+	logger.Info().Msg("Columns ready")
 
 	return iter, nil
 }

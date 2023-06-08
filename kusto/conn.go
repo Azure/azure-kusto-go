@@ -8,6 +8,8 @@ import (
 	"context"
 	"encoding/json"
 	"fmt"
+	"github.com/Azure/azure-kusto-go/kusto/utils"
+	"github.com/rs/zerolog"
 	"io"
 	"net/http"
 	"net/url"
@@ -118,29 +120,66 @@ type execResp struct {
 }
 
 func (c *Conn) execute(ctx context.Context, execType int, db string, query Statement, properties requestProperties) (execResp, error) {
+	logger := utils.Logger.With().
+		Str("function", "execute").
+		Str("db", db).
+		Str("query", query.String()).
+		Str("clientRequestID", properties.ClientRequestID).
+		Str("User", properties.User).
+		Str("Application", properties.Application).
+		Logger()
+
+	logger.Info().Msg("starting execution")
 	op, reqHeader, respHeader, body, e := c.doRequest(ctx, execType, db, query, properties)
 	if e != nil {
+		logger.Error().Err(e).Msg("request failed")
 		return execResp{}, e
 	}
 
+	logger.Info().Msg("request done")
+
 	var dec frames.Decoder
+	var decName = ""
 	switch execType {
 	case execMgmt:
 		dec = &v1.Decoder{}
+		decName = "v1"
 	case execQuery:
 		dec = &v2.Decoder{}
+		decName = "v2"
 	default:
 		return execResp{}, errors.ES(op, errors.KInternal, "unknown execution type was %v", execType).SetNoRetry()
 	}
 
+	logger.Info().Str("decoder", decName).Msg("decoder created")
+
+	ctx = context.WithValue(ctx, "logger", logger)
+
 	frameCh := dec.Decode(ctx, body, op)
+
+	logger.Info().Msg("decoder started")
 
 	return execResp{reqHeader: reqHeader, respHeader: respHeader, frameCh: frameCh}, nil
 }
 
 func (c *Conn) doRequest(ctx context.Context, execType int, db string, query Statement, properties requestProperties) (errors.Op, http.Header, http.Header,
 	io.ReadCloser, error) {
+
+	logger := utils.Logger.With().
+		Str("function", "doRequest").
+		Str("db", db).
+		Str("query", query.String()).
+		Str("execType", fmt.Sprintf("%v", execType)).
+		Logger()
+
+	logger.Info().Msg("starting doRequest")
+
+	logger.Info().Msg("validating endpoint")
+
 	err := c.validateEndpoint()
+
+	logger.Info().Msg("validated endpoint")
+
 	var op errors.Op
 	if execType == execQuery {
 		op = errors.OpQuery
@@ -148,11 +187,15 @@ func (c *Conn) doRequest(ctx context.Context, execType int, db string, query Sta
 		op = errors.OpMgmt
 	}
 
+	logger.Info().Str("op", op.String()).Msg("setting op")
+
 	var endpoint *url.URL
 
 	buff := bufferPool.Get().(*bytes.Buffer)
 	buff.Reset()
 	defer bufferPool.Put(buff)
+
+	logger.Info().Msg("got buffer from pool")
 
 	switch execType {
 	case execQuery, execMgmt:
@@ -163,6 +206,9 @@ func (c *Conn) doRequest(ctx context.Context, execType int, db string, query Sta
 		} else {
 			csl = fmt.Sprintf("%s\n%s", properties.QueryParameters.ToDeclarationString(), query.String())
 		}
+
+		logger.Info().Str("query", csl).Msg("got query")
+
 		err = json.NewEncoder(buff).Encode(
 			queryMsg{
 				DB:         db,
@@ -170,7 +216,10 @@ func (c *Conn) doRequest(ctx context.Context, execType int, db string, query Sta
 				Properties: properties,
 			},
 		)
+		logger.Info().Msg("encoded query")
+
 		if err != nil {
+			logger.Error().Err(err).Msg("could not JSON marshal the Query message")
 			return 0, nil, nil, nil, errors.E(op, errors.KInternal, fmt.Errorf("could not JSON marshal the Query message: %w", err))
 		}
 		if execType == execQuery {
@@ -178,11 +227,13 @@ func (c *Conn) doRequest(ctx context.Context, execType int, db string, query Sta
 		} else {
 			endpoint = c.endMgmt
 		}
+
 	default:
 		return 0, nil, nil, nil, errors.ES(op, errors.KInternal, "internal error: did not understand the type of execType: %d", execType)
 	}
 
 	headers := c.getHeaders(properties)
+	logger.Info().Dict("headers", zerolog.Dict().Fields(headers)).Msg("got headers")
 	responseHeaders, closer, err := c.doRequestImpl(ctx, op, endpoint, io.NopCloser(buff), headers, fmt.Sprintf("With query: %s", query.String()))
 	return op, headers, responseHeaders, closer, err
 }
@@ -194,6 +245,12 @@ func (c *Conn) doRequestImpl(
 	buff io.ReadCloser,
 	headers http.Header,
 	errorContext string) (http.Header, io.ReadCloser, error) {
+
+	logger := utils.Logger.With().
+		Str("function", "doRequestImpl").
+		Str("endpoint", endpoint.String()).
+		Str("errorContext", errorContext).
+		Logger()
 
 	// Replace non-ascii chars in headers with '?'
 	for _, values := range headers {
@@ -210,6 +267,8 @@ func (c *Conn) doRequestImpl(
 		}
 	}
 
+	logger.Info().Dict("headers", zerolog.Dict().Fields(headers)).Msg("got headers")
+
 	if c.auth.TokenProvider != nil && c.auth.TokenProvider.AuthorizationRequired() {
 		c.auth.TokenProvider.SetHttp(c.client)
 		token, tokenType, tkerr := c.auth.TokenProvider.AcquireToken(ctx)
@@ -219,6 +278,8 @@ func (c *Conn) doRequestImpl(
 		headers.Add("Authorization", fmt.Sprintf("%s %s", tokenType, token))
 	}
 
+	logger.Info().Msg("added authorization header")
+
 	req := &http.Request{
 		Method: http.MethodPost,
 		URL:    endpoint,
@@ -226,18 +287,26 @@ func (c *Conn) doRequestImpl(
 		Body:   buff,
 	}
 
+	logger.Info().Msg("created request")
+
 	resp, err := c.client.Do(req.WithContext(ctx))
+	logger.Info().Msg("sent request")
+
 	if err != nil {
+		logger.Error().Err(err).Msg("error sending request")
 		// TODO(jdoak): We need a http error unwrap function that pulls out an *errors.Error.
 		return nil, nil, errors.E(op, errors.KHTTPError, fmt.Errorf("%v, %w", errorContext, err))
 	}
 
+	logger.Info().Msg("got response")
 	body, err := response.TranslateBody(resp, op)
 	if err != nil {
+		logger.Error().Err(err).Msg("error translating response body")
 		return nil, nil, err
 	}
 
 	if resp.StatusCode != http.StatusOK {
+		logger.Error().Msg("response status code not OK")
 		return nil, nil, errors.HTTP(op, resp.Status, resp.StatusCode, body, fmt.Sprintf("error from Kusto endpoint, %v", errorContext))
 	}
 	return resp.Header, body, nil

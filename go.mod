@@ -13,7 +13,9 @@ require (
 	github.com/gofrs/uuid v4.2.0+incompatible
 	github.com/google/uuid v1.3.0
 	github.com/kylelemons/godebug v1.1.0
+	github.com/rs/zerolog v1.29.1
 	github.com/samber/lo v1.37.0
+	github.com/shopspring/decimal v1.3.1
 	github.com/stretchr/testify v1.8.1
 	github.com/tj/assert v0.0.3
 	go.uber.org/goleak v1.2.0
@@ -32,9 +34,10 @@ require (
 	github.com/davecgh/go-spew v1.1.1 // indirect
 	github.com/golang-jwt/jwt/v4 v4.4.3 // indirect
 	github.com/kr/text v0.1.0 // indirect
+	github.com/mattn/go-colorable v0.1.12 // indirect
+	github.com/mattn/go-isatty v0.0.14 // indirect
 	github.com/pkg/browser v0.0.0-20210911075715-681adbf594b8 // indirect
 	github.com/pmezard/go-difflib v1.0.0 // indirect
-	github.com/shopspring/decimal v1.3.1 // indirect
 	golang.org/x/crypto v0.4.0 // indirect
 	golang.org/x/exp v0.0.0-20220303212507-bbda1eaf7a17 // indirect
 	golang.org/x/net v0.7.0 // indirect

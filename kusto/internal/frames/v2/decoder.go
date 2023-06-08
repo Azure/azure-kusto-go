@@ -4,6 +4,7 @@ import (
 	"bytes"
 	"context"
 	"fmt"
+	"github.com/rs/zerolog"
 	"io"
 
 	"github.com/Azure/azure-kusto-go/kusto/data/errors"
@@ -34,16 +35,26 @@ func (d *Decoder) Decode(ctx context.Context, r io.ReadCloser, op errors.Op) cha
 		defer r.Close()
 		defer close(ch)
 
+		logger := ctx.Value("logger").(zerolog.Logger)
+
+		logger.Info().Msg("starting decode")
+
 		// We should receive a '[' indicating the start of the JSON list of Frames.
 		t, err := d.dec.Token()
+
+		logger.Info().Msg("got first token")
+
 		if err == io.EOF {
+			logger.Error().Msg("got EOF")
 			return
 		}
 		if err != nil {
+			logger.Error().Err(err).Msg("got error")
 			frames.Errorf(ctx, ch, err.Error())
 			return
 		}
 		if t != json.Delim('[') {
+			logger.Error().Msgf("Expected '[' delimiter, got %s", t)
 			frames.Errorf(ctx, ch, "Expected '[' delimiter")
 			return
 		}
@@ -51,6 +62,7 @@ func (d *Decoder) Decode(ctx context.Context, r io.ReadCloser, op errors.Op) cha
 		// Extract the initial Frame, a dataSetHeader.
 		dsh, err := d.dataSetHeader()
 		if err != nil {
+			logger.Error().Err(err).Msg("got error on first frame")
 			frames.Errorf(ctx, ch, "first frame had error: %s", err)
 			return
 		}
@@ -59,17 +71,22 @@ func (d *Decoder) Decode(ctx context.Context, r io.ReadCloser, op errors.Op) cha
 		// Start decoding the rest of the frames.
 		d.decodeFrames(ctx, ch)
 
+		logger.Info().Msg("final decode")
 		// Expect to recieve the end of our JSON list of frames, marked by the ']' delimiter.
+		logger.Info().Msg("expecting final token")
 		t, err = d.dec.Token()
 		if err != nil {
+			logger.Error().Err(err).Msg("got error on final token")
 			frames.Errorf(ctx, ch, err.Error())
 			return
 		}
 
 		if t != json.Delim(']') {
+			logger.Error().Msgf("Expected ']' delimiter, got %s", t)
 			frames.Errorf(ctx, ch, "Expected ']' delimiter")
 			return
 		}
+		logger.Info().Msg("final token received")
 	}()
 
 	return ch
@@ -102,19 +119,28 @@ var (
 )
 
 func (d *Decoder) decode(ctx context.Context, ch chan frames.Frame) error {
+	logger := ctx.Value("logger").(zerolog.Logger)
+
 	if ctx.Err() != nil {
+		logger.Error().Err(ctx.Err()).Msg("context error")
 		return ctx.Err()
 	}
 
+	logger.Info().Msg("decoding frame")
+
 	err := d.dec.Decode(&d.frameRaw)
 	if err != nil {
+		logger.Error().Err(err).Msg("decode error")
 		return err
 	}
 
 	ft, err := getFrameType(d.frameRaw)
 	if err != nil {
+		logger.Error().Err(err).Msg("get frame type error")
 		return err
 	}
+
+	logger.Info().Str("frame type", string(ft)).Msg("frame type")
 
 	switch {
 	case bytes.Equal(ft, ftDataTable):
@@ -164,6 +190,7 @@ func (d *Decoder) decode(ctx context.Context, ch chan frames.Frame) error {
 	default:
 		return fmt.Errorf("received FrameType %s, which we did not expect", ft)
 	}
+	logger.Info().Msg("Finished decoding frame")
 	return nil
 }
 
