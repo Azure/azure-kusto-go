@@ -28,6 +28,9 @@ jobs:
       - name: Check Format
         run: if [ "$(gofmt -d -s -l . | tee /dev/fd/2 | wc -l)" -gt 0 ]; then exit 1; fi
 
+      - name: Go Work Sync
+        run: go work sync
+
       - name: Get dependencies
         run: |
           cd azkustodata
