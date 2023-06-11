@@ -1339,5 +1339,9 @@ func waitForIngest(t *testing.T, ctx context.Context, client *azkustodata.Client
 }
 
 func TestMain(m *testing.M) {
+	if kql.Wacky() != 3 {
+		os.Exit(1)
+	}
+
 	goleak.VerifyTestMain(m)
 }

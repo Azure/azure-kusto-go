@@ -117,3 +117,7 @@ func FormatTimespan(duration time.Duration) string {
 func FormatDatetime(datetime time.Time) string {
 	return datetime.Format("2006-01-02T15:04:05.9999999Z07:00")
 }
+
+func Wacky() int {
+	return 3
+}
