@@ -35,7 +35,12 @@ func (d *Decoder) Decode(ctx context.Context, r io.ReadCloser, op errors.Op) cha
 		defer r.Close()
 		defer close(ch)
 
-		logger := ctx.Value("logger").(zerolog.Logger)
+		var logger zerolog.Logger
+		if val, ok := ctx.Value("logger").(zerolog.Logger); ok {
+			logger = val
+		} else {
+			logger = zerolog.Nop()
+		}
 
 		logger.Info().Msg("starting decode")
 
@@ -119,7 +124,12 @@ var (
 )
 
 func (d *Decoder) decode(ctx context.Context, ch chan frames.Frame) error {
-	logger := ctx.Value("logger").(zerolog.Logger)
+	var logger zerolog.Logger
+	if val, ok := ctx.Value("logger").(zerolog.Logger); ok {
+		logger = val
+	} else {
+		logger = zerolog.Nop()
+	}
 
 	if ctx.Err() != nil {
 		logger.Error().Err(ctx.Err()).Msg("context error")
