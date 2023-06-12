@@ -144,7 +144,7 @@ func backOff(off *backoff.ExponentialBackOff) FileOption {
 	}
 }
 
-// FlushImmediately tells Kusto to flush on write.
+// FlushImmediately  the service will not aggregate files together and flush immediately, thus overrideing batching policy
 func FlushImmediately() FileOption {
 	return option{
 		run: func(p *properties.All) error {
@@ -457,5 +457,19 @@ func ClientRequestId(clientRequestId string) FileOption {
 		sourceScope:  FromFile | FromReader | FromBlob,
 		clientScopes: StreamingClient | ManagedClient,
 		name:         "ClientRequestId",
+	}
+}
+
+// RawDataSize is the uncompressed data size. Should be used to comunicate the file size to the service for efficient ingestion.
+// Also used by managed client in the decision to use queued ingestion instead of streaming (if > 4mb)
+func RawDataSize(size int64) FileOption {
+	return option{
+		run: func(p *properties.All) error {
+			p.Ingestion.RawDataSize = size
+			return nil
+		},
+		sourceScope:  FromFile | FromReader | FromBlob,
+		clientScopes: StreamingClient | ManagedClient | QueuedClient,
+		name:         "RawDataSize",
 	}
 }
