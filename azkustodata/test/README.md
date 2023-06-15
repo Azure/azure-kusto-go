@@ -35,23 +35,8 @@ It will need to have the following content:
 	"Database": "[database_name]",
 	"ClientID": "[client ID]",
 	"ClientSecret": "[client secret]",
-    "TenantID": "[tenant ID]",
-    "Principals": ["[principal name]", "[prinicipal name]"]
+    "TenantID": "[tenant ID]"
 }
-```
-- Anything within [] must be replaced. The [] should be removed.
-
-Most of these are self explanatory, with the exception of `Principals`.
-
-`Principals` are found by running the following management query: 
-```
-.show database e2e principals
-```
-
-You will need to extract a few `PrincipalDisplayName`'s and insert them here. Something like:
-
-```
-"Principals": ["John Doak (upn: jdoak@microsoft.com)", "Daniel Dubovski (upn: dadubovs@microsoft.com)"]
 ```
 
 ## Running the test

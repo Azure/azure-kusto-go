@@ -11,6 +11,18 @@ For details on the Azure Kusto service, see: https://azure.microsoft.com/en-us/s
 
 For general documentation on APIs and the Kusto query language, see: https://docs.microsoft.com/en-us/azure/data-explorer/
 
+# Version 1.0.0 Released (BREAKING CHANGES)
+Version 1.0.0 introduced a significant change to the package structure, aligning Azure-Kusto-Go with all other Kusto SDKs structure.
+The main package, `github.com/Azure/azure-kusto-go` is no longer supported.
+Instead, there are two new packages:
+- `github.com/Azure/azure-kusto-go/azkustodata` - for interacting with the data plane (querying data)
+- `github.com/Azure/azure-kusto-go/azkustoingest` - for interacting with the ingest plane (importing data)
+
+Required code changes to upgrade to v1.0.0:
+- Replace your `github.com/Azure/azure-kusto-go` imports with `github.com/Azure/azure-kusto-go/azkustodata` or `github.com/Azure/azure-kusto-go/azkustoingest` depending on your use case (Use tools or IDEs to do this)
+- Replace the `kusto` qualifier with `azkustodata`
+- Replace the `ingest` qualifier with `azkustoingest`
+
 ## Examples
 
 Examples for various scenarios can be found on [pkg.go.dev](https://pkg.go.dev/github.com/Azure/azure-kusto-go#readme-examples) or in the example*_test.go files in our GitHub repo for [azure-kusto-go](https://github.com/Azure/azure-kusto-go/tree/master/kusto).

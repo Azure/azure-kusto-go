@@ -4,16 +4,14 @@
 - [Data Client documentation](https://godoc.org/github.com/Azure/azure-kusto-go/azkustodata)
 - [Ingest Client documentation](https://godoc.org/github.com/Azure/azure-kusto-go/azkustoingest)
 
-# BREAKING - 1.0.0 - Please read
-In 1.0.0 there is a massive change to the package structure.  
+# Version 1.0.0 Released (BREAKING CHANGES)
+Version 1.0.0 introduced a significant change to the package structure, aligning Azure-Kusto-Go with all other Kusto SDKs structure. 
 The main package, `github.com/Azure/azure-kusto-go` is no longer supported. 
 Instead, there are two new packages:
 - `github.com/Azure/azure-kusto-go/azkustodata` - for interacting with the data plane (querying data)
 - `github.com/Azure/azure-kusto-go/azkustoingest` - for interacting with the ingest plane (importing data)
 
-The old package `github.com/Azure/azure-kusto-go` will only be available in versions 0.x.x.
-
-The changes you need to make in your code are:
+Required code changes to upgrade to v1.0.0:
 - Replace your `github.com/Azure/azure-kusto-go` imports with `github.com/Azure/azure-kusto-go/azkustodata` or `github.com/Azure/azure-kusto-go/azkustoingest` depending on your use case (Use tools or IDEs to do this)
 - Replace the `kusto` qualifier with `azkustodata`
 - Replace the `ingest` qualifier with `azkustoingest`
@@ -22,9 +20,11 @@ The changes you need to make in your code are:
 ## Intro
 This is a data plane SDK (it is for interacting with Azure Data Explorer (Kusto) service). For the control plane (resource administration), go [here](https://github.com/Azure/azure-sdk-for-go/tree/master/services/kusto/mgmt).
 
-Use the data plane SDK `github.com/Azure/azure-kusto-go/azkustodata` in your application to:
+Use `github.com/Azure/azure-kusto-go/azkustodata` in your application to:
 
 - Query Kusto/Azure Data Explorer clusters for rows, optionally into structs.
+
+Use `github.com/Azure/azure-kusto-go/azkustoingest` in your application to:
 - Import data into Kusto from local file, Azure Blob Storage file, Stream, or an `io.Reader`.
 
 
@@ -57,7 +57,7 @@ go get github.com/Azure/azure-kusto-go
 
 ### Prerequisites
 
-- Go, version 1.20 or higher
+- Go, version 1.19 or higher
 - An [Azure subscription](https://azure.microsoft.com/free/)
 - An [Azure Data Explorer Cluster](https://learn.microsoft.com/en-us/azure/data-explorer/).
 - An Azure Data Explorer Database. You can create a Database in your Azure Data Explorer Cluster using the [Azure Portal](https://learn.microsoft.com/en-us/azure/data-explorer/create-cluster-database-portal).

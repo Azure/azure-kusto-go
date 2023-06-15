@@ -1,6 +1,6 @@
 module github.com/Azure/azure-kusto-go/quickstart
 
-go 1.20
+go 1.19
 
 require github.com/Azure/azure-kusto-go/azkustodata v0.0.0-20230601105621-25ff51d13bbc
 
