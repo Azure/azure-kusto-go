@@ -5,11 +5,11 @@
 - [Ingest Client documentation](https://godoc.org/github.com/Azure/azure-kusto-go/azkustoingest)
 
 # Version 1.0.0 Released (BREAKING CHANGES)
-Version 1.0.0 introduced a significant change to the package structure, aligning Azure-Kusto-Go with all other Kusto SDKs structure. 
-The main package, `github.com/Azure/azure-kusto-go` is no longer supported. 
+Version 1.0.0 introduced a significant change to the package structure, aligning Azure-Kusto-Go with all other Kusto SDKs structure.
+The original package, `github.com/Azure/azure-kusto-go` is no longer published.
 Instead, there are two new packages:
-- `github.com/Azure/azure-kusto-go/azkustodata` - for interacting with the data plane (querying data)
-- `github.com/Azure/azure-kusto-go/azkustoingest` - for interacting with the ingest plane (importing data)
+- `github.com/Azure/azure-kusto-go/azkustodata` - for query and management commands.
+- `github.com/Azure/azure-kusto-go/azkustoingest` - for interacting with the ingesting data.
 
 Required code changes to upgrade to v1.0.0:
 - Replace your `github.com/Azure/azure-kusto-go` imports with `github.com/Azure/azure-kusto-go/azkustodata` or `github.com/Azure/azure-kusto-go/azkustoingest` depending on your use case (Use tools or IDEs to do this)
