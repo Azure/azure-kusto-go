@@ -5,7 +5,7 @@ package kusto
 
 import (
 	"context"
-	"github.com/Azure/azure-kusto-go/kusto/utils"
+	"github.com/rs/zerolog"
 	"sync"
 
 	"github.com/Azure/azure-kusto-go/kusto/data/errors"
@@ -29,14 +29,14 @@ type stateMachine interface {
 func runSM(sm stateMachine) {
 	defer close(sm.rowIter().inRows)
 
-	logger := utils.Logger
+	logger := zerolog.Ctx(sm.rowIter().ctx).With().Logger()
 	logger.Info().Msg("starting runSM")
 
 	var fn = sm.start
 	var err error
 	for {
 		fn, err = fn()
-		logger.Info().Msgf("Running fn")
+		logger.Info().Msgf("Running fn %v", fn)
 		switch {
 		case err != nil:
 			sm.rowIter().inErr <- send{inErr: err} // Unique case, don't send a WaitGroup (also means, design needs to be fixed)

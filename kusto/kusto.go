@@ -3,6 +3,7 @@ package kusto
 import (
 	"context"
 	"github.com/Azure/azure-kusto-go/kusto/utils"
+	"github.com/google/uuid"
 	"io"
 	"net/http"
 	"net/url"
@@ -132,7 +133,9 @@ const (
 // Note that the server has a timeout of 4 minutes for a query by default unless the context deadline is set. Queries can
 // take a maximum of 1 hour.
 func (c *Client) Query(ctx context.Context, db string, query Statement, options ...QueryOption) (*RowIterator, error) {
-	logger := utils.Logger.With().Str("db", db).Logger()
+	logger := utils.Logger.With().Str("queryId", uuid.New().String()).Str("db", db).Logger()
+	ctx = logger.WithContext(ctx)
+
 	ctx, cancel, err := contextSetup(ctx, false) // Note: cancel is called when *RowIterator has Stop() called.
 	if err != nil {
 		return nil, err

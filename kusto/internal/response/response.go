@@ -4,7 +4,7 @@ import (
 	"compress/flate"
 	"compress/gzip"
 	"fmt"
-	"github.com/Azure/azure-kusto-go/kusto/utils"
+	"github.com/rs/zerolog"
 	"io"
 	"net/http"
 	"strings"
@@ -28,11 +28,9 @@ func (o *originalCloser) Close() error {
 	return o.original.Close()
 }
 
-func TranslateBody(resp *http.Response, op errors.Op) (io.ReadCloser, error) {
+func TranslateBody(resp *http.Response, op errors.Op, logger zerolog.Logger) (io.ReadCloser, error) {
 	body := resp.Body
 	var wrapper io.ReadCloser
-
-	logger := utils.Logger.With().Str("op", op.String()).Str("response-uri", resp.Request.URL.String()).Logger()
 
 	switch enc := strings.ToLower(resp.Header.Get("Content-Encoding")); enc {
 	case "":

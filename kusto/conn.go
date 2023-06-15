@@ -8,7 +8,6 @@ import (
 	"context"
 	"encoding/json"
 	"fmt"
-	"github.com/Azure/azure-kusto-go/kusto/utils"
 	"github.com/rs/zerolog"
 	"io"
 	"net/http"
@@ -120,7 +119,7 @@ type execResp struct {
 }
 
 func (c *Conn) execute(ctx context.Context, execType int, db string, query Statement, properties requestProperties) (execResp, error) {
-	logger := utils.Logger.With().
+	logger := zerolog.Ctx(ctx).With().
 		Str("function", "execute").
 		Str("db", db).
 		Str("query", query.String()).
@@ -153,8 +152,6 @@ func (c *Conn) execute(ctx context.Context, execType int, db string, query State
 
 	logger.Info().Str("decoder", decName).Msg("decoder created")
 
-	ctx = context.WithValue(ctx, "logger", logger)
-
 	frameCh := dec.Decode(ctx, body, op)
 
 	logger.Info().Msg("decoder started")
@@ -165,7 +162,7 @@ func (c *Conn) execute(ctx context.Context, execType int, db string, query State
 func (c *Conn) doRequest(ctx context.Context, execType int, db string, query Statement, properties requestProperties) (errors.Op, http.Header, http.Header,
 	io.ReadCloser, error) {
 
-	logger := utils.Logger.With().
+	logger := zerolog.Ctx(ctx).With().
 		Str("function", "doRequest").
 		Str("db", db).
 		Str("query", query.String()).
@@ -246,7 +243,7 @@ func (c *Conn) doRequestImpl(
 	headers http.Header,
 	errorContext string) (http.Header, io.ReadCloser, error) {
 
-	logger := utils.Logger.With().
+	logger := zerolog.Ctx(ctx).With().
 		Str("function", "doRequestImpl").
 		Str("endpoint", endpoint.String()).
 		Str("errorContext", errorContext).
@@ -299,7 +296,7 @@ func (c *Conn) doRequestImpl(
 	}
 
 	logger.Info().Msg("got response")
-	body, err := response.TranslateBody(resp, op)
+	body, err := response.TranslateBody(resp, op, logger)
 	if err != nil {
 		logger.Error().Err(err).Msg("error translating response body")
 		return nil, nil, err

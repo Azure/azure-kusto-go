@@ -6,8 +6,8 @@ import (
 	"context"
 	"flag"
 	"fmt"
-	"github.com/Azure/azure-kusto-go/kusto/utils"
 	"github.com/google/uuid"
+	"github.com/rs/zerolog"
 	"io"
 	"net/http"
 	"sync"
@@ -119,7 +119,7 @@ func (r *RowIterator) start() chan struct{} {
 		once.Do(func() { close(done) })
 	}
 
-	logger := utils.Logger.With().Str("id", uuid.New().String()).Logger()
+	logger := zerolog.Ctx(r.ctx).With().Str("id", uuid.New().String()).Logger()
 
 	logger.Info().Msg("starting row iterator")
 
