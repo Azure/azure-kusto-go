@@ -859,9 +859,11 @@ func TestNoRedirects(t *testing.T) {
 			})
 
 			q, err := client.Query(context.Background(), "db", kql.New("table"))
+			if q != nil {
+				defer q.Stop()
+			}
 			require.Error(t, err)
 			assert.Contains(t, err.Error(), fmt.Sprintf("%d", code))
-			q.Stop()
 		})
 
 		t.Run(fmt.Sprintf("Fail at client %d", code), func(t *testing.T) {
@@ -875,11 +877,13 @@ func TestNoRedirects(t *testing.T) {
 			})
 
 			q, err := client.Query(context.Background(), "db", kql.New("table"))
+			if q != nil {
+				defer q.Stop()
+			}
 			require.Error(t, err)
 			convErr, ok := err.(*errors.HttpError)
 			require.True(t, ok)
 			assert.Equal(t, code, convErr.StatusCode)
-			q.Stop()
 		})
 	}
 }
@@ -935,13 +939,16 @@ func TestError(t *testing.T) {
 	q, err := client.Query(context.Background(), testConfig.Database, kql.New("table(tableName) | count"),
 		azkustodata.QueryParameters(kql.NewParameters().AddString("tableName", uuid.NewString())))
 
+	if q != nil {
+		defer q.Stop()
+	}
+
 	kustoError, ok := errors.GetKustoError(err)
 	require.True(t, ok)
 	assert.Equal(t, errors.OpQuery, kustoError.Op)
 	assert.Equal(t, errors.KHTTPError, kustoError.Kind)
 	assert.True(t, strings.Contains(kustoError.Error(), "Failed to resolve table expression"))
 	assert.True(t, isASCII(kustoError.Error()))
-	q.Stop()
 }
 func TestMain(m *testing.M) {
 	goleak.VerifyTestMain(m)
