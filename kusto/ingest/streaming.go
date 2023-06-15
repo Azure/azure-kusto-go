@@ -59,7 +59,7 @@ func (i *Streaming) FromFile(ctx context.Context, fPath string, options ...FileO
 }
 
 func prepFileAndProps(fPath string, props *properties.All, options []FileOption, client ClientScope) (*os.File, error) {
-	local, err := queued.IsLocalPath(fPath)
+	local, err := queued.IsLocalPath(properties.RemoveQueryParamsFromUrl(fPath))
 	if err != nil {
 		return nil, err
 	}
@@ -82,7 +82,7 @@ func prepFileAndProps(fPath string, props *properties.All, options []FileOption,
 		props.Source.DontCompress = true
 	}
 
-	err = queued.CompleteFormatFromFileName(props, fPath)
+	err = queued.CompleteFormatFromFileName(props, properties.RemoveQueryParamsFromUrl(fPath))
 	if err != nil {
 		return nil, err
 	}

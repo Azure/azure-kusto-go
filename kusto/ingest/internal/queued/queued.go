@@ -115,7 +115,7 @@ func (i *Ingestion) Local(ctx context.Context, from string, props properties.All
 		return err
 	}
 
-	// We want to check the queue size here so so we don't upload a file and then find we don't have a Kusto queue to stick
+	// We want to check the queue size here so we don't upload a file and then find we don't have a Kusto queue to stick
 	// it in. If we don't have a container, that is handled by containerQueue().
 	if len(mgrResources.Queues) == 0 {
 		return errors.ES(errors.OpFileIngest, errors.KBlobstore, "no Kusto queue resources are defined, there is no queue to upload to").SetNoRetry()
@@ -219,7 +219,7 @@ func (i *Ingestion) Blob(ctx context.Context, from string, fileSize int64, props
 
 	props.Ingestion.RetainBlobOnSuccess = !props.Source.DeleteLocalSource
 
-	err = CompleteFormatFromFileName(&props, from)
+	err = CompleteFormatFromFileName(&props, properties.RemoveQueryParamsFromUrl(from))
 	if err != nil {
 		return err
 	}
@@ -329,7 +329,7 @@ func createPipeline(http *http.Client) pipeline.Pipeline {
 
 var nower = time.Now
 
-// localToBlob copies from a local to to an Azure Blobstore blob. It returns the URL of the Blob, the local file info and an
+// localToBlob copies from a local to an Azure Blobstore blob. It returns the URL of the Blob, the local file info and an
 // error if there was one.
 func (i *Ingestion) localToBlob(ctx context.Context, from string, client *azblob.Client, container string, props *properties.All) (string, int64, error) {
 	compression := CompressionDiscovery(from)
@@ -448,7 +448,7 @@ func IsLocalPath(s string) (bool, error) {
 	return true, nil
 }
 
-func fullUrl(client *azblob.Client, container, blob string) string {
+func fullUrl(client *azblob.Client, container string, blob string) string {
 	parseURL, err := azblob.ParseURL(client.URL())
 	if err != nil {
 		return ""

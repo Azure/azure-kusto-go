@@ -219,9 +219,9 @@ const (
 	SingleJSON DataFormat = properties.SingleJSON
 )
 
-// InferFormatFromFileName  looks at the file name and tries to discern what the file format is
+// InferFormatFromFileName looks at the file name and tries to discern what the file format is
 func InferFormatFromFileName(fName string) DataFormat {
-	return properties.DataFormatDiscovery(fName)
+	return properties.DataFormatDiscovery(properties.RemoveQueryParamsFromUrl(fName))
 }
 
 // IngestionMapping provides runtime mapping of the data being imported to the fields in the table.
