@@ -9,5 +9,5 @@ var Logger = zerolog.Nop()
 
 func InitLog() {
 	zerolog.TimeFieldFormat = zerolog.TimeFormatUnix
-	Logger = zerolog.New(os.Stdout).With().Timestamp().Logger()
+	Logger = zerolog.New(os.Stdout).With().Timestamp().Logger().Output(zerolog.ConsoleWriter{Out: os.Stderr, NoColor: true})
 }
