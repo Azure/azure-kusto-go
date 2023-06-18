@@ -36,7 +36,7 @@ func runSM(sm stateMachine) {
 	var err error
 	for {
 		fn, err = fn()
-		logger.Info().Msgf("Running fn %v", fn)
+		logger.Info().Msgf("Running fn %p", fn)
 		switch {
 		case err != nil:
 			sm.rowIter().inErr <- send{inErr: err} // Unique case, don't send a WaitGroup (also means, design needs to be fixed)
