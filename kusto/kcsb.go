@@ -2,11 +2,12 @@ package kusto
 
 import (
 	"fmt"
+	"strconv"
+	"strings"
+
 	kustoErrors "github.com/Azure/azure-kusto-go/kusto/data/errors"
 	"github.com/Azure/azure-sdk-for-go/sdk/azcore"
 	"github.com/Azure/azure-sdk-for-go/sdk/azidentity"
-	"strconv"
-	"strings"
 )
 
 type ConnectionStringBuilder struct {
@@ -23,6 +24,8 @@ type ConnectionStringBuilder struct {
 	ApplicationToken                 string
 	AzCli                            bool
 	MsiAuthentication                bool
+	WorkloadAuthentication           bool
+	FederationTokenFile              string
 	ManagedServiceIdentity           string
 	InteractiveLogin                 bool
 	RedirectURL                      string
@@ -251,6 +254,15 @@ func (kcsb *ConnectionStringBuilder) WithSystemManagedIdentity() *ConnectionStri
 	return kcsb
 }
 
+// WithSystemManagedIdentity Creates a Kusto Connection string builder that will authenticate with AAD application, using
+// an application token obtained from a Microsoft Service Identity endpoint using system assigned id.
+func (kcsb *ConnectionStringBuilder) WithKubernetesWorkloadIdentity() *ConnectionStringBuilder {
+	// requireNonEmpty(dataSource, kcsb.DataSource)
+	kcsb.resetConnectionString()
+	kcsb.WorkloadAuthentication = true
+	return kcsb
+}
+
 // WithInteractiveLogin Creates a Kusto Connection string builder that will authenticate by launching the system default browser
 // to interactively authenticate a user, and obtain an access token
 func (kcsb *ConnectionStringBuilder) WithInteractiveLogin(authorityID string) *ConnectionStringBuilder {
@@ -374,6 +386,29 @@ func (kcsb *ConnectionStringBuilder) newTokenProvider() (*TokenProvider, error) 
 			if err != nil {
 				return nil, kustoErrors.E(kustoErrors.OpTokenProvider, kustoErrors.KOther,
 					fmt.Errorf("error: Couldn't retrieve client credentials using Managed Identity: %s", err))
+			}
+
+			return cred, nil
+		}
+	case kcsb.WorkloadAuthentication:
+		init = func(ci *CloudInfo, cliOpts *azcore.ClientOptions, appClientId string) (azcore.TokenCredential, error) {
+			opts := &azidentity.WorkloadIdentityCredentialOptions{ClientOptions: *cliOpts}
+			if !isEmpty(kcsb.ApplicationClientId) {
+				opts.ClientID = kcsb.ApplicationClientId
+			}
+
+			if !isEmpty(kcsb.FederationTokenFile) {
+				opts.TokenFilePath = kcsb.FederationTokenFile
+			}
+
+			if !isEmpty(kcsb.AuthorityId) {
+				opts.TenantID = kcsb.AuthorityId
+			}
+
+			cred, err := azidentity.NewWorkloadIdentityCredential(opts)
+			if err != nil {
+				return nil, kustoErrors.E(kustoErrors.OpTokenProvider, kustoErrors.KOther,
+					fmt.Errorf("error: Couldn't retrieve client credentials using Workload Identity: %s", err))
 			}
 
 			return cred, nil

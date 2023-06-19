@@ -167,6 +167,12 @@ func TestGetTokenProviderHappy(t *testing.T) {
 				MsiAuthentication: true,
 			},
 		}, {
+			name: "test_tokenprovider_workloadidentity",
+			kcsb: ConnectionStringBuilder{
+				DataSource:             "https://endpoint/test_tokenprovider_workloadidentity",
+				WorkloadAuthentication: true,
+			},
+		}, {
 			name: "test_tokenprovider_usertoken",
 			kcsb: ConnectionStringBuilder{
 				DataSource: "https://endpoint/test_tokenprovider_usertoken",
