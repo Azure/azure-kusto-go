@@ -254,10 +254,10 @@ func (kcsb *ConnectionStringBuilder) WithSystemManagedIdentity() *ConnectionStri
 	return kcsb
 }
 
-// WithSystemManagedIdentity Creates a Kusto Connection string builder that will authenticate with AAD application, using
-// an application token obtained from a Microsoft Service Identity endpoint using system assigned id.
+// WithKubernetesWorkloadIdentity Creates a Kusto Connection string builder that will authenticate with AAD application, using
+// an application token obtained from a Microsoft Service Identity endpoint using Kubernetes workload identity.
 func (kcsb *ConnectionStringBuilder) WithKubernetesWorkloadIdentity() *ConnectionStringBuilder {
-	// requireNonEmpty(dataSource, kcsb.DataSource)
+	requireNonEmpty(dataSource, kcsb.DataSource)
 	kcsb.resetConnectionString()
 	kcsb.WorkloadAuthentication = true
 	return kcsb
