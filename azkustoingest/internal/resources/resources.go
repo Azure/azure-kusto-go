@@ -63,12 +63,23 @@ func parse(uri string) (*URI, error) {
 		return nil, fmt.Errorf("error: Storage URI (%s) is invalid'", uri)
 	}
 
-	v := &URI{
-		u:          u,
-		account:    hostSplit[0],
-		objectType: hostSplit[1],
-		objectName: strings.TrimLeft(u.EscapedPath(), "/"),
-		sas:        u.Query(),
+	var v *URI
+	if len(hostSplit) == 5 {
+		v = &URI{
+			u:          u,
+			account:    hostSplit[0],
+			objectType: hostSplit[1],
+			objectName: strings.TrimLeft(u.EscapedPath(), "/"),
+			sas:        u.Query(),
+		}
+	} else {
+		v = &URI{
+			u:          u,
+			account:    hostSplit[0] + "." + hostSplit[1],
+			objectType: hostSplit[2],
+			objectName: strings.TrimLeft(u.EscapedPath(), "/"),
+			sas:        u.Query(),
+		}
 	}
 
 	if err := v.validate(); err != nil {
@@ -105,7 +116,7 @@ func (u *URI) ObjectType() string {
 	return u.objectType
 }
 
-// ObjectName returns the object name that will be ingested???
+// ObjectName returns the object name of the resource, i.e container name.
 func (u *URI) ObjectName() string {
 	return u.objectName
 }
