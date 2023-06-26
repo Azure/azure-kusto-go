@@ -22,7 +22,7 @@ import (
 	v1 "github.com/Azure/azure-kusto-go/azkustodata/internal/frames/v1"
 	v2 "github.com/Azure/azure-kusto-go/azkustodata/internal/frames/v2"
 	"github.com/Azure/azure-kusto-go/azkustodata/internal/response"
-	truestedEndpoints "github.com/Azure/azure-kusto-go/azkustodata/trustedEndpoints"
+	truestedEndpoints "github.com/Azure/azure-kusto-go/azkustodata/trusted_endpoints"
 	"github.com/google/uuid"
 )
 
