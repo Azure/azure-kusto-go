@@ -1,4 +1,4 @@
-package trustedendpoints
+package trustedEndpoints
 
 import (
 	_ "embed"
