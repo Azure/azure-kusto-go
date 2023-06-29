@@ -44,7 +44,7 @@ func TestManaged(t *testing.T) {
 	bigData, _ := initFile(t, bigReader)
 	counter := 0
 
-	someBlobPath := "https://some-blob.blob.core.windows.net/some-container/some-blob"
+	someBlobPath := "https://some-blob.blob.core.windows.net/some-container/some-blob;Managed_Identity="
 
 	tests := []struct {
 		name            string
@@ -292,11 +292,9 @@ func TestManaged(t *testing.T) {
 		},
 		{
 			name:     "TestBlob",
-			options:  []FileOption{RawDataSize(maxStreamingSize + 1)},
 			blobPath: someBlobPath,
 			onStreamIngest: func(t *testing.T, ctx context.Context, db, table string, payload io.Reader, format kusto.DataFormatForStreaming, mappingName string,
 				clientRequestId string, isBlobUri bool) error {
-				require.Fail(t, "Big file shouldn't try to stream")
 				return errors.E(errors.OpIngestStream, errors.KHTTPError, fmt.Errorf("error"))
 			},
 			onMgmt: func(t *testing.T, ctx context.Context, db string, query kusto.Statement, options ...kusto.MgmtOption) (*kusto.RowIterator, error) {
