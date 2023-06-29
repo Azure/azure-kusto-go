@@ -18,7 +18,7 @@ import (
 
 const (
 	mb                     = 1024 * 1024
-	maxStreamingSize       = 4 * mb
+	maxStreamingSize       = int64(4 * mb)
 	defaultInitialInterval = 1 * time.Second
 	defaultMultiplier      = 2
 	retryCount             = 2
@@ -124,9 +124,8 @@ func (m *Managed) FromFile(ctx context.Context, fPath string, options ...FileOpt
 
 func shouldUseQueuedIngestBySize(compression properties.CompressionType, fileSize int64) bool {
 	switch compression {
-	case properties.GZIP:
-	case properties.ZIP:
-		return fileSize <= maxStreamingSize
+	case properties.GZIP, properties.ZIP:
+		return fileSize > maxStreamingSize
 	}
 
 	return fileSize/utils.EstimatedCompressionFactor > maxStreamingSize
@@ -159,7 +158,6 @@ func (m *Managed) managedStreamImpl(ctx context.Context, payload io.Reader, prop
 		return nil, err
 	}
 
-	// If the payload is larger than the max size for streaming, we fall back to queued by combining what we read with the rest of the payload
 	if shouldUseQueuedIngestBySize(properties.GZIP, int64(len(buf))) {
 		combinedBuf := io.MultiReader(bytes.NewReader(buf), payload)
 		return m.queued.fromReader(ctx, combinedBuf, []FileOption{}, props)
@@ -170,6 +168,8 @@ func (m *Managed) managedStreamImpl(ctx context.Context, payload io.Reader, prop
 		return res, err
 	}
 
+	// Theres no size estimation when ingesting from stream. If we did not already use queued ingestion
+	// we can assume all the original payload reader is < 4mb, therefore no need to combine
 	return m.queued.fromReader(ctx, bytes.NewReader(buf), []FileOption{}, props)
 }
 
