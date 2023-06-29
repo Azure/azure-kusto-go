@@ -10,7 +10,7 @@ import (
 	"github.com/Azure/azure-kusto-go/kusto/data/errors"
 	"github.com/Azure/azure-kusto-go/kusto/ingest/internal/gzip"
 	"github.com/Azure/azure-kusto-go/kusto/ingest/internal/properties"
-	"github.com/Azure/azure-kusto-go/kusto/ingest/internal/resources"
+	"github.com/Azure/azure-kusto-go/kusto/ingest/internal/utils"
 
 	"github.com/cenkalti/backoff/v4"
 	"github.com/google/uuid"
@@ -93,25 +93,25 @@ func (m *Managed) streamWithRetries(ctx context.Context, payloadProvider func() 
 
 func (m *Managed) FromFile(ctx context.Context, fPath string, options ...FileOption) (*Result, error) {
 	props := m.newProp()
-	file, err := prepFileAndProps(fPath, &props, options, ManagedClient)
+	file, err, local := prepFileAndProps(fPath, &props, options, ManagedClient)
 
-	if file == nil {
-		if props.Ingestion.RawDataSize == 0 {
-			size, err := resources.FetchBlobSize(fPath, ctx, m.queued.client.HttpClient())
-			if err != nil {
-				// Failed fetch blob properties
-				return nil, err
-			}
-			props.Ingestion.RawDataSize = size
+	if !local {
+		size, err := utils.FetchBlobSize(fPath, ctx, m.queued.client.HttpClient())
+		if err != nil {
+			// Failed fetch blob properties
+			return nil, err
 		}
 
-		if props.Ingestion.RawDataSize <= maxStreamingSize {
+		compressionType := utils.CompressionDiscovery(fPath)
+
+		if !shouldUseQueuedIngestBySize(compressionType, size) {
 			res, err := m.streamWithRetries(ctx, func() io.Reader { return generateBlobUriPayloadReader(fPath) }, props, true)
 			if err != nil || res != nil {
 				return res, err
 			}
 		}
 
+		props.Ingestion.RawDataSize = utils.EstimateRawDataSize(compressionType, size)
 		return m.queued.fromFile(ctx, fPath, []FileOption{}, props)
 	}
 
@@ -120,6 +120,16 @@ func (m *Managed) FromFile(ctx context.Context, fPath string, options ...FileOpt
 	}
 
 	return m.managedStreamImpl(ctx, file, props)
+}
+
+func shouldUseQueuedIngestBySize(compression properties.CompressionType, fileSize int64) bool {
+	switch compression {
+	case properties.GZIP:
+	case properties.ZIP:
+		return fileSize <= maxStreamingSize
+	}
+
+	return fileSize/utils.EstimatedCompressionFactor > maxStreamingSize
 }
 
 func (m *Managed) FromReader(ctx context.Context, reader io.Reader, options ...FileOption) (*Result, error) {
@@ -150,7 +160,7 @@ func (m *Managed) managedStreamImpl(ctx context.Context, payload io.Reader, prop
 	}
 
 	// If the payload is larger than the max size for streaming, we fall back to queued by combining what we read with the rest of the payload
-	if len(buf) > maxSize {
+	if shouldUseQueuedIngestBySize(properties.GZIP, int64(len(buf))) {
 		combinedBuf := io.MultiReader(bytes.NewReader(buf), payload)
 		return m.queued.fromReader(ctx, combinedBuf, []FileOption{}, props)
 	}

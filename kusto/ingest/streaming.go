@@ -13,6 +13,7 @@ import (
 	"github.com/Azure/azure-kusto-go/kusto/ingest/internal/gzip"
 	"github.com/Azure/azure-kusto-go/kusto/ingest/internal/properties"
 	"github.com/Azure/azure-kusto-go/kusto/ingest/internal/queued"
+	"github.com/Azure/azure-kusto-go/kusto/ingest/internal/utils"
 
 	"github.com/google/uuid"
 )
@@ -57,13 +58,13 @@ func NewStreaming(client QueryClient, db, table string) (*Streaming, error) {
 // This method is thread-safe.
 func (i *Streaming) FromFile(ctx context.Context, fPath string, options ...FileOption) (*Result, error) {
 	props := i.newProp()
-	file, err := prepFileAndProps(fPath, &props, options, StreamingClient)
+	file, err, local := prepFileAndProps(fPath, &props, options, StreamingClient)
 
 	if err != nil {
 		return nil, err
 	}
 
-	if file == nil {
+	if local {
 		return streamImpl(i.streamConn, ctx, generateBlobUriPayloadReader(fPath), props, true)
 	}
 
@@ -74,41 +75,41 @@ func (i *Streaming) FromFile(ctx context.Context, fPath string, options ...FileO
 	return streamImpl(i.streamConn, ctx, file, props, false)
 }
 
-func prepFileAndProps(fPath string, props *properties.All, options []FileOption, client ClientScope) (*os.File, error) {
+func prepFileAndProps(fPath string, props *properties.All, options []FileOption, client ClientScope) (*os.File, error, bool) {
 	var err error
 	for _, option := range options {
 		err := option.Run(props, client, FromFile)
 		if err != nil {
-			return nil, err
+			return nil, err, true
 		}
 	}
 
 	local, err := queued.IsLocalPath(fPath)
 	if err != nil {
-		return nil, err
+		return nil, err, local
 	}
 
 	props.Source.OriginalSource = fPath
 
 	if !local {
-		return nil, nil
+		return nil, nil, false
 	}
 
-	compression := queued.CompressionDiscovery(fPath)
+	compression := utils.CompressionDiscovery(fPath)
 	if compression != properties.CTNone {
 		props.Source.DontCompress = true
 	}
 
 	err = queued.CompleteFormatFromFileName(props, fPath)
 	if err != nil {
-		return nil, err
+		return nil, err, true
 	}
 
 	file, err := os.Open(fPath)
 	if err != nil {
-		return nil, err
+		return nil, err, true
 	}
-	return file, nil
+	return file, nil, true
 }
 
 // FromReader allows uploading a data file for Kusto from an io.Reader. The content is uploaded to Blobstore and

@@ -119,7 +119,8 @@ func Table(name string) FileOption {
 	}
 }
 
-// DontCompress sets whether to compress the data.
+// DontCompress sets whether to compress the data. 	In streaming - do not pass DontCompress if file is not already compressed.
+
 func DontCompress() FileOption {
 	return option{
 		run: func(p *properties.All) error {
@@ -144,7 +145,7 @@ func backOff(off *backoff.ExponentialBackOff) FileOption {
 	}
 }
 
-// FlushImmediately  the service will not aggregate files together and flush immediately, thus overrideing batching policy
+// FlushImmediately  the service batching manager will not aggregate this file, thus overriding the batching policy
 func FlushImmediately() FileOption {
 	return option{
 		run: func(p *properties.All) error {

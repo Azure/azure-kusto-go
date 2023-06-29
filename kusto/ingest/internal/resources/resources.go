@@ -6,16 +6,11 @@ import (
 	"context"
 	"errors"
 	"fmt"
-	"net/http"
 	"net/url"
 	"strings"
 	"sync"
 	"sync/atomic"
 	"time"
-
-	"github.com/Azure/azure-sdk-for-go/sdk/azcore"
-	"github.com/Azure/azure-sdk-for-go/sdk/storage/azblob"
-	"github.com/Azure/azure-sdk-for-go/sdk/storage/azblob/blob"
 
 	"github.com/Azure/azure-kusto-go/kusto"
 	kustoErrors "github.com/Azure/azure-kusto-go/kusto/data/errors"
@@ -398,27 +393,4 @@ func InitBackoff() backoff.BackOff {
 	exp.InitialInterval = defaultInitialInterval
 	exp.Multiplier = defaultMultiplier
 	return backoff.WithMaxRetries(exp, retryCount)
-}
-
-func FetchBlobSize(fPath string, ctx context.Context, client *http.Client) (size int64, err error) {
-	parsed, err := Parse(fPath)
-	if err != nil {
-		return 0, err
-	}
-
-	service := fmt.Sprintf("%s://%s?%s", parsed.URL().Scheme, parsed.URL().Host, parsed.SAS().Encode())
-	blobClient, err := azblob.NewClientWithNoCredential(service, &azblob.ClientOptions{
-		ClientOptions: azcore.ClientOptions{
-			Transport: client,
-		},
-	})
-
-	objectNameSplit := strings.SplitN(parsed.ObjectName(), "/", 2)
-	blobCli := blobClient.ServiceClient().NewContainerClient(objectNameSplit[0]).NewBlobClient(objectNameSplit[1])
-	properties, err := blobCli.GetProperties(ctx, &blob.GetPropertiesOptions{})
-	if err != nil {
-		return 0, err
-	}
-
-	return *properties.ContentLength, nil
 }

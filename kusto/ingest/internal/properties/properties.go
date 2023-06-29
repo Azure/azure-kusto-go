@@ -258,7 +258,7 @@ type SourceOptions struct {
 	// DeleteLocalSource indicates to delete the local file after it has been consumed.
 	DeleteLocalSource bool
 
-	// DontCompress indicates to not compress the file.
+	// DontCompress indicates to not compress the file. In streaming - do not pass DontCompress if file is not already compressed.
 	DontCompress bool
 
 	// OriginalSource is the path to the original source file, used for deletion.
@@ -279,7 +279,7 @@ type Ingestion struct {
 	RawDataSize int64 `json:",omitempty"`
 	// RetainBlobOnSuccess indicates if the source blob should be retained or deleted. True is preferrable.
 	RetainBlobOnSuccess bool `json:",omitempty"`
-	// FlushImmediately - the service will not aggregate files together and flush immediately, thus overrideing batching policy
+	// FlushImmediately - the service batching manager will not aggregate this file, thus overriding the batching policy
 	FlushImmediately bool
 	// IgnoreSizeLimit - ignores the size limit for data ingestion.
 	IgnoreSizeLimit bool `json:",omitempty"`

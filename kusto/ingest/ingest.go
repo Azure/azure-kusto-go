@@ -163,7 +163,6 @@ func (i *Ingestion) fromFile(ctx context.Context, fPath string, options []FileOp
 	if local {
 		err = i.fs.Local(ctx, fPath, props)
 	} else {
-
 		err = i.fs.Blob(ctx, fPath, 0, props)
 	}
 

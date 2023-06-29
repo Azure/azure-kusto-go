@@ -10,15 +10,14 @@ import (
 	"net/http"
 	"net/url"
 	"os"
-	"path"
 	"path/filepath"
-	"strings"
 	"time"
 
 	"github.com/Azure/azure-kusto-go/kusto/data/errors"
 	"github.com/Azure/azure-kusto-go/kusto/ingest/internal/gzip"
 	"github.com/Azure/azure-kusto-go/kusto/ingest/internal/properties"
 	"github.com/Azure/azure-kusto-go/kusto/ingest/internal/resources"
+	"github.com/Azure/azure-kusto-go/kusto/ingest/internal/utils"
 
 	"github.com/Azure/azure-pipeline-go/pipeline"
 	"github.com/Azure/azure-sdk-for-go/sdk/azcore"
@@ -154,7 +153,7 @@ func (i *Ingestion) Reader(ctx context.Context, reader io.Reader, props properti
 
 	shouldCompress := true
 	if props.Source.OriginalSource != "" {
-		shouldCompress = CompressionDiscovery(props.Source.OriginalSource) == properties.CTNone
+		shouldCompress = utils.CompressionDiscovery(props.Source.OriginalSource) == properties.CTNone
 	}
 	if props.Source.DontCompress {
 		shouldCompress = false
@@ -332,7 +331,7 @@ var nower = time.Now
 // localToBlob copies from a local to to an Azure Blobstore blob. It returns the URL of the Blob, the local file info and an
 // error if there was one.
 func (i *Ingestion) localToBlob(ctx context.Context, from string, client *azblob.Client, container string, props *properties.All) (string, int64, error) {
-	compression := CompressionDiscovery(from)
+	compression := utils.CompressionDiscovery(from)
 	blobName := fmt.Sprintf("%s_%s_%s_%s_%s", i.db, i.table, nower(), filepath.Base(uuid.New().String()), filepath.Base(from))
 	if compression == properties.CTNone {
 		blobName = blobName + ".gz"
@@ -394,26 +393,6 @@ func (i *Ingestion) localToBlob(ctx context.Context, from string, client *azblob
 	}
 
 	return fullUrl(client, container, blobName), stat.Size(), nil
-}
-
-// CompressionDiscovery looks at the file extension. If it is one we support, we return that
-// CompressionType that represents that value. Otherwise we return CTNone to indicate that the
-// file should not be compressed.
-func CompressionDiscovery(fName string) properties.CompressionType {
-	var ext string
-	if strings.HasPrefix(strings.ToLower(fName), "http") {
-		ext = strings.ToLower(filepath.Ext(path.Base(fName)))
-	} else {
-		ext = strings.ToLower(filepath.Ext(fName))
-	}
-
-	switch ext {
-	case ".gz":
-		return properties.GZIP
-	case ".zip":
-		return properties.ZIP
-	}
-	return properties.CTNone
 }
 
 // This allows mocking the stat func later on
