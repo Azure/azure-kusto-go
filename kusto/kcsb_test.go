@@ -107,6 +107,20 @@ func TestWitAadUserToken(t *testing.T) {
 	assert.EqualValues(t, want, *actual)
 }
 
+func TestWithWorkloadIdentity(t *testing.T) {
+	want := ConnectionStringBuilder{
+		DataSource:              "endpoint",
+		ApplicationClientId:     "clientID",
+		AuthorityId:             "authorityID",
+		FederationTokenFilePath: "tokenfilepath",
+		WorkloadAuthentication:  true,
+	}
+
+	actual := NewConnectionStringBuilder("endpoint").WithKubernetesWorkloadIdentity("clientID", "tokenfilepath", "authorityID")
+
+	assert.EqualValues(t, want, *actual)
+}
+
 func TestWitAadUserTokenErr(t *testing.T) {
 	defer func() {
 		if res := recover(); res == nil {
@@ -169,8 +183,11 @@ func TestGetTokenProviderHappy(t *testing.T) {
 		}, {
 			name: "test_tokenprovider_workloadidentity",
 			kcsb: ConnectionStringBuilder{
-				DataSource:             "https://endpoint/test_tokenprovider_workloadidentity",
-				WorkloadAuthentication: true,
+				DataSource:              "https://endpoint/test_tokenprovider_workloadidentity",
+				ApplicationClientId:     "clientID",
+				AuthorityId:             "tenantID",
+				FederationTokenFilePath: "tokenfilepath",
+				WorkloadAuthentication:  true,
 			},
 		}, {
 			name: "test_tokenprovider_usertoken",

@@ -25,7 +25,7 @@ type ConnectionStringBuilder struct {
 	AzCli                            bool
 	MsiAuthentication                bool
 	WorkloadAuthentication           bool
-	FederationTokenFile              string
+	FederationTokenFilePath          string
 	ManagedServiceIdentity           string
 	InteractiveLogin                 bool
 	RedirectURL                      string
@@ -161,6 +161,7 @@ func (kcsb *ConnectionStringBuilder) resetConnectionString() {
 	kcsb.ApplicationToken = ""
 	kcsb.AzCli = false
 	kcsb.MsiAuthentication = false
+	kcsb.WorkloadAuthentication = false
 	kcsb.ManagedServiceIdentity = ""
 	kcsb.InteractiveLogin = false
 	kcsb.RedirectURL = ""
@@ -256,9 +257,12 @@ func (kcsb *ConnectionStringBuilder) WithSystemManagedIdentity() *ConnectionStri
 
 // WithKubernetesWorkloadIdentity Creates a Kusto Connection string builder that will authenticate with AAD application, using
 // an application token obtained from a Microsoft Service Identity endpoint using Kubernetes workload identity.
-func (kcsb *ConnectionStringBuilder) WithKubernetesWorkloadIdentity() *ConnectionStringBuilder {
+func (kcsb *ConnectionStringBuilder) WithKubernetesWorkloadIdentity(appId, tokenFilePath, authorityID string) *ConnectionStringBuilder {
 	requireNonEmpty(dataSource, kcsb.DataSource)
 	kcsb.resetConnectionString()
+	kcsb.ApplicationClientId = appId
+	kcsb.AuthorityId = authorityID
+	kcsb.FederationTokenFilePath = tokenFilePath
 	kcsb.WorkloadAuthentication = true
 	return kcsb
 }
@@ -397,8 +401,8 @@ func (kcsb *ConnectionStringBuilder) newTokenProvider() (*TokenProvider, error) 
 				opts.ClientID = kcsb.ApplicationClientId
 			}
 
-			if !isEmpty(kcsb.FederationTokenFile) {
-				opts.TokenFilePath = kcsb.FederationTokenFile
+			if !isEmpty(kcsb.FederationTokenFilePath) {
+				opts.TokenFilePath = kcsb.FederationTokenFilePath
 			}
 
 			if !isEmpty(kcsb.AuthorityId) {
