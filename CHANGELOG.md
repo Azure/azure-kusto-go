@@ -11,7 +11,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 * [BREAKING] [MAJOR] Split the main module into two packages:
     * azkustodata - contains querying, management APIs.
     * azkustoingest - contains ingestion in all its forms.
-
+### Fixed
+* Fixed wrong context deadline setting
 ## [0.13.1] - 2023-05-24
 
 ### Changed
