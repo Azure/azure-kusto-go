@@ -346,6 +346,7 @@ func (i *Ingestion) localToBlob(ctx context.Context, from string, client *azblob
 		).SetNoRetry()
 	}
 
+	defer file.Close()
 	stat, err := file.Stat()
 	if err != nil {
 		return "", 0, errors.ES(

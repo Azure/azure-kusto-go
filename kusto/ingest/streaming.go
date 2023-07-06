@@ -68,13 +68,11 @@ func (i *Streaming) FromFile(ctx context.Context, fPath string, options ...FileO
 		return streamImpl(i.streamConn, ctx, generateBlobUriPayloadReader(fPath), props, true)
 	}
 
-	if err != nil {
-		return nil, err
-	}
-
+	defer file.Close()
 	return streamImpl(i.streamConn, ctx, file, props, false)
 }
 
+// Returns the opened file, err, boolean indicator if its a local file
 func prepFileAndProps(fPath string, props *properties.All, options []FileOption, client ClientScope) (*os.File, error, bool) {
 	var err error
 	for _, option := range options {

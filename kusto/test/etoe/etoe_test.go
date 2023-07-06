@@ -1606,6 +1606,7 @@ func TestReaderIngestion(t *testing.T) { // ok
 				panic(err)
 			}
 
+			defer f.Close()
 			// We could do this other ways that are simplier for testing, but this mimics what the user will likely do.
 			reader, writer := io.Pipe()
 			go func() {

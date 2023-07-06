@@ -94,6 +94,9 @@ func (m *Managed) streamWithRetries(ctx context.Context, payloadProvider func() 
 func (m *Managed) FromFile(ctx context.Context, fPath string, options ...FileOption) (*Result, error) {
 	props := m.newProp()
 	file, err, local := prepFileAndProps(fPath, &props, options, ManagedClient)
+	if err != nil {
+		return nil, err
+	}
 
 	if !local {
 		size, err := utils.FetchBlobSize(fPath, ctx, m.queued.client.HttpClient())
@@ -115,10 +118,7 @@ func (m *Managed) FromFile(ctx context.Context, fPath string, options ...FileOpt
 		return m.queued.fromFile(ctx, fPath, []FileOption{}, props)
 	}
 
-	if err != nil {
-		return nil, err
-	}
-
+	// No need to get local file size as we later use the compressed stream size
 	return m.managedStreamImpl(ctx, file, props)
 }
 
@@ -141,25 +141,27 @@ func (m *Managed) FromReader(ctx context.Context, reader io.Reader, options ...F
 		}
 	}
 
-	return m.managedStreamImpl(ctx, reader, props)
+	return m.managedStreamImpl(ctx, io.NopCloser(reader), props)
 }
 
-func (m *Managed) managedStreamImpl(ctx context.Context, payload io.Reader, props properties.All) (*Result, error) {
+func (m *Managed) managedStreamImpl(ctx context.Context, payload io.ReadCloser, props properties.All) (*Result, error) {
+	defer payload.Close()
 	compress := !props.Source.DontCompress
+	var compressed io.Reader
 	if compress {
-		payload = gzip.Compress(payload)
+		compressed = gzip.Compress(io.NopCloser(payload))
 		props.Source.DontCompress = true
 	}
 
 	maxSize := maxStreamingSize
 
-	buf, err := io.ReadAll(io.LimitReader(payload, int64(maxSize+1)))
+	buf, err := io.ReadAll(io.LimitReader(compressed, int64(maxSize+1)))
 	if err != nil {
 		return nil, err
 	}
 
 	if shouldUseQueuedIngestBySize(properties.GZIP, int64(len(buf))) {
-		combinedBuf := io.MultiReader(bytes.NewReader(buf), payload)
+		combinedBuf := io.MultiReader(bytes.NewReader(buf), compressed)
 		return m.queued.fromReader(ctx, combinedBuf, []FileOption{}, props)
 	}
 
