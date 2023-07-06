@@ -147,7 +147,7 @@ func (m *Managed) FromReader(ctx context.Context, reader io.Reader, options ...F
 func (m *Managed) managedStreamImpl(ctx context.Context, payload io.ReadCloser, props properties.All) (*Result, error) {
 	defer payload.Close()
 	compress := !props.Source.DontCompress
-	var compressed io.Reader
+	var compressed io.Reader = payload
 	if compress {
 		compressed = gzip.Compress(io.NopCloser(payload))
 		props.Source.DontCompress = true
