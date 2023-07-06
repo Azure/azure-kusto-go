@@ -64,7 +64,7 @@ func (i *Streaming) FromFile(ctx context.Context, fPath string, options ...FileO
 		return nil, err
 	}
 
-	if local {
+	if !local {
 		return streamImpl(i.streamConn, ctx, generateBlobUriPayloadReader(fPath), props, true)
 	}
 
