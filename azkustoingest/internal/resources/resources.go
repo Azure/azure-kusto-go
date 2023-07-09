@@ -7,7 +7,6 @@ import (
 	"errors"
 	"fmt"
 	"github.com/Azure/azure-kusto-go/azkustodata"
-	"github.com/Azure/azure-kusto-go/azkustodata/kql"
 	"net/url"
 	"strings"
 	"sync"
@@ -15,8 +14,8 @@ import (
 	"time"
 
 	kustoErrors "github.com/Azure/azure-kusto-go/azkustodata/errors"
-	"github.com/Azure/azure-kusto-go/azkustodata/table"
 	"github.com/Azure/azure-kusto-go/azkustodata/kql"
+	"github.com/Azure/azure-kusto-go/azkustodata/table"
 	"github.com/cenkalti/backoff/v4"
 )
 

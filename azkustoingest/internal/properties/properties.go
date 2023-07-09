@@ -7,13 +7,13 @@ import (
 	"encoding/json"
 	"fmt"
 	"github.com/Azure/azure-kusto-go/azkustodata"
+	"github.com/cenkalti/backoff/v4"
 	"net/url"
 	"os"
 	"path/filepath"
 	"strings"
 	"time"
 
-	"github.com/Azure/azure-kusto-go/kusto"
 	"github.com/Azure/azure-kusto-go/azkustodata/errors"
 	"github.com/google/uuid"
 )

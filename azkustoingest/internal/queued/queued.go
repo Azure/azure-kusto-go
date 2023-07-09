@@ -5,6 +5,7 @@ package queued
 import (
 	"context"
 	"fmt"
+	"github.com/Azure/azure-kusto-go/azkustoingest/internal/utils"
 	"io"
 	"math/rand"
 	"net/http"
@@ -17,7 +18,6 @@ import (
 	"github.com/Azure/azure-kusto-go/azkustoingest/internal/gzip"
 	"github.com/Azure/azure-kusto-go/azkustoingest/internal/properties"
 	"github.com/Azure/azure-kusto-go/azkustoingest/internal/resources"
-	"github.com/Azure/azure-kusto-go/kusto/ingest/internal/utils"
 
 	"github.com/Azure/azure-pipeline-go/pipeline"
 	"github.com/Azure/azure-sdk-for-go/sdk/azcore"

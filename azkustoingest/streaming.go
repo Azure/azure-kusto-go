@@ -5,6 +5,7 @@ import (
 	"bytes"
 	"context"
 	"encoding/json"
+	"github.com/Azure/azure-kusto-go/azkustoingest/internal/utils"
 	"io"
 	"os"
 
@@ -13,7 +14,6 @@ import (
 	"github.com/Azure/azure-kusto-go/azkustoingest/internal/gzip"
 	"github.com/Azure/azure-kusto-go/azkustoingest/internal/properties"
 	"github.com/Azure/azure-kusto-go/azkustoingest/internal/queued"
-	"github.com/Azure/azure-kusto-go/kusto/ingest/internal/utils"
 	"github.com/google/uuid"
 )
 

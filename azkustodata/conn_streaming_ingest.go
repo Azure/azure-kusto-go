@@ -8,8 +8,6 @@ import (
 	"io"
 	"net/url"
 	"time"
-
-
 )
 
 type DataFormatForStreaming interface {

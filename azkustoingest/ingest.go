@@ -4,10 +4,9 @@ import (
 	"bytes"
 	"context"
 	"fmt"
+	"github.com/Azure/azure-kusto-go/azkustodata"
 	"io"
 	"sync"
-
-	"github.com/Azure/azure-kusto-go/kusto"
 
 	"github.com/Azure/azure-kusto-go/azkustodata/errors"
 	"github.com/Azure/azure-kusto-go/azkustoingest/internal/properties"

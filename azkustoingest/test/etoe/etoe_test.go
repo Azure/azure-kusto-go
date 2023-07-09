@@ -138,11 +138,48 @@ func TestFileIngestion(t *testing.T) { //ok
 			}),
 		},
 		{
-			desc:     "Ingest from blob with streaming ingestion should fail",
+			desc:     "Streaming ingest from blob",
 			ingestor: streamingIngestor,
 			src:      "https://adxingestiondemo.blob.core.windows.net/data/demo.json",
 			options:  []azkustoingest.FileOption{azkustoingest.IngestionMappingRef("Logs_mapping", azkustoingest.JSON)},
-			wantErr:  azkustoingest.FileIsBlobErr,
+			stmt:     countStatement,
+			table:    streamingTable,
+			doer: func(row *table.Row, update interface{}) error {
+				rec := testshared.CountResult{}
+				if err := row.ToStruct(&rec); err != nil {
+					return err
+				}
+				recs := update.(*[]testshared.CountResult)
+				*recs = append(*recs, rec)
+				return nil
+			},
+			gotInit: func() interface{} {
+				v := []testshared.CountResult{}
+				return &v
+			},
+			want: &[]testshared.CountResult{{Count: 500}},
+		},
+		{
+			desc:     "Managed streaming ingest from blob",
+			ingestor: managedIngestor,
+			src:      "https://adxingestiondemo.blob.core.windows.net/data/demo.json",
+			options:  []azkustoingest.FileOption{azkustoingest.IngestionMappingRef("Logs_mapping", azkustoingest.JSON)},
+			stmt:     countStatement,
+			table:    managedTable,
+			doer: func(row *table.Row, update interface{}) error {
+				rec := testshared.CountResult{}
+				if err := row.ToStruct(&rec); err != nil {
+					return err
+				}
+				recs := update.(*[]testshared.CountResult)
+				*recs = append(*recs, rec)
+				return nil
+			},
+			gotInit: func() interface{} {
+				v := []testshared.CountResult{}
+				return &v
+			},
+			want: &[]testshared.CountResult{{Count: 500}},
 		},
 		{
 			desc:     "Ingest from blob with existing mapping",
@@ -739,6 +776,7 @@ func TestReaderIngestion(t *testing.T) { // ok
 			if err != nil {
 				panic(err)
 			}
+			defer f.Close()
 
 			// We could do this other ways that are simplier for testing, but this mimics what the user will likely do.
 			reader, writer := io.Pipe()
