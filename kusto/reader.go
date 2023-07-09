@@ -138,18 +138,6 @@ func (r *RowIterator) start() chan struct{} {
 				r.columns = sent.inColumns
 				sent.done()
 				gotColumns = true
-				closeDone()
-			case sent, ok := <-r.inRows:
-				logger.Info().Msg("got rows")
-				if !ok {
-					close(r.rows)
-					return
-				}
-				if !gotColumns {
-					rowBuffer = append(rowBuffer, sent)
-					sent.done()
-					continue
-				}
 				if len(rowBuffer) > 0 {
 					logger.Info().Msg("sending buffered rows")
 					for _, s := range rowBuffer {
@@ -178,7 +166,18 @@ func (r *RowIterator) start() chan struct{} {
 					logger.Info().Msg("sent buffered row errors")
 					rowBuffer = rowBuffer[:0]
 				}
-
+				closeDone()
+			case sent, ok := <-r.inRows:
+				logger.Info().Msg("got rows")
+				if !ok {
+					close(r.rows)
+					return
+				}
+				if !gotColumns {
+					rowBuffer = append(rowBuffer, sent)
+					sent.done()
+					continue
+				}
 				logger.Info().Msg("got rows ok")
 				if sent.inRows != nil {
 					logger.Info().Msg("sending rows")
