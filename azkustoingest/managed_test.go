@@ -44,7 +44,7 @@ func TestManaged(t *testing.T) {
 	bigData, _ := initFile(t, bigReader)
 	counter := 0
 
-	someBlobPath := "https://some-blob.windows.net/some-container/some-blob"
+	someBlobPath := "https://some-blob.blob.core.windows.net/some-container/some-blob;Managed_Identity="
 
 	tests := []struct {
 		name            string
@@ -64,7 +64,7 @@ func TestManaged(t *testing.T) {
 			name:    "TestManagedStreamingDefault",
 			options: []FileOption{},
 			onStreamIngest: func(t *testing.T, ctx context.Context, db, table string, payload io.Reader, format azkustodata.DataFormatForStreaming, mappingName string,
-				clientRequestId string) error {
+				clientRequestId string, isBlobUri bool) error {
 				assert.Equal(t, "defaultDb", db)
 				assert.Equal(t, "defaultTable", table)
 				payloadBytes, err := io.ReadAll(payload)
@@ -88,7 +88,7 @@ func TestManaged(t *testing.T) {
 				Table("otherTable"),
 			},
 			onStreamIngest: func(t *testing.T, ctx context.Context, db, table string, payload io.Reader, format azkustodata.DataFormatForStreaming, mappingName string,
-				clientRequestId string) error {
+				clientRequestId string, isBlobUri bool) error {
 				assert.Equal(t, "otherDb", db)
 				assert.Equal(t, "otherTable", table)
 				payloadBytes, err := io.ReadAll(payload)
@@ -110,7 +110,7 @@ func TestManaged(t *testing.T) {
 				FileFormat(properties.JSON),
 			},
 			onStreamIngest: func(t *testing.T, ctx context.Context, db, table string, payload io.Reader, format azkustodata.DataFormatForStreaming, mappingName string,
-				clientRequestId string) error {
+				clientRequestId string, isBlobUri bool) error {
 				assert.Equal(t, "defaultDb", db)
 				assert.Equal(t, "defaultTable", table)
 				payloadBytes, err := io.ReadAll(payload)
@@ -133,7 +133,7 @@ func TestManaged(t *testing.T) {
 				ClientRequestId("clientRequestId"),
 			},
 			onStreamIngest: func(t *testing.T, ctx context.Context, db, table string, payload io.Reader, format azkustodata.DataFormatForStreaming, mappingName string,
-				clientRequestId string) error {
+				clientRequestId string, isBlobUri bool) error {
 				assert.Equal(t, "defaultDb", db)
 				assert.Equal(t, "defaultTable", table)
 				payloadBytes, err := io.ReadAll(payload)
@@ -151,7 +151,7 @@ func TestManaged(t *testing.T) {
 			name:    "TestPermanentError",
 			options: []FileOption{},
 			onStreamIngest: func(t *testing.T, ctx context.Context, db, table string, payload io.Reader, format azkustodata.DataFormatForStreaming, mappingName string,
-				clientRequestId string) error {
+				clientRequestId string, isBlobUri bool) error {
 				assert.Equal(t, "defaultDb", db)
 				assert.Equal(t, "defaultTable", table)
 				payloadBytes, err := io.ReadAll(payload)
@@ -173,7 +173,7 @@ func TestManaged(t *testing.T) {
 			name:    "TestPermanentErrorNotKusto",
 			options: []FileOption{},
 			onStreamIngest: func(t *testing.T, ctx context.Context, db, table string, payload io.Reader, format azkustodata.DataFormatForStreaming, mappingName string,
-				clientRequestId string) error {
+				clientRequestId string, isBlobUri bool) error {
 				assert.Equal(t, "defaultDb", db)
 				assert.Equal(t, "defaultTable", table)
 				payloadBytes, err := io.ReadAll(payload)
@@ -195,7 +195,7 @@ func TestManaged(t *testing.T) {
 			name:    "TestSingleTransientError",
 			options: []FileOption{},
 			onStreamIngest: func(t *testing.T, ctx context.Context, db, table string, payload io.Reader, format azkustodata.DataFormatForStreaming, mappingName string,
-				clientRequestId string) error {
+				clientRequestId string, isBlobUri bool) error {
 				assert.Equal(t, "defaultDb", db)
 				assert.Equal(t, "defaultTable", table)
 				payloadBytes, err := io.ReadAll(payload)
@@ -219,7 +219,7 @@ func TestManaged(t *testing.T) {
 			name:    "TestMultipleTransientErrors",
 			options: []FileOption{},
 			onStreamIngest: func(t *testing.T, ctx context.Context, db, table string, payload io.Reader, format azkustodata.DataFormatForStreaming, mappingName string,
-				clientRequestId string) error {
+				clientRequestId string, isBlobUri bool) error {
 				assert.Equal(t, "defaultDb", db)
 				assert.Equal(t, "defaultTable", table)
 				payloadBytes, err := io.ReadAll(payload)
@@ -262,7 +262,7 @@ func TestManaged(t *testing.T) {
 			options:   []FileOption{},
 			isBigFile: true,
 			onStreamIngest: func(t *testing.T, ctx context.Context, db, table string, payload io.Reader, format azkustodata.DataFormatForStreaming, mappingName string,
-				clientRequestId string) error {
+				clientRequestId string, isBlobUri bool) error {
 				require.Fail(t, "Big file shouldn't try to stream")
 				return errors.E(errors.OpIngestStream, errors.KHTTPError, fmt.Errorf("error"))
 			},
@@ -292,11 +292,9 @@ func TestManaged(t *testing.T) {
 		},
 		{
 			name:     "TestBlob",
-			options:  []FileOption{},
 			blobPath: someBlobPath,
 			onStreamIngest: func(t *testing.T, ctx context.Context, db, table string, payload io.Reader, format azkustodata.DataFormatForStreaming, mappingName string,
-				clientRequestId string) error {
-				require.Fail(t, "Big file shouldn't try to stream")
+				clientRequestId string, isBlobUri bool) error {
 				return errors.E(errors.OpIngestStream, errors.KHTTPError, fmt.Errorf("error"))
 			},
 			onMgmt: func(t *testing.T, ctx context.Context, db string, query azkustodata.Statement, options ...azkustodata.MgmtOption) (*azkustodata.RowIterator, error) {
@@ -326,8 +324,8 @@ func TestManaged(t *testing.T) {
 	for _, test := range tests {
 		t.Run(test.name, func(t *testing.T) {
 			streamIngestor := fakeStreamIngestor{
-				onStreamIngest: func(ctx context.Context, db, table string, payload io.Reader, format azkustodata.DataFormatForStreaming, mappingName string, clientRequestId string) error {
-					err := test.onStreamIngest(t, ctx, db, table, payload, format, mappingName, clientRequestId)
+				onStreamIngest: func(ctx context.Context, db, table string, payload io.Reader, format azkustodata.DataFormatForStreaming, mappingName string, clientRequestId string, isBlobUri bool) error {
+					err := test.onStreamIngest(t, ctx, db, table, payload, format, mappingName, clientRequestId, isBlobUri)
 					counter++
 					return err
 				},

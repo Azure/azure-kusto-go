@@ -119,7 +119,8 @@ func Table(name string) FileOption {
 	}
 }
 
-// DontCompress sets whether to compress the data.
+// DontCompress sets whether to compress the data. 	In streaming - do not pass DontCompress if file is not already compressed.
+
 func DontCompress() FileOption {
 	return option{
 		run: func(p *properties.All) error {
@@ -144,7 +145,7 @@ func backOff(off *backoff.ExponentialBackOff) FileOption {
 	}
 }
 
-// FlushImmediately tells Kusto to flush on write.
+// FlushImmediately  the service batching manager will not aggregate this file, thus overriding the batching policy
 func FlushImmediately() FileOption {
 	return option{
 		run: func(p *properties.All) error {
@@ -457,5 +458,19 @@ func ClientRequestId(clientRequestId string) FileOption {
 		sourceScope:  FromFile | FromReader | FromBlob,
 		clientScopes: StreamingClient | ManagedClient,
 		name:         "ClientRequestId",
+	}
+}
+
+// RawDataSize is the uncompressed data size. Should be used to comunicate the file size to the service for efficient ingestion.
+// Also used by managed client in the decision to use queued ingestion instead of streaming (if > 4mb)
+func RawDataSize(size int64) FileOption {
+	return option{
+		run: func(p *properties.All) error {
+			p.Ingestion.RawDataSize = size
+			return nil
+		},
+		sourceScope:  FromFile | FromReader | FromBlob,
+		clientScopes: StreamingClient | ManagedClient | QueuedClient,
+		name:         "RawDataSize",
 	}
 }

@@ -7,13 +7,13 @@ import (
 	"encoding/json"
 	"fmt"
 	"github.com/Azure/azure-kusto-go/azkustodata"
-	"github.com/cenkalti/backoff/v4"
 	"net/url"
 	"os"
 	"path/filepath"
 	"strings"
 	"time"
 
+	"github.com/Azure/azure-kusto-go/kusto"
 	"github.com/Azure/azure-kusto-go/azkustodata/errors"
 	"github.com/google/uuid"
 )
@@ -258,7 +258,7 @@ type SourceOptions struct {
 	// DeleteLocalSource indicates to delete the local file after it has been consumed.
 	DeleteLocalSource bool
 
-	// DontCompress indicates to not compress the file.
+	// DontCompress indicates to not compress the file. In streaming - do not pass DontCompress if file is not already compressed.
 	DontCompress bool
 
 	// OriginalSource is the path to the original source file, used for deletion.
@@ -275,16 +275,13 @@ type Ingestion struct {
 	DatabaseName string
 	// TableName is the name of the Kusto table the the data will ingest into.
 	TableName string
-	// RawDataSize is the size of the file on the filesystem, if it was provided.
+	// RawDataSize is the uncompressed data size. Should be used to comunicate the file size to the service for efficient ingestion.
 	RawDataSize int64 `json:",omitempty"`
-	// RetainBlobOnSuccess indicates if the source blob should be retained or deleted.
+	// RetainBlobOnSuccess indicates if the source blob should be retained or deleted. True is preferrable.
 	RetainBlobOnSuccess bool `json:",omitempty"`
-	// Daniel:
-	// FlushImmediately ... I know what flushing means, but in terms of here, do we not return until the Kusto
-	// table is updated, does this mean we do....  This is really a duplicate comment on the options in ingest.go
+	// FlushImmediately - the service batching manager will not aggregate this file, thus overriding the batching policy
 	FlushImmediately bool
-	// Daniel:
-	// IgnoreSizeLimit
+	// IgnoreSizeLimit - ignores the size limit for data ingestion.
 	IgnoreSizeLimit bool `json:",omitempty"`
 	// ReportLevel defines which if any ingestion states are reported.
 	ReportLevel IngestionReportLevel `json:",omitempty"`
