@@ -12,11 +12,10 @@ import (
 	"sync/atomic"
 	"time"
 
-	"github.com/Azure/azure-kusto-go/kusto/kql"
-
 	"github.com/Azure/azure-kusto-go/kusto"
 	kustoErrors "github.com/Azure/azure-kusto-go/kusto/data/errors"
 	"github.com/Azure/azure-kusto-go/kusto/data/table"
+	"github.com/Azure/azure-kusto-go/kusto/kql"
 	"github.com/cenkalti/backoff/v4"
 )
 
@@ -45,8 +44,8 @@ type URI struct {
 	sas                             url.Values
 }
 
-// parse parses a string representing a Kutso resource URI.
-func parse(uri string) (*URI, error) {
+// Parse parses a string representing a Kutso resource URI.
+func Parse(uri string) (*URI, error) {
 	// Example for a valid url:
 	// https://fkjsalfdks.blob.core.windows.com/sdsadsadsa?sas=asdasdasd
 
@@ -275,7 +274,7 @@ type Ingestion struct {
 var errDoNotCare = errors.New("don't care about this")
 
 func (i *Ingestion) importRec(rec ingestResc) error {
-	u, err := parse(rec.Root)
+	u, err := Parse(rec.Root)
 	if err != nil {
 		return fmt.Errorf("the StorageRoot URI received(%s) has an error: %s", rec.Root, err)
 	}

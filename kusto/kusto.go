@@ -136,10 +136,7 @@ func (c *Client) Query(ctx context.Context, db string, query Statement, options 
 	logger := utils.Logger.With().Str("queryId", uuid.New().String()).Str("db", db).Logger()
 	ctx = logger.WithContext(ctx)
 
-	ctx, cancel, err := contextSetup(ctx, false) // Note: cancel is called when *RowIterator has Stop() called.
-	if err != nil {
-		return nil, err
-	}
+	ctx, cancel := contextSetup(ctx) // Note: cancel is called when *RowIterator has Stop() called.
 
 	opts, err := setQueryOptions(ctx, errors.OpQuery, query, queryCall, options...)
 	if err != nil {
@@ -205,10 +202,7 @@ func (c *Client) Query(ctx context.Context, db string, query Statement, options 
 }
 
 func (c *Client) QueryToJson(ctx context.Context, db string, query Statement, options ...QueryOption) (string, error) {
-	ctx, cancel, err := contextSetup(ctx, false) // Note: cancel is called when *RowIterator has Stop() called.
-	if err != nil {
-		return "", err
-	}
+	ctx, cancel := contextSetup(ctx) // Note: cancel is called when *RowIterator has Stop() called.
 
 	opts, err := setQueryOptions(ctx, errors.OpQuery, query, queryCall, options...)
 	if err != nil {
@@ -241,10 +235,7 @@ func (c *Client) Mgmt(ctx context.Context, db string, query Statement, options .
 		}
 	}
 
-	ctx, cancel, err := contextSetup(ctx, true) // Note: cancel is called when *RowIterator has Stop() called.
-	if err != nil {
-		return nil, err
-	}
+	ctx, cancel := contextSetup(ctx) // Note: cancel is called when *RowIterator has Stop() called.
 
 	opts, err := setQueryOptions(ctx, errors.OpQuery, query, mgmtCall, options...)
 	if err != nil {
@@ -374,25 +365,8 @@ func (c *Client) getConn(callType callType, options connOptions) (queryer, error
 	}
 }
 
-func contextSetup(ctx context.Context, mgmtCall bool) (context.Context, context.CancelFunc, error) {
-	t, ok := ctx.Deadline()
-	if ok {
-		d := t.Sub(time.Now())
-		if d > 1*time.Hour {
-			if mgmtCall {
-				return ctx, nil, errors.ES(errors.OpMgmt, errors.KClientArgs, "cannot set a deadline greater than 1 hour(%s)", d)
-			}
-			return ctx, nil, errors.ES(errors.OpQuery, errors.KClientArgs, "cannot set a deadline greater than 1 hour(%s)", d)
-		}
-		ctx, cancel := context.WithCancel(ctx)
-		return ctx, cancel, nil
-	}
-	if mgmtCall {
-		ctx, cancel := context.WithTimeout(ctx, 10*time.Minute)
-		return ctx, cancel, nil
-	}
-	ctx, cancel := context.WithTimeout(ctx, 4*time.Minute)
-	return ctx, cancel, nil
+func contextSetup(ctx context.Context) (context.Context, context.CancelFunc) {
+	return context.WithCancel(ctx)
 }
 
 func (c *Client) HttpClient() *http.Client {
