@@ -4,9 +4,10 @@ import (
 	"bytes"
 	"context"
 	"fmt"
-	"github.com/Azure/azure-kusto-go/kusto"
 	"io"
 	"sync"
+
+	"github.com/Azure/azure-kusto-go/kusto"
 
 	"github.com/Azure/azure-kusto-go/kusto/data/errors"
 	"github.com/Azure/azure-kusto-go/kusto/ingest/internal/properties"
@@ -162,7 +163,6 @@ func (i *Ingestion) fromFile(ctx context.Context, fPath string, options []FileOp
 	if local {
 		err = i.fs.Local(ctx, fPath, props)
 	} else {
-
 		err = i.fs.Blob(ctx, fPath, 0, props)
 	}
 
@@ -198,7 +198,7 @@ func (i *Ingestion) fromReader(ctx context.Context, reader io.Reader, options []
 	return result, nil
 }
 
-// Deprecated: Stream usea streaming ingest client instead - `ingest.NewStreaming`.
+// Deprecated: Stream use a streaming ingest client instead - `ingest.NewStreaming`.
 // takes a payload that is encoded in format with a server stored mappingName, compresses it and uploads it to Kusto.
 // More information can be found here:
 // https://docs.microsoft.com/en-us/azure/kusto/management/create-ingestion-mapping-command
@@ -220,7 +220,7 @@ func (i *Ingestion) Stream(ctx context.Context, payload []byte, format DataForma
 		},
 	}
 
-	_, err = streamImpl(c, ctx, bytes.NewReader(payload), props)
+	_, err = streamImpl(c, ctx, bytes.NewReader(payload), props, false)
 
 	return err
 }

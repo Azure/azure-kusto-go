@@ -537,6 +537,12 @@ func TestQueries(t *testing.T) {
 			},
 			want: &[]CountResult{{Count: 1}},
 		},
+		// {
+		// 	desc:   "Query: get json",
+		// 	stmt:   kql.New("").AddTable(allDataTypesTable).AddLiteral("| count"),
+		// 	qjcall: client.QueryToJson,
+		// 	want:   "[{\"FrameType\":\"DataSetHeader\",\"IsProgressive\":true,\"Version\":\"v2.0\"},{\"FrameType\":\"DataTable\",\"TableId\":<NUM>,\"TableKind\":\"QueryProperties\",\"TableName\":\"@ExtendedProperties\",\"Columns\":[{\"ColumnName\":\"TableId\",\"ColumnType\":\"int\"},{\"ColumnName\":\"Key\",\"ColumnType\":\"string\"},{\"ColumnName\":\"Value\",\"ColumnType\":\"dynamic\"}],\"Rows\":[[1,\"Visualization\",\"{\\\"Visualization\\\":null,\\\"Title\\\":null,\\\"XColumn\\\":null,\\\"Series\\\":null,\\\"YColumns\\\":null,\\\"AnomalyColumns\\\":null,\\\"XTitle\\\":null,\\\"YTitle\\\":null,\\\"XAxis\\\":null,\\\"YAxis\\\":null,\\\"Legend\\\":null,\\\"YSplit\\\":null,\\\"Accumulate\\\":false,\\\"IsQuerySorted\\\":false,\\\"Kind\\\":null,\\\"Ymin\\\":\\\"NaN\\\",\\\"Ymax\\\":\\\"NaN\\\",\\\"Xmin\\\":null,\\\"Xmax\\\":null}\"]]},{\"FrameType\":\"TableHeader\",\"TableId\":<NUM>,\"TableKind\":\"PrimaryResult\",\"TableName\":\"PrimaryResult\",\"Columns\":[{\"ColumnName\":\"Count\",\"ColumnType\":\"long\"}]},{\"FrameType\":\"TableFragment\",\"TableFragmentType\":\"DataAppend\",\"TableId\":<NUM>,\"Rows\":[[1]]},{\"FrameType\":\"TableProgress\",\"TableId\":<NUM>,\"TableProgress\"<TIME>},{\"FrameType\":\"TableCompletion\",\"TableId\":<NUM>,\"RowCount\":1},{\"FrameType\":\"DataTable\",\"TableId\":<NUM>,\"TableKind\":\"QueryCompletionInformation\",\"TableName\":\"QueryCompletionInformation\",\"Columns\":[{\"ColumnName\":\"Timestamp\",\"ColumnType\":\"datetime\"},{\"ColumnName\":\"ClientRequestId\",\"ColumnType\":\"string\"},{\"ColumnName\":\"ActivityId\",\"ColumnType\":\"guid\"},{\"ColumnName\":\"SubActivityId\",\"ColumnType\":\"guid\"},{\"ColumnName\":\"ParentActivityId\",\"ColumnType\":\"guid\"},{\"ColumnName\":\"Level\",\"ColumnType\":\"int\"},{\"ColumnName\":\"LevelName\",\"ColumnType\":\"string\"},{\"ColumnName\":\"StatusCode\",\"ColumnType\":\"int\"},{\"ColumnName\":\"StatusCodeName\",\"ColumnType\":\"string\"},{\"ColumnName\":\"EventType\",\"ColumnType\":\"int\"},{\"ColumnName\":\"EventTypeName\",\"ColumnType\":\"string\"},{\"ColumnName\":\"Payload\",\"ColumnType\":\"string\"}],\"Rows\":[[\"<TIME>\",\"KGC.execute;<GUID>\",\"<GUID>\",\"<GUID>\",\"<GUID>\",4,\"Info\",0,\"S_OK (0)\",4,\"QueryInfo\",\"{\\\"Count\\\":<NUM>,\\\"Text\\\":\\\"Query completed successfully\\\"}\"],[\"<TIME>\",\"KGC.execute;<GUID>\",\"<GUID>\",\"<GUID>\",\"<GUID>\",4,\"Info\",0,\"S_OK (0)\",5,\"WorkloadGroup\",\"{\\\"Count\\\":<NUM>,\\\"Text\\\":\\\"default\\\"}\"],[\"<TIME>\",\"KGC.execute;<GUID>\",\"<GUID>\",\"<GUID>\",\"<GUID>\",4,\"Info\",0,\"S_OK (0)\",6,\"EffectiveRequestOptions\",\"{\\\"Count\\\":<NUM>,\\\"Text\\\":\\\"{\\\\\\\"DataScope\\\\\\\":\\\\\\\"All\\\\\\\",\\\\\\\"QueryConsistency\\\\\\\":\\\\\\\"strongconsistency\\\\\\\",\\\\\\\"MaxMemoryConsumptionPerIterator\\\\\\\":<NUM>,\\\\\\\"MaxMemoryConsumptionPerQueryPerNode\\\\\\\":<NUM>,\\\\\\\"QueryFanoutNodesPercent\\\\\\\":<NUM>,\\\\\\\"QueryFanoutThreadsPercent\\\\\\\":100}\\\"}\"],[\"<TIME>\",\"KGC.execute;<GUID>\",\"<GUID>\",\"<GUID>\",\"<GUID>\",6,\"Stats\",0,\"S_OK (0)\",0,\"QueryResourceConsumption\",\"{\\\"ExecutionTime\\\"<TIME>,\\\"resource_usage\\\":{\\\"cache\\\":{\\\"memory\\\":{\\\"hits\\\":<NUM>,\\\"misses\\\":<NUM>,\\\"total\\\":0},\\\"disk\\\":{\\\"hits\\\":<NUM>,\\\"misses\\\":<NUM>,\\\"total\\\":0},\\\"shards\\\":{\\\"hot\\\":{\\\"hitbytes\\\":<NUM>,\\\"missbytes\\\":<NUM>,\\\"retrievebytes\\\":0},\\\"cold\\\":{\\\"hitbytes\\\":<NUM>,\\\"missbytes\\\":<NUM>,\\\"retrievebytes\\\":0},\\\"bypassbytes\\\":0}},\\\"cpu\\\":{\\\"user\\\":\\\"00:00:00\\\",\\\"kernel\\\":\\\"00:00:00\\\",\\\"total cpu\\\":\\\"00:00:00\\\"},\\\"memory\\\":{\\\"peak_per_node\\\":524384},\\\"network\\\":{\\\"inter_cluster_total_bytes\\\":<NUM>,\\\"cross_cluster_total_bytes\\\":0}},\\\"input_dataset_statistics\\\":{\\\"extents\\\":{\\\"total\\\":<NUM>,\\\"scanned\\\":<NUM>,\\\"scanned_min_datetime\\\":\\\"<TIME>\\\",\\\"scanned_max_datetime\\\":\\\"<TIME>\\\"},\\\"rows\\\":{\\\"total\\\":<NUM>,\\\"scanned\\\":0},\\\"rowstores\\\":{\\\"scanned_rows\\\":<NUM>,\\\"scanned_values_size\\\":0},\\\"shards\\\":{\\\"queries_generic\\\":<NUM>,\\\"queries_specialized\\\":0}},\\\"dataset_statistics\\\":[{\\\"table_row_count\\\":<NUM>,\\\"table_size\\\":9}],\\\"cross_cluster_resource_usage\\\":{}}\"]]},{\"FrameType\":\"DataSetCompletion\",\"HasErrors\":false,\"Cancelled\":false}]",
+		// },
 	}
 
 	for _, test := range tests {
@@ -961,13 +967,6 @@ func TestFileIngestion(t *testing.T) { //ok
 			}),
 		},
 		{
-			desc:     "Ingest from blob with streaming ingestion should fail",
-			ingestor: streamingIngestor,
-			src:      "https://adxingestiondemo.blob.core.windows.net/data/demo.json",
-			options:  []ingest.FileOption{ingest.IngestionMappingRef("Logs_mapping", ingest.JSON)},
-			wantErr:  ingest.FileIsBlobErr,
-		},
-		{
 			desc:     "Ingest from blob with existing mapping",
 			ingestor: queuedIngestor,
 			src:      "https://adxingestiondemo.blob.core.windows.net/data/demo.json",
@@ -1209,6 +1208,50 @@ func TestFileIngestion(t *testing.T) { //ok
 				return &v
 			},
 			want: &[]CountResult{{Count: 3}},
+		},
+		{
+			desc:     "Streaming ingest from blob",
+			ingestor: streamingIngestor,
+			src:      "https://adxingestiondemo.blob.core.windows.net/data/demo.json",
+			options:  []ingest.FileOption{ingest.IngestionMappingRef("Logs_mapping", ingest.JSON)},
+			stmt:     countStatement,
+			table:    streamingTable,
+			doer: func(row *table.Row, update interface{}) error {
+				rec := CountResult{}
+				if err := row.ToStruct(&rec); err != nil {
+					return err
+				}
+				recs := update.(*[]CountResult)
+				*recs = append(*recs, rec)
+				return nil
+			},
+			gotInit: func() interface{} {
+				v := []CountResult{}
+				return &v
+			},
+			want: &[]CountResult{{Count: 500}},
+		},
+		{
+			desc:     "Managed streaming ingest from blob",
+			ingestor: managedIngestor,
+			src:      "https://adxingestiondemo.blob.core.windows.net/data/demo.json",
+			options:  []ingest.FileOption{ingest.IngestionMappingRef("Logs_mapping", ingest.JSON)},
+			stmt:     countStatement,
+			table:    managedTable,
+			doer: func(row *table.Row, update interface{}) error {
+				rec := CountResult{}
+				if err := row.ToStruct(&rec); err != nil {
+					return err
+				}
+				recs := update.(*[]CountResult)
+				*recs = append(*recs, rec)
+				return nil
+			},
+			gotInit: func() interface{} {
+				v := []CountResult{}
+				return &v
+			},
+			want: &[]CountResult{{Count: 500}},
 		},
 	}
 
@@ -1563,6 +1606,7 @@ func TestReaderIngestion(t *testing.T) { // ok
 				panic(err)
 			}
 
+			defer f.Close()
 			// We could do this other ways that are simplier for testing, but this mimics what the user will likely do.
 			reader, writer := io.Pipe()
 			go func() {
