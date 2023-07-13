@@ -218,7 +218,7 @@ func (i *Ingestion) Blob(ctx context.Context, from string, fileSize int64, props
 
 	props.Ingestion.RetainBlobOnSuccess = !props.Source.DeleteLocalSource
 
-	err = CompleteFormatFromFileName(&props, properties.RemoveQueryParamsFromUrl(from))
+	err = CompleteFormatFromFileName(&props, from)
 	if err != nil {
 		return err
 	}

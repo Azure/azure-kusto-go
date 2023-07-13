@@ -140,7 +140,7 @@ func (i *Ingestion) FromFile(ctx context.Context, fPath string, options ...FileO
 
 // fromFile is an internal function to allow managed streaming to pass a properties object to the ingestion.
 func (i *Ingestion) fromFile(ctx context.Context, fPath string, options []FileOption, props properties.All) (*Result, error) {
-	local, err := queued.IsLocalPath(properties.RemoveQueryParamsFromUrl(fPath))
+	local, err := queued.IsLocalPath(fPath)
 	if err != nil {
 		return nil, err
 	}

@@ -98,7 +98,7 @@ func prepFileAndProps(fPath string, props *properties.All, options []FileOption,
 		props.Source.DontCompress = true
 	}
 
-	err = queued.CompleteFormatFromFileName(props, properties.RemoveQueryParamsFromUrl(fPath))
+	err = queued.CompleteFormatFromFileName(props, fPath)
 	if err != nil {
 		return nil, err, true
 	}
