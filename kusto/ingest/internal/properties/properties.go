@@ -414,10 +414,14 @@ func (i Ingestion) validate() error {
 }
 
 func RemoveQueryParamsFromUrl(url string) string {
-	if idx := strings.Index(url, "?"); idx != -1 {
-		return url[:idx]
+	result := url
+	if idx := strings.Index(result, "?"); idx != -1 {
+		result = result[:idx]
 	}
-	return url
+	if idx := strings.Index(result, ";"); idx != -1 {
+		result = result[:idx]
+	}
+	return result
 }
 
 func uuidIsZero(id uuid.UUID) bool {
