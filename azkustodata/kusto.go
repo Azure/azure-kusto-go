@@ -4,8 +4,6 @@ import (
 	"context"
 	"io"
 	"net/http"
-	"net/url"
-	"strings"
 	"sync"
 	"time"
 
@@ -36,12 +34,11 @@ const (
 
 // Client is a client to a Kusto instance.
 type Client struct {
-	conn, ingestConn queryer
-	endpoint         string
-	auth             Authorization
-	mgmtConnMu       sync.Mutex
-	http             *http.Client
-	clientDetails    *ClientDetails
+	conn          queryer
+	endpoint      string
+	auth          Authorization
+	http          *http.Client
+	clientDetails *ClientDetails
 }
 
 // Option is an optional argument type for New().
@@ -57,18 +54,6 @@ func New(kcsb *ConnectionStringBuilder, options ...Option) (*Client, error) {
 		TokenProvider: tkp,
 	}
 	endpoint := kcsb.DataSource
-	u, err := url.Parse(endpoint)
-	if err != nil {
-		return nil, errors.ES(errors.OpServConn, errors.KClientArgs, "could not parse the endpoint(%s): %s", endpoint, err).SetNoRetry()
-	}
-	if strings.HasPrefix(u.Hostname(), "ingest-") {
-		return nil, errors.ES(
-			errors.OpServConn,
-			errors.KClientArgs,
-			"endpoint argument started with 'ingest-'. Adding 'ingest-' is taken care of by the client. "+
-				"If using Mgmt() on an ingestion endpoint, use option QueryIngestion(). This is very uncommon",
-		)
-	}
 
 	client := &Client{auth: *auth, endpoint: endpoint, clientDetails: NewClientDetails(kcsb.ApplicationForTracing, kcsb.UserForTracing)}
 	for _, o := range options {
@@ -321,30 +306,6 @@ func (c *Client) getConn(callType callType, options connOptions) (queryer, error
 		return c.conn, nil
 	case mgmtCall:
 		delete(options.queryOptions.requestProperties.Options, "results_progressive_enabled")
-		if options.queryOptions.queryIngestion {
-			c.mgmtConnMu.Lock()
-			defer c.mgmtConnMu.Unlock()
-
-			if c.ingestConn != nil {
-				return c.ingestConn, nil
-			}
-
-			u, _ := url.Parse(c.endpoint) // Don't care about the error
-			u.Host = "ingest-" + u.Host
-			auth := c.auth
-			var details *ClientDetails
-			if innerConn, ok := c.conn.(*Conn); ok {
-				details = innerConn.clientDetails
-			}
-
-			iconn, err := NewConn(u.String(), auth, c.http, details)
-			if err != nil {
-				return nil, err
-			}
-			c.ingestConn = iconn
-
-			return iconn, nil
-		}
 		return c.conn, nil
 	default:
 		return nil, errors.ES(errors.OpServConn, errors.KInternal, "an unknown calltype was passed to getConn()")
@@ -367,14 +328,6 @@ func (c *Client) Close() error {
 	var err error
 	if c.conn != nil {
 		err = c.conn.Close()
-	}
-	if c.ingestConn != nil {
-		err2 := c.ingestConn.Close()
-		if err == nil {
-			err = err2
-		} else {
-			err = errors.GetCombinedError(err, err2)
-		}
 	}
 	return err
 }

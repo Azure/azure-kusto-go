@@ -3,16 +3,14 @@ package azkustodata
 import (
 	"context"
 	"fmt"
-	"io"
-	"net/http"
-	"reflect"
-	"sync"
-
 	"github.com/Azure/azure-kusto-go/azkustodata/errors"
 	"github.com/Azure/azure-kusto-go/azkustodata/internal/frames"
 	v1 "github.com/Azure/azure-kusto-go/azkustodata/internal/frames/v1"
 	"github.com/Azure/azure-kusto-go/azkustodata/table"
 	"github.com/Azure/azure-kusto-go/azkustodata/value"
+	"io"
+	"net/http"
+	"reflect"
 )
 
 type columnData struct {
@@ -151,10 +149,8 @@ func NewMockClient() *Client {
 
 	return &Client{
 		conn:          mockConn{},
-		ingestConn:    mockConn{},
 		endpoint:      "https://sdkse2etest.eastus.kusto.windows.net",
 		auth:          Authorization{TokenProvider: tkp},
-		mgmtConnMu:    sync.Mutex{},
 		http:          &http.Client{},
 		clientDetails: NewClientDetails("test", "test"),
 	}

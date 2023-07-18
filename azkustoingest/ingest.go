@@ -1,24 +1,22 @@
 package azkustoingest
 
 import (
-	"bytes"
 	"context"
 	"fmt"
 	"github.com/Azure/azure-kusto-go/azkustodata"
-	"io"
-	"sync"
-
 	"github.com/Azure/azure-kusto-go/azkustodata/errors"
 	"github.com/Azure/azure-kusto-go/azkustoingest/internal/properties"
 	"github.com/Azure/azure-kusto-go/azkustoingest/internal/queued"
 	"github.com/Azure/azure-kusto-go/azkustoingest/internal/resources"
 	"github.com/google/uuid"
+	"io"
 )
 
 type Ingestor interface {
 	io.Closer
 	FromFile(ctx context.Context, fPath string, options ...FileOption) (*Result, error)
 	FromReader(ctx context.Context, reader io.Reader, options ...FileOption) (*Result, error)
+	QueryClient() QueryClient
 }
 
 // Ingestion provides data ingestion from external sources into Kusto.
@@ -31,44 +29,45 @@ type Ingestion struct {
 
 	fs queued.Queued
 
-	connMu     sync.Mutex
-	streamConn streamIngestor
-
 	bufferSize int
 	maxBuffers int
-}
 
-// Option is an optional argument to New().
-type Option func(s *Ingestion)
-
-// WithStaticBuffer configures the ingest client to upload data to Kusto using a set of one or more static memory buffers with a fixed size.
-func WithStaticBuffer(bufferSize int, maxBuffers int) Option {
-	return func(s *Ingestion) {
-		s.bufferSize = bufferSize
-		s.maxBuffers = maxBuffers
-	}
+	withoutEndpointCorrection    bool
+	customIngestConnectionString *azkustodata.ConnectionStringBuilder
 }
 
 // New is a constructor for Ingestion.
-func New(client QueryClient, db, table string, options ...Option) (*Ingestion, error) {
-	mgr, err := resources.New(client)
+func New(kcsb *azkustodata.ConnectionStringBuilder, options ...Option) (*Ingestion, error) {
+	i := getOptions(options)
+
+	if !i.withoutEndpointCorrection {
+		newKcsb := *kcsb
+		newKcsb.DataSource = addIngestPrefix(newKcsb.DataSource)
+		kcsb = &newKcsb
+	}
+
+	client, err := azkustodata.New(kcsb)
 	if err != nil {
 		return nil, err
 	}
 
-	i := &Ingestion{
-		client: client,
-		mgr:    mgr,
-		db:     db,
-		table:  table,
-	}
+	return newFromClient(client, i)
+}
 
-	for _, option := range options {
-		option(i)
-	}
-
-	fs, err := queued.New(db, table, mgr, client.HttpClient(), queued.WithStaticBuffer(i.bufferSize, i.maxBuffers))
+func newFromClient(client QueryClient, i *Ingestion) (*Ingestion, error) {
+	mgr, err := resources.New(client)
 	if err != nil {
+		client.Close()
+		return nil, err
+	}
+
+	i.client = client
+	i.mgr = mgr
+
+	fs, err := queued.New(i.db, i.table, mgr, client.HttpClient(), queued.WithStaticBuffer(i.bufferSize, i.maxBuffers))
+	if err != nil {
+		mgr.Close()
+		client.Close()
 		return nil, err
 	}
 
@@ -197,49 +196,6 @@ func (i *Ingestion) fromReader(ctx context.Context, reader io.Reader, options []
 	return result, nil
 }
 
-// Deprecated: Stream use a streaming ingest client instead - `azkustoingest.NewStreaming`.
-// takes a payload that is encoded in format with a server stored mappingName, compresses it and uploads it to Kusto.
-// More information can be found here:
-// https://docs.microsoft.com/en-us/azure/kusto/management/create-ingestion-mapping-command
-// The context object can be used with a timeout or cancel to limit the request time.
-func (i *Ingestion) Stream(ctx context.Context, payload []byte, format DataFormat, mappingName string) error {
-	c, err := i.getStreamConn()
-	if err != nil {
-		return err
-	}
-
-	props := properties.All{
-		Ingestion: properties.Ingestion{
-			DatabaseName: i.db,
-			TableName:    i.table,
-			Additional: properties.Additional{
-				Format:              format,
-				IngestionMappingRef: mappingName,
-			},
-		},
-	}
-
-	_, err = streamImpl(c, ctx, bytes.NewReader(payload), props, false)
-
-	return err
-}
-
-func (i *Ingestion) getStreamConn() (streamIngestor, error) {
-	i.connMu.Lock()
-	defer i.connMu.Unlock()
-
-	if i.streamConn != nil {
-		return i.streamConn, nil
-	}
-
-	sc, err := azkustodata.NewConn(removeIngestPrefix(i.client.Endpoint()), i.client.Auth(), i.client.HttpClient(), i.client.ClientDetails())
-	if err != nil {
-		return nil, err
-	}
-	i.streamConn = sc
-	return i.streamConn, nil
-}
-
 func (i *Ingestion) newProp() properties.All {
 	return properties.All{
 		Ingestion: properties.Ingestion{
@@ -249,17 +205,16 @@ func (i *Ingestion) newProp() properties.All {
 	}
 }
 
+func (i *Ingestion) QueryClient() QueryClient {
+	return i.client
+}
+
 func (i *Ingestion) Close() error {
 	i.mgr.Close()
-	var err error
-	err = i.fs.Close()
-	if i.streamConn != nil {
-		err2 := i.streamConn.Close()
-		if err == nil {
-			err = err2
-		} else {
-			err = errors.GetCombinedError(err, err2)
-		}
+	err := i.client.Close()
+	if err != nil {
+		return err
 	}
+	err = i.fs.Close()
 	return err
 }
