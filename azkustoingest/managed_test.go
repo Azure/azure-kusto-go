@@ -341,7 +341,7 @@ func TestManaged(t *testing.T) {
 				},
 			}
 
-			ingestion, err := newFromClient(mockClient, &Ingestion{db: "defaultDb", table:"defaultTable"})
+			ingestion, err := newFromClient(mockClient, &Ingestion{db: "defaultDb", table: "defaultTable"})
 			ingestion.fs = resources.FsMock{
 				OnLocal: func(ctx context.Context, from string, props properties.All) error {
 					if test.onLocal == nil {

@@ -88,11 +88,11 @@ func TestAddIngestPrefix(t *testing.T) {
 
 func TestCtorOptions(t *testing.T) {
 	type TestClient struct {
-		name 						string
+		name                              string
 		clientType                        string
 		endpoint, defaultDB, defaultTable string
 		autoCorrectEndpoint               bool
-		managedIngestEndpoint 		   string
+		managedIngestEndpoint             string
 		expectedEndpoint                  string
 		expectedIngestEndpoint            string
 	}
@@ -104,7 +104,7 @@ func TestCtorOptions(t *testing.T) {
 			defaultDB:           "someDb",
 			defaultTable:        "defaultTable",
 			autoCorrectEndpoint: true,
-			expectedEndpoint:   "https://ingest-help.kusto.windows.net",
+			expectedEndpoint:    "https://ingest-help.kusto.windows.net",
 		},
 		{
 			name:                "Queued client without autocorrect endpoint, database and table",
@@ -113,7 +113,7 @@ func TestCtorOptions(t *testing.T) {
 			defaultDB:           "someDb",
 			defaultTable:        "defaultTable",
 			autoCorrectEndpoint: false,
-			expectedEndpoint:   "https://help.kusto.windows.net",
+			expectedEndpoint:    "https://help.kusto.windows.net",
 		},
 		{
 			name:                "Queued client with autocorrect endpoint, no database and a table",
@@ -122,7 +122,7 @@ func TestCtorOptions(t *testing.T) {
 			defaultDB:           "",
 			defaultTable:        "defaultTable",
 			autoCorrectEndpoint: true,
-			expectedEndpoint:   "https://ingest-help.kusto.windows.net",
+			expectedEndpoint:    "https://ingest-help.kusto.windows.net",
 		},
 		{
 			name:                "Streaming client with autocorrect endpoint, database and table",
@@ -131,7 +131,7 @@ func TestCtorOptions(t *testing.T) {
 			defaultDB:           "someDb",
 			defaultTable:        "defaultTable",
 			autoCorrectEndpoint: true,
-			expectedEndpoint:   "https://help.kusto.windows.net",
+			expectedEndpoint:    "https://help.kusto.windows.net",
 		},
 		{
 			name:                "Streaming client without autocorrect endpoint, database and table",
@@ -140,7 +140,7 @@ func TestCtorOptions(t *testing.T) {
 			defaultDB:           "someDb",
 			defaultTable:        "defaultTable",
 			autoCorrectEndpoint: false,
-			expectedEndpoint:   "https://ingest-help.kusto.windows.net",
+			expectedEndpoint:    "https://ingest-help.kusto.windows.net",
 		},
 		{
 			name:                "Streaming client with autocorrect endpoint, no database and a table",
@@ -149,47 +149,47 @@ func TestCtorOptions(t *testing.T) {
 			defaultDB:           "",
 			defaultTable:        "defaultTable",
 			autoCorrectEndpoint: true,
-			expectedEndpoint:   "https://help.kusto.windows.net",
+			expectedEndpoint:    "https://help.kusto.windows.net",
 		},
 		{
-			name:                "Managed Streaming client with autocorrect endpoint, database and table",
-			clientType:          "Managed",
-			endpoint:            "https://ingest-help.kusto.windows.net",
-			defaultDB:           "someDb",
-			defaultTable:        "defaultTable",
-			autoCorrectEndpoint: true,
-			expectedEndpoint:   "https://help.kusto.windows.net",
+			name:                   "Managed Streaming client with autocorrect endpoint, database and table",
+			clientType:             "Managed",
+			endpoint:               "https://ingest-help.kusto.windows.net",
+			defaultDB:              "someDb",
+			defaultTable:           "defaultTable",
+			autoCorrectEndpoint:    true,
+			expectedEndpoint:       "https://help.kusto.windows.net",
 			expectedIngestEndpoint: "https://ingest-help.kusto.windows.net",
 		},
 		{
-			name:                "Managed Streaming client without autocorrect endpoint, database and table",
-			clientType:          "Managed",
-			endpoint:            "https://ingest-help.kusto.windows.net",
-			defaultDB:           "someDb",
-			defaultTable:        "defaultTable",
-			autoCorrectEndpoint: false,
-			expectedEndpoint:   "https://ingest-help.kusto.windows.net",
+			name:                   "Managed Streaming client without autocorrect endpoint, database and table",
+			clientType:             "Managed",
+			endpoint:               "https://ingest-help.kusto.windows.net",
+			defaultDB:              "someDb",
+			defaultTable:           "defaultTable",
+			autoCorrectEndpoint:    false,
+			expectedEndpoint:       "https://ingest-help.kusto.windows.net",
 			expectedIngestEndpoint: "https://ingest-help.kusto.windows.net",
 		},
 		{
-			name:                "Managed Streaming client with autocorrect endpoint, no database and a table",
-			clientType:          "Managed",
-			endpoint:            "https://ingest-help.kusto.windows.net",
-			defaultDB:           "",
-			defaultTable:        "defaultTable",
-			autoCorrectEndpoint: true,
-			expectedEndpoint:   "https://help.kusto.windows.net",
+			name:                   "Managed Streaming client with autocorrect endpoint, no database and a table",
+			clientType:             "Managed",
+			endpoint:               "https://ingest-help.kusto.windows.net",
+			defaultDB:              "",
+			defaultTable:           "defaultTable",
+			autoCorrectEndpoint:    true,
+			expectedEndpoint:       "https://help.kusto.windows.net",
 			expectedIngestEndpoint: "https://ingest-help.kusto.windows.net",
 		},
 		{
-			name: "Managed Streaming client with custom ingest endpoint",
-			clientType: "Managed",
-			endpoint: "https://help.kusto.windows.net",
-			defaultDB: "someDb",
-			defaultTable: "defaultTable",
-			autoCorrectEndpoint: false,
-			managedIngestEndpoint: "https://ingest-custom.kusto.windows.net",
-			expectedEndpoint: "https://help.kusto.windows.net",
+			name:                   "Managed Streaming client with custom ingest endpoint",
+			clientType:             "Managed",
+			endpoint:               "https://help.kusto.windows.net",
+			defaultDB:              "someDb",
+			defaultTable:           "defaultTable",
+			autoCorrectEndpoint:    false,
+			managedIngestEndpoint:  "https://ingest-custom.kusto.windows.net",
+			expectedEndpoint:       "https://help.kusto.windows.net",
 			expectedIngestEndpoint: "https://ingest-custom.kusto.windows.net",
 		},
 	}
