@@ -114,22 +114,29 @@ func (m *Managed) FromFile(ctx context.Context, fPath string, options ...FileOpt
 	}
 
 	if !local {
-		size, err := utils.FetchBlobSize(fPath, ctx, m.queued.client.HttpClient())
-		if err != nil {
-			// Failed fetch blob properties
-			return nil, err
+		var size int64
+		var compressionTypeForEstimation properties.CompressionType
+		if size = props.Ingestion.RawDataSize; size == 0 {
+			size, err = utils.FetchBlobSize(fPath, ctx, m.queued.client.HttpClient())
+			if err != nil {
+				// Failed fetch blob properties
+				return nil, err
+			}
+			compressionTypeForEstimation = utils.CompressionDiscovery(fPath)
+			props.Ingestion.RawDataSize = utils.EstimateRawDataSize(compressionTypeForEstimation, size)
+		} else {
+			// If user sets raw data size we always want to devide it for estimation
+			compressionTypeForEstimation = properties.CTNone
 		}
 
-		compressionType := utils.CompressionDiscovery(fPath)
-
-		if !shouldUseQueuedIngestBySize(compressionType, size) {
+		// File is not compressed and user says its compressed, raw 10 mb -> do
+		if !shouldUseQueuedIngestBySize(compressionTypeForEstimation, size) {
 			res, err := m.streamWithRetries(ctx, func() io.Reader { return generateBlobUriPayloadReader(fPath) }, props, true)
 			if err != nil || res != nil {
 				return res, err
 			}
 		}
 
-		props.Ingestion.RawDataSize = utils.EstimateRawDataSize(compressionType, size)
 		return m.queued.fromFile(ctx, fPath, []FileOption{}, props)
 	}
 
