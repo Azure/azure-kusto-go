@@ -7,6 +7,7 @@ import (
 )
 
 func TestIsReservedHostname(t *testing.T) {
+
 	t.Parallel()
 
 	testCases := []struct {
