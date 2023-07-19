@@ -872,7 +872,7 @@ func TestMultipleClusters(t *testing.T) { //ok
 		t.Log("Closed streamingIngestor")
 	})
 
-	secondaryQueuedIngestor, err := azkustoingest.New(testConfig.kcsb, azkustoingest.WithDefaultDatabase(testConfig.SecondaryDatabase), azkustoingest.WithDefaultTable(queuedTable))
+	secondaryQueuedIngestor, err := azkustoingest.New(skcsb, azkustoingest.WithDefaultDatabase(testConfig.SecondaryDatabase), azkustoingest.WithDefaultTable(queuedTable))
 	if err != nil {
 		panic(err)
 	}
@@ -883,7 +883,7 @@ func TestMultipleClusters(t *testing.T) { //ok
 		t.Log("Closed secondaryQueuedIngestor")
 	})
 
-	secondaryStreamingIngestor, err := azkustoingest.NewStreaming(testConfig.kcsb, azkustoingest.WithDefaultDatabase(testConfig.SecondaryDatabase), azkustoingest.WithDefaultTable(streamingTable))
+	secondaryStreamingIngestor, err := azkustoingest.NewStreaming(skcsb, azkustoingest.WithDefaultDatabase(testConfig.SecondaryDatabase), azkustoingest.WithDefaultTable(streamingTable))
 	if err != nil {
 		panic(err)
 	}
