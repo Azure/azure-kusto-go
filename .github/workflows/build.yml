@@ -97,29 +97,13 @@ jobs:
         if: always()
         run: cat /tmp/gotest-ingest.log | go-junit-report -parser gojson > report-ingest.xml
 
-      - name: Upload Test Results
+      - name: Test Results
         if: always()
-        uses: actions/upload-artifact@v2
-        with:
-          name: Unit Test Results
-          path: report*.xml
-      - name: Upload coverage to Codecov
-        uses: codecov/codecov-action@v2
-
-  publish-test-results:
-
-    name: "Publish Unit Tests Results"
-    needs: build
-    runs-on: ubuntu-latest
-    if: always()
-
-    steps:
-      - name: Download Artifacts
-        uses: actions/download-artifact@v2
-        with:
-          path: artifacts
-
-      - name: Publish Unit Test Results
         uses: EnricoMi/publish-unit-test-result-action@v2
         with:
-          files: artifacts/**/*.xml
+          files: report*.xml
+          report_individual_runs: true
+          report_suite_logs: info
+
+      - name: Upload coverage to Codecov
+        uses: codecov/codecov-action@v2
