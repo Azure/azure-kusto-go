@@ -42,7 +42,7 @@ func NewStreaming(kcsb *azkustodata.ConnectionStringBuilder, options ...Option) 
 
 	if !o.withoutEndpointCorrection {
 		newKcsb := *kcsb
-		newKcsb.DataSource = addIngestPrefix(newKcsb.DataSource)
+		newKcsb.DataSource = removeIngestPrefix(newKcsb.DataSource)
 		kcsb = &newKcsb
 	}
 

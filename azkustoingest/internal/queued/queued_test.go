@@ -5,13 +5,13 @@ import (
 	"compress/gzip"
 	"context"
 	"fmt"
+	"github.com/Azure/azure-kusto-go/azkustoingest/internal/utils"
 	"io"
 	"os"
 	"testing"
 
 	"github.com/Azure/azure-kusto-go/azkustodata/errors"
 	"github.com/Azure/azure-kusto-go/azkustoingest/internal/properties"
-	"github.com/Azure/azure-kusto-go/kusto/ingest/internal/utils"
 	"github.com/stretchr/testify/assert"
 
 	"github.com/Azure/azure-sdk-for-go/sdk/storage/azblob"
