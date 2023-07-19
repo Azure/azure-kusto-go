@@ -127,9 +127,6 @@ func (r *RowIterator) start() chan struct{} {
 		defer closeDone() // Catchall
 		logger.Info().Msg("starting row iterator goroutine")
 
-		rowBuffer := make([]send, 0, 1000)
-		gotColumns := false
-
 		for {
 			select {
 			case <-r.ctx.Done():
@@ -137,46 +134,12 @@ func (r *RowIterator) start() chan struct{} {
 				logger.Info().Msg("got columns")
 				r.columns = sent.inColumns
 				sent.done()
-				gotColumns = true
-				if len(rowBuffer) > 0 {
-					logger.Info().Msg("sending buffered rows")
-					for _, s := range rowBuffer {
-						if s.inRows != nil {
-							logger.Info().Msg("starting buffered rows")
-							for k, values := range s.inRows {
-								select {
-								case <-r.ctx.Done():
-								case r.rows <- Row{Values: values, Replace: k == 0 && s.inTableFragmentType == "DataReplace"}:
-								}
-							}
-							logger.Info().Msg("sent buffered rows")
-						}
-
-						logger.Info().Msg("sending buffered row errors")
-						if s.inRowErrors != nil {
-							for _, e := range s.inRowErrors {
-								e := e // capture so we can send reference
-								select {
-								case <-r.ctx.Done():
-								case r.rows <- Row{Error: &e}:
-								}
-							}
-						}
-					}
-					logger.Info().Msg("sent buffered row errors")
-					rowBuffer = rowBuffer[:0]
-				}
 				closeDone()
 			case sent, ok := <-r.inRows:
 				logger.Info().Msg("got rows")
 				if !ok {
 					close(r.rows)
 					return
-				}
-				if !gotColumns {
-					rowBuffer = append(rowBuffer, sent)
-					sent.done()
-					continue
 				}
 				logger.Info().Msg("got rows ok")
 				if sent.inRows != nil {
