@@ -99,6 +99,13 @@ kustoConnectionString := kustoConnectionStringBuilder.WithUserManagedIdentity(cl
 client, err = kusto.New(kustoConnectionString)
 ```
 
+#### Using a k8s workload identity
+
+```go
+kustoConnectionString := kustoConnectionStringBuilder.WithKubernetesWorkloadIdentity(appId, tokenFilePath, authorityID)
+client, err = kusto.New(kustoConnectionString)
+```
+
 #### Using a bearer token
 
 ```go
