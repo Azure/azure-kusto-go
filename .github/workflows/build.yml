@@ -103,7 +103,7 @@ jobs:
         with:
           files: report*.xml
           report_individual_runs: true
-          report_suite_logs: info
+          report_suite_logs: error
 
       - name: Upload coverage to Codecov
         uses: codecov/codecov-action@v2
