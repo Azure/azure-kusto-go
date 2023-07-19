@@ -86,8 +86,7 @@ jobs:
 
       - name: Parse tests data
         if: always()
-        run: |
-        	cat /tmp/gotest-data.log | go-junit-report -parser gojson > report-data.xml
+        run: cat /tmp/gotest-data.log | go-junit-report -parser gojson > report-data.xml
 
       - name: Display tests ingest
         if: always()
@@ -96,8 +95,7 @@ jobs:
 
       - name: Parse tests ingest
         if: always()
-        run: |
-        	cat /tmp/gotest-ingest.log | go-junit-report -parser gojson > report-ingest.xml
+        run: cat /tmp/gotest-ingest.log | go-junit-report -parser gojson > report-ingest.xml
 
       - name: Upload Test Results
         if: always()
