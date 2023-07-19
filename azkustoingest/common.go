@@ -5,6 +5,7 @@ import (
 	"net"
 	"strings"
 )
+
 // Option is an optional argument to New().
 type Option func(s *Ingestion)
 
@@ -49,17 +50,16 @@ func WithCustomIngestConnectionString(kcsb *azkustodata.ConnectionStringBuilder)
 	}
 }
 
-const domainPrefix = "://"
-const ingestPrefix = "ingest-"
-
 func getOptions(options []Option) *Ingestion {
-	s := &Ingestion{
-	}
+	s := &Ingestion{}
 	for _, o := range options {
 		o(s)
 	}
 	return s
 }
+
+const domainPrefix = "://"
+const ingestPrefix = "ingest-"
 
 func removeIngestPrefix(s string) string {
 	if isReservedHostname(s) {
@@ -78,13 +78,17 @@ func addIngestPrefix(s string) string {
 	}
 
 	if strings.Contains(s, domainPrefix) {
-		return strings.Replace(s, domainPrefix, domainPrefix + ingestPrefix, 1)
+		return strings.Replace(s, domainPrefix, domainPrefix+ingestPrefix, 1)
 	} else {
 		return ingestPrefix + s
 	}
 }
 
 func isReservedHostname(host string) bool {
+	if strings.Contains(host, domainPrefix) {
+		host = strings.Split(host, domainPrefix)[1]
+	}
+
 	// Check if host is an IP address
 	if ip := net.ParseIP(host); ip != nil {
 		return true

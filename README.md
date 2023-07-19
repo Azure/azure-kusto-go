@@ -308,9 +308,9 @@ from an `io.Pipe()`. The data will not begin ingestion until the writer closes.
 
 #### Creating a queued ingestion client
 There are a few types of ingestion clients:
-* Queued Ingest - `ingest.New()` - the default client, uses queues and batching to ingest data. Most reliable.
-* Streaming Ingest - `ingest.NewStreaming()` - Directly streams data into the engine. Fast, but is limited with size and can fail.
-* Managed Streaming Ingest - `ingest.NewManaged()` - Combines a streaming ingest client with a queued ingest client to provide a reliable ingestion method that is fast and can ingest large amounts of data.
+* Queued Ingest - `azkustoingest.New()` - the default client, uses queues and batching to ingest data. Most reliable.
+* Streaming Ingest - `azkustoingest.NewStreaming()` - Directly streams data into the engine. Fast, but is limited with size and can fail.
+* Managed Streaming Ingest - `azkustoingest.NewManaged()` - Combines a streaming ingest client with a queued ingest client to provide a reliable ingestion method that is fast and can ingest large amounts of data.
   Managed Streaming will try to stream the data, and if it fails multiple times, it will fall back to a queued ingestion.
 
 To create an ingestion client, pass a Connection String, and additional options. 
