@@ -20,7 +20,7 @@ jobs:
           go-version: '^1.19.0'
 
       - name: Setup JUnit Report
-        run: go install github.com/jstemmer/go-junit-report/v2@master
+        run: go install github.com/jstemmer/go-junit-report/v2@7933520
 
       - name: Set up tparse
         run: go install github.com/mfridman/tparse@latest
@@ -44,7 +44,7 @@ jobs:
       - name: Run tests data
         run: |
           cd azkustodata
-          go test -p 100 -race -coverprofile=coverage.out -json -v ./... 2>&1 > /tmp/gotest-data.log
+          go test -p 100 -race -coverprofile=coverage.out -json ./... 2>&1 > /tmp/gotest-data.log
         env:
           ENGINE_CONNECTION_STRING: ${{ secrets.ENGINE_CONNECTION_STRING }}
           AZURE_CLIENT_ID: ${{ secrets.APP_ID }}
@@ -68,7 +68,7 @@ jobs:
       - name: Run tests ingest
         run: |
           cd azkustoingest
-          go test -p 100 -race -coverprofile=coverage.out -json -v ./... 2>&1 > /tmp/gotest-ingest.log
+          go test -p 100 -race -coverprofile=coverage.out -json ./... 2>&1 > /tmp/gotest-ingest.log
         env:
           ENGINE_CONNECTION_STRING: ${{ secrets.ENGINE_CONNECTION_STRING }}
           AZURE_CLIENT_ID: ${{ secrets.APP_ID }}
