@@ -98,11 +98,11 @@ func newRowIterator(ctx context.Context, cancel context.CancelFunc, execResp exe
 		ctx:          ctx,
 		cancel:       cancel,
 		progressive:  header.IsProgressive,
-		inColumns:    make(chan send, 1),
+		inColumns:    make(chan send, 5),
 		inRows:       make(chan send, 100),
-		inProgress:   make(chan send, 1),
-		inNonPrimary: make(chan send, 1),
-		inCompletion: make(chan send, 1),
+		inProgress:   make(chan send, 5),
+		inNonPrimary: make(chan send, 5),
+		inCompletion: make(chan send, 5),
 		inErr:        make(chan send),
 
 		rows:       make(chan Row, 1000),
@@ -147,6 +147,8 @@ func (r *RowIterator) start() chan struct{} {
 					for k, values := range sent.inRows {
 						select {
 						case <-r.ctx.Done():
+							logger.Info().Msg("context done")
+							break
 						case r.rows <- Row{Values: values, Replace: k == 0 && sent.inTableFragmentType == "DataReplace"}:
 						}
 					}

@@ -71,58 +71,80 @@ func (d *nonProgressiveSM) rowIter() *RowIterator {
 func (d *nonProgressiveSM) process() (sf stateFn, err error) {
 	// These are two separate select cases since we always want to check for context cancellation first, otherwise order is not guaranteed.
 
+	logger := zerolog.Ctx(d.ctx).
+		With().
+		Str("type", "nonProgressiveSM").
+		Logger()
+
 	select {
 	case <-d.ctx.Done():
+		logger.Info().Msg("context done 1")
 		return nil, d.ctx.Err()
 	default:
 	}
 
 	select {
 	case <-d.ctx.Done():
+		logger.Info().Msg("context done 2")
 		return nil, d.ctx.Err()
 	case fr, ok := <-d.in:
 		if !ok {
+			logger.Info().Msg("channel closed")
 			d.wg.Wait()
+			logger.Info().Msg("waitgroup done")
 
 			if !d.hasCompletion {
+				logger.Info().Msg("no completion")
 				return nil, errors.ES(d.op, errors.KInternal, "non-progressive stream did not have DataSetCompletion frame")
 			}
+			logger.Info().Msg("completion")
 			return nil, nil
 		}
 
 		if d.hasCompletion {
+			logger.Info().Msg("has completion")
 			return nil, errors.ES(d.op, errors.KInternal, "saw a DataSetCompletion frame, then received a %T frame", fr)
 		}
 
 		switch table := fr.(type) {
 		case v2.DataTable:
+			logger := logger.With().Str("type", "DataTable").Logger()
 			d.wg.Add(1)
 			switch table.TableKind {
 			case frames.PrimaryResult:
+				logger.Info().Msg("primary result")
 				d.columnSetOnce.Do(func() {
+					logger.Info().Msg("column set once")
 					d.wg.Add(1) // We add here as well because two things are sent in this case statement.
 					d.iter.inColumns <- send{inColumns: table.Columns, wg: d.wg}
+					logger.Info().Msg("sent columns once")
 				})
 
+				logger.Info().Msg("sending rows")
 				select {
 				case <-d.ctx.Done():
+					logger.Info().Msg("context done 3")
 					return nil, d.ctx.Err()
 				case d.iter.inRows <- send{inRows: table.KustoRows, inRowErrors: table.RowErrors, wg: d.wg}:
 				}
 			default:
 				select {
 				case <-d.ctx.Done():
+					logger.Info().Msg("context done 4")
 					return nil, d.ctx.Err()
 				case d.iter.inNonPrimary <- send{inNonPrimary: table, wg: d.wg}:
 				}
 			}
 		case frames.Error:
+			logger.Info().Msg("error")
 			return nil, table
 		case v2.DataSetCompletion:
+			logger.Info().Msg("completion")
 			d.wg.Add(1)
 
 			select {
 			case <-d.ctx.Done():
+				logger.Info().Msg("context done 5")
 				return nil, d.ctx.Err()
 			case d.iter.inCompletion <- send{inCompletion: table, wg: d.wg}:
 			}
@@ -186,48 +208,76 @@ func (p *progressiveSM) rowIter() *RowIterator {
 func (p *progressiveSM) nextFrame() (stateFn, error) {
 	// These are two separate select cases since we always want to check for context cancellation first, otherwise order is not guaranteed.
 
+	logger := zerolog.Ctx(p.ctx).
+		With().
+		Str("type", "nonProgressiveSM").
+		Logger()
+
 	select {
 	case <-p.ctx.Done():
+		logger.Info().Msg("context done 1")
 		return nil, p.ctx.Err()
 	default:
 	}
 
 	select {
 	case <-p.ctx.Done():
+		logger.Info().Msg("context done 2")
 		return nil, p.ctx.Err()
 	case fr, ok := <-p.in:
 		if !ok {
+			logger.Info().Msg("channel closed")
 			return nil, errors.ES(p.op, errors.KInternal, "received a table stream that did not finish before our input channel, this is usually a return size or time limit")
 		}
 
 		p.currentFrame = fr
 		switch table := fr.(type) {
 		case v2.DataTable:
+			logger := logger.With().Str("type", "DataTable").Logger()
+			p.ctx = logger.WithContext(p.ctx)
 			return p.dataTable, nil
 		case v2.DataSetCompletion:
+			logger := logger.With().Str("type", "DataSetCompletion").Logger()
+			p.ctx = logger.WithContext(p.ctx)
 			return p.dataSetCompletion, nil
 		case v2.TableHeader:
+			logger := logger.With().Str("type", "TableHeader").Logger()
+			p.ctx = logger.WithContext(p.ctx)
 			return p.tableHeader, nil
 		case v2.TableFragment:
+			logger := logger.With().Str("type", "TableFragment").Logger()
+			p.ctx = logger.WithContext(p.ctx)
 			return p.fragment, nil
 		case v2.TableProgress:
+			logger := logger.With().Str("type", "TableProgress").Logger()
+			p.ctx = logger.WithContext(p.ctx)
 			return p.progress, nil
 		case v2.TableCompletion:
+			logger := logger.With().Str("type", "TableCompletion").Logger()
+			p.ctx = logger.WithContext(p.ctx)
 			return p.completion, nil
 		case frames.Error:
+			logger.Info().Msg("error")
 			return nil, table
 		default:
+			logger.Info().Msg("unknown frame")
 			return nil, errors.ES(p.op, errors.KInternal, "received an unknown frame in a progressive table stream we didn't understand: %T", table)
 		}
 	}
 }
 
 func (p *progressiveSM) dataTable() (stateFn, error) {
+	logger := zerolog.Ctx(p.ctx)
+
+	logger.Info().Msg("dataTable")
+
 	if p.currentHeader != nil {
+		logger.Error().Msg("currentHeader != nil")
 		return nil, errors.ES(p.op, errors.KInternal, "received a DatTable between a tableHeader and TableCompletion")
 	}
 	table := p.currentFrame.(v2.DataTable)
 	if table.TableKind == frames.PrimaryResult {
+		logger.Error().Msg("table.TableKind == frames.PrimaryResult")
 		return nil, errors.ES(p.op, errors.KInternal, "progressive stream had dataTable with Kind == PrimaryResult")
 	}
 
@@ -235,43 +285,56 @@ func (p *progressiveSM) dataTable() (stateFn, error) {
 
 	select {
 	case <-p.ctx.Done():
+		logger.Error().Msg("context done 3")
 		return nil, p.ctx.Err()
 	case p.iter.inNonPrimary <- send{inNonPrimary: table, wg: p.wg}:
 	}
 
+	logger.Info().Msg("dataTable done")
 	return p.nextFrame, nil
 }
 
 func (p *progressiveSM) dataSetCompletion() (stateFn, error) {
+	logger := zerolog.Ctx(p.ctx)
 	p.wg.Add(1)
+
+	logger.Info().Msg("dataSetCompletion")
 
 	select {
 	case <-p.ctx.Done():
+		logger.Error().Msg("context done 4")
 		return nil, p.ctx.Err()
 	case p.iter.inCompletion <- send{inCompletion: p.currentFrame.(v2.DataSetCompletion), wg: p.wg}:
 	}
 
 	select {
 	case <-p.ctx.Done():
+		logger.Error().Msg("context done 5")
 		return nil, p.ctx.Err()
 	case frame, ok := <-p.in:
 		if !ok {
 			p.wg.Wait()
+			logger.Info().Msg("finished")
 			return nil, nil
 		}
+		logger.Info().Msg("dataSetCompletion done")
 		return nil, errors.ES(p.op, errors.KInternal, "received a dataSetCompletion frame and then a %T frame", frame)
 	}
 }
 
 func (p *progressiveSM) tableHeader() (stateFn, error) {
+	logger := zerolog.Ctx(p.ctx)
 	table := p.currentFrame.(v2.TableHeader)
+	logger.Info().Msg("tableHeader")
 	p.currentHeader = &table
 	if p.currentHeader.TableKind == frames.PrimaryResult {
+		logger.Info().Msg("tableHeader PrimaryResult")
 		p.columnSetOnce.Do(func() {
 			p.wg.Add(1)
 			p.iter.inColumns <- send{inColumns: table.Columns, wg: p.wg}
 		})
 	} else {
+		logger.Info().Msg("tableHeader not PrimaryResult")
 		p.nonPrimary = &v2.DataTable{
 			Base:      v2.Base{FrameType: frames.TypeDataTable},
 			TableID:   p.currentHeader.TableID,
@@ -285,47 +348,62 @@ func (p *progressiveSM) tableHeader() (stateFn, error) {
 }
 
 func (p *progressiveSM) fragment() (stateFn, error) {
+	logger := zerolog.Ctx(p.ctx)
+
 	if p.currentHeader == nil {
+		logger.Error().Msg("currentHeader == nil")
 		return nil, errors.ES(p.op, errors.KInternal, "received a TableFragment without a tableHeader")
 	}
 
 	if p.currentHeader.TableKind == frames.PrimaryResult {
+		logger.Info().Msg("currentHeader.TableKind == frames.PrimaryResult")
 		table := p.currentFrame.(v2.TableFragment)
+		logger.Info().Int("TableId", table.TableID).Msg("TableFragment")
 
 		p.wg.Add(1)
 		select {
 		case <-p.ctx.Done():
+			logger.Error().Msg("context done 6")
 			return nil, p.ctx.Err()
 		case p.iter.inRows <- send{inRows: table.KustoRows, inRowErrors: table.RowErrors, inTableFragmentType: table.TableFragmentType, wg: p.wg}:
 		}
 	} else {
+		logger.Info().Msg("currentHeader.TableKind != frames.PrimaryResult")
 		p.nonPrimary.Rows = append(p.nonPrimary.Rows, p.currentFrame.(v2.TableFragment).Rows...)
 	}
 	return p.nextFrame, nil
 }
 
 func (p *progressiveSM) progress() (stateFn, error) {
+	logger := zerolog.Ctx(p.ctx)
 	if p.currentHeader == nil {
+		logger.Error().Msg("currentHeader == nil")
 		return nil, errors.ES(p.op, errors.KInternal, "received a TableProgress without a tableHeader")
 	}
 	p.wg.Add(1)
 	p.iter.inProgress <- send{inProgress: p.currentFrame.(v2.TableProgress), wg: p.wg}
+	logger.Info().Msg("progress")
 	return p.nextFrame, nil
 }
 
 func (p *progressiveSM) completion() (stateFn, error) {
+	logger := zerolog.Ctx(p.ctx)
 	if p.currentHeader == nil {
+		logger.Error().Msg("currentHeader == nil")
 		return nil, errors.ES(p.op, errors.KInternal, "received a TableCompletion without a tableHeader")
 	}
 	if p.currentHeader.TableKind == frames.PrimaryResult {
+		logger.Info().Msg("currentHeader.TableKind == frames.PrimaryResult")
 		// Do nothing here.
 	} else {
+		logger.Info().Msg("currentHeader.TableKind != frames.PrimaryResult")
 		p.wg.Add(1)
 		p.iter.inNonPrimary <- send{inNonPrimary: *p.nonPrimary, wg: p.wg}
 	}
 	p.nonPrimary = nil
 	p.currentHeader = nil
 	p.currentFrame = nil
+	logger.Info().Msg("table completion")
 
 	return p.nextFrame, nil
 }
