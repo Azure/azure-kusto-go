@@ -26,7 +26,7 @@ import (
 	"github.com/google/uuid"
 )
 
-var validURL = regexp.MustCompile(`https://([a-zA-Z0-9_-]+\.){1,2}.*`)
+var validURL = regexp.MustCompile(`https?://([a-zA-Z0-9_-]+\.){1,2}.*(?::\d+)?`)
 
 var bufferPool = sync.Pool{
 	New: func() interface{} {
@@ -65,6 +65,7 @@ func NewConn(endpoint string, auth Authorization, client *http.Client, clientDet
 		endStreamIngest: u.JoinPath("/v1/rest/ingest"),
 		client:          client,
 		clientDetails:   clientDetails,
+		endpoint:        endpoint,
 	}
 
 	return c, nil
