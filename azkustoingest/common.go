@@ -41,7 +41,7 @@ func WithoutEndpointCorrection() Option {
 }
 
 // WithCustomIngestConnectionString is relevant to Managed ingestion client only.
-// It configures the ingest client using a custom connection string, as opposed to one derived from the query client.
+// It configures the ingest client using a custom connection string, as opposed to one derived from the streaming client.
 // This option implies WithoutEndpointCorrection().
 func WithCustomIngestConnectionString(kcsb *azkustodata.ConnectionStringBuilder) Option {
 	return func(s *Ingestion) {
