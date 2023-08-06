@@ -341,7 +341,8 @@ in, err := azkustoingest.NewManaged(kustoConnectionString, azkustoingest.WithDef
 defer in.Close()
 ```
 
-Queued ingestion client requires a url to the ingestion endpoint, usually starting with `ingest-`, and for streaming ingestion it's the oppposite. 
+Queued ingestion client requires the url of the ingestion endpoint, usually starting with `ingest-`, and for streaming ingestion it's the opposite. 
+
 The SDK will infer this endpoint from the given url. In case this is not wanted, you can use an option to disable it:
 
 ```go
