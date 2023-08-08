@@ -8,6 +8,7 @@ import (
 	"os"
 	"path/filepath"
 	"runtime"
+	"strings"
 )
 
 // Config represents a config.json file that must be in the directory and hold information to do the integration tests.
@@ -27,7 +28,8 @@ type Config struct {
 	// TenantID is the tenant on which the principal exists
 	TenantID string
 	// Connection string builder to get a new kusto client
-	kcsb *azkustodata.ConnectionStringBuilder
+	kcsb   *azkustodata.ConnectionStringBuilder
+	dmKscb *azkustodata.ConnectionStringBuilder
 }
 
 func (c *Config) validate() error {
@@ -84,10 +86,13 @@ func init() {
 		return
 	}
 
+	dmEndpoint := strings.Replace(testConfig.Endpoint, "://", "://ingest-", 1)
 	if testConfig.ClientID == "" {
 		testConfig.kcsb = azkustodata.NewConnectionStringBuilder(testConfig.Endpoint).WithAzCli()
+		testConfig.dmKscb = azkustodata.NewConnectionStringBuilder(dmEndpoint).WithAzCli()
 	} else {
 		testConfig.kcsb = azkustodata.NewConnectionStringBuilder(testConfig.Endpoint).WithAadAppKey(testConfig.ClientID, testConfig.ClientSecret, testConfig.TenantID)
+		testConfig.dmKscb = azkustodata.NewConnectionStringBuilder(dmEndpoint).WithAadAppKey(testConfig.ClientID, testConfig.ClientSecret, testConfig.TenantID)
 	}
 	testConfig.kcsb.UserForTracing = "GoLang_E2ETest_ø"
 	skipETOE = false
