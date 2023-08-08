@@ -189,10 +189,6 @@ func (i *Streaming) newProp() properties.All {
 	}
 }
 
-func (i *Streaming) QueryClient() QueryClient {
-	return i.client
-}
-
 func (i *Streaming) Close() error {
 	return i.streamConn.Close()
 }

@@ -213,10 +213,6 @@ func (m *Managed) newProp() properties.All {
 	}
 }
 
-func (i *Managed) QueryClient() QueryClient {
-	return i.queued.QueryClient()
-}
-
 func (m *Managed) Close() error {
 	var err error
 	err = m.queued.Close()

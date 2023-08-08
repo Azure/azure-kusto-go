@@ -16,7 +16,6 @@ type Ingestor interface {
 	io.Closer
 	FromFile(ctx context.Context, fPath string, options ...FileOption) (*Result, error)
 	FromReader(ctx context.Context, reader io.Reader, options ...FileOption) (*Result, error)
-	QueryClient() QueryClient
 }
 
 // Ingestion provides data ingestion from external sources into Kusto.
@@ -203,10 +202,6 @@ func (i *Ingestion) newProp() properties.All {
 			TableName:    i.table,
 		},
 	}
-}
-
-func (i *Ingestion) QueryClient() QueryClient {
-	return i.client
 }
 
 func (i *Ingestion) Close() error {
