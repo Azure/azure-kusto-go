@@ -52,7 +52,7 @@ func NewConn(endpoint string, auth Authorization, client *http.Client, clientDet
 		return nil, errors.ES(errors.OpQuery, errors.KClientArgs, "endpoint cannot be empty")
 	}
 
-	if (u.Scheme == "http") && auth.TokenProvider.AuthorizationRequired() {
+	if (u.Scheme != "https") && auth.TokenProvider.AuthorizationRequired() {
 		return nil, errors.ES(errors.OpServConn, errors.KClientArgs, "cannot use token provider with http endpoint, as it would send the token in clear text").SetNoRetry()
 	}
 
