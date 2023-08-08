@@ -34,7 +34,8 @@ func TestIngestionStatus(t *testing.T) {
 	defer cancel()
 	client, err := azkustodata.New(testConfig.kcsb)
 	require.NoError(t, err)
-	dmClient := azkustodata.New(testConfig.kcsb)
+	dmClient, err := azkustodata.New(testConfig.kcsb)
+	require.NoError(t, err)
 
 	ingestor, err := azkustoingest.New(testConfig.kcsb, azkustoingest.WithDefaultDatabase(testConfig.Database), azkustoingest.WithDefaultTable(tableName))
 	require.NoError(t, err)
