@@ -11,6 +11,7 @@ import (
 )
 
 func TestHeaders(t *testing.T) {
+	t.Parallel()
 	tests := []struct {
 		name                              string
 		kcsbApplication, kcsbUser         string
@@ -84,7 +85,68 @@ func TestHeaders(t *testing.T) {
 	}
 }
 
+func TestSchemas(t *testing.T) {
+	t.Parallel()
+
+	tests := []struct {
+		name    string
+		url     string
+		hasAuth bool
+		err     error
+	}{
+		{
+			name:    "TestNoAuthHttps",
+			url:     "https://test.kusto.windows.net",
+			hasAuth: false,
+		},
+		{
+			name:    "TestNoAuthHttp",
+			url:     "http://test.kusto.windows.net",
+			hasAuth: false,
+		},
+		{
+			name:    "TestAuthHttps",
+			url:     "https://test.kusto.windows.net",
+			hasAuth: true,
+		},
+		{
+			name:    "TestAuthHttp",
+			url:     "http://test.kusto.windows.net",
+			hasAuth: true,
+			err:     errors.ES(errors.OpServConn, errors.KClientArgs, "cannot use token provider with http endpoint, as it would send the token in clear text").SetNoRetry(),
+		},
+		{
+			name: "TestEmptyUrl",
+			url:  "",
+			err:  errors.ES(errors.OpQuery, errors.KClientArgs, "endpoint cannot be empty"),
+		},
+	}
+	for _, tt := range tests {
+		tt := tt // Capture
+		t.Run(tt.name, func(t *testing.T) {
+			t.Parallel()
+			var kcsb = &ConnectionStringBuilder{}
+			if tt.url != "" {
+				kcsb = NewConnectionStringBuilder(tt.url)
+			}
+			if tt.hasAuth {
+				kcsb = kcsb.WithApplicationToken("1", "1")
+			}
+			client, err := New(kcsb)
+			if tt.err != nil {
+				assert.Equal(t, tt.err, err)
+				return
+			}
+			assert.NoError(t, err)
+
+			_, err = client.Query(context.Background(), "test", kql.New("test"))
+			assert.Contains(t, err.Error(), "no such host")
+		})
+	}
+}
+
 func TestSetConnectorDetails(t *testing.T) {
+	t.Parallel()
 	tests := []struct {
 		testName                          string
 		name, version                     string
