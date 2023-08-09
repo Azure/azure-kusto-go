@@ -57,14 +57,6 @@ data via an io.Reader.
 It is important to remember that FromReader() will terminate when it receives an io.EOF from the io.Reader.  Use io.Readers that won't
 return io.EOF until the io.Writer is closed (such as io.Pipe).
 
-# Ingestion from a Stream
-
-Instestion from a stream commits blocks of fully formed data encodes (JSON, AVRO, ...) into Kusto:
-
-	if err := in.Stream(ctx , jsonEncodedData, azkustoingest.JSON, "mappingName"); err != nil {
-		panic("add error handling")
-	}
-
 # Ingestion with Status Reporting
 
 You can use Kusto Go SDK to get table-based status reporting of ingestion operations.

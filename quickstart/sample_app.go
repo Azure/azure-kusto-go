@@ -249,7 +249,7 @@ func main() {
 
 	preIngestionQuerying(config, kustoClient)
 
-	ingestClient, err := azkustoingest.New(kustoClient, config.DatabaseName, config.TableName)
+	ingestClient, err := azkustoingest.New(kustoKcs, azkustoingest.WithDefaultDatabase(config.DatabaseName), azkustoingest.WithDefaultTable(config.TableName))
 	if err != nil {
 		utils.ErrorHandler("Couldn't create Ingestion client. Please validate your URIs in the configuration file.", err)
 	}

@@ -11,10 +11,13 @@ Instead, there are two new packages:
 - `github.com/Azure/azure-kusto-go/azkustodata` - for query and management commands.
 - `github.com/Azure/azure-kusto-go/azkustoingest` - for interacting with the ingesting data.
 
+In addition, the way to construct ingest clients has changed, see below for more details.
+
 Required code changes to upgrade to v1.0.0:
 - Replace your `github.com/Azure/azure-kusto-go` imports with `github.com/Azure/azure-kusto-go/azkustodata` or `github.com/Azure/azure-kusto-go/azkustoingest` depending on your use case (Use tools or IDEs to do this)
 - Replace the `kusto` qualifier with `azkustodata`
 - Replace the `ingest` qualifier with `azkustoingest`
+- Change the constructors for your ingest clients
 
 
 ## Intro
@@ -311,26 +314,42 @@ from an `io.Pipe()`. The data will not begin ingestion until the writer closes.
 
 
 #### Creating a queued ingestion client
+There are a few types of ingestion clients:
+* Queued Ingest - `azkustoingest.New()` - the default client, uses queues and batching to ingest data. Most reliable.
+* Streaming Ingest - `azkustoingest.NewStreaming()` - Directly streams data into the engine. Fast, but is limited with size and can fail.
+* Managed Streaming Ingest - `azkustoingest.NewManaged()` - Combines a streaming ingest client with a queued ingest client to provide a reliable ingestion method that is fast and can ingest large amounts of data.
+  Managed Streaming will try to stream the data, and if it fails multiple times, it will fall back to a queued ingestion.
 
-Setup is quite simple, simply pass a `*kusto.Client`, the name of the database and table you wish to ingest into.
-
+To create an ingestion client, pass a Connection String, and additional options. 
 ```go
-in, err :=azkustoingest.New(kustoClient, "database", "table")
+// queued client
+kustoConnectionString := azkustodata.NewConnectionStringBuilder("<cluster>").WithDefaultAzureCredential()
+
+// Queued ingestion client
+in, err := azkustoingest.New(kustoConnectionString)
 if err != nil {
 	panic("add error handling")
 }
+
+// Streaming ingestion client with default database and table
+in, err := azkustoingest.NewStreaming(kustoConnectionString, azkustoingest.WithDefaultDatabase("database"), azkustoingest.WithDefaultTable("table"))
+
+// Managed streaming ingest client
+in, err := azkustoingest.NewManaged(kustoConnectionString, azkustoingest.WithDefaultDatabase("database"), azkustoingest.WithDefaultTable("table"))
+
 // Be sure to close the ingestor when you're done. (Error handling omitted for brevity.)
 defer in.Close()
 ```
 
-#### Other Ingestion Clients
+Queued ingestion client requires the url of the ingestion endpoint, usually starting with `ingest-`, and for streaming ingestion it's the opposite. 
 
-There are other ingestion clients that can be used for different ingestion scenarios.  The `azkustoingest` package provides
-the following clients:
-* Queued Ingest - `ingest.New()` - the default client, uses queues and batching to ingest data. Most reliable.
-* Streaming Ingest - `ingest.NewStreaming()` - Directly streams data into the engine. Fast, but is limited with size and can fail.
-* Managed Streaming Ingest - `ingest.NewManaged()` - Combines a streaming ingest client with a queued ingest client to provide a reliable ingestion method that is fast and can ingest large amounts of data. 
- Managed Streaming will try to stream the data, and if it fails multiple times, it will fall back to a queued ingestion.
+The SDK will infer this endpoint from the given url. In case this is not wanted, you can use an option to disable it:
+
+```go
+in, err := azkustoingest.New(kustoConnectionString, azkustoingest.WithoutEndpointCorrection())
+// Similarly, you can use azkustoingest.WithCustomIngestConnectionString() to provide a different query and ingest endpoint to a managed streaming ingest client.
+in, err := azkustoingest.NewManaged(kustoConnectionString, azkustoingest.WithCustomIngestConnectionString(azkustodata.NewConnectionStringBuilder("https://ingest-<cluster>").WithDefaultAzureCredential()))
+```
 
 #### Ingestion From a File
 

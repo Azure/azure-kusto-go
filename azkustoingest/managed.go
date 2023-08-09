@@ -4,6 +4,7 @@ import (
 	"bytes"
 	"context"
 	"fmt"
+	"github.com/Azure/azure-kusto-go/azkustodata"
 	"io"
 	"time"
 
@@ -30,12 +31,19 @@ type Managed struct {
 }
 
 // NewManaged is a constructor for Managed.
-func NewManaged(client QueryClient, db, table string, options ...Option) (*Managed, error) {
-	queued, err := New(client, db, table, options...)
+func NewManaged(kcsb *azkustodata.ConnectionStringBuilder, options ...Option) (*Managed, error) {
+	o := getOptions(options)
+
+	queuedKcsb := kcsb
+	if o.customIngestConnectionString != nil {
+		queuedKcsb = o.customIngestConnectionString
+	}
+
+	queued, err := New(queuedKcsb, options...)
 	if err != nil {
 		return nil, err
 	}
-	streaming, err := NewStreaming(client, db, table)
+	streaming, err := NewStreaming(kcsb, options...)
 	if err != nil {
 		return nil, err
 	}
@@ -44,6 +52,13 @@ func NewManaged(client QueryClient, db, table string, options ...Option) (*Manag
 		queued:    queued,
 		streaming: streaming,
 	}, nil
+}
+
+func newManagedFromClients(queued *Ingestion, streaming *Streaming) *Managed {
+	return &Managed{
+		queued:    queued,
+		streaming: streaming,
+	}
 }
 
 // Attempts to stream with retries, on success - return res,nil.

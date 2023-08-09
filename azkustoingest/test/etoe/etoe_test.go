@@ -68,7 +68,7 @@ func TestFileIngestion(t *testing.T) { //ok
 	streamingTable := "goe2e_streaming_file_logs"
 	managedTable := "goe2e_managed_streaming_file_logs"
 
-	queuedIngestor, err := azkustoingest.New(client, testConfig.Database, queuedTable)
+	queuedIngestor, err := azkustoingest.New(testConfig.kcsb, azkustoingest.WithDefaultDatabase(testConfig.Database), azkustoingest.WithDefaultTable(queuedTable))
 	if err != nil {
 		panic(err)
 	}
@@ -78,7 +78,7 @@ func TestFileIngestion(t *testing.T) { //ok
 		t.Log("Closed queuedIngestor")
 	})
 
-	streamingIngestor, err := azkustoingest.NewStreaming(client, testConfig.Database, streamingTable)
+	streamingIngestor, err := azkustoingest.NewStreaming(testConfig.kcsb, azkustoingest.WithDefaultDatabase(testConfig.Database), azkustoingest.WithDefaultTable(streamingTable))
 	if err != nil {
 		panic(err)
 	}
@@ -89,7 +89,7 @@ func TestFileIngestion(t *testing.T) { //ok
 		t.Log("Closed streamingIngestor")
 	})
 
-	managedIngestor, err := azkustoingest.NewManaged(client, testConfig.Database, managedTable)
+	managedIngestor, err := azkustoingest.NewManaged(testConfig.kcsb, azkustoingest.WithDefaultDatabase(testConfig.Database), azkustoingest.WithDefaultTable(managedTable))
 	if err != nil {
 		panic(err)
 	}
@@ -496,7 +496,7 @@ func TestReaderIngestion(t *testing.T) { // ok
 		t.Log("Closed client")
 	})
 
-	queuedIngestor, err := azkustoingest.New(client, testConfig.Database, queuedTable)
+	queuedIngestor, err := azkustoingest.New(testConfig.kcsb, azkustoingest.WithDefaultDatabase(testConfig.Database), azkustoingest.WithDefaultTable(queuedTable))
 	if err != nil {
 		panic(err)
 	}
@@ -507,7 +507,7 @@ func TestReaderIngestion(t *testing.T) { // ok
 		t.Log("Closed queuedIngestor")
 	})
 
-	streamingIngestor, err := azkustoingest.NewStreaming(client, testConfig.Database, streamingTable)
+	streamingIngestor, err := azkustoingest.NewStreaming(testConfig.kcsb, azkustoingest.WithDefaultDatabase(testConfig.Database), azkustoingest.WithDefaultTable(streamingTable))
 	if err != nil {
 		panic(err)
 	}
@@ -518,7 +518,7 @@ func TestReaderIngestion(t *testing.T) { // ok
 		t.Log("Closed streamingIngestor")
 	})
 
-	managedIngestor, err := azkustoingest.NewManaged(client, testConfig.Database, managedTable)
+	managedIngestor, err := azkustoingest.NewManaged(testConfig.kcsb, azkustoingest.WithDefaultDatabase(testConfig.Database), azkustoingest.WithDefaultTable(managedTable))
 	if err != nil {
 		panic(err)
 	}
@@ -851,7 +851,7 @@ func TestMultipleClusters(t *testing.T) { //ok
 	streamingTable := "goe2e_streaming_multiple_logs"
 	secondaryStreamingTable := "goe2e_secondary_streaming_multiple_logs"
 
-	queuedIngestor, err := azkustoingest.New(client, testConfig.Database, queuedTable)
+	queuedIngestor, err := azkustoingest.New(testConfig.kcsb, azkustoingest.WithDefaultDatabase(testConfig.Database), azkustoingest.WithDefaultTable(queuedTable))
 	if err != nil {
 		panic(err)
 	}
@@ -861,7 +861,7 @@ func TestMultipleClusters(t *testing.T) { //ok
 		t.Log("Closed queuedIngestor")
 	})
 
-	streamingIngestor, err := azkustoingest.NewStreaming(client, testConfig.Database, streamingTable)
+	streamingIngestor, err := azkustoingest.NewStreaming(testConfig.kcsb, azkustoingest.WithDefaultDatabase(testConfig.Database), azkustoingest.WithDefaultTable(streamingTable))
 	if err != nil {
 		panic(err)
 	}
@@ -872,7 +872,7 @@ func TestMultipleClusters(t *testing.T) { //ok
 		t.Log("Closed streamingIngestor")
 	})
 
-	secondaryQueuedIngestor, err := azkustoingest.New(secondaryClient, testConfig.SecondaryDatabase, queuedTable)
+	secondaryQueuedIngestor, err := azkustoingest.New(skcsb, azkustoingest.WithDefaultDatabase(testConfig.SecondaryDatabase), azkustoingest.WithDefaultTable(queuedTable))
 	if err != nil {
 		panic(err)
 	}
@@ -883,7 +883,7 @@ func TestMultipleClusters(t *testing.T) { //ok
 		t.Log("Closed secondaryQueuedIngestor")
 	})
 
-	secondaryStreamingIngestor, err := azkustoingest.NewStreaming(secondaryClient, testConfig.SecondaryDatabase, streamingTable)
+	secondaryStreamingIngestor, err := azkustoingest.NewStreaming(skcsb, azkustoingest.WithDefaultDatabase(testConfig.SecondaryDatabase), azkustoingest.WithDefaultTable(streamingTable))
 	if err != nil {
 		panic(err)
 	}
@@ -1043,117 +1043,6 @@ func TestMultipleClusters(t *testing.T) { //ok
 	}
 }
 
-func TestStreamingIngestion(t *testing.T) { //OK
-	t.Parallel()
-
-	if skipETOE || testing.Short() {
-		t.SkipNow()
-	}
-	client, err := azkustodata.New(testConfig.kcsb)
-	if err != nil {
-		panic(err)
-	}
-
-	t.Cleanup(func() {
-		t.Log("Closing client")
-		require.NoError(t, client.Close())
-		t.Log("Closed client")
-	})
-
-	tableName := fmt.Sprintf("goe2e_streaming_datatypes_%d", time.Now().Unix())
-	err = testshared.CreateTestTable(t, client, tableName, false)
-	if err != nil {
-		panic(err)
-	}
-
-	tests := []struct {
-		// desc describes the test.
-		desc string
-		// segment represents a data segment in our stream.
-		segment []byte
-		// mapping is the name of the mapping reference to be used.
-		mapping string
-		// stmt is used to query for the results.
-		stmt azkustodata.Statement
-		// doer is called from within the function passed to RowIterator.Do(). It allows us to collect the data we receive.
-		doer func(row *table.Row, update interface{}) error
-		// gotInit creates the variable that will be used by doer's update argument.
-		gotInit func() interface{}
-		// want is the data we want to receive from the query.
-		want interface{}
-		// wantErr indicates that we want the ingestion to fail before the query.
-		wantErr bool
-	}{
-		{
-			desc:    "Streaming ingestion with bad existing mapping",
-			segment: []byte(createStringyLogsData()),
-			mapping: "Logs_bad_mapping",
-			wantErr: true,
-		},
-		{
-			desc:    "Test successful streaming ingestion",
-			segment: []byte(createStringyLogsData()),
-			mapping: "Logs_mapping",
-			stmt:    countStatement,
-			doer: func(row *table.Row, update interface{}) error {
-				rec := testshared.CountResult{}
-				if err := row.ToStruct(&rec); err != nil {
-					return err
-				}
-				recs := update.(*[]testshared.CountResult)
-				*recs = append(*recs, rec)
-				return nil
-			},
-			gotInit: func() interface{} {
-				v := []testshared.CountResult{}
-				return &v
-			},
-			want: &[]testshared.CountResult{{Count: 4}},
-		},
-	}
-
-	for _, test := range tests {
-		test := test // Capture
-		t.Run(test.desc, func(t *testing.T) {
-			t.Parallel()
-
-			ctx, cancel := context.WithCancel(context.Background())
-			defer cancel()
-
-			ingestor, err := azkustoingest.New(client, testConfig.Database, tableName)
-			t.Cleanup(func() {
-				t.Log("Closing ingestor")
-				require.NoError(t, ingestor.Close())
-				t.Log("Closed ingestor")
-			})
-
-			if err != nil {
-				panic(err)
-			}
-
-			err = ingestor.Stream( //nolint:staticcheck // It is deprecated, but we want to test it.
-				context.Background(),
-				test.segment,
-				azkustoingest.JSON,
-				test.mapping,
-			)
-
-			switch {
-			case err == nil && test.wantErr:
-				t.Errorf("TestStreamingIngestion(%s): ingestor.Stream(): got err == nil, want err != nil", test.desc)
-			case err != nil && !test.wantErr:
-				t.Errorf("TestStreamingIngestion(%s): ingestor.Stream(): got err == %s, want err == nil", test.desc, err)
-			case err != nil:
-				return
-			}
-
-			if err := waitForIngest(t, ctx, client, testConfig.Database, tableName, test.stmt, test.doer, test.want, test.gotInit); err != nil {
-				t.Errorf("TestStreamingIngestion(%s): %s", test.desc, err)
-			}
-		})
-	}
-}
-
 func assertErrorsMatch(t *testing.T, got, want error) bool {
 	if azkustoingest.IsStatusRecord(got) {
 		if want == nil || !azkustoingest.IsStatusRecord(want) {
@@ -1290,13 +1179,6 @@ func bigCsvFileFromString(t *testing.T) string {
 	return fileFromString(t, `,,,,
 	2020-03-10T20:59:30.694177Z,11196991-b193-4610-ae12-bcc03d092927,v0.0.1,`+strings.Repeat("Hello world!", 4*1024*1024)+`,Daniel Dubovski
 	2020-03-10T20:59:30.694177Z,,v0.0.2,,`)
-}
-
-func createStringyLogsData() string {
-	return "{\"header\":{\"time\":\"24-Aug-18 09:42:15\", \"id\":\"0944f542-a637-411b-94dd-8874992d6ebc\", \"api_version\":\"v2\"}, \"payload\":{\"data\":\"NEEUGQSPIPKDPQPIVFE\", \"user\":\"owild@fabrikam.com\"}}\n" +
-		"{\"header\":{\"time\":\"24-Aug-18 09:42:27\", \"id\":\"09f7c3a2-27e0-4a9b-b00a-3538fb50fb51\", \"api_version\":\"v1\"}, \"payload\":{\"data\":\"MSLAMKKSTOKEWCQKFHISYDRBGGJAMTOGCGSCUPFFYXROFLTGFUZBNSZIAKUFBJGZAECQJNQPBDUBMDWUNCVRUMTJGKBKUADOQRNAIDWRDJZJYYVXNARYNOEOLTJZMGVBZFKVPWLKGENLMJKIOEWUIFACMZOPTXEXOYJTNAHQOGSJATBBJBKHJATUEIIPHWRIZQXOZQUNWGGBMRBTYMFRMWONFPOESRJSPJJKVNCSHXLDURHM\", \"user\":\"owild@fabrikam.com\"}}\n" +
-		"{\"header\":{\"time\":\"24-Aug-18 09:42:47\", \"id\":\"e0e4a6dd-8823-412f-ad0c-84b55267518f\", \"api_version\":\"v1\"}, \"payload\":{\"data\":\"QZWCBJJKBPVEWNLDIQXLKNKPLKTNIBXDAOBPNGJMDSQRBGGGFDERQGJDPHRQQWBZSSEIMWQBGLHSWTOEEMHEWGMUEYAFOSVHQQZICYUJNDKEYRGVTNMDOXDMGJDNVKMOPZCGUFBFSXQTVHVNREMBFSTSNMCSVGODRVOZOABNLGKRGJQZOPWQXKJXGJSHDJKMJNCASVYRDZ\", \"user\":\"jane.austin@fabrikam.com\"}}\n" +
-		"{\"header\":{\"time\":\"24-Aug-18 09:42:56\", \"id\":\"e52cd01e-6984-4821-a4aa-a97c334517e5\", \"api_version\":\"v2\"}, \"payload\":{\"data\":\"LEWDDGKXFGMRTFITKCWYH\", \"user\":\"owild@fabrikam.com\"}}\n"
 }
 
 func waitForIngest(t *testing.T, ctx context.Context, client *azkustodata.Client, database string, tableName string, stmt azkustodata.Statement, doer func(row *table.Row, update interface{}) error, want interface{}, gotInit func() interface{}) error {

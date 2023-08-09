@@ -275,28 +275,42 @@ If ingesting data from memory, it is suggested that you stream the data in via `
 from an `io.Pipe()`. The data will not begin ingestion until the writer closes.
 
 #### Creating a queued ingestion client
+There are a few types of ingestion clients:
+  - Queued Ingest - `azkustoingest.New()` - the default client, uses queues and batching to ingest data. Most reliable.
+  - Streaming Ingest - `azkustoingest.NewStreaming()` - Directly streams data into the engine. Fast, but is limited with size and can fail.
+  - Managed Streaming Ingest - `azkustoingest.NewManaged()` - Combines a streaming ingest client with a queued ingest client to provide a reliable ingestion method that is fast and can ingest large amounts of data.
+    Managed Streaming will try to stream the data, and if it fails multiple times, it will fall back to a queued ingestion.
 
-Setup is quite simple, simply pass a `*azkustodata.Client`, the name of the database and table you wish to ingest into.
-
+To create an ingestion client, pass a Connection String, and additional options.
 ```go
-in, err := azkustoingest.New(kustoClient, "database", "table")
+// queued client
+kustoConnectionString := azkustodata.NewConnectionStringBuilder("<cluster>").WithDefaultAzureCredential()
+
+// Queued ingestion client
+in, err := azkustoingest.New(kustoConnectionString)
 
 	if err != nil {
 		panic("add error handling")
 	}
 
+// Streaming ingestion client with default database and table
+in, err := azkustoingest.NewStreaming(kustoConnectionString, azkustoingest.WithDefaultDatabase("database"), azkustoingest.WithDefaultTable("table"))
+
+// Managed streaming ingest client
+in, err := azkustoingest.NewManaged(kustoConnectionString, azkustoingest.WithDefaultDatabase("database"), azkustoingest.WithDefaultTable("table"))
+
 // Be sure to close the ingestor when you're done. (Error handling omitted for brevity.)
 defer in.Close()
 ```
 
-#### Other Ingestion Clients
+Queued ingestion client requires a url to the ingestion endpoint, usually starting with `ingest-`, and for streaming ingestion it's the oppposite.
+The SDK will infer this endpoint from the given url. In case this is not wanted, you can use an option to disable it:
 
-There are other ingestion clients that can be used for different ingestion scenarios.  The `azkustoingest` package provides
-the following clients:
-  - Queued Ingest - `azkustoingest.New()` - the default client, uses queues and batching to ingest data. Most reliable.
-  - Streaming Ingest - `azkustoingest.NewStreaming()` - Directly streams data into the engine. Fast, but is limited with size and can fail.
-  - Managed Streaming Ingest - `azkustoingest.NewManaged()` - Combines a streaming ingest client with a queued ingest client to provide a reliable ingestion method that is fast and can ingest large amounts of data.
-    Managed Streaming will try to stream the data, and if it fails multiple times, it will fall back to a queued ingestion.
+```go
+in, err := azkustoingest.New(kustoConnectionString, azkustoingest.WithoutEndpointCorrection())
+// Similarly, you can use azkustoingest.WithCustomIngestConnectionString() to provide a different query and ingest endpoint to a managed streaming ingest client.
+in, err := azkustoingest.NewManaged(kustoConnectionString, azkustoingest.WithCustomIngestConnectionString(azkustodata.NewConnectionStringBuilder("https://ingest-<cluster>").WithDefaultAzureCredential()))
+```
 
 #### Ingestion From a File
 
