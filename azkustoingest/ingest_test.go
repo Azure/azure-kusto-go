@@ -94,11 +94,11 @@ func TestIngestion(t *testing.T) {
 			name: "TestSameClient",
 			clients: []func() *Ingestion{
 				func() *Ingestion {
-					ingestion, _ := New(firstMockClient, "test", "test")
+					ingestion, _ := newFromClient(firstMockClient, &Ingestion{db: "test", table: "test"})
 					return ingestion
 				},
 				func() *Ingestion {
-					ingestion, _ := New(firstMockClient, "test2", "test2")
+					ingestion, _ := newFromClient(firstMockClient, &Ingestion{db: "test2", table: "test2"})
 					return ingestion
 				},
 			},
@@ -107,11 +107,11 @@ func TestIngestion(t *testing.T) {
 			name: "TestSameEndpoint",
 			clients: []func() *Ingestion{
 				func() *Ingestion {
-					ingestion, _ := New(firstMockClient, "test", "test")
+					ingestion, _ := newFromClient(firstMockClient, &Ingestion{db: "test", table: "test"})
 					return ingestion
 				},
 				func() *Ingestion {
-					ingestion, _ := New(mockClientSame, "test2", "test2")
+					ingestion, _ := newFromClient(mockClientSame, &Ingestion{db: "test2", table: "test2"})
 					return ingestion
 				},
 			},
@@ -120,11 +120,11 @@ func TestIngestion(t *testing.T) {
 			name: "TestDifferentEndpoint",
 			clients: []func() *Ingestion{
 				func() *Ingestion {
-					ingestion, _ := New(firstMockClient, "test", "test")
+					ingestion, _ := newFromClient(firstMockClient, &Ingestion{db: "test", table: "test"})
 					return ingestion
 				},
 				func() *Ingestion {
-					ingestion, _ := New(secondMockClient, "test2", "test2")
+					ingestion, _ := newFromClient(secondMockClient, &Ingestion{db: "test2", table: "test2"})
 					return ingestion
 				},
 			},
@@ -133,15 +133,15 @@ func TestIngestion(t *testing.T) {
 			name: "TestDifferentAndSameEndpoints",
 			clients: []func() *Ingestion{
 				func() *Ingestion {
-					ingestion, _ := New(firstMockClient, "test", "test")
+					ingestion, _ := newFromClient(firstMockClient, &Ingestion{db: "test", table: "test"})
 					return ingestion
 				},
 				func() *Ingestion {
-					ingestion, _ := New(mockClientSame, "test", "test")
+					ingestion, _ := newFromClient(mockClientSame, &Ingestion{db: "test", table: "test"})
 					return ingestion
 				},
 				func() *Ingestion {
-					ingestion, _ := New(secondMockClient, "test2", "test2")
+					ingestion, _ := newFromClient(secondMockClient, &Ingestion{db: "test2", table: "test2"})
 					return ingestion
 				},
 			},

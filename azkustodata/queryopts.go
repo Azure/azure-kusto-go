@@ -566,12 +566,3 @@ func ValidatePermissions() QueryOption {
 		return nil
 	}
 }
-
-// IngestionEndpoint will instruct the Mgmt call to connect to the ingest-[endpoint] instead of [endpoint].
-// This is not often used by end users and can only be used with a Mgmt() call.
-func IngestionEndpoint() QueryOption {
-	return func(m *queryOptions) error {
-		m.queryIngestion = true
-		return nil
-	}
-}

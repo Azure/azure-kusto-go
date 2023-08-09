@@ -213,7 +213,7 @@ func (m *Manager) AuthContext(ctx context.Context) (string, error) {
 	retryCtx := backoff.WithContext(InitBackoff(), ctx)
 	err := backoff.Retry(func() error {
 		var err error
-		rows, err = m.client.Mgmt(ctx, "NetDefaultDB", kql.New(".get kusto identity token"), azkustodata.IngestionEndpoint())
+		rows, err = m.client.Mgmt(ctx, "NetDefaultDB", kql.New(".get kusto identity token"))
 		if err == nil {
 			return nil
 		}
@@ -301,7 +301,7 @@ func (m *Manager) fetch(ctx context.Context) error {
 	retryCtx := backoff.WithContext(InitBackoff(), ctx)
 	err := backoff.Retry(func() error {
 		var err error
-		rows, err = m.client.Mgmt(ctx, "NetDefaultDB", kql.New(".get ingestion resources"), azkustodata.IngestionEndpoint())
+		rows, err = m.client.Mgmt(ctx, "NetDefaultDB", kql.New(".get ingestion resources"))
 		if err == nil {
 			return nil
 		}

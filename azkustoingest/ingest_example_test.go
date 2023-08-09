@@ -12,14 +12,7 @@ func ExampleIngestion_FromFile() {
 
 	kcsb := azkustodata.NewConnectionStringBuilder(`endpoint`).WithAadAppKey("clientID", "clientSecret", "tenentID")
 
-	client, err := azkustodata.New(kcsb)
-	if err != nil {
-		// Do something
-	}
-	// Be sure to close the client when you're done. (Error handling omitted for brevity.)
-	defer client.Close()
-
-	ingestor, err := azkustoingest.New(client, "database", "table")
+	ingestor, err := azkustoingest.New(kcsb, azkustoingest.WithDefaultDatabase("database"), azkustoingest.WithDefaultTable("table"))
 	if err != nil {
 		// Do something
 	}

@@ -37,15 +37,33 @@ type blobUri struct {
 // NewStreaming is the constructor for Streaming.
 // More information can be found here:
 // https://docs.microsoft.com/en-us/azure/kusto/management/create-ingestion-mapping-command
-func NewStreaming(client QueryClient, db, table string) (*Streaming, error) {
-	streamConn, err := azkustodata.NewConn(removeIngestPrefix(client.Endpoint()), client.Auth(), client.HttpClient(), client.ClientDetails())
+func NewStreaming(kcsb *azkustodata.ConnectionStringBuilder, options ...Option) (*Streaming, error) {
+	o := getOptions(options)
+
+	if !o.withoutEndpointCorrection {
+		newKcsb := *kcsb
+		newKcsb.DataSource = removeIngestPrefix(newKcsb.DataSource)
+		kcsb = &newKcsb
+	}
+
+	client, err := azkustodata.New(kcsb)
 	if err != nil {
 		return nil, err
 	}
 
+	return newStreamingFromClient(client, o)
+}
+
+func newStreamingFromClient(client QueryClient, o *Ingestion) (*Streaming, error) {
+	streamConn, err := azkustodata.NewConn(removeIngestPrefix(client.Endpoint()), client.Auth(), client.HttpClient(), client.ClientDetails())
+	if err != nil {
+		client.Close()
+		return nil, err
+	}
+
 	i := &Streaming{
-		db:         db,
-		table:      table,
+		db:         o.db,
+		table:      o.table,
 		client:     client,
 		streamConn: streamConn,
 	}

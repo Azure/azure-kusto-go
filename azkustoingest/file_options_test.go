@@ -25,14 +25,13 @@ func TestOptions(t *testing.T) {
 
 	client := azkustodata.NewMockClient()
 
-	queuedClient, err := New(client, "", "")
+	queuedClient, err := newFromClient(client, &Ingestion{})
 	require.NoError(t, err)
 
-	streamingClient, err := NewStreaming(client, "", "")
+	streamingClient, err := newStreamingFromClient(client, &Ingestion{})
 	require.NoError(t, err)
 
-	managedClient, err := NewManaged(client, "", "")
-	require.NoError(t, err)
+	managedClient := newManagedFromClients(queuedClient, streamingClient)
 
 	var tests = []struct {
 		desc     string
@@ -207,7 +206,7 @@ func TestFileFormatAndMapping(t *testing.T) {
 
 	client := azkustodata.NewMockClient()
 
-	queuedClient, err := New(client, "", "")
+	queuedClient, err := newFromClient(client, &Ingestion{})
 	require.NoError(t, err)
 
 	for _, test := range tests {

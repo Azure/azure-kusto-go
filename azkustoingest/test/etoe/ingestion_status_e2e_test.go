@@ -32,11 +32,12 @@ func TestIngestionStatus(t *testing.T) {
 
 	ctx, cancel := context.WithTimeout(context.Background(), 1*time.Minute)
 	defer cancel()
-
 	client, err := azkustodata.New(testConfig.kcsb)
 	require.NoError(t, err)
+	dmClient, err := azkustodata.New(testConfig.dmKscb)
+	require.NoError(t, err)
 
-	ingestor, err := azkustoingest.New(client, testConfig.Database, tableName)
+	ingestor, err := azkustoingest.New(testConfig.kcsb, azkustoingest.WithDefaultDatabase(testConfig.Database), azkustoingest.WithDefaultTable(tableName))
 	require.NoError(t, err)
 
 	t.Cleanup(func() {
@@ -60,7 +61,7 @@ func TestIngestionStatus(t *testing.T) {
 	// Refresh policy cache on DM
 	batchingStmt2 := kql.New(".refresh database '").AddKeyword(testConfig.Database).AddLiteral(
 		"' table '").AddTable(tableName).AddLiteral("' cache ingestionbatchingpolicy")
-	_, err = client.Mgmt(ctx, "NetDefaultDB", batchingStmt2, azkustodata.IngestionEndpoint())
+	_, err = dmClient.Mgmt(ctx, "NetDefaultDB", batchingStmt2)
 
 	require.NoError(t, err, "failed to refresh policy cache on DM")
 
@@ -216,7 +217,7 @@ func TestIngestionStatus(t *testing.T) {
 		client, err := azkustodata.New(testConfig.kcsb)
 		require.NoError(t, err)
 
-		ingestor, err := azkustoingest.New(client, testConfig.Database, tableName)
+		ingestor, err := azkustoingest.New(testConfig.kcsb, azkustoingest.WithDefaultDatabase(testConfig.Database), azkustoingest.WithDefaultTable(tableName))
 		require.NoError(t, err)
 
 		t.Cleanup(func() {
