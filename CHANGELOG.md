@@ -7,10 +7,6 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## Unreleased
 ### Added
-- Support streaming for blob, for Managed client as well.
-- Support more urls for kusto, including http and port.
-
-### Added
 * [BREAKING] [MAJOR] Split the main module into two packages:
     * azkustodata - contains querying, management APIs.
     * azkustoingest - contains ingestion in all its forms.
@@ -30,11 +26,26 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 * Removed `QueryIngestion()` option for Query client. If you want to perform commands against the dm, create a query client with the "ingest-" endpoint.
 
 ### Fixed
-* Fixed wrong context deadline setting* Fixed accepting empty url.
+
+- Fixed deadlock when having high number of concurrent queries
+
+## [0.14.0] - 2023-08-10
+
+### Added
+
+- Support streaming for blob, for Managed client as well.
+- Support more urls for kusto, including http and port.
+
+### Fixed
+
+* Fixed wrong context deadline setting
+* Fixed accepting empty url.
+
   
 ## [0.13.1] - 2023-05-24
 
 ### Changed
+
 - Modified `once.go` to reset `sync.Once` instance when an error occurs
 
 ## [0.13.0] - 2023-05-09
@@ -42,9 +53,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ### Added
 
 - `ServerTimeout` Query Option
-  - The timeout to the server will be set to the value of this option, or to none if `RequestNoTimeout` is set to true.
-  - If it is not provided, the timeout will be set by the context (the old behaviour).
-  - If a context timeout is not provided, it will fall back to a default value by the type of request.
+    - The timeout to the server will be set to the value of this option, or to none if `RequestNoTimeout` is set to
+      true.
+    - If it is not provided, the timeout will be set by the context (the old behaviour).
+    - If a context timeout is not provided, it will fall back to a default value by the type of request.
 - Support for `IgnoreFirstRecord` ingestion option
 
 ### Changed
