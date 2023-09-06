@@ -7,6 +7,9 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## Unreleased
 
+## Added
+- Support new playfab domain
+
 ### Fixed
 
 - Fixed deadlock when having high number of concurrent queries
