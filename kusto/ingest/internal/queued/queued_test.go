@@ -2,9 +2,9 @@ package queued
 
 import (
 	"bytes"
-	"compress/gzip"
 	"context"
 	"fmt"
+	"github.com/klauspost/compress/gzip"
 	"io"
 	"os"
 	"testing"

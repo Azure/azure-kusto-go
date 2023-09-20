@@ -2,7 +2,7 @@ package gzip
 
 import (
 	"bytes"
-	"compress/gzip"
+	"github.com/klauspost/compress/gzip"
 	"io"
 	"math/rand"
 	"os"
