@@ -3,17 +3,52 @@ package kusto
 import (
 	"context"
 	"fmt"
-	"github.com/Azure/azure-kusto-go/kusto/kql"
 	"io"
 	"net/http"
 	"net/url"
 	"sync"
 	"time"
 
+	"github.com/Azure/azure-kusto-go/kusto/kql"
+
 	kustoErrors "github.com/Azure/azure-kusto-go/kusto/data/errors"
 
 	"github.com/Azure/azure-kusto-go/kusto/data/table"
 )
+
+func Example_structs() {
+	// Query and capture the values and put them in a slice of structs representing the row.
+
+	// NodeRec represents our Kusto data that will be returned.
+	type NodeRec struct {
+		// ID is the table's NodeId. We use the field tag here to instruct our client to convert NodeId to ID.
+		ID int64 `kusto:"NodeId"`
+		// CollectionTime is Go representation of the Kusto datetime type.
+		CollectionTime time.Time
+	}
+
+	kcsb := NewConnectionStringBuilder("endpoint").WithAadAppKey("clientID", "clientSecret", "tenentID")
+	client, err := New(kcsb)
+	if err != nil {
+		panic("add error handling")
+	}
+
+	// Be sure to close the client when you're done. (Error handling omitted for brevity.)
+	defer client.Close()
+
+	ctx := context.Background()
+
+	var recs []NodeRec
+	// Query our database table "systemNodes" for the CollectionTimes and the NodeIds.
+	err = client.QueryToStructs(ctx, "database", kql.New("systemNodes | project CollectionTime, NodeId"), &recs)
+	if err != nil {
+		panic("add error handling")
+	}
+
+	for _, rec := range recs {
+		fmt.Println(rec.ID)
+	}
+}
 
 func Example_simple() {
 	// Query and capture the values and put them in a slice of structs representing the row.

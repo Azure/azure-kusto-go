@@ -283,6 +283,24 @@ if err != nil {
 }
 ```
 
+We also provide a function `client.QueryToRows()`, which does exactly the same as above code but is easier to use.
+
+```go
+// NodeRec represents our Kusto data that will be returned.
+type NodeRec struct {
+	// ID is the table's NodeId. We use the field tag here to instruct our client to convert NodeId to ID.
+	ID int64 `kusto:"NodeId"`
+	// CollectionTime is Go representation of the Kusto datetime type.
+	CollectionTime time.Time
+}
+
+recs := []NodeRec{}
+err := client.QueryToStructs(ctx, "database", query, &recs)
+if err != nil {
+	panic("add error handling")
+}
+```
+
 ### Ingestion
 
 The `ingest` package provides access to Kusto's ingestion service for importing data into Kusto. This requires

@@ -5,11 +5,14 @@ import (
 	"io"
 	"net/http"
 	"net/url"
+	"reflect"
 	"strings"
 	"sync"
 	"time"
 
 	"github.com/Azure/azure-kusto-go/kusto/data/errors"
+	kustoErrors "github.com/Azure/azure-kusto-go/kusto/data/errors"
+	"github.com/Azure/azure-kusto-go/kusto/data/table"
 	"github.com/Azure/azure-kusto-go/kusto/internal/frames"
 	v2 "github.com/Azure/azure-kusto-go/kusto/internal/frames/v2"
 )
@@ -185,6 +188,77 @@ func (c *Client) Query(ctx context.Context, db string, query Statement, options 
 	<-columnsReady
 
 	return iter, nil
+}
+
+// QueryToStructs turns the retured data into Go struct slice.
+// `dest` can be either `[]Struct` or `[]*Struct`.
+// Example:
+//
+//	type MyStruct struct {
+//		Name string `kusto:"Name"`
+//		Age  int64  `kusto:"Age"`
+//	}
+//	var list []MyStruct
+//	err := client.QueryToStructs(ctx, "db", kql.New("MyTable | project Name, Age"), &list)
+//	if err != nil {
+//		return err
+//	}
+func (c *Client) QueryToStructs(ctx context.Context, db string, query Statement, dest interface{}, options ...QueryOption) error {
+	iter, err := c.Query(ctx, db, query, options...)
+	if err != nil {
+		return err
+	}
+
+	reflectValue := reflect.ValueOf(dest)
+	if reflectValue.Kind() != reflect.Ptr || reflectValue.IsNil() {
+		return errors.ES(errors.OpQuery, errors.KClientArgs, "dest must be a non-nil pointer: %s", reflect.TypeOf(dest).String())
+	}
+
+	list := reflectValue.Elem()
+	if list.Kind() != reflect.Slice {
+		return errors.ES(errors.OpQuery, errors.KClientArgs, "dest must be a pointer to a slice: %s", reflect.TypeOf(dest).String())
+	}
+
+	listType := list.Type().Elem()
+	if !(listType.Kind() == reflect.Ptr && listType.Elem().Kind() == reflect.Struct) && !(listType.Kind() == reflect.Struct) {
+		return errors.ES(errors.OpQuery, errors.KClientArgs, "dest must be []*Struct or []Struct: %s", reflect.TypeOf(dest).String())
+	}
+
+	defer iter.Stop()
+	err = iter.DoOnRowOrError(
+		func(row *table.Row, e *kustoErrors.Error) error {
+			if e != nil {
+				return e
+			}
+
+			// create an instance of the struct to decode into
+			var item reflect.Value
+			if listType.Kind() == reflect.Ptr {
+				item = reflect.New(listType.Elem())
+				if err := row.ToStruct(item.Interface()); err != nil {
+					return err
+				}
+			} else {
+				item = reflect.New(listType).Elem()
+				if err := row.ToStruct(item.Addr().Interface()); err != nil {
+					return err
+				}
+			}
+
+			// clear the list if we received a `replace` flag
+			if row.Replace {
+				list.Set(reflect.MakeSlice(list.Type(), 0, 0))
+			}
+
+			list.Set(reflect.Append(list, item))
+			return nil
+		},
+	)
+
+	if err != nil {
+		return err
+	}
+	return nil
 }
 
 func (c *Client) QueryToJson(ctx context.Context, db string, query Statement, options ...QueryOption) (string, error) {
