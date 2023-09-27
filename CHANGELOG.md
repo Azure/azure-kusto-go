@@ -5,14 +5,15 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
-## Unreleased
+## [0.14.1] - 2023-09-27
 
-## Added
+### Added
 - Support new playfab domain
 
 ### Fixed
 
 - Fixed deadlock when having high number of concurrent queries
+- Fixed wrong endpoint error not triggering
 
 ## [0.14.0] - 2023-08-10
 
