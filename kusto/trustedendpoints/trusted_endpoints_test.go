@@ -164,6 +164,7 @@ func TestWellTrustedEndpoints_ProxyTest(t *testing.T) {
 		fmt.Sprintf("https://kusto.aria.microsoft.com,%s", defaultPublicLoginUrl),
 		fmt.Sprintf("https://adx.monitor.azure.com,%s", defaultPublicLoginUrl),
 		fmt.Sprintf("https://cluster.playfab.com,%s", defaultPublicLoginUrl),
+		fmt.Sprintf("https://cluster.azureplayfab.com,%s", defaultPublicLoginUrl),
 		fmt.Sprintf("https://cluster.playfabapi.com,%s", defaultPublicLoginUrl),
 		fmt.Sprintf("https://cluster.playfab.cn,%s", chinaCloudLoginUrl),
 	} {
