@@ -1,9 +1,9 @@
 package response
 
 import (
+	"compress/flate"
+	"compress/gzip"
 	"fmt"
-	"github.com/klauspost/compress/flate"
-	"github.com/klauspost/compress/gzip"
 	"io"
 	"net/http"
 	"strings"

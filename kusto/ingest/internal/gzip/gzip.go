@@ -3,7 +3,7 @@
 package gzip
 
 import (
-	"github.com/klauspost/compress/gzip"
+	"compress/gzip"
 	"io"
 	"sync"
 	"sync/atomic"
