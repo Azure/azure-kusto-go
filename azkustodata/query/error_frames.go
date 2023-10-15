@@ -1,5 +1,7 @@
 package query
 
+import "fmt"
+
 type OneApiError struct {
 	Error ErrorMessage `json:"error"`
 }
@@ -25,4 +27,16 @@ type ErrorContext struct {
 	ActivityType     string `json:"activityType"`
 	ParentActivityId string `json:"parentActivityId"`
 	ActivityStack    string `json:"activityStack"`
+}
+
+func (e *OneApiError) String() string {
+	return fmt.Sprintf("OneApiError(Error=%v)", e.Error)
+}
+
+func (e *ErrorMessage) String() string {
+	return fmt.Sprintf("ErrorMessage(Code=%s, Message=%s, Type=%s, ErrorContext=%v, IsPermanent=%t)", e.Code, e.Message, e.Type, e.Context, e.IsPermanent)
+}
+
+func (e *ErrorContext) String() string {
+	return fmt.Sprintf("ErrorContext(Timestamp=%s, ServiceAlias=%s, MachineName=%s, ProcessName=%s, ProcessId=%d, ThreadId=%d, ClientRequestId=%s, ActivityId=%s, SubActivityId=%s, ActivityType=%s, ParentActivityId=%s, ActivityStack=%s)", e.Timestamp, e.ServiceAlias, e.MachineName, e.ProcessName, e.ProcessId, e.ThreadId, e.ClientRequestId, e.ActivityId, e.SubActivityId, e.ActivityType, e.ParentActivityId, e.ActivityStack)
 }

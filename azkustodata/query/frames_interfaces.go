@@ -1,6 +1,8 @@
 package query
 
-import "fmt"
+import (
+	"fmt"
+)
 
 func (f *DataSetHeader) String() string {
 	return fmt.Sprintf("DataSetHeader(IsProgressive=%t, Version=%s, IsFragmented=%t, ErrorReportingPlacement=%s)", f.IsProgressive, f.Version, f.IsFragmented, f.ErrorReportingPlacement)
@@ -22,18 +24,6 @@ func (f *TableFragment) String() string {
 
 func (f *TableCompletion) String() string {
 	return fmt.Sprintf("TableCompletion(TableId=%d, RowCount=%d, OneApiErrors=%v)", f.TableId, f.RowCount, f.OneApiErrors)
-}
-
-func (e *OneApiError) String() string {
-	return fmt.Sprintf("OneApiError(Error=%v)", e.Error)
-}
-
-func (e *ErrorMessage) String() string {
-	return fmt.Sprintf("ErrorMessage(Code=%s, Message=%s, Type=%s, ErrorContext=%v, IsPermanent=%t)", e.Code, e.Message, e.Type, e.Context, e.IsPermanent)
-}
-
-func (e *ErrorContext) String() string {
-	return fmt.Sprintf("ErrorContext(Timestamp=%s, ServiceAlias=%s, MachineName=%s, ProcessName=%s, ProcessId=%d, ThreadId=%d, ClientRequestId=%s, ActivityId=%s, SubActivityId=%s, ActivityType=%s, ParentActivityId=%s, ActivityStack=%s)", e.Timestamp, e.ServiceAlias, e.MachineName, e.ProcessName, e.ProcessId, e.ThreadId, e.ClientRequestId, e.ActivityId, e.SubActivityId, e.ActivityType, e.ParentActivityId, e.ActivityStack)
 }
 
 func (f *DataSetCompletion) String() string {
