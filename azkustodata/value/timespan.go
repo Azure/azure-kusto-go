@@ -256,10 +256,10 @@ func (t *Timespan) Convert(v reflect.Value) error {
 		}
 		return nil
 	case pt.ConvertibleTo(reflect.TypeOf(Timespan{})):
-		v.Set(reflect.ValueOf(t))
+		v.Set(reflect.ValueOf(*t))
 		return nil
 	case pt.ConvertibleTo(reflect.TypeOf(&Timespan{})):
-		v.Set(reflect.ValueOf(&t))
+		v.Set(reflect.ValueOf(t))
 		return nil
 	}
 	return fmt.Errorf("Column was type Kusto.Timespan, receiver had base Kind %s ", pt.Kind())

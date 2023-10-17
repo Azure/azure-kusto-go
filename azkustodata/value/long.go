@@ -76,10 +76,10 @@ func (l *Long) Convert(v reflect.Value) error {
 		}
 		return nil
 	case t.ConvertibleTo(reflect.TypeOf(Long{})):
-		v.Set(reflect.ValueOf(l))
+		v.Set(reflect.ValueOf(*l))
 		return nil
 	case t.ConvertibleTo(reflect.TypeOf(&Long{})):
-		v.Set(reflect.ValueOf(&l))
+		v.Set(reflect.ValueOf(l))
 		return nil
 	}
 	return fmt.Errorf("Column was type Kusto.Long, receiver had base Kind %s ", t.Kind())

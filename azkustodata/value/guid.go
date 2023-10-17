@@ -60,10 +60,10 @@ func (g *GUID) Convert(v reflect.Value) error {
 		}
 		return nil
 	case t.ConvertibleTo(reflect.TypeOf(GUID{})):
-		v.Set(reflect.ValueOf(g))
+		v.Set(reflect.ValueOf(*g))
 		return nil
 	case t.ConvertibleTo(reflect.TypeOf(&GUID{})):
-		v.Set(reflect.ValueOf(&g))
+		v.Set(reflect.ValueOf(g))
 		return nil
 	}
 	return fmt.Errorf("Column was type Kusto.GUID, receiver had base Kind %s ", t.Kind())

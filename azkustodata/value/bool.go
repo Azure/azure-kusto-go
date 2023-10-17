@@ -61,10 +61,10 @@ func (bo *Bool) Convert(v reflect.Value) error {
 		}
 		return nil
 	case t.ConvertibleTo(reflect.TypeOf(Bool{})):
-		v.Set(reflect.ValueOf(bo))
+		v.Set(reflect.ValueOf(*bo))
 		return nil
 	case t.ConvertibleTo(reflect.TypeOf(&Bool{})):
-		v.Set(reflect.ValueOf(&bo))
+		v.Set(reflect.ValueOf(bo))
 		return nil
 	}
 	return fmt.Errorf("Column was type Kusto.Bool, receiver had base Kind %s ", t.Kind())

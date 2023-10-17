@@ -71,10 +71,10 @@ func (d *DateTime) Convert(v reflect.Value) error {
 		}
 		return nil
 	case t.ConvertibleTo(reflect.TypeOf(DateTime{})):
-		v.Set(reflect.ValueOf(d))
+		v.Set(reflect.ValueOf(*d))
 		return nil
 	case t.ConvertibleTo(reflect.TypeOf(&DateTime{})):
-		v.Set(reflect.ValueOf(&d))
+		v.Set(reflect.ValueOf(d))
 		return nil
 	}
 	return fmt.Errorf("Column was type Kusto.DateTime, receiver had base Kind %s ", t.Kind())

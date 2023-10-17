@@ -69,10 +69,10 @@ func (r *Real) Convert(v reflect.Value) error {
 		}
 		return nil
 	case t.ConvertibleTo(reflect.TypeOf(Real{})):
-		v.Set(reflect.ValueOf(r))
+		v.Set(reflect.ValueOf(*r))
 		return nil
 	case t.ConvertibleTo(reflect.TypeOf(&Real{})):
-		v.Set(reflect.ValueOf(&r))
+		v.Set(reflect.ValueOf(r))
 		return nil
 	}
 	return fmt.Errorf("Column was type Kusto.Real, receiver had base Kind %s ", t.Kind())

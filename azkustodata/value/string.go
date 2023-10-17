@@ -57,10 +57,10 @@ func (s *String) Convert(v reflect.Value) error {
 		}
 		return nil
 	case t.ConvertibleTo(reflect.TypeOf(String{})):
-		v.Set(reflect.ValueOf(s))
+		v.Set(reflect.ValueOf(*s))
 		return nil
 	case t.ConvertibleTo(reflect.TypeOf(&String{})):
-		v.Set(reflect.ValueOf(&s))
+		v.Set(reflect.ValueOf(s))
 		return nil
 	}
 	return fmt.Errorf("Column was type Kusto.String, receiver had base Kind %s ", t.Kind())

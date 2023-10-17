@@ -65,7 +65,7 @@ func (d *Dynamic) Convert(v reflect.Value) error {
 	var valueToSet reflect.Value
 	switch {
 	case t.ConvertibleTo(reflect.TypeOf(Dynamic{})):
-		valueToSet = reflect.ValueOf(d)
+		valueToSet = reflect.ValueOf(*d)
 	case t.ConvertibleTo(reflect.TypeOf([]byte{})):
 		if t.Kind() == reflect.String {
 			s := string(d.Value)

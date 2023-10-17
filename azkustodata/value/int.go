@@ -78,10 +78,10 @@ func (in *Int) Convert(v reflect.Value) error {
 		}
 		return nil
 	case t.ConvertibleTo(reflect.TypeOf(Int{})):
-		v.Set(reflect.ValueOf(in))
+		v.Set(reflect.ValueOf(*in))
 		return nil
 	case t.ConvertibleTo(reflect.TypeOf(&Int{})):
-		v.Set(reflect.ValueOf(&in))
+		v.Set(reflect.ValueOf(in))
 		return nil
 	}
 	return fmt.Errorf("Column was type Kusto.Int, receiver had base Kind %s ", t.Kind())
