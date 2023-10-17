@@ -15,17 +15,17 @@ type DateTime struct {
 }
 
 // String implements fmt.Stringer.
-func (d DateTime) String() string {
+func (d *DateTime) String() string {
 	if !d.Valid {
 		return ""
 	}
 	return fmt.Sprint(d.Value.Format(time.RFC3339Nano))
 }
 
-func (DateTime) isKustoVal() {}
+func (*DateTime) isKustoVal() {}
 
 // Marshal marshals the DateTime into a Kusto compatible string.
-func (d DateTime) Marshal() string {
+func (d *DateTime) Marshal() string {
 	if !d.Valid {
 		return time.Time{}.Format(time.RFC3339Nano)
 	}
@@ -56,7 +56,7 @@ func (d *DateTime) Unmarshal(i interface{}) error {
 }
 
 // Convert DateTime into reflect value.
-func (d DateTime) Convert(v reflect.Value) error {
+func (d *DateTime) Convert(v reflect.Value) error {
 	t := v.Type()
 	switch {
 	case t.AssignableTo(reflect.TypeOf(time.Time{})):
@@ -78,4 +78,12 @@ func (d DateTime) Convert(v reflect.Value) error {
 		return nil
 	}
 	return fmt.Errorf("Column was type Kusto.DateTime, receiver had base Kind %s ", t.Kind())
+}
+
+// GetValue returns the value of the type.
+func (d *DateTime) GetValue() interface{} {
+	if !d.Valid {
+		return nil
+	}
+	return d.Value
 }

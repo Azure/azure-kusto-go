@@ -15,10 +15,10 @@ type Real struct {
 	Valid bool
 }
 
-func (Real) isKustoVal() {}
+func (*Real) isKustoVal() {}
 
 // String implements fmt.Stringer.
-func (r Real) String() string {
+func (r *Real) String() string {
 	if !r.Valid {
 		return ""
 	}
@@ -54,7 +54,7 @@ func (r *Real) Unmarshal(i interface{}) error {
 }
 
 // Convert Real into reflect value.
-func (r Real) Convert(v reflect.Value) error {
+func (r *Real) Convert(v reflect.Value) error {
 	t := v.Type()
 	switch {
 	case t.Kind() == reflect.Float64:
@@ -76,4 +76,12 @@ func (r Real) Convert(v reflect.Value) error {
 		return nil
 	}
 	return fmt.Errorf("Column was type Kusto.Real, receiver had base Kind %s ", t.Kind())
+}
+
+// GetValue returns the value of the type.
+func (r *Real) GetValue() interface{} {
+	if !r.Valid {
+		return nil
+	}
+	return r.Value
 }

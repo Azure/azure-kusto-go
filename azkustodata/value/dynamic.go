@@ -14,10 +14,10 @@ type Dynamic struct {
 	Valid bool
 }
 
-func (Dynamic) isKustoVal() {}
+func (*Dynamic) isKustoVal() {}
 
 // String implements fmt.Stringer.
-func (d Dynamic) String() string {
+func (d *Dynamic) String() string {
 	if !d.Valid {
 		return ""
 	}
@@ -105,4 +105,13 @@ func (d Dynamic) Convert(v reflect.Value) error {
 		v.Elem().Set(valueToSet)
 	}
 	return nil
+}
+
+// GetValue returns the value of the type.
+func (d *Dynamic) GetValue() interface{} {
+	if !d.Valid {
+		return nil
+	}
+
+	return d.Value
 }

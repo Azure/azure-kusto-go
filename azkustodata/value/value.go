@@ -35,15 +35,17 @@ The Unmarshal() is for internal use, it should not be needed by an end user. Use
 */
 package value
 
-import "reflect"
+import (
+	"fmt"
+	"reflect"
+)
 
 // Kusto represents a Kusto value.
 type Kusto interface {
+	fmt.Stringer
 	isKustoVal()
-	// String implements fmt.Stringer().
-	String() string
-	// Convert into reflect value.
 	Convert(v reflect.Value) error
+	GetValue() interface{}
 }
 
 // Values is a list of Kusto values, usually an ordered row.

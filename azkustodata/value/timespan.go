@@ -18,10 +18,10 @@ type Timespan struct {
 	Valid bool
 }
 
-func (Timespan) isKustoVal() {}
+func (*Timespan) isKustoVal() {}
 
 // String implements fmt.Stringer.
-func (t Timespan) String() string {
+func (t *Timespan) String() string {
 	if !t.Valid {
 		return ""
 	}
@@ -30,7 +30,7 @@ func (t Timespan) String() string {
 
 // Marshal marshals the Timespan into a Kusto compatible string. The string is the contant invariant(c)
 // format. See https://docs.microsoft.com/en-us/dotnet/standard/base-types/standard-timespan-format-strings .
-func (t Timespan) Marshal() string {
+func (t *Timespan) Marshal() string {
 	const (
 		day = 24 * time.Hour
 	)
@@ -241,26 +241,34 @@ func (t *Timespan) unmarshalSeconds(s string) (time.Duration, error) {
 }
 
 // Convert Timespan into reflect value.
-func (ts Timespan) Convert(v reflect.Value) error {
-	t := v.Type()
+func (t *Timespan) Convert(v reflect.Value) error {
+	pt := v.Type()
 	switch {
-	case t.AssignableTo(reflect.TypeOf(time.Duration(0))):
-		if ts.Valid {
-			v.Set(reflect.ValueOf(ts.Value))
+	case pt.AssignableTo(reflect.TypeOf(time.Duration(0))):
+		if t.Valid {
+			v.Set(reflect.ValueOf(t.Value))
 		}
 		return nil
-	case t.ConvertibleTo(reflect.TypeOf(new(time.Duration))):
-		if ts.Valid {
-			t := &ts.Value
-			v.Set(reflect.ValueOf(t))
+	case pt.ConvertibleTo(reflect.TypeOf(new(time.Duration))):
+		if t.Valid {
+			pt := &t.Value
+			v.Set(reflect.ValueOf(pt))
 		}
 		return nil
-	case t.ConvertibleTo(reflect.TypeOf(Timespan{})):
-		v.Set(reflect.ValueOf(ts))
+	case pt.ConvertibleTo(reflect.TypeOf(Timespan{})):
+		v.Set(reflect.ValueOf(t))
 		return nil
-	case t.ConvertibleTo(reflect.TypeOf(&Timespan{})):
-		v.Set(reflect.ValueOf(&ts))
+	case pt.ConvertibleTo(reflect.TypeOf(&Timespan{})):
+		v.Set(reflect.ValueOf(&t))
 		return nil
 	}
-	return fmt.Errorf("Column was type Kusto.Timespan, receiver had base Kind %s ", t.Kind())
+	return fmt.Errorf("Column was type Kusto.Timespan, receiver had base Kind %s ", pt.Kind())
+}
+
+// GetValue returns the value of the type.
+func (t *Timespan) GetValue() interface{} {
+	if !t.Valid {
+		return nil
+	}
+	return t.Value
 }

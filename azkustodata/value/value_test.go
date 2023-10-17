@@ -2,6 +2,7 @@ package value
 
 import (
 	"encoding/json"
+	"github.com/shopspring/decimal"
 	"math"
 	"strings"
 	"testing"
@@ -209,7 +210,10 @@ func TestGUID(t *testing.T) {
 		{
 			desc: "value is a UUID",
 			i:    goodUUID.String(),
-			want: GUID{Value: goodUUID, Valid: true},
+			want: GUID{Value: uuid.NullUUID{
+				UUID:  goodUUID,
+				Valid: true,
+			}},
 		},
 	}
 
@@ -544,11 +548,11 @@ func TestDecimal(t *testing.T) {
 			i:    3.0,
 			err:  true,
 		},
-		{desc: "Conversion of '1',", i: "1", want: Decimal{Value: "1", Valid: true}},
-		{desc: "Conversion of '.1',", i: ".1", want: Decimal{Value: ".1", Valid: true}},
-		{desc: "Conversion of '1.',", i: "1.", want: Decimal{Value: "1.", Valid: true}},
-		{desc: "Conversion of '0.1',", i: "0.1", want: Decimal{Value: "0.1", Valid: true}},
-		{desc: "Conversion of '3.07',", i: "3.07", want: Decimal{Value: "3.07", Valid: true}},
+		{desc: "Conversion of '1',", i: "1", want: Decimal{Value: decimal.NewNullDecimal(decimal.RequireFromString("1"))}},
+		{desc: "Conversion of '.1',", i: ".1", want: Decimal{Value: decimal.NewNullDecimal(decimal.RequireFromString(".1"))}},
+		{desc: "Conversion of '1.',", i: "1.", want: Decimal{Value: decimal.NewNullDecimal(decimal.RequireFromString("1."))}},
+		{desc: "Conversion of '0.1',", i: "0.1", want: Decimal{Value: decimal.NewNullDecimal(decimal.RequireFromString("0.1"))}},
+		{desc: "Conversion of '3.07',", i: "3.07", want: Decimal{Value: decimal.NewNullDecimal(decimal.RequireFromString("3.07"))}},
 	}
 
 	for _, test := range tests {

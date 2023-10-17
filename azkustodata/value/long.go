@@ -16,10 +16,10 @@ type Long struct {
 	Valid bool
 }
 
-func (Long) isKustoVal() {}
+func (*Long) isKustoVal() {}
 
 // String implements fmt.Stringer.
-func (l Long) String() string {
+func (l *Long) String() string {
 	if !l.Valid {
 		return ""
 	}
@@ -60,7 +60,7 @@ func (l *Long) Unmarshal(i interface{}) error {
 }
 
 // Convert Long into reflect value.
-func (l Long) Convert(v reflect.Value) error {
+func (l *Long) Convert(v reflect.Value) error {
 	t := v.Type()
 	switch {
 	case t.Kind() == reflect.Int64:
@@ -83,4 +83,12 @@ func (l Long) Convert(v reflect.Value) error {
 		return nil
 	}
 	return fmt.Errorf("Column was type Kusto.Long, receiver had base Kind %s ", t.Kind())
+}
+
+// GetValue returns the value of the type.
+func (l *Long) GetValue() interface{} {
+	if !l.Valid {
+		return nil
+	}
+	return l.Value
 }

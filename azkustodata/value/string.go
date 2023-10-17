@@ -13,10 +13,10 @@ type String struct {
 	Valid bool
 }
 
-func (String) isKustoVal() {}
+func (*String) isKustoVal() {}
 
 // String implements fmt.Stringer.
-func (s String) String() string {
+func (s *String) String() string {
 	if !s.Valid {
 		return ""
 	}
@@ -42,7 +42,7 @@ func (s *String) Unmarshal(i interface{}) error {
 }
 
 // Convert String into reflect value.
-func (s String) Convert(v reflect.Value) error {
+func (s *String) Convert(v reflect.Value) error {
 	t := v.Type()
 	switch {
 	case t.Kind() == reflect.String:
@@ -64,4 +64,12 @@ func (s String) Convert(v reflect.Value) error {
 		return nil
 	}
 	return fmt.Errorf("Column was type Kusto.String, receiver had base Kind %s ", t.Kind())
+}
+
+// GetValue returns the value of the type.
+func (s *String) GetValue() interface{} {
+	if !s.Valid {
+		return nil
+	}
+	return s.Value
 }

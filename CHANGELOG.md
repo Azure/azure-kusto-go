@@ -11,6 +11,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
     * azkustodata - contains querying, management APIs.
     * azkustoingest - contains ingestion in all its forms.
 * [BREAKING] [MAJOR] Constructing ingest clients is now done using a KustoConnectionStringBuilder, and not a client struct.
+* [BREAKING] [MAJOR] Changes in the kusto type system
+  * Decimal values are now represented as `decimal.Decimal` instead of `string`. This is to maintain efficiency and ease of use.
 * In addition, passing a default database and table for ingestion is not necessary anymore, and can be done using Options.
    ```go
    // before:
