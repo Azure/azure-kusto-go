@@ -3,6 +3,7 @@ package azkustodata
 import (
 	"encoding/json"
 	"fmt"
+	"github.com/shopspring/decimal"
 	"reflect"
 	"strings"
 	"time"
@@ -60,61 +61,61 @@ func fieldConvert(colData columnData, v reflect.Value, row value.Values) error {
 		if err != nil {
 			return err
 		}
-		row[colData.position] = c
+		row[colData.position] = &c
 	case types.DateTime:
 		c, err := convertDateTime(v)
 		if err != nil {
 			return err
 		}
-		row[colData.position] = c
+		row[colData.position] = &c
 	case types.Dynamic:
 		c, err := convertDynamic(v)
 		if err != nil {
 			return err
 		}
-		row[colData.position] = c
+		row[colData.position] = &c
 	case types.GUID:
 		c, err := convertGUID(v)
 		if err != nil {
 			return err
 		}
-		row[colData.position] = c
+		row[colData.position] = &c
 	case types.Int:
 		c, err := convertInt(v)
 		if err != nil {
 			return err
 		}
-		row[colData.position] = c
+		row[colData.position] = &c
 	case types.Long:
 		c, err := convertLong(v)
 		if err != nil {
 			return err
 		}
-		row[colData.position] = c
+		row[colData.position] = &c
 	case types.Real:
 		c, err := convertReal(v)
 		if err != nil {
 			return err
 		}
-		row[colData.position] = c
+		row[colData.position] = &c
 	case types.String:
 		c, err := convertString(v)
 		if err != nil {
 			return err
 		}
-		row[colData.position] = c
+		row[colData.position] = &c
 	case types.Timespan:
 		c, err := convertTimespan(v)
 		if err != nil {
 			return err
 		}
-		row[colData.position] = c
+		row[colData.position] = &c
 	case types.Decimal:
 		c, err := convertDecimal(v)
 		if err != nil {
 			return err
 		}
-		row[colData.position] = c
+		row[colData.position] = &c
 	default:
 		return fmt.Errorf("column[%d] was for a column type that we don't understand(%s)", colData.position, colData.column.Type)
 	}
@@ -128,25 +129,25 @@ func defaultRow(cols table.Columns) (value.Values, error) {
 	for i, col := range cols {
 		switch col.Type {
 		case types.Bool:
-			row[i] = value.Bool{}
+			row[i] = &value.Bool{}
 		case types.DateTime:
-			row[i] = value.DateTime{}
+			row[i] = &value.DateTime{}
 		case types.Dynamic:
-			row[i] = value.Dynamic{}
+			row[i] = &value.Dynamic{}
 		case types.GUID:
-			row[i] = value.GUID{}
+			row[i] = &value.GUID{}
 		case types.Int:
-			row[i] = value.Int{}
+			row[i] = &value.Int{}
 		case types.Long:
-			row[i] = value.Long{}
+			row[i] = &value.Long{}
 		case types.Real:
-			row[i] = value.Real{}
+			row[i] = &value.Real{}
 		case types.String:
-			row[i] = value.String{}
+			row[i] = &value.String{}
 		case types.Timespan:
-			row[i] = value.Timespan{}
+			row[i] = &value.Timespan{}
 		case types.Decimal:
-			row[i] = value.Decimal{}
+			row[i] = &value.Decimal{}
 		default:
 			return nil, fmt.Errorf("column[%d] was for a column type that we don't understand(%s)", i, col.Type)
 		}
@@ -324,7 +325,7 @@ func convertGUID(v reflect.Value) (value.GUID, error) {
 
 	// Was a uuid.UUID, so return its value.
 	if t == reflect.TypeOf(uuid.UUID{}) {
-		return value.GUID{Value: v.Interface().(uuid.UUID), Valid: true}, nil
+		return value.GUID{Value: uuid.NullUUID{UUID: v.Interface().(uuid.UUID), Valid: true}}, nil
 	}
 
 	return value.GUID{}, fmt.Errorf("value was expected to be either a value.BUID, *uuid.UUID or uuid.UUID, was %T", v.Interface())
@@ -434,7 +435,11 @@ func convertDecimal(v reflect.Value) (value.Decimal, error) {
 
 	// Was a string, so return its value.
 	if t == reflect.TypeOf("") {
-		return value.Decimal{Value: v.Interface().(string), Valid: true}, nil
+		dec, err := decimal.NewFromString(v.Interface().(string))
+		if err != nil {
+			return value.Decimal{}, err
+		}
+		return value.Decimal{Value: decimal.NewNullDecimal(dec)}, nil
 	}
 
 	return value.Decimal{}, fmt.Errorf("value was expected to be either a types.Decimal, *string or string, was %T", v.Interface())

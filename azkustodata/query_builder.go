@@ -8,6 +8,7 @@ These provide injection safe querying for data retrieval and insertion.
 import (
 	"encoding/json"
 	"fmt"
+	"github.com/shopspring/decimal"
 	"math/big"
 	"sort"
 	"strings"
@@ -118,10 +119,10 @@ func (p ParamType) validate() error {
 	case types.Decimal:
 		switch v := p.Default.(type) {
 		case string:
-			if !value.DecRE.MatchString(v) {
-				return fmt.Errorf("string representing decimal does not appear to be a decimal number, was %v", v)
+			_, err := decimal.NewFromString(v)
+			if err != nil {
+				return fmt.Errorf("the .Type was %s, but the value was a %T, which could not be converted to a decimal: %s", p.Type, p.Default, err)
 			}
-			return nil
 		case *big.Float:
 			if v == nil {
 				return fmt.Errorf("*big.Float type cannot be set to the nil value")
@@ -189,7 +190,7 @@ func (p ParamType) string() string {
 			return p.name + ":timespan"
 		}
 		v := p.Default.(time.Duration)
-		return fmt.Sprintf("%s:timespan = timespan(%s)", p.name, value.Timespan{Value: v, Valid: true}.Marshal())
+		return fmt.Sprintf("%s:timespan = timespan(%s)", p.name, value.TimespanString(v))
 	case types.Decimal:
 		if p.Default == nil {
 			return p.name + ":decimal"
@@ -453,7 +454,7 @@ func (q Parameters) validate(p Definitions) (Parameters, error) {
 			if !ok {
 				return q, fmt.Errorf("parameters[%s](timespan) = %T, which is not a time.Duration", k, v)
 			}
-			out[k] = fmt.Sprintf("timespan(%s)", value.Timespan{Value: d, Valid: true}.Marshal())
+			out[k] = fmt.Sprintf("timespan(%s)", value.TimespanString(d))
 		case types.Decimal:
 			var sval string
 			switch v := v.(type) {

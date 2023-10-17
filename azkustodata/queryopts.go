@@ -139,7 +139,7 @@ func ResultsProgressiveDisable() QueryOption {
 // ServerTimeout overrides the default request timeout.
 func ServerTimeout(d time.Duration) QueryOption {
 	return func(q *queryOptions) error {
-		q.requestProperties.Options[ServerTimeoutValue] = value.Timespan{Valid: true, Value: d}.Marshal()
+		q.requestProperties.Options[ServerTimeoutValue] = value.TimespanString(d)
 		return nil
 	}
 }
@@ -416,7 +416,7 @@ func QueryResultsApplyGetschema() QueryOption {
 // QueryResultsCacheMaxAge If positive, controls the maximum age of the cached query results the service is allowed to return
 func QueryResultsCacheMaxAge(d time.Duration) QueryOption {
 	return func(q *queryOptions) error {
-		q.requestProperties.Options[QueryResultsCacheMaxAgeValue] = value.Timespan{Value: d, Valid: true}.Marshal()
+		q.requestProperties.Options[QueryResultsCacheMaxAgeValue] = value.TimespanString(d)
 		return nil
 	}
 }

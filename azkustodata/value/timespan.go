@@ -272,3 +272,7 @@ func (t *Timespan) GetValue() interface{} {
 	}
 	return t.Value
 }
+
+func TimespanString(d time.Duration) string {
+	return (&Timespan{Value: d, Valid: true}).Marshal()
+}
