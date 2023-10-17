@@ -51,61 +51,61 @@ func Rows(columns table.Columns, interRows []interface{}, op errors.Op) ([]value
 		for i, col := range columns {
 			switch col.Type {
 			case types.Bool:
-				v := value.Bool{}
+				v := &value.Bool{}
 				if err := v.Unmarshal(interRow[i]); err != nil {
 					return nil, nil, fmt.Errorf("unable to unmarshal column %s into a Bool value: %s", col.Name, err)
 				}
 				row[i] = v
 			case types.DateTime:
-				v := value.DateTime{}
+				v := &value.DateTime{}
 				if err := v.Unmarshal(interRow[i]); err != nil {
 					return nil, nil, fmt.Errorf("unable to unmarshal column %s into a DateTime value: %s", col.Name, err)
 				}
 				row[i] = v
 			case types.Decimal:
-				v := value.Decimal{}
+				v := &value.Decimal{}
 				if err := v.Unmarshal(interRow[i]); err != nil {
 					return nil, nil, fmt.Errorf("unable to unmarshal column %s into a Decimal value: %s", col.Name, err)
 				}
 				row[i] = v
 			case types.Dynamic:
-				v := value.Dynamic{}
+				v := &value.Dynamic{}
 				if err := v.Unmarshal(interRow[i]); err != nil {
 					return nil, nil, fmt.Errorf("unable to unmarshal column %s into a Dynamic value: %s", col.Name, err)
 				}
 				row[i] = v
 			case types.GUID:
-				v := value.GUID{}
+				v := &value.GUID{}
 				if err := v.Unmarshal(interRow[i]); err != nil {
 					return nil, nil, fmt.Errorf("unable to unmarshal column %s into a GUID value: %s", col.Name, err)
 				}
 				row[i] = v
 			case types.Int:
-				v := value.Int{}
+				v := &value.Int{}
 				if err := v.Unmarshal(interRow[i]); err != nil {
 					return nil, nil, fmt.Errorf("unable to unmarshal column %s into a Int value: %s", col.Name, err)
 				}
 				row[i] = v
 			case types.Long:
-				v := value.Long{}
+				v := &value.Long{}
 				if err := v.Unmarshal(interRow[i]); err != nil {
 					return nil, nil, fmt.Errorf("unable to unmarshal column %s into a Long value: %s", col.Name, err)
 				}
 				row[i] = v
 			case types.Real:
-				v := value.Real{}
+				v := &value.Real{}
 				if err := v.Unmarshal(interRow[i]); err != nil {
 					return nil, nil, fmt.Errorf("unable to unmarshal column %s into a Real value: %s", col.Name, err)
 				}
 				row[i] = v
 			case types.String:
-				v := value.String{}
+				v := &value.String{}
 				if err := v.Unmarshal(interRow[i]); err != nil {
 					return nil, nil, fmt.Errorf("unable to unmarshal column %s into a String value: %s", col.Name, err)
 				}
 				row[i] = v
 			case types.Timespan:
-				v := value.Timespan{}
+				v := &value.Timespan{}
 				if err := v.Unmarshal(interRow[i]); err != nil {
 					return nil, nil, fmt.Errorf("unable to unmarshal column %s into a Timespan value: %s", col.Name, err)
 				}
