@@ -56,7 +56,7 @@ func (d *Dynamic) Unmarshal(i interface{}) error {
 }
 
 // Convert Dynamic into reflect value.
-func (d Dynamic) Convert(v reflect.Value) error {
+func (d *Dynamic) Convert(v reflect.Value) error {
 	t := v.Type()
 	if t.Kind() == reflect.Ptr {
 		t = t.Elem()
