@@ -2,6 +2,7 @@ package value
 
 import (
 	"fmt"
+	"github.com/Azure/azure-kusto-go/azkustodata/types"
 	"reflect"
 	"time"
 )
@@ -86,4 +87,9 @@ func (d *DateTime) GetValue() interface{} {
 		return nil
 	}
 	return d.Value
+}
+
+// GetType returns the type of the value.
+func (d *DateTime) GetType() types.Column {
+	return types.DateTime
 }

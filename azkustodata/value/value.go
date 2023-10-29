@@ -37,6 +37,7 @@ package value
 
 import (
 	"fmt"
+	"github.com/Azure/azure-kusto-go/azkustodata/types"
 	"reflect"
 )
 
@@ -46,6 +47,7 @@ type Kusto interface {
 	isKustoVal()
 	Convert(v reflect.Value) error
 	GetValue() interface{}
+	GetType() types.Column
 }
 
 // Values is a list of Kusto values, usually an ordered row.

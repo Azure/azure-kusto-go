@@ -7,30 +7,16 @@ import (
 	"time"
 )
 
-type Value interface {
-	fmt.Stringer
-	Value() interface{}
-	Type() types.Column
-}
+func QuoteValue(v value.Kusto) string {
+	val := v.GetValue()
+	t := v.GetType()
+	if val == nil {
+		return fmt.Sprintf("%v(null)", t)
+	}
 
-type kqlValue struct {
-	value     interface{}
-	kustoType types.Column
-}
-
-func (v *kqlValue) Value() interface{} {
-	return v.value
-}
-
-func (v *kqlValue) Type() types.Column {
-	return v.kustoType
-}
-
-func (v *kqlValue) String() string {
-	val := v.value
-	switch v.kustoType {
+	switch t {
 	case types.String:
-		return QuoteString(val.(string), false)
+		return QuoteString(v.String(), false)
 	case types.DateTime:
 		val = FormatDatetime(val.(time.Time))
 	case types.Timespan:
@@ -41,12 +27,5 @@ func (v *kqlValue) String() string {
 		val = got
 	}
 
-	return fmt.Sprintf("%v(%v)", v.kustoType, val)
-}
-
-func newValue(value interface{}, kustoType types.Column) Value {
-	return &kqlValue{
-		value:     value,
-		kustoType: kustoType,
-	}
+	return fmt.Sprintf("%v(%v)", t, val)
 }

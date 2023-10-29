@@ -2,6 +2,7 @@ package value
 
 import (
 	"fmt"
+	"github.com/Azure/azure-kusto-go/azkustodata/types"
 	"reflect"
 	"strconv"
 	"strings"
@@ -275,4 +276,9 @@ func (t *Timespan) GetValue() interface{} {
 
 func TimespanString(d time.Duration) string {
 	return (&Timespan{Value: d, Valid: true}).Marshal()
+}
+
+// GetType returns the type of the value.
+func (t *Timespan) GetType() types.Column {
+	return types.Timespan
 }

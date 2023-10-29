@@ -2,6 +2,7 @@ package value
 
 import (
 	"fmt"
+	"github.com/Azure/azure-kusto-go/azkustodata/types"
 	"reflect"
 )
 
@@ -72,4 +73,9 @@ func (s *String) GetValue() interface{} {
 		return nil
 	}
 	return s.Value
+}
+
+// GetType returns the type of the value.
+func (s *String) GetType() types.Column {
+	return types.String
 }

@@ -3,6 +3,7 @@ package value
 import (
 	"encoding/json"
 	"fmt"
+	"github.com/Azure/azure-kusto-go/azkustodata/types"
 	"reflect"
 )
 
@@ -114,4 +115,9 @@ func (d *Dynamic) GetValue() interface{} {
 	}
 
 	return d.Value
+}
+
+// GetType returns the type of the value.
+func (d *Dynamic) GetType() types.Column {
+	return types.Dynamic
 }

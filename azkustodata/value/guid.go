@@ -2,6 +2,7 @@ package value
 
 import (
 	"fmt"
+	"github.com/Azure/azure-kusto-go/azkustodata/types"
 	"reflect"
 
 	"github.com/google/uuid"
@@ -75,4 +76,9 @@ func (g *GUID) GetValue() interface{} {
 		return nil
 	}
 	return g.Value.UUID
+}
+
+// GetType returns the type of the value.
+func (g *GUID) GetType() types.Column {
+	return types.GUID
 }

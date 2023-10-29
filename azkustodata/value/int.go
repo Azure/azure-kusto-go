@@ -3,6 +3,7 @@ package value
 import (
 	"encoding/json"
 	"fmt"
+	"github.com/Azure/azure-kusto-go/azkustodata/types"
 	"math"
 	"reflect"
 	"strconv"
@@ -93,4 +94,9 @@ func (in *Int) GetValue() interface{} {
 		return nil
 	}
 	return in.Value
+}
+
+// GetType returns the type of the value.
+func (in *Int) GetType() types.Column {
+	return types.Int
 }

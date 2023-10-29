@@ -2,6 +2,7 @@ package value
 
 import (
 	"fmt"
+	"github.com/Azure/azure-kusto-go/azkustodata/types"
 	"github.com/shopspring/decimal"
 	"math/big"
 	"reflect"
@@ -98,4 +99,9 @@ func (d *Decimal) GetValue() interface{} {
 		return nil
 	}
 	return d.Value.Decimal
+}
+
+// GetType returns the type of the value.
+func (d *Decimal) GetType() types.Column {
+	return types.Decimal
 }

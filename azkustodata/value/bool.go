@@ -2,6 +2,7 @@ package value
 
 import (
 	"fmt"
+	"github.com/Azure/azure-kusto-go/azkustodata/types"
 	"reflect"
 )
 
@@ -11,6 +12,10 @@ type Bool struct {
 	Value bool
 	// Valid indicates if this value was set.
 	Valid bool
+}
+
+func NewBool(v bool) *Bool {
+	return &Bool{Value: v, Valid: true}
 }
 
 func (*Bool) isKustoVal() {}
@@ -70,9 +75,15 @@ func (bo *Bool) Convert(v reflect.Value) error {
 	return fmt.Errorf("Column was type Kusto.Bool, receiver had base Kind %s ", t.Kind())
 }
 
+// GetValue returns the value of the type.
 func (bo *Bool) GetValue() interface{} {
 	if !bo.Valid {
 		return nil
 	}
 	return bo.Value
+}
+
+// GetType returns the type of the value.
+func (bo *Bool) GetType() types.Column {
+	return types.Bool
 }
