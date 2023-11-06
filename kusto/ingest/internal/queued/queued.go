@@ -161,25 +161,9 @@ func (i *Ingestion) Reader(ctx context.Context, reader io.Reader, props properti
 	if len(mgrResources.Queues) == 0 {
 		return "", errors.ES(errors.OpFileIngest, errors.KBlobstore, "no Kusto queue resources are defined, there is no queue to upload to").SetNoRetry()
 	}
-
-	shouldCompress := true
-	if props.Source.OriginalSource != "" {
-		shouldCompress = CompressionDiscovery(props.Source.OriginalSource) == properties.CTNone
-	}
-	if props.Source.DontCompress {
-		shouldCompress = false
-	}
-
-	extension := "gz"
-	if !shouldCompress {
-		if props.Source.OriginalSource != "" {
-			extension = filepath.Ext(props.Source.OriginalSource)
-		} else {
-			extension = props.Ingestion.Additional.Format.String() // Best effort
-		}
-	}
-
-	blobName := fmt.Sprintf("%s_%s_%s_%s.%s", i.db, i.table, nower(), filepath.Base(uuid.New().String()), extension)
+	compression := CompressionDiscovery(props.Source.OriginalSource)
+	shouldCompress := ShouldCompress(&props, compression)
+	blobName := GenBlobName(i.db, i.table, nower(), filepath.Base(uuid.New().String()), filepath.Base(props.Source.OriginalSource), compression, shouldCompress, props.Ingestion.Additional.Format.String())
 
 	// Here's how to upload a blob.
 	blobClient := to.NewBlockBlobClient(blobName)
@@ -324,10 +308,8 @@ var nower = time.Now
 // error if there was one.
 func (i *Ingestion) localToBlob(ctx context.Context, from string, container azblob.ContainerClient, props *properties.All) (string, int64, error) {
 	compression := CompressionDiscovery(from)
-	blobName := fmt.Sprintf("%s_%s_%s_%s_%s", i.db, i.table, nower(), filepath.Base(uuid.New().String()), filepath.Base(from))
-	if compression == properties.CTNone {
-		blobName = blobName + ".gz"
-	}
+	shouldCompress := ShouldCompress(props, compression)
+	blobName := GenBlobName(i.db, i.table, nower(), filepath.Base(uuid.New().String()), filepath.Base(from), compression, shouldCompress, props.Ingestion.Additional.Format.String())
 
 	// Here's how to upload a blob.
 	blobClient := container.NewBlockBlobClient(blobName)
@@ -350,7 +332,7 @@ func (i *Ingestion) localToBlob(ctx context.Context, from string, container azbl
 		).SetNoRetry()
 	}
 
-	if compression == properties.CTNone && !props.Source.DontCompress {
+	if shouldCompress {
 		gstream := gzip.New()
 		gstream.Reset(file)
 
@@ -390,6 +372,10 @@ func (i *Ingestion) localToBlob(ctx context.Context, from string, container azbl
 // CompressionType that represents that value. Otherwise we return CTNone to indicate that the
 // file should not be compressed.
 func CompressionDiscovery(fName string) properties.CompressionType {
+	if fName == "" {
+		return properties.CTUnknown
+	}
+
 	var ext string
 	if strings.HasPrefix(strings.ToLower(fName), "http") {
 		ext = strings.ToLower(filepath.Ext(path.Base(fName)))
@@ -404,6 +390,51 @@ func CompressionDiscovery(fName string) properties.CompressionType {
 		return properties.ZIP
 	}
 	return properties.CTNone
+}
+
+func GenBlobName(databaseName string, tableName string, time time.Time, guid string, fileName string, compressionFileExtension properties.CompressionType, shouldCompress bool, dataFormat string) string {
+	extension := "gz"
+	if !shouldCompress {
+		if compressionFileExtension == properties.CTNone {
+			extension = dataFormat
+		} else {
+			extension = compressionFileExtension.String()
+		}
+
+		extension = dataFormat
+	}
+
+	blobName := fmt.Sprintf("%s_%s_%s_%s_%s.%s", databaseName, tableName, time, guid, fileName, extension)
+
+	return blobName
+}
+
+// Do not compress if user specified in DontCompress or CompressionType,
+// if the file extension shows compression, or if the format is binary.
+func ShouldCompress(props *properties.All, compressionFileExtension properties.CompressionType) bool {
+	if props.Source.DontCompress {
+		return false
+	}
+
+	if props.Source.CompressionType != properties.CTUnknown {
+		if props.Source.CompressionType != properties.CTNone {
+			return false
+		}
+	} else {
+		if compressionFileExtension == properties.CTNone {
+			return false
+		}
+	}
+
+	switch props.Ingestion.Additional.Format {
+	case properties.AVRO:
+	case properties.ApacheAVRO:
+	case properties.Parquet:
+	case properties.ORC:
+		return false
+	}
+
+	return true
 }
 
 // This allows mocking the stat func later on

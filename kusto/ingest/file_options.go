@@ -164,6 +164,7 @@ type DataFormat = properties.DataFormat
 // note: any change here needs to be kept up to date with the properties version.
 // I'm not a fan of having two copies, but I don't think it is worth moving to its own package
 // to allow properties and ingest to both import without a cycle.
+//
 //goland:noinspection GoUnusedConst - Part of the API
 const (
 	// DFUnknown indicates the EncodingType is not set.
@@ -325,10 +326,14 @@ func IfNotExists(ingestByTag string) FileOption {
 // ReportResultToTable option requests that the ingestion status will be tracked in an Azure table.
 // Note using Table status reporting is not recommended for high capacity ingestions, as it could slow down the ingestion.
 // In such cases, it's recommended to enable it temporarily for debugging failed ingestions.
-func ReportResultToTable() FileOption {
+func ReportResultToTable(reportSuccess bool) FileOption {
 	return option{
 		run: func(p *properties.All) error {
 			p.Ingestion.ReportLevel = properties.FailureAndSuccess
+			if !reportSuccess {
+				p.Ingestion.ReportLevel = properties.FailuresOnly
+			}
+
 			p.Ingestion.ReportMethod = properties.ReportStatusToTable
 			return nil
 		},
@@ -433,5 +438,35 @@ func ClientRequestId(clientRequestId string) FileOption {
 		sourceScope:  FromFile | FromReader | FromBlob,
 		clientScopes: StreamingClient | ManagedClient,
 		name:         "ClientRequestId",
+	}
+}
+
+// CompressionType sets the compression type of the data.
+// Use this if the file name does not expose the compression type.
+// This sets DontCompress to true for compressed data.
+func CompressionType(compressionType properties.CompressionType) FileOption {
+	return option{
+		run: func(p *properties.All) error {
+			p.Source.CompressionType = compressionType
+			return nil
+		},
+		clientScopes: QueuedClient | StreamingClient | ManagedClient,
+		sourceScope:  FromFile | FromReader,
+		name:         "CompressionType",
+	}
+}
+
+// RawDataSize sets the Raw data uncompressed size on the filesystem.
+// Use this if the size is known to avoid blob attributes fetch and size estimation.
+// Size is used by the ingest service for aggregation calculations.
+func RawDataSize(size int64) FileOption {
+	return option{
+		run: func(p *properties.All) error {
+			p.Ingestion.RawDataSize = size
+			return nil
+		},
+		clientScopes: QueuedClient | ManagedClient,
+		sourceScope:  FromFile | FromReader | FromBlob,
+		name:         "RawDataSize",
 	}
 }

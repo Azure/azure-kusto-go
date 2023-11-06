@@ -220,7 +220,7 @@ func DataFormatDiscovery(fName string) DataFormat {
 type All struct {
 	// Ingestion is a set of properties that are used across all ingestion methods.
 	Ingestion Ingestion
-	// Source provides options that are used when doing an ingestion on a filesystem.
+	// Source provides options that are used to operate on the source data.
 	Source SourceOptions
 	// Streaming provides options that are used when doing an ingestion from a stream.
 	Streaming Streaming
@@ -234,13 +234,13 @@ type ManagedStreaming struct {
 	Backoff backoff.BackOff
 }
 
-// Streaming provides options that are used when doing an ingestion from a stream.
+// Streaming provides options that are used when doing a streaming ingestion.
 type Streaming struct {
 	// ClientRequestID is the client request ID to use for the ingestion.
 	ClientRequestId string
 }
 
-// SourceOptions are options that the user provides about the source file that is going to be uploaded.
+// SourceOptions are options that the user provides about the source that is going to be uploaded.
 type SourceOptions struct {
 	// ID allows someone to set the UUID for upload themselves. We aren't providing this option at this time, but here
 	// when we do.
@@ -254,6 +254,9 @@ type SourceOptions struct {
 
 	// OriginalSource is the path to the original source file, used for deletion.
 	OriginalSource string
+
+	// CompressionType is the type of compression used on the file.
+	CompressionType CompressionType
 }
 
 // Ingestion is a JSON serializable set of options that must be provided to the service.

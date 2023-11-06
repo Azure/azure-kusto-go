@@ -77,11 +77,8 @@ func prepFileAndProps(fPath string, props *properties.All, options []FileOption,
 	}
 
 	props.Source.OriginalSource = fPath
-
 	compression := queued.CompressionDiscovery(fPath)
-	if compression != properties.CTNone {
-		props.Source.DontCompress = true
-	}
+	props.Source.DontCompress = queued.ShouldCompress(props, compression)
 
 	err = queued.CompleteFormatFromFileName(props, fPath)
 	if err != nil {
@@ -92,6 +89,7 @@ func prepFileAndProps(fPath string, props *properties.All, options []FileOption,
 	if err != nil {
 		return nil, err
 	}
+
 	return file, nil
 }
 
@@ -112,7 +110,7 @@ func (i *Streaming) FromReader(ctx context.Context, reader io.Reader, options ..
 }
 
 func streamImpl(c streamIngestor, ctx context.Context, payload io.Reader, props properties.All) (*Result, error) {
-	compress := !props.Source.DontCompress
+	compress := queued.ShouldCompress(&props, properties.CTUnknown)
 	if compress {
 		payload = gzip.Compress(payload)
 	}
