@@ -78,7 +78,7 @@ If the error is nil and Table Status Reporting option was used, the SDK user can
 Note!
 This feature is not suitable for users running ingestion at high rates, and may slow down the ingestion operation.
 
-	status, err := ingestor.FromFile(ctx, "/path/to/file", ingest.ReportResultToTable(true))
+	status, err := ingestor.FromFile(ctx, "/path/to/file", ingest.ReportResultToTable())
 	if err != nil {
 		// The ingestion command failed to be sent, Do something
 	}

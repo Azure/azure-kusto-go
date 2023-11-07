@@ -57,7 +57,7 @@ func TestIngestionStatus(t *testing.T) {
 		var errors [5]error
 
 		for i := 0; i < count; i++ {
-			res, err := ingestor.FromFile(ctx, csvFile, ingest.ReportResultToTable(true))
+			res, err := ingestor.FromFile(ctx, csvFile, ingest.ReportResultToTable())
 			require.NoError(t, err)
 
 			ch[i] = res.Wait(ctx)
@@ -95,7 +95,7 @@ func TestIngestionStatus(t *testing.T) {
 				require.NoError(t, err)
 			}()
 
-			res, err := ingestor.FromReader(ctx, reader, ingest.ReportResultToTable(true), ingest.FileFormat(ingest.CSV))
+			res, err := ingestor.FromReader(ctx, reader, ingest.ReportResultToTable(), ingest.FileFormat(ingest.CSV))
 			ch[i] = res.Wait(ctx)
 		}
 
@@ -155,7 +155,7 @@ func TestIngestionStatus(t *testing.T) {
 		assert.Error(t, err, "Test without status reporting:\nExepcted status ClientError however result is:\n%s", err)
 
 		// Once with table status reporting
-		_, err = ingestor.FromFile(ctx, "thisfiledoesnotexist.csv", ingest.ReportResultToTable(true))
+		_, err = ingestor.FromFile(ctx, "thisfiledoesnotexist.csv", ingest.ReportResultToTable())
 		assert.Error(t, err, "Test with status reporting:\nExepcted status ClientError however result is:\n%s", err)
 
 	})
@@ -181,7 +181,7 @@ func TestIngestionStatus(t *testing.T) {
 		assert.NoError(t, err)
 
 		// Once with table status reporting
-		res, err := ingestor.FromReader(ctx, reader, ingest.ReportResultToTable(true))
+		res, err := ingestor.FromReader(ctx, reader, ingest.ReportResultToTable())
 		assert.NoError(t, err)
 		err = <-res.Wait(ctx)
 		assert.Error(t, err)
@@ -201,7 +201,7 @@ func TestIngestionStatus(t *testing.T) {
 		ingestor, err := ingest.New(client, testConfig.Database, tableName)
 		require.NoError(t, err)
 
-		res, err := ingestor.FromFile(ctx, csvFile, ingest.ReportResultToTable(true), ingest.FlushImmediately())
+		res, err := ingestor.FromFile(ctx, csvFile, ingest.ReportResultToTable(), ingest.FlushImmediately())
 		require.NoError(t, err)
 
 		err = <-res.Wait(ctx)
@@ -226,7 +226,7 @@ func TestIngestionStatus(t *testing.T) {
 			require.NoError(t, err)
 		}()
 
-		res, err := ingestor.FromReader(ctx, reader, ingest.ReportResultToTable(true), ingest.FlushImmediately(), ingest.FileFormat(ingest.CSV))
+		res, err := ingestor.FromReader(ctx, reader, ingest.ReportResultToTable(), ingest.FlushImmediately(), ingest.FileFormat(ingest.CSV))
 		require.NoError(t, err)
 
 		err = <-res.Wait(ctx)

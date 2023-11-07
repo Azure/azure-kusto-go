@@ -752,7 +752,7 @@ func TestFileIngestion(t *testing.T) {
 			_, isQueued := test.ingestor.(*ingest.Ingestion)
 			_, isManaged := test.ingestor.(*ingest.Managed)
 			if isQueued || isManaged {
-				test.options = append(test.options, ingest.FlushImmediately(), ingest.ReportResultToTable(true))
+				test.options = append(test.options, ingest.FlushImmediately(), ingest.ReportResultToTable())
 			}
 
 			res, err := test.ingestor.FromFile(ctx, test.src, test.options...)
@@ -1073,7 +1073,7 @@ func TestReaderIngestion(t *testing.T) {
 			_, isManaged := test.ingestor.(*ingest.Managed)
 			if isQueued || isManaged {
 				test.options = append(test.options, ingest.FlushImmediately(),
-					ingest.ReportResultToTable(true), ingest.RawDataSize(1024*1024*1024*10),
+					ingest.ReportResultToTable(), ingest.RawDataSize(1024*1024*1024*10),
 					ingest.CompressionType(types.CTNone))
 			}
 
@@ -1289,7 +1289,7 @@ func TestMultipleClusters(t *testing.T) {
 
 			var options []ingest.FileOption
 			if _, ok := test.ingestor.(*ingest.Ingestion); ok {
-				options = append(options, ingest.FlushImmediately(), ingest.ReportResultToTable(true))
+				options = append(options, ingest.FlushImmediately(), ingest.ReportResultToTable())
 			}
 			firstOptions := append(options, ingest.Database(testConfig.Database), ingest.Table(fTable))
 

@@ -327,14 +327,10 @@ func IfNotExists(ingestByTag string) FileOption {
 // ReportResultToTable option requests that the ingestion status will be tracked in an Azure table.
 // Note using Table status reporting is not recommended for high capacity ingestions, as it could slow down the ingestion.
 // In such cases, it's recommended to enable it temporarily for debugging failed ingestions.
-func ReportResultToTable(reportSuccess bool) FileOption {
+func ReportResultToTable() FileOption {
 	return option{
 		run: func(p *properties.All) error {
 			p.Ingestion.ReportLevel = properties.FailureAndSuccess
-			if !reportSuccess {
-				p.Ingestion.ReportLevel = properties.FailuresOnly
-			}
-
 			p.Ingestion.ReportMethod = properties.ReportStatusToTable
 			return nil
 		},
@@ -445,7 +441,7 @@ func ClientRequestId(clientRequestId string) FileOption {
 // CompressionType sets the compression type of the data.
 // Use this if the file name does not expose the compression type.
 // This sets DontCompress to true for compressed data.
-func CompressionType(compressionType types.CompressionType) FileOption {
+func CompressionType(compressionType source.CompressionType) FileOption {
 	return option{
 		run: func(p *properties.All) error {
 			p.Source.CompressionType = compressionType
