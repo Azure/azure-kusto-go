@@ -110,7 +110,7 @@ func (i *Streaming) FromReader(ctx context.Context, reader io.Reader, options ..
 }
 
 func streamImpl(c streamIngestor, ctx context.Context, payload io.Reader, props properties.All) (*Result, error) {
-	compress := queued.ShouldCompress(&props, properties.CTUnknown)
+	compress := queued.ShouldCompress(&props, types.CTUnknown)
 	if compress {
 		payload = gzip.Compress(payload)
 	}

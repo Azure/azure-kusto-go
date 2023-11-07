@@ -18,7 +18,7 @@ import (
 	"github.com/Azure/azure-kusto-go/kusto/data/types"
 	"github.com/Azure/azure-kusto-go/kusto/data/value"
 	"github.com/Azure/azure-kusto-go/kusto/ingest"
-	"github.com/Azure/azure-kusto-go/kusto/ingest/internal/properties"
+	"github.com/Azure/azure-kusto-go/kusto/ingest/source"
 	"github.com/Azure/azure-kusto-go/kusto/internal/frames"
 	"github.com/Azure/azure-kusto-go/kusto/unsafe"
 	"github.com/google/uuid"
@@ -752,7 +752,7 @@ func TestFileIngestion(t *testing.T) {
 			_, isQueued := test.ingestor.(*ingest.Ingestion)
 			_, isManaged := test.ingestor.(*ingest.Managed)
 			if isQueued || isManaged {
-				test.options = append(test.options, ingest.FlushImmediately(), ingest.ReportResultToTable())
+				test.options = append(test.options, ingest.FlushImmediately(), ingest.ReportResultToTable(true))
 			}
 
 			res, err := test.ingestor.FromFile(ctx, test.src, test.options...)
@@ -1073,8 +1073,8 @@ func TestReaderIngestion(t *testing.T) {
 			_, isManaged := test.ingestor.(*ingest.Managed)
 			if isQueued || isManaged {
 				test.options = append(test.options, ingest.FlushImmediately(),
-				 ingest.ReportResultToTable(true), ingest.RawDataSize(1024*1024*1024*10),
-				 ingest.CompressionType(properties.CTNone))
+					ingest.ReportResultToTable(true), ingest.RawDataSize(1024*1024*1024*10),
+					ingest.CompressionType(types.CTNone))
 			}
 
 			f, err := os.Open(test.src)
@@ -1289,7 +1289,7 @@ func TestMultipleClusters(t *testing.T) {
 
 			var options []ingest.FileOption
 			if _, ok := test.ingestor.(*ingest.Ingestion); ok {
-				options = append(options, ingest.FlushImmediately(), ingest.ReportResultToTable())
+				options = append(options, ingest.FlushImmediately(), ingest.ReportResultToTable(true))
 			}
 			firstOptions := append(options, ingest.Database(testConfig.Database), ingest.Table(fTable))
 

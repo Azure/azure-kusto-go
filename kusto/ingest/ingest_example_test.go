@@ -53,7 +53,7 @@ func ExampleIngestion_FromFile() {
 
 	// Upload our file WITH status reporting.
 	// When completed, delete the file on local storage we are uploading.
-	status, err := ingestor.FromFile(ctx, "/path/to/file", ingest.DeleteSource(), ingest.ReportResultToTable())
+	status, err := ingestor.FromFile(ctx, "/path/to/file", ingest.DeleteSource(), ingest.ReportResultToTable(true))
 	if err != nil {
 		// The ingestion command failed to be sent, Do something
 	}

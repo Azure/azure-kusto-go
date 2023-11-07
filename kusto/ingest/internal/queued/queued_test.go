@@ -13,6 +13,7 @@ import (
 
 	"github.com/Azure/azure-kusto-go/kusto/data/errors"
 	"github.com/Azure/azure-kusto-go/kusto/ingest/internal/properties"
+	"github.com/Azure/azure-kusto-go/kusto/ingest/source"
 	"github.com/stretchr/testify/assert"
 
 	"github.com/Azure/azure-sdk-for-go/sdk/storage/azblob"
@@ -57,7 +58,7 @@ func TestCompressionDiscovery(t *testing.T) {
 
 	tests := []struct {
 		input string
-		want  properties.CompressionType
+		want  types.CompressionType
 	}{
 		{"https://somehost.somedomain.com:8080/v1/somestuff/file.gz", properties.GZIP},
 		{"https://somehost.somedomain.com:8080/v1/somestuff/file.zip", properties.ZIP},

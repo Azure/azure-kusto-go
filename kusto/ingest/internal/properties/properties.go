@@ -17,40 +17,6 @@ import (
 	"github.com/google/uuid"
 )
 
-// CompressionType is a file's compression type.
-type CompressionType int8
-
-// String implements fmt.Stringer.
-func (c CompressionType) String() string {
-	switch c {
-	case GZIP:
-		return "gzip"
-	case ZIP:
-		return "zip"
-	}
-	return "unknown compression type"
-}
-
-// MarshalJSON implements json.Marshaler.MarshalJSON.
-func (c CompressionType) MarshalJSON() ([]byte, error) {
-	if c == 0 {
-		return nil, fmt.Errorf("CTUnknown is an invalid compression type")
-	}
-	return []byte(fmt.Sprintf("%q", c.String())), nil
-}
-
-//goland:noinspection GoUnusedConst - Part of the API
-const (
-	// CTUnknown indicates that that the compression type was unset.
-	CTUnknown CompressionType = 0
-	// CTNone indicates that the file was not compressed.
-	CTNone CompressionType = 1
-	// GZIP indicates that the file is GZIP compressed.
-	GZIP CompressionType = 2
-	// ZIP indicates that the file is ZIP compressed.
-	ZIP CompressionType = 3
-)
-
 // DataFormat indicates what type of encoding format was used for source data.
 // Note: This is very similar to ingest.DataFormat, except this supports more formats.
 // We are not using a shared list, because this list is used only internally and is for the
@@ -256,7 +222,7 @@ type SourceOptions struct {
 	OriginalSource string
 
 	// CompressionType is the type of compression used on the file.
-	CompressionType CompressionType
+	CompressionType types.CompressionType
 }
 
 // Ingestion is a JSON serializable set of options that must be provided to the service.

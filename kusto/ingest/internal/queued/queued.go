@@ -371,9 +371,9 @@ func (i *Ingestion) localToBlob(ctx context.Context, from string, container azbl
 // CompressionDiscovery looks at the file extension. If it is one we support, we return that
 // CompressionType that represents that value. Otherwise we return CTNone to indicate that the
 // file should not be compressed.
-func CompressionDiscovery(fName string) properties.CompressionType {
+func CompressionDiscovery(fName string) types.CompressionType {
 	if fName == "" {
-		return properties.CTUnknown
+		return types.CTUnknown
 	}
 
 	var ext string
@@ -385,17 +385,17 @@ func CompressionDiscovery(fName string) properties.CompressionType {
 
 	switch ext {
 	case ".gz":
-		return properties.GZIP
+		return types.GZIP
 	case ".zip":
-		return properties.ZIP
+		return types.ZIP
 	}
-	return properties.CTNone
+	return types.CTNone
 }
 
-func GenBlobName(databaseName string, tableName string, time time.Time, guid string, fileName string, compressionFileExtension properties.CompressionType, shouldCompress bool, dataFormat string) string {
+func GenBlobName(databaseName string, tableName string, time time.Time, guid string, fileName string, compressionFileExtension types.CompressionType, shouldCompress bool, dataFormat string) string {
 	extension := "gz"
 	if !shouldCompress {
-		if compressionFileExtension == properties.CTNone {
+		if compressionFileExtension == types.CTNone {
 			extension = dataFormat
 		} else {
 			extension = compressionFileExtension.String()
@@ -411,17 +411,17 @@ func GenBlobName(databaseName string, tableName string, time time.Time, guid str
 
 // Do not compress if user specified in DontCompress or CompressionType,
 // if the file extension shows compression, or if the format is binary.
-func ShouldCompress(props *properties.All, compressionFileExtension properties.CompressionType) bool {
+func ShouldCompress(props *properties.All, compressionFileExtension types.CompressionType) bool {
 	if props.Source.DontCompress {
 		return false
 	}
 
-	if props.Source.CompressionType != properties.CTUnknown {
-		if props.Source.CompressionType != properties.CTNone {
+	if props.Source.CompressionType != types.CTUnknown {
+		if props.Source.CompressionType != types.CTNone {
 			return false
 		}
 	} else {
-		if compressionFileExtension == properties.CTNone {
+		if compressionFileExtension == types.CTNone {
 			return false
 		}
 	}
