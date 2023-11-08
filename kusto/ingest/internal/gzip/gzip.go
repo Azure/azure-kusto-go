@@ -69,7 +69,9 @@ func (s *Streamer) run() {
 		defer zw.Close()
 		defer zw.Flush()
 
-		_, err := io.Copy(zw, s.userInput)
+		amount, err := io.Copy(zw, s.userInput)
+		atomic.AddInt64(&s.size, int64(amount))
+
 		if err != nil {
 			s.err.Store(err)
 		}
@@ -79,7 +81,6 @@ func (s *Streamer) run() {
 // Read implements io.Reader.
 func (s *Streamer) Read(b []byte) (int, error) {
 	amount, err := s.outputRead.Read(b)
-	atomic.AddInt64(&s.size, int64(amount))
 	return amount, err
 }
 
