@@ -116,6 +116,7 @@ func TestAuth(t *testing.T) {
 			Transport: &transporter,
 		},
 	})
+	require.NoError(t, err)
 	credential, err := azidentity.NewChainedTokenCredential([]azcore.TokenCredential{
 		defaultCred,
 	}, &azidentity.ChainedTokenCredentialOptions{})
@@ -640,8 +641,11 @@ func TestStatement(t *testing.T) {
 	allDataTypesTable := fmt.Sprintf("goe2e_all_data_types_%d_%d", time.Now().UnixNano(), rand.Int())
 	require.NoError(t, createIngestionTable(t, client, allDataTypesTable, true))
 	dt, err := time.Parse(time.RFC3339Nano, "2020-03-04T14:05:01.3109965Z")
+	require.NoError(t, err)
 	ts, err := time.ParseDuration("1h23m45.6789s")
+	require.NoError(t, err)
 	guid, err := uuid.Parse("74be27de-1e4e-49d9-b579-fe0b331d3642")
+	require.NoError(t, err)
 	tests := []struct {
 		// desc is a description of a test.
 		desc string

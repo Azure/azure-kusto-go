@@ -12,7 +12,6 @@ import (
 	"io"
 	"net/http"
 	"net/url"
-	"regexp"
 	"strings"
 	"sync"
 	"sync/atomic"
@@ -26,8 +25,6 @@ import (
 	truestedEndpoints "github.com/Azure/azure-kusto-go/kusto/trustedendpoints"
 	"github.com/google/uuid"
 )
-
-var validURL = regexp.MustCompile(`https://([a-zA-Z0-9_-]+\.){1,2}.*`)
 
 var bufferPool = sync.Pool{
 	New: func() interface{} {
@@ -47,14 +44,19 @@ type Conn struct {
 
 // NewConn returns a new Conn object with an injected http.Client
 func NewConn(endpoint string, auth Authorization, client *http.Client, clientDetails *ClientDetails) (*Conn, error) {
-	if !validURL.MatchString(endpoint) {
-		return nil, errors.ES(errors.OpServConn, errors.KClientArgs, "endpoint is not valid(%s), should be https://<cluster name>.*", endpoint).SetNoRetry()
-	}
-
 	u, err := url.Parse(endpoint)
 	if err != nil {
 		return nil, errors.ES(errors.OpServConn, errors.KClientArgs, "could not parse the endpoint(%s): %s", endpoint, err).SetNoRetry()
 	}
+
+	if endpoint == "" {
+		return nil, errors.ES(errors.OpQuery, errors.KClientArgs, "endpoint cannot be empty")
+	}
+
+	if (u.Scheme != "https") && auth.TokenProvider.AuthorizationRequired() {
+		return nil, errors.ES(errors.OpServConn, errors.KClientArgs, "cannot use token provider with http endpoint, as it would send the token in clear text").SetNoRetry()
+	}
+
 	if !strings.HasPrefix(u.Path, "/") {
 		u.Path = "/" + u.Path
 	}
@@ -66,6 +68,7 @@ func NewConn(endpoint string, auth Authorization, client *http.Client, clientDet
 		endStreamIngest: u.JoinPath("/v1/rest/ingest"),
 		client:          client,
 		clientDetails:   clientDetails,
+		endpoint:        endpoint,
 	}
 
 	return c, nil
@@ -161,7 +164,6 @@ func (c *Conn) execute(ctx context.Context, execType int, db string, query State
 
 func (c *Conn) doRequest(ctx context.Context, execType int, db string, query Statement, properties requestProperties) (errors.Op, http.Header, http.Header,
 	io.ReadCloser, error) {
-
 	logger := zerolog.Ctx(ctx).With().
 		Str("function", "doRequest").
 		Str("db", db).
@@ -173,11 +175,15 @@ func (c *Conn) doRequest(ctx context.Context, execType int, db string, query Sta
 
 	logger.Info().Msg("validating endpoint")
 
+	var op errors.Op
 	err := c.validateEndpoint()
+	if err != nil {
+		op = errors.OpQuery
+		return 0, nil, nil, nil, errors.E(op, errors.KInternal, fmt.Errorf("could not validate endpoint: %w", err))
+	}
 
 	logger.Info().Msg("validated endpoint")
 
-	var op errors.Op
 	if execType == execQuery {
 		op = errors.OpQuery
 	} else if execType == execMgmt {
