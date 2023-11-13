@@ -270,9 +270,9 @@ func TestQueries(t *testing.T) {
 			want: &[]MgmtProjectionResult{{A: "1"}, {A: "2"}},
 		},
 		{
-			desc:  "Query: Progressive query: make sure we can convert all data types from a row",
-			stmt:  kql.New("").AddTable(allDataTypesTable),
-			qcall: client.Query,
+			desc:    "Query: Progressive query: make sure we can convert all data types from a row",
+			stmt:    kql.New("").AddTable(allDataTypesTable),
+			qcall:   client.Query,
 			options: []kusto.QueryOption{kusto.ResultsProgressiveEnabled()},
 			doer: func(row *table.Row, update interface{}) error {
 				rec := AllDataType{}
@@ -311,9 +311,9 @@ func TestQueries(t *testing.T) {
 			want: &[]AllDataType{getExpectedResult()},
 		},
 		{
-			desc:    "Query: Non-Progressive query: make sure we can convert all data types from a row",
-			stmt:    kql.New("").AddTable(allDataTypesTable),
-			qcall:   client.Query,
+			desc:  "Query: Non-Progressive query: make sure we can convert all data types from a row",
+			stmt:  kql.New("").AddTable(allDataTypesTable),
+			qcall: client.Query,
 			doer: func(row *table.Row, update interface{}) error {
 				rec := AllDataType{}
 				if err := row.ToStruct(&rec); err != nil {
@@ -382,7 +382,7 @@ func TestQueries(t *testing.T) {
 					"lg":        int64(9223372036854775807),
 					"guid":      uuid.MustParse("74be27de-1e4e-49d9-b579-fe0b331d3642"),
 				})),
-			qcall:   client.Query,
+			qcall: client.Query,
 			doer: func(row *table.Row, update interface{}) error {
 				rec := AllDataType{}
 				if err := row.ToStruct(&rec); err != nil {
@@ -435,7 +435,7 @@ func TestQueries(t *testing.T) {
 						"lg":        kusto.ParamType{Type: types.Long, Default: int64(9223372036854775807)},
 						"guid":      kusto.ParamType{Type: types.GUID, Default: uuid.MustParse("74be27de-1e4e-49d9-b579-fe0b331d3642")},
 					})),
-			qcall:   client.Query,
+			qcall: client.Query,
 			doer: func(row *table.Row, update interface{}) error {
 				rec := AllDataType{}
 				if err := row.ToStruct(&rec); err != nil {
@@ -473,9 +473,9 @@ func TestQueries(t *testing.T) {
 			want: &[]AllDataType{getExpectedResult()},
 		},
 		{
-			desc:    "Query: make sure Dynamic data type variations can be parsed",
-			stmt:    kql.New(`print PlainValue = dynamic('1'), PlainArray = dynamic('[1,2,3]'), PlainJson= dynamic('{ "a": 1}'), JsonArray= dynamic('[{ "a": 1}, { "a": 2}]')`),
-			qcall:   client.Query,
+			desc:  "Query: make sure Dynamic data type variations can be parsed",
+			stmt:  kql.New(`print PlainValue = dynamic('1'), PlainArray = dynamic('[1,2,3]'), PlainJson= dynamic('{ "a": 1}'), JsonArray= dynamic('[{ "a": 1}, { "a": 2}]')`),
+			qcall: client.Query,
 			doer: func(row *table.Row, update interface{}) error {
 				rec := DynamicTypeVariations{}
 				if err := row.ToStruct(&rec); err != nil {
