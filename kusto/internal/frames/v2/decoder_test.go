@@ -2,7 +2,8 @@ package v2
 
 import (
 	"context"
-	"io/ioutil"
+	"encoding/json"
+	"io"
 	"strings"
 	"testing"
 	"time"
@@ -214,7 +215,7 @@ func TestNormalDecode(t *testing.T) {
 	}
 
 	dec := Decoder{}
-	ch := dec.Decode(ctx, ioutil.NopCloser(strings.NewReader(jsonStr)), errors.OpQuery)
+	ch := dec.Decode(ctx, io.NopCloser(strings.NewReader(jsonStr)), errors.OpQuery)
 
 	for _, want := range wantFrames {
 		got := <-ch
@@ -344,8 +345,31 @@ func TestErrorDecode(t *testing.T) {
   },
   {
     "FrameType":"DataSetCompletion",
-    "HasErrors":false,
-    "Cancelled":false
+    "HasErrors":true,
+    "Cancelled":false,
+	"OneApiErrors": [{
+			"error": {
+				"code": "LimitsExceeded",
+				"message": "Request is invalid and cannot be executed.",
+				"@type": "Kusto.Data.Exceptions.KustoServicePartialQueryFailureLimitsExceededException",
+				"@message": "Query execution has exceeded the allowed limits (80DA0003): .",
+				"@context": {
+					"timestamp": "2018-12-10T15:10:48.8352222Z",
+					"machineName": "RD0003FFBEDEB9",
+					"processName": "Kusto.Azure.Svc",
+					"processId": 4328,
+					"threadId": 7284,
+					"appDomainName": "RdRuntime",
+					"clientRequestId": "KPC.execute;d3a43e37-0d7f-47a9-b6cd-a889b2aee3d3",
+					"activityId": "a57ec272-8846-49e6-b458-460b841ed47d",
+					"subActivityId": "a57ec272-8846-49e6-b458-460b841ed47d",
+					"activityType": "PO-OWIN-CallContext",
+					"parentActivityId": "a57ec272-8846-49e6-b458-460b841ed47d",
+					"activityStack": "(Activity stack: CRID=KPC.execute;d3a43e37-0d7f-47a9-b6cd-a889b2aee3d3 ARID=a57ec272-8846-49e6-b458-460b841ed47d > PO-OWIN-CallContext/a57ec272-8846-49e6-b458-460b841ed47d)"
+				},
+				"@permanent": false
+			}
+		}]
   }
 ]
 	`
@@ -442,14 +466,41 @@ func TestErrorDecode(t *testing.T) {
 		},
 		DataSetCompletion{
 			Base:      Base{FrameType: "DataSetCompletion"},
-			HasErrors: false,
+			HasErrors: true,
 			Cancelled: false,
-			Op:        errors.OpQuery,
+			OneAPIErrors: []interface{}{
+				map[string]interface{}{
+					"error": map[string]interface{}{
+						"@context": map[string]interface{}{
+							"activityId":       "a57ec272-8846-49e6-b458-460b841ed47d",
+							"activityStack":    "(Activity stack: CRID=KPC.execute;d3a43e37-0d7f-47a9-b6cd-a889b2aee3d3 ARID=a57ec272-8846-49e6-b458-460b841ed47d > PO-OWIN-CallContext/a57ec272-8846-49e6-b458-460b841ed47d)",
+							"activityType":     "PO-OWIN-CallContext",
+							"appDomainName":    "RdRuntime",
+							"clientRequestId":  "KPC.execute;d3a43e37-0d7f-47a9-b6cd-a889b2aee3d3",
+							"machineName":      "RD0003FFBEDEB9",
+							"parentActivityId": "a57ec272-8846-49e6-b458-460b841ed47d",
+							"processId":        json.Number("4328"),
+							"processName":      "Kusto.Azure.Svc",
+							"subActivityId":    "a57ec272-8846-49e6-b458-460b841ed47d",
+							"threadId":         json.Number("7284"),
+							"timestamp":        "2018-12-10T15:10:48.8352222Z",
+						},
+						"@message":   "Query execution has exceeded the allowed limits (80DA0003): .",
+						"@permanent": false,
+						"@type":      "Kusto.Data.Exceptions.KustoServicePartialQueryFailureLimitsExceededException",
+						"code":       "LimitsExceeded",
+						"message":    "Request is invalid and cannot be executed.",
+					},
+				},
+			},
+			Error: *errors.ES(errors.OpUnknown, errors.KLimitsExceeded, "Request is invalid and cannot be executed.;See https://docs.microsoft."+
+				"com/en-us/azure/kusto/concepts/querylimits"),
+			Op: errors.OpQuery,
 		},
 	}
 
 	dec := Decoder{}
-	ch := dec.Decode(ctx, ioutil.NopCloser(strings.NewReader(jsonStr)), errors.OpQuery)
+	ch := dec.Decode(ctx, io.NopCloser(strings.NewReader(jsonStr)), errors.OpQuery)
 
 	for _, want := range wantFrames {
 		got := <-ch

@@ -4,6 +4,8 @@ import (
 	"context"
 	"errors"
 	"fmt"
+	kustoErrors "github.com/Azure/azure-kusto-go/kusto/data/errors"
+	"github.com/Azure/azure-kusto-go/kusto/kql"
 	"testing"
 	"time"
 
@@ -22,12 +24,12 @@ import (
 // querier provides a single method, Query(), which is used to query Kusto for some information.
 // This can be substituted for our fake during tests.
 type querier interface {
-	Query(context.Context, string, kusto.Stmt, ...kusto.QueryOption) (*kusto.RowIterator, error)
+	Query(context.Context, string, kusto.Statement, ...kusto.QueryOption) (*kusto.RowIterator, error)
 }
 
 // NodeRec represents our Kusto data that will be returned.
 type NodeRec struct {
-	// ID is the table's NodeId. We use the field tag here to to instruct our client to convert NodeId to ID.
+	// ID is the table's NodeId. We use the field tag here to instruct our client to convert NodeId to ID.
 	ID int64 `kusto:"NodeId"`
 	// CollectionTime is Go representation of the Kusto datetime type.
 	CollectionTime time.Time
@@ -35,7 +37,7 @@ type NodeRec struct {
 
 // NodeInfo is the type we are going to test.
 type NodeInfo struct {
-	stmt    kusto.Stmt
+	stmt    *kql.Builder
 	querier querier // This can be a fakeQuerier or *kusto.Client
 }
 
@@ -43,31 +45,20 @@ type NodeInfo struct {
 func New(client *kusto.Client) (*NodeInfo, error) {
 	return &NodeInfo{
 		querier: client,
-		stmt: kusto.NewStmt("systemNodes | project CollectionTime, NodeId | where NodeId == ParamNodeId").MustDefinitions(
-			kusto.NewDefinitions().Must(
-				kusto.ParamTypes{
-					"ParamNodeId": kusto.ParamType{Type: types.Long},
-				},
-			),
-		),
+		stmt:    kql.New("systemNodes | project CollectionTime, NodeId | where NodeId == ParamNodeId"),
 	}, nil
 }
 
 // Node queries the datastore for the Node with ID "id".
 func (n *NodeInfo) Node(ctx context.Context, id int64) (NodeRec, error) {
-	stmt, err := n.stmt.WithParameters(kusto.NewParameters().Must(kusto.QueryValues{"ParamNodeId": id}))
-	if err != nil {
-		return NodeRec{}, err
-	}
-
-	iter, err := n.querier.Query(ctx, "db", stmt)
+	iter, err := n.querier.Query(ctx, "db", n.stmt, kusto.QueryParameters(kql.NewParameters().AddLong("ParamNodeId", id)))
 	if err != nil {
 		return NodeRec{}, err
 	}
 
 	rec := NodeRec{}
-	err = iter.Do(
-		func(row *table.Row) error {
+	err = iter.DoOnRowOrError(
+		func(row *table.Row, _ *kustoErrors.Error) error {
 			return row.ToStruct(&rec)
 		},
 	)
@@ -89,17 +80,17 @@ type fakeQuerier struct {
 }
 
 // Query implements querier.querier.
-func (f *fakeQuerier) Query(ctx context.Context, db string, passedQuery kusto.Stmt, options ...kusto.QueryOption) (*kusto.RowIterator, error) {
+func (f *fakeQuerier) Query(_ context.Context, _ string, passedQuery kusto.Statement, _ ...kusto.QueryOption) (*kusto.RowIterator, error) {
 	if passedQuery.String() != f.expectQuery {
 		panic("we expect the query to be " + f.expectQuery)
 	}
 
 	ri := &kusto.RowIterator{}
-	ri.Mock(f.mock)
+	_ = ri.Mock(f.mock)
 	return ri, nil
 }
 
-func ExampleMockRows(t *testing.T) {
+func ExampleMockRows(t *testing.T) { // nolint:govet // Example code
 	now := time.Now()
 
 	tests := []struct {
@@ -154,7 +145,7 @@ func ExampleMockRows(t *testing.T) {
 			}
 		}
 		if test.kustoErr {
-			m.Error(errors.New("kusto error"))
+			_ = m.Error(errors.New("kusto error"))
 		}
 
 		// Create our client and add in our fake querier, which pretends to be Kusto.

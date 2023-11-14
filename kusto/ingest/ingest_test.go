@@ -15,9 +15,12 @@ import (
 type mockClient struct {
 	endpoint string
 	auth     kusto.Authorization
-	onMgmt   func(ctx context.Context, db string, query kusto.Stmt, options ...kusto.MgmtOption) (*kusto.RowIterator, error)
+	onMgmt   func(ctx context.Context, db string, query kusto.Statement, options ...kusto.MgmtOption) (*kusto.RowIterator, error)
 }
 
+func (m mockClient) ClientDetails() *kusto.ClientDetails {
+	return kusto.NewClientDetails("test", "test")
+}
 func (m mockClient) HttpClient() *http.Client {
 	return &http.Client{}
 }
@@ -34,11 +37,11 @@ func (m mockClient) Endpoint() string {
 	return m.endpoint
 }
 
-func (m mockClient) Query(context.Context, string, kusto.Stmt, ...kusto.QueryOption) (*kusto.RowIterator, error) {
+func (m mockClient) Query(context.Context, string, kusto.Statement, ...kusto.QueryOption) (*kusto.RowIterator, error) {
 	panic("not implemented")
 }
 
-func (m mockClient) Mgmt(ctx context.Context, db string, query kusto.Stmt, options ...kusto.MgmtOption) (*kusto.RowIterator, error) {
+func (m mockClient) Mgmt(ctx context.Context, db string, query kusto.Statement, options ...kusto.MgmtOption) (*kusto.RowIterator, error) {
 	if m.onMgmt != nil {
 		rows, err := m.onMgmt(ctx, db, query, options...)
 		if err != nil || rows != nil {

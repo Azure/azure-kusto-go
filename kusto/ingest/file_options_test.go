@@ -3,6 +3,7 @@ package ingest
 import (
 	"bytes"
 	"context"
+	"github.com/Azure/azure-kusto-go/kusto/ingest/internal/properties"
 	"testing"
 
 	"github.com/Azure/azure-kusto-go/kusto"
@@ -143,4 +144,90 @@ func TestOptions(t *testing.T) {
 		})
 
 	}
+}
+
+func TestFileFormatAndMapping(t *testing.T) {
+	t.Parallel()
+	tests := []struct {
+		desc                string
+		options             []FileOption
+		expectedFormat      DataFormat
+		expectedMappingType DataFormat
+		source              SourceScope
+		err                 error
+	}{
+		{
+			desc:                "Reader defaults to csv",
+			options:             []FileOption{},
+			source:              FromReader,
+			expectedFormat:      CSV,
+			expectedMappingType: 0,
+		},
+		{
+			desc:                "Test just file format",
+			options:             []FileOption{FileFormat(AVRO)},
+			source:              FromReader,
+			expectedFormat:      AVRO,
+			expectedMappingType: 0,
+		},
+		{
+			desc:                "Test just ingestion mapping ref",
+			options:             []FileOption{IngestionMappingRef("mapping", JSON)},
+			source:              FromFile,
+			expectedFormat:      JSON,
+			expectedMappingType: JSON,
+		},
+		{
+			desc:                "Test just ingestion mapping",
+			options:             []FileOption{IngestionMapping("mapping", JSON)},
+			source:              FromFile,
+			expectedFormat:      JSON,
+			expectedMappingType: JSON,
+		},
+		{
+			desc:                "Test matching options",
+			options:             []FileOption{IngestionMapping("mapping", JSON), FileFormat(JSON)},
+			source:              FromFile,
+			expectedFormat:      JSON,
+			expectedMappingType: JSON,
+		},
+		{
+			desc:                "Test non-matching options",
+			options:             []FileOption{IngestionMapping("mapping", JSON), FileFormat(AVRO)},
+			source:              FromFile,
+			expectedFormat:      JSON,
+			expectedMappingType: JSON,
+			err: errors.ES(
+				errors.OpUnknown,
+				errors.KClientArgs,
+				"format and ingestion mapping type must match (hint: using ingestion mapping sets the format automatically)",
+			).SetNoRetry(),
+		},
+	}
+
+	client := kusto.NewMockClient()
+
+	queuedClient, err := New(client, "", "")
+	require.NoError(t, err)
+
+	for _, test := range tests {
+		test := test // capture
+		t.Run(test.desc, func(t *testing.T) {
+			t.Parallel()
+
+			props := properties.All{}
+			_, all, err := queuedClient.prepForIngestion(context.Background(), test.options, props, test.source)
+
+			if test.err != nil {
+				assert.EqualError(t, err, test.err.Error())
+				return
+			}
+
+			assert.NoError(t, err)
+			assert.Equal(t, test.expectedFormat, all.Ingestion.Additional.Format)
+			assert.Equal(t, test.expectedMappingType, all.Ingestion.Additional.IngestionMappingType)
+
+		})
+	}
+
 }

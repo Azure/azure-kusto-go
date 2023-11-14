@@ -4,7 +4,7 @@ import (
 	"context"
 	"testing"
 
-	"github.com/kylelemons/godebug/pretty"
+	"github.com/stretchr/testify/assert"
 
 	"github.com/Azure/azure-kusto-go/kusto/data/table"
 	"github.com/Azure/azure-kusto-go/kusto/data/types"
@@ -38,11 +38,6 @@ func TestParse(t *testing.T) {
 			err:  true,
 		},
 		{
-			desc: "invalid domain",
-			url:  "https://account.blob.core.invalid.net/objectname",
-			err:  true,
-		},
-		{
 			desc: "no object name provided",
 			url:  "https://account.invalid.core.windows.net/",
 			err:  true,
@@ -59,33 +54,40 @@ func TestParse(t *testing.T) {
 			wantObjectType: "table",
 			wantObjectName: "objectname",
 		},
+		{
+			desc:           "success non-public",
+			url:            "https://account.table.kusto.chinacloudapi.cn/objectname",
+			wantAccount:    "account",
+			wantObjectType: "table",
+			wantObjectName: "objectname",
+		},
+		{
+			desc:           "success dns zone",
+			url:            "https://account.zone1.blob.storage.azure.net/objectname",
+			wantAccount:    "account.zone1",
+			wantObjectType: "blob",
+			wantObjectName: "objectname",
+		},
 	}
 
 	for _, test := range tests {
-		got, err := parse(test.url)
-		switch {
-		case err == nil && test.err:
-			t.Errorf("TestParse(%s): got err == nil, want err != nil", test.desc)
-			continue
-		case err != nil && !test.err:
-			t.Errorf("TestParse(%s): got err == %s, want err != nil", test.desc, err)
-			continue
-		case err != nil:
-			continue
-		}
+		test := test
+		t.Run(test.desc, func(t *testing.T) {
+			t.Parallel()
+			got, err := Parse(test.url)
 
-		if got.Account() != test.wantAccount {
-			t.Errorf("TestParse(%s): URI.Account(): got %s, want %s", test.desc, got.Account(), test.wantAccount)
-		}
-		if got.ObjectType() != test.wantObjectType {
-			t.Errorf("TestParse(%s): URI.ObjectType(): got %s, want %s", test.desc, got.ObjectType(), test.wantObjectType)
-		}
-		if got.ObjectName() != test.wantObjectName {
-			t.Errorf("TestParse(%s): URI.ObjectName(): got %s, want %s", test.desc, got.ObjectName(), test.wantObjectName)
-		}
-		if got.String() != test.url {
-			t.Errorf("TestParse(%s): String(): got %s, want %s", test.desc, got.String(), test.url)
-		}
+			if test.err {
+				assert.Error(t, err)
+				return
+			}
+
+			assert.NoError(t, err)
+
+			assert.Equal(t, test.wantAccount, got.Account())
+			assert.Equal(t, test.wantObjectType, got.ObjectType())
+			assert.Equal(t, test.wantObjectName, got.ObjectName())
+			assert.Equal(t, test.url, got.String())
+		})
 	}
 }
 
@@ -164,28 +166,27 @@ func TestAuthContext(t *testing.T) {
 	}
 
 	for _, test := range tests {
-		manager := &Manager{client: test.fakeMgmt}
+		test := test
+		t.Run(test.desc, func(t *testing.T) {
+			t.Parallel()
+			manager := &Manager{client: test.fakeMgmt}
 
-		got, err := manager.AuthContext(context.Background())
-		switch {
-		case err == nil && test.err:
-			t.Errorf("TestAuthContext(%s): got err == nil, want err != nil", test.desc)
-			continue
-		case err != nil && !test.err:
-			t.Errorf("TestAuthContext(%s): got err == %s, want err != nil", test.desc, err)
-			continue
-		case err != nil:
-			continue
-		}
+			got, err := manager.AuthContext(context.Background())
 
-		if got != test.want {
-			t.Errorf("TestAuthContext(%s): got %s, want %s", test.desc, got, test.want)
-		}
+			if test.err {
+				assert.Error(t, err)
+				return
+			}
+
+			assert.NoError(t, err)
+
+			assert.Equal(t, test.want, got)
+		})
 	}
 }
 
 func mustParse(s string) *URI {
-	u, err := parse(s)
+	u, err := Parse(s)
 	if err != nil {
 		panic(err)
 	}
@@ -239,28 +240,25 @@ func TestResources(t *testing.T) {
 	}
 
 	for _, test := range tests {
-		manager := &Manager{client: test.fakeMgmt}
+		test := test
+		t.Run(test.desc, func(t *testing.T) {
+			t.Parallel()
 
-		err := manager.fetch(context.Background())
+			manager := &Manager{client: test.fakeMgmt}
 
-		switch {
-		case err == nil && test.err:
-			t.Errorf("TestResources(%s): got err == nil, want err != nil", test.desc)
-			continue
-		case err != nil && !test.err:
-			t.Errorf("TestResources(%s): got err == %s, want err != nil", test.desc, err)
-			continue
-		case err != nil:
-			continue
-		}
+			err := manager.fetch(context.Background())
 
-		got, err := manager.Resources()
-		if err != nil {
-			panic(err)
-		}
+			if test.err {
+				assert.Error(t, err)
+				return
+			}
 
-		if diff := pretty.Compare(test.want, got); diff != "" {
-			t.Errorf("TestResources(%s): -want/+got:\n%s", test.desc, diff)
-		}
+			assert.NoError(t, err)
+
+			got, err := manager.Resources()
+			assert.NoError(t, err)
+
+			assert.Equal(t, test.want, got)
+		})
 	}
 }

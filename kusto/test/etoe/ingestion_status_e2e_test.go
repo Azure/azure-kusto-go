@@ -3,6 +3,7 @@ package etoe
 import (
 	"context"
 	"fmt"
+	"github.com/Azure/azure-kusto-go/kusto/kql"
 	"io"
 	"os"
 	"strings"
@@ -11,7 +12,6 @@ import (
 
 	"github.com/Azure/azure-kusto-go/kusto"
 	"github.com/Azure/azure-kusto-go/kusto/ingest"
-	"github.com/Azure/azure-kusto-go/kusto/unsafe"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 )
@@ -32,20 +32,36 @@ func TestIngestionStatus(t *testing.T) {
 	ctx, cancel := context.WithTimeout(context.Background(), 1*time.Minute)
 	defer cancel()
 
-	client, err := kusto.New(testConfig.Endpoint, testConfig.Authorizer)
+	client, err := kusto.New(testConfig.kcsb)
 	require.NoError(t, err)
 
 	ingestor, err := ingest.New(client, testConfig.Database, tableName)
 	require.NoError(t, err)
 
+	t.Cleanup(func() {
+		t.Log("Closing client")
+		require.NoError(t, client.Close())
+		t.Log("Closed client")
+		t.Log("Closing ingestor")
+		require.NoError(t, ingestor.Close())
+		t.Log("Closed ingestor")
+	})
+
 	err = createIngestionTableWithDBAndScheme(t, client, testConfig.Database, tableName, false, scheme)
 	require.NoError(t, err)
 
 	// Change the ingestion batching time
-	batchingStmt := kusto.NewStmt(".alter table ", kusto.UnsafeStmt(unsafe.Stmt{Add: true})).UnsafeAdd(tableName).Add(
+	batchingStmt := kql.New(".alter table ").AddTable(tableName).AddLiteral(
 		" policy ingestionbatching @'{ \"MaximumBatchingTimeSpan\": \"00:00:05\", \"MaximumNumberOfItems\": 500, \"MaximumRawDataSizeMB\": 1024 }' ")
 	_, err = client.Mgmt(ctx, testConfig.Database, batchingStmt)
 	require.NoError(t, err, "failed to reduce the default batching time")
+
+	// Refresh policy cache on DM
+	batchingStmt2 := kql.New(".refresh database '").AddKeyword(testConfig.Database).AddLiteral(
+		"' table '").AddTable(tableName).AddLiteral("' cache ingestionbatchingpolicy")
+	_, err = client.Mgmt(ctx, "NetDefaultDB", batchingStmt2, kusto.IngestionEndpoint())
+
+	require.NoError(t, err, "failed to refresh policy cache on DM")
 
 	t.Run("FromFileWithStatusReportingQueued", func(t *testing.T) {
 		t.Parallel()
@@ -96,6 +112,7 @@ func TestIngestionStatus(t *testing.T) {
 			}()
 
 			res, err := ingestor.FromReader(ctx, reader, ingest.ReportResultToTable(), ingest.FileFormat(ingest.CSV))
+			require.NoError(t, err)
 			ch[i] = res.Wait(ctx)
 		}
 
@@ -195,11 +212,20 @@ func TestIngestionStatus(t *testing.T) {
 		ctx, cancel := context.WithTimeout(context.Background(), 1*time.Minute)
 		defer cancel()
 
-		client, err := kusto.New(testConfig.Endpoint, testConfig.Authorizer)
+		client, err := kusto.New(testConfig.kcsb)
 		require.NoError(t, err)
 
 		ingestor, err := ingest.New(client, testConfig.Database, tableName)
 		require.NoError(t, err)
+
+		t.Cleanup(func() {
+			t.Log("Closing client")
+			require.NoError(t, client.Close())
+			t.Log("Closed client")
+			t.Log("Closing ingestor")
+			require.NoError(t, ingestor.Close())
+			t.Log("Closed ingestor")
+		})
 
 		res, err := ingestor.FromFile(ctx, csvFile, ingest.ReportResultToTable(), ingest.FlushImmediately())
 		require.NoError(t, err)
@@ -214,6 +240,7 @@ func TestIngestionStatus(t *testing.T) {
 		defer cancel()
 
 		f, err := os.Open(csvFile)
+		defer f.Close()
 		require.NoError(t, err)
 
 		reader, writer := io.Pipe()

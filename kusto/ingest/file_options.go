@@ -120,7 +120,8 @@ func Table(name string) FileOption {
 	}
 }
 
-// DontCompress sets whether to compress the data.
+// DontCompress sets whether to compress the data. 	In streaming - do not pass DontCompress if file is not already compressed.
+
 func DontCompress() FileOption {
 	return option{
 		run: func(p *properties.All) error {
@@ -145,7 +146,7 @@ func backOff(off *backoff.ExponentialBackOff) FileOption {
 	}
 }
 
-// FlushImmediately tells Kusto to flush on write.
+// FlushImmediately  the service batching manager will not aggregate this file, thus overriding the batching policy
 func FlushImmediately() FileOption {
 	return option{
 		run: func(p *properties.All) error {
@@ -155,6 +156,19 @@ func FlushImmediately() FileOption {
 		clientScopes: QueuedClient | ManagedClient,
 		sourceScope:  FromFile | FromReader | FromBlob,
 		name:         "FlushImmediately",
+	}
+}
+
+// IgnoreFirstRecord tells Kusto to flush on write.
+func IgnoreFirstRecord() FileOption {
+	return option{
+		run: func(p *properties.All) error {
+			p.Ingestion.Additional.IgnoreFirstRecord = true
+			return nil
+		},
+		clientScopes: QueuedClient | ManagedClient,
+		sourceScope:  FromFile | FromReader | FromBlob,
+		name:         "IgnoreFirstRecord",
 	}
 }
 
@@ -207,10 +221,16 @@ const (
 	SingleJSON DataFormat = properties.SingleJSON
 )
 
+// InferFormatFromFileName looks at the file name and tries to discern what the file format is
+func InferFormatFromFileName(fName string) DataFormat {
+	return properties.DataFormatDiscovery(fName)
+}
+
 // IngestionMapping provides runtime mapping of the data being imported to the fields in the table.
 // "ref" will be JSON encoded, so it can be any type that can be JSON marshalled. If you pass a string
 // or []byte, it will be interpreted as already being JSON encoded.
 // mappingKind can only be: CSV, JSON, AVRO, Parquet or ORC.
+// The mappingKind parameter will also automatically set the FileFormat option.
 func IngestionMapping(mapping interface{}, mappingKind DataFormat) FileOption {
 	return option{
 		run: func(p *properties.All) error {
@@ -242,6 +262,7 @@ func IngestionMapping(mapping interface{}, mappingKind DataFormat) FileOption {
 
 			p.Ingestion.Additional.IngestionMapping = j
 			p.Ingestion.Additional.IngestionMappingType = mappingKind
+			p.Ingestion.Additional.Format = mappingKind
 
 			return nil
 		},
@@ -254,6 +275,7 @@ func IngestionMapping(mapping interface{}, mappingKind DataFormat) FileOption {
 // IngestionMappingRef provides the name of a pre-created mapping for the data being imported to the fields in the table.
 // mappingKind can only be: CSV, JSON, AVRO, Parquet or ORC.
 // For more details, see: https://docs.microsoft.com/en-us/azure/kusto/management/create-ingestion-mapping-command
+// The mappingKind parameter will also automatically set the FileFormat option.
 func IngestionMappingRef(refName string, mappingKind DataFormat) FileOption {
 	return option{
 		run: func(p *properties.All) error {
@@ -262,6 +284,7 @@ func IngestionMappingRef(refName string, mappingKind DataFormat) FileOption {
 			}
 			p.Ingestion.Additional.IngestionMappingRef = refName
 			p.Ingestion.Additional.IngestionMappingType = mappingKind
+			p.Ingestion.Additional.Format = mappingKind
 			return nil
 		},
 		clientScopes: QueuedClient | StreamingClient | ManagedClient,
@@ -413,6 +436,7 @@ func ValidationPolicy(policy ValPolicy) FileOption {
 // FileFormat can be used to indicate what type of encoding is supported for the file. This is only needed if
 // the file extension is not present. A file like: "input.json.gz" or "input.json" does not need this option, while
 // "input" would.
+// If an ingestion mapping is specified, there is no need to specify the file format.
 func FileFormat(et DataFormat) FileOption {
 	return option{
 		run: func(p *properties.All) error {
@@ -453,9 +477,8 @@ func CompressionType(compressionType source.CompressionType) FileOption {
 	}
 }
 
-// RawDataSize sets the Raw data uncompressed size on the filesystem.
-// Use this if the size is known to avoid blob attributes fetch and size estimation.
-// Size is used by the ingest service for aggregation calculations.
+// RawDataSize is the uncompressed data size. Should be used to comunicate the file size to the service for efficient ingestion.
+// Also used by managed client in the decision to use queued ingestion instead of streaming (if > 4mb)
 func RawDataSize(size int64) FileOption {
 	return option{
 		run: func(p *properties.All) error {

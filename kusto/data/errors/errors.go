@@ -15,7 +15,6 @@ import (
 	"errors"
 	"fmt"
 	"io"
-	"io/ioutil"
 	"net/http"
 	"runtime"
 	"strings"
@@ -33,12 +32,14 @@ type Op uint16
 
 //go:generate stringer -type Op
 const (
-	OpUnknown      Op = 0 // OpUnknown indicates that the operation that caused the problem is unknown.
-	OpQuery        Op = 1 // OpQuery indicates that a Query() call is being made.
-	OpMgmt         Op = 2 // OpMgmt indicates that a Mgmt() call is being made.
-	OpServConn     Op = 3 // OpServConn indicates that the client is attempting to connect to the service.
-	OpIngestStream Op = 4 // OpIngestStream indicates the client is making a streaming ingestion call.
-	OpFileIngest   Op = 5 // OpFileIngest indicates the client is making a file ingestion call.
+	OpUnknown       Op = 0 // OpUnknown indicates that the operation that caused the problem is unknown.
+	OpQuery         Op = 1 // OpQuery indicates that a Query() call is being made.
+	OpMgmt          Op = 2 // OpMgmt indicates that a Mgmt() call is being made.
+	OpServConn      Op = 3 // OpServConn indicates that the client is attempting to connect to the service.
+	OpIngestStream  Op = 4 // OpIngestStream indicates the client is making a streaming ingestion call.
+	OpFileIngest    Op = 5 // OpFileIngest indicates the client is making a file ingestion call.
+	OpCloudInfo     Op = 6 // OpCloudInfo indicates an error fetching data from the cloud metadata.
+	OpTokenProvider Op = 7 // OpTokenProvider indicates an error creating a token provider.
 )
 
 // Kind field classifies the error as one of a set of standard conditions.
@@ -115,10 +116,6 @@ func (e *Error) UnmarshalREST() map[string]interface{} {
 func (e *Error) SetNoRetry() *Error {
 	e.permanent = true
 	return e
-}
-
-func (e *Error) isZero() bool {
-	return e == nil || (e.Op == OpUnknown && e.Kind == KOther && e.Err == nil)
 }
 
 // Unwrap implements "interface {Unwrap() error}" as defined internally by the go stdlib errors package.
@@ -226,7 +223,8 @@ func ES(o Op, k Kind, s string, args ...interface{}) *Error {
 
 // HTTP constructs an *Error from an *http.Response and a prefix to the error message.
 func HTTP(o Op, status string, statusCode int, body io.ReadCloser, prefix string) *HttpError {
-	bodyBytes, err := ioutil.ReadAll(body)
+	defer body.Close()
+	bodyBytes, err := io.ReadAll(body)
 	if err != nil {
 		bodyBytes = []byte(fmt.Sprintf("Failed to read body: %v", err))
 	}
@@ -263,8 +261,8 @@ func e(args ...interface{}) *Error {
 			e.Kind = arg
 		case *Error:
 			// Make a copy
-			copy := *arg
-			e.Err = copy.Err
+			argCopy := *arg
+			e.Err = argCopy.Err
 		case error:
 			e.Err = arg
 		default:
@@ -372,7 +370,7 @@ func oneToErr(m map[string]interface{}, err *Error, op Op) *Error {
 		return ES(op, kind, msg)
 	}
 
-	W(ES(op, kind, msg), err)
+	err = W(ES(op, kind, msg), err)
 
 	return err
 }

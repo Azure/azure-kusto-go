@@ -4,7 +4,6 @@ import (
 	"bytes"
 	"compress/gzip"
 	"io"
-	"io/ioutil"
 	"math/rand"
 	"os"
 	"testing"
@@ -25,7 +24,7 @@ func TestStreamer(t *testing.T) {
 
 	str := randStringBytes(4 * 1024 * 1024)
 
-	f, err := ioutil.TempFile("", "")
+	f, err := os.CreateTemp("", "")
 	if err != nil {
 		panic(err)
 	}
@@ -33,7 +32,7 @@ func TestStreamer(t *testing.T) {
 	if err != nil {
 		panic(err)
 	}
-	f.Close()
+	_ = f.Close()
 
 	r, err := os.Open(f.Name())
 	if err != nil {

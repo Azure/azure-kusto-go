@@ -6,11 +6,19 @@ import (
 	"fmt"
 	"io"
 	"math/rand"
+	"net/http"
 	"os"
+	"regexp"
 	"strings"
+	"sync"
 	"testing"
 	"time"
 	"unicode"
+
+	"github.com/Azure/azure-sdk-for-go/sdk/azcore"
+	"github.com/Azure/azure-sdk-for-go/sdk/azidentity"
+	"github.com/shopspring/decimal"
+	"go.uber.org/goleak"
 
 	"github.com/Azure/azure-kusto-go/kusto"
 	"github.com/Azure/azure-kusto-go/kusto/data/errors"
@@ -20,21 +28,15 @@ import (
 	"github.com/Azure/azure-kusto-go/kusto/ingest"
 	"github.com/Azure/azure-kusto-go/kusto/ingest/source"
 	"github.com/Azure/azure-kusto-go/kusto/internal/frames"
-	"github.com/Azure/azure-kusto-go/kusto/unsafe"
+	"github.com/Azure/azure-kusto-go/kusto/kql"
+	"github.com/Azure/azure-kusto-go/kusto/utils"
 	"github.com/google/uuid"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 )
 
 var (
-	pCountStmt = kusto.NewStmt("table(tableName) | count").MustDefinitions(
-		kusto.NewDefinitions().Must(
-			kusto.ParamTypes{
-				"tableName": kusto.ParamType{Type: types.String},
-			},
-		),
-	)
-	pTableStmt = kusto.NewStmt("table(tableName)").MustDefinitions(
+	pTableStmtOld = kusto.NewStmt("table(tableName)").MustDefinitions(
 		kusto.NewDefinitions().Must(
 			kusto.ParamTypes{
 				"tableName": kusto.ParamType{Type: types.String},
@@ -43,7 +45,9 @@ var (
 	)
 
 	// This is needed because of a bug in the backend that sometimes causes the tables not to drop and get stuck.
-	clearStreamingCacheStatement = kusto.NewStmt(".clear database cache streamingingestion schema")
+	clearStreamingCacheStatement = kql.New(".clear database cache streamingingestion schema")
+
+	countStatement = kql.New("table(tableName) | count")
 )
 
 type CountResult struct {
@@ -92,9 +96,67 @@ func (lr LogRow) CSVMarshal() []string {
 	}
 }
 
-type queryFunc func(ctx context.Context, db string, query kusto.Stmt, options ...kusto.QueryOption) (*kusto.RowIterator, error)
+type queryFunc func(ctx context.Context, db string, query kusto.Statement, options ...kusto.QueryOption) (*kusto.RowIterator, error)
 
-type mgmtFunc func(ctx context.Context, db string, query kusto.Stmt, options ...kusto.MgmtOption) (*kusto.RowIterator, error)
+type mgmtFunc func(ctx context.Context, db string, query kusto.Statement, options ...kusto.MgmtOption) (*kusto.RowIterator, error)
+
+type queryJsonFunc func(ctx context.Context, db string, query kusto.Statement, options ...kusto.QueryOption) (string, error)
+
+func TestAuth(t *testing.T) {
+	t.Parallel()
+	transporter := utils.Transporter{ // using custom transporter to make sure it closes
+		Http: &http.Client{
+			Transport: &http.Transport{
+				IdleConnTimeout:   0,
+				DisableKeepAlives: true,
+			},
+		},
+	}
+	defaultCred, err := azidentity.NewDefaultAzureCredential(&azidentity.DefaultAzureCredentialOptions{
+		ClientOptions: azcore.ClientOptions{
+			Transport: &transporter,
+		},
+	})
+	require.NoError(t, err)
+	credential, err := azidentity.NewChainedTokenCredential([]azcore.TokenCredential{
+		defaultCred,
+	}, &azidentity.ChainedTokenCredentialOptions{})
+	require.NoError(t, err)
+
+	tests := []struct {
+		desc string
+		kcsb *kusto.ConnectionStringBuilder
+	}{
+		{
+			desc: "Default",
+			kcsb: kusto.NewConnectionStringBuilder(testConfig.Endpoint).WithDefaultAzureCredential(),
+		},
+		{
+			desc: "With TokenCredential",
+			kcsb: kusto.NewConnectionStringBuilder(testConfig.Endpoint).WithTokenCredential(credential),
+		},
+	}
+
+	for _, test := range tests {
+		test := test
+		t.Run(test.desc, func(t *testing.T) {
+			t.Parallel()
+			client, err := kusto.New(test.kcsb)
+			require.NoError(t, err)
+			defer client.Close()
+
+			query, err := client.Query(context.Background(), testConfig.Database, kql.New("print 1"))
+			require.NoError(t, err)
+
+			row, inlineError, err := query.NextRowOrError()
+			defer query.Stop()
+			require.NoError(t, err)
+			require.Nil(t, inlineError)
+			assert.Equal(t, "1\n", row.String())
+		})
+	}
+
+}
 
 func TestQueries(t *testing.T) {
 	t.Parallel()
@@ -105,8 +167,7 @@ func TestQueries(t *testing.T) {
 
 	_, cancel := context.WithCancel(context.Background())
 	defer cancel()
-
-	client, err := kusto.New(testConfig.Endpoint, testConfig.Authorizer)
+	client, err := kusto.New(testConfig.kcsb)
 	if err != nil {
 		panic(err)
 	}
@@ -117,28 +178,22 @@ func TestQueries(t *testing.T) {
 		t.Log("Closed client")
 	})
 
-	pCountStmt := kusto.NewStmt("table(tableName) | count").MustDefinitions(
-		kusto.NewDefinitions().Must(
-			kusto.ParamTypes{
-				"tableName": kusto.ParamType{Type: types.String},
-			},
-		),
-	)
-
-	allDataTypesTable := fmt.Sprintf("goe2e_all_data_types")
-	require.NoError(t, createIngestionTable(t, client, allDataTypesTable, true))
+	allDataTypesTable := fmt.Sprintf("goe2e_all_data_types_%d_%d", time.Now().UnixNano(), rand.Int())
+	err = createIngestionTable(t, client, allDataTypesTable, true)
+	require.NoError(t, err)
 
 	tests := []struct {
 		// desc is a description of a test.
 		desc string
-		// stmt is the Kusot Stmt that will be sent.
-		stmt kusto.Stmt
+		// stmt is the query to run.
+		stmt kusto.Statement
 		// setup is a function that will be called before the test runs.
 		setup func() error
 		// teardown is a functiont that will be called before the test ends.
 		teardown func() error
 		qcall    queryFunc
 		mcall    mgmtFunc
+		qjcall   queryJsonFunc
 		options  interface{} // either []kusto.QueryOption or []kusto.MgmtOption
 		// doer is called from within the function passed to RowIterator.Do(). It allows us to collect the data we receive.
 		doer func(row *table.Row, update interface{}) error
@@ -148,10 +203,8 @@ func TestQueries(t *testing.T) {
 		want interface{}
 	}{
 		{
-			desc: "Query: Retrieve count of the number of rows that match",
-			stmt: pCountStmt.MustParameters(
-				kusto.NewParameters().Must(kusto.QueryValues{"tableName": allDataTypesTable}),
-			),
+			desc:  "Query: Retrieve count of the number of rows that match",
+			stmt:  kql.New("").AddTable(allDataTypesTable).AddLiteral("| count"),
 			qcall: client.Query,
 			doer: func(row *table.Row, update interface{}) error {
 				rec := CountResult{}
@@ -170,7 +223,7 @@ func TestQueries(t *testing.T) {
 		},
 		{
 			desc:  "Mgmt(regression github.com/Azure/azure-kusto-go/issues/11): make sure we can retrieve .show databases, but we do not check the results at this time",
-			stmt:  kusto.NewStmt(`.show databases`),
+			stmt:  kql.New(`.show databases`),
 			mcall: client.Mgmt,
 			doer: func(row *table.Row, update interface{}) error {
 				return nil
@@ -181,7 +234,7 @@ func TestQueries(t *testing.T) {
 		},
 		{
 			desc:  "Mgmt(https://github.com/Azure/azure-kusto-go/issues/55): transformations on mgmt queries",
-			stmt:  kusto.NewStmt(`.show databases | project A="1" | take 1`),
+			stmt:  kql.New(`.show databases | project A="1" | take 1`),
 			mcall: client.Mgmt,
 			doer: func(row *table.Row, update interface{}) error {
 				rec := MgmtProjectionResult{}
@@ -199,9 +252,8 @@ func TestQueries(t *testing.T) {
 			want: &[]MgmtProjectionResult{{A: "1"}},
 		},
 		{
-			desc: "Mgmt(https://github.com/Azure/azure-kusto-go/issues/55): transformations on mgmt queries - multiple tables",
-			stmt: kusto.NewStmt(`.show databases | project A="1" | take 1;`, kusto.UnsafeStmt(unsafe.Stmt{Add: true})).UnsafeAdd(allDataTypesTable).Add(
-				" | project A=\"2\" | take 1"),
+			desc:  "Mgmt(https://github.com/Azure/azure-kusto-go/issues/55): transformations on mgmt queries - multiple tables",
+			stmt:  kql.New(`.show databases | project A="1" | take 1;`).AddTable(allDataTypesTable).AddLiteral(" | project A=\"2\" | take 1"),
 			mcall: client.Mgmt,
 			doer: func(row *table.Row, update interface{}) error {
 				rec := MgmtProjectionResult{}
@@ -220,7 +272,7 @@ func TestQueries(t *testing.T) {
 		},
 		{
 			desc:  "Query: Progressive query: make sure we can convert all data types from a row",
-			stmt:  pTableStmt.MustParameters(kusto.NewParameters().Must(kusto.QueryValues{"tableName": allDataTypesTable})),
+			stmt:  kql.New("").AddTable(allDataTypesTable),
 			qcall: client.Query,
 			doer: func(row *table.Row, update interface{}) error {
 				rec := AllDataType{}
@@ -260,7 +312,131 @@ func TestQueries(t *testing.T) {
 		},
 		{
 			desc:    "Query: Non-Progressive query: make sure we can convert all data types from a row",
-			stmt:    pTableStmt.MustParameters(kusto.NewParameters().Must(kusto.QueryValues{"tableName": allDataTypesTable})),
+			stmt:    kql.New("").AddTable(allDataTypesTable),
+			qcall:   client.Query,
+			options: []kusto.QueryOption{kusto.ResultsProgressiveDisable()},
+			doer: func(row *table.Row, update interface{}) error {
+				rec := AllDataType{}
+				if err := row.ToStruct(&rec); err != nil {
+					return err
+				}
+
+				valuesRec := AllDataType{}
+
+				err := row.ExtractValues(&valuesRec.Vnum,
+					&valuesRec.Vdec,
+					&valuesRec.Vdate,
+					&valuesRec.Vspan,
+					&valuesRec.Vobj,
+					&valuesRec.Vb,
+					&valuesRec.Vreal,
+					&valuesRec.Vstr,
+					&valuesRec.Vlong,
+					&valuesRec.Vguid,
+				)
+
+				if err != nil {
+					return err
+				}
+
+				assert.Equal(t, rec, valuesRec)
+
+				recs := update.(*[]AllDataType)
+				*recs = append(*recs, rec)
+				return nil
+			},
+			gotInit: func() interface{} {
+				ad := []AllDataType{}
+				return &ad
+			},
+			want: &[]AllDataType{getExpectedResult()},
+		},
+		{
+			desc: "Query: All parameter types are working",
+			stmt: pTableStmtOld.Add(" | where  vnum == num and vdec == dec and vdate == dt and vspan == span and tostring(vobj) == tostring(obj) and vb == b and vreal" +
+				" == rl and vstr == str and vlong == lg and vguid == guid ").
+				MustDefinitions(kusto.NewDefinitions().Must(
+					kusto.ParamTypes{
+						"tableName": kusto.ParamType{Type: types.String},
+						"num":       kusto.ParamType{Type: types.Int},
+						"dec":       kusto.ParamType{Type: types.Decimal},
+						"dt":        kusto.ParamType{Type: types.DateTime},
+						"span":      kusto.ParamType{Type: types.Timespan},
+						"obj":       kusto.ParamType{Type: types.Dynamic},
+						"b":         kusto.ParamType{Type: types.Bool},
+						"rl":        kusto.ParamType{Type: types.Real},
+						"str":       kusto.ParamType{Type: types.String},
+						"lg":        kusto.ParamType{Type: types.Long},
+						"guid":      kusto.ParamType{Type: types.GUID},
+					})).
+				MustParameters(kusto.NewParameters().Must(kusto.
+					QueryValues{
+					"tableName": allDataTypesTable,
+					"num":       int32(1),
+					"dec":       "2.00000000000001",
+					"dt":        time.Date(2020, 03, 04, 14, 05, 01, 310996500, time.UTC),
+					"span":      time.Hour + 23*time.Minute + 45*time.Second + 678900000*time.Nanosecond,
+					"obj":       map[string]interface{}{"moshe": "value"},
+					"b":         true,
+					"rl":        0.01,
+					"str":       "asdf",
+					"lg":        int64(9223372036854775807),
+					"guid":      uuid.MustParse("74be27de-1e4e-49d9-b579-fe0b331d3642"),
+				})),
+			qcall:   client.Query,
+			options: []kusto.QueryOption{kusto.ResultsProgressiveDisable()},
+			doer: func(row *table.Row, update interface{}) error {
+				rec := AllDataType{}
+				if err := row.ToStruct(&rec); err != nil {
+					return err
+				}
+
+				valuesRec := AllDataType{}
+
+				err := row.ExtractValues(&valuesRec.Vnum,
+					&valuesRec.Vdec,
+					&valuesRec.Vdate,
+					&valuesRec.Vspan,
+					&valuesRec.Vobj,
+					&valuesRec.Vb,
+					&valuesRec.Vreal,
+					&valuesRec.Vstr,
+					&valuesRec.Vlong,
+					&valuesRec.Vguid,
+				)
+
+				if err != nil {
+					return err
+				}
+
+				assert.Equal(t, rec, valuesRec)
+
+				recs := update.(*[]AllDataType)
+				*recs = append(*recs, rec)
+				return nil
+			},
+			gotInit: func() interface{} {
+				ad := []AllDataType{}
+				return &ad
+			},
+			want: &[]AllDataType{getExpectedResult()},
+		},
+		{
+			desc: "Query: All parameter types are working with defaults",
+			stmt: pTableStmtOld.Add(" | where  vnum == num and vdec == dec and vdate == dt and vspan == span and vb == b and vreal == rl and vstr == str and vlong == lg and vguid == guid ").
+				MustDefinitions(kusto.NewDefinitions().Must(
+					kusto.ParamTypes{
+						"tableName": kusto.ParamType{Type: types.String, Default: allDataTypesTable},
+						"num":       kusto.ParamType{Type: types.Int, Default: int32(1)},
+						"dec":       kusto.ParamType{Type: types.Decimal, Default: "2.00000000000001"},
+						"dt":        kusto.ParamType{Type: types.DateTime, Default: time.Date(2020, 03, 04, 14, 05, 01, 310996500, time.UTC)},
+						"span":      kusto.ParamType{Type: types.Timespan, Default: time.Hour + 23*time.Minute + 45*time.Second + 678900000*time.Nanosecond},
+						"b":         kusto.ParamType{Type: types.Bool, Default: true},
+						"rl":        kusto.ParamType{Type: types.Real, Default: 0.01},
+						"str":       kusto.ParamType{Type: types.String, Default: "asdf"},
+						"lg":        kusto.ParamType{Type: types.Long, Default: int64(9223372036854775807)},
+						"guid":      kusto.ParamType{Type: types.GUID, Default: uuid.MustParse("74be27de-1e4e-49d9-b579-fe0b331d3642")},
+					})),
 			qcall:   client.Query,
 			options: []kusto.QueryOption{kusto.ResultsProgressiveDisable()},
 			doer: func(row *table.Row, update interface{}) error {
@@ -301,7 +477,7 @@ func TestQueries(t *testing.T) {
 		},
 		{
 			desc:    "Query: make sure Dynamic data type variations can be parsed",
-			stmt:    kusto.NewStmt(`print PlainValue = dynamic('1'), PlainArray = dynamic('[1,2,3]'), PlainJson= dynamic('{ "a": 1}'), JsonArray= dynamic('[{ "a": 1}, { "a": 2}]')`),
+			stmt:    kql.New(`print PlainValue = dynamic('1'), PlainArray = dynamic('[1,2,3]'), PlainJson= dynamic('{ "a": 1}'), JsonArray= dynamic('[{ "a": 1}, { "a": 2}]')`),
 			qcall:   client.Query,
 			options: []kusto.QueryOption{kusto.ResultsProgressiveDisable()},
 			doer: func(row *table.Row, update interface{}) error {
@@ -341,6 +517,34 @@ func TestQueries(t *testing.T) {
 				},
 			},
 		},
+		{
+			desc: "Query: Use many options",
+			stmt: kql.New("").AddTable(allDataTypesTable).AddLiteral("| count"),
+			options: []kusto.QueryOption{kusto.QueryNow(time.Now()), kusto.NoRequestTimeout(), kusto.NoTruncation(), kusto.RequestAppName("bd1e472c-a8e4-4c6e-859d-c86d72253197"),
+				kusto.RequestDescription("9bff424f-711d-48b8-9a6e-d3a618748334"), kusto.Application("aaa"), kusto.User("bbb"),
+				kusto.CustomQueryOption("additional", "additional")},
+			qcall: client.Query,
+			doer: func(row *table.Row, update interface{}) error {
+				rec := CountResult{}
+				if err := row.ToStruct(&rec); err != nil {
+					return err
+				}
+				recs := update.(*[]CountResult)
+				*recs = append(*recs, rec)
+				return nil
+			},
+			gotInit: func() interface{} {
+				v := []CountResult{}
+				return &v
+			},
+			want: &[]CountResult{{Count: 1}},
+		},
+		// {
+		// 	desc:   "Query: get json",
+		// 	stmt:   kql.New("").AddTable(allDataTypesTable).AddLiteral("| count"),
+		// 	qjcall: client.QueryToJson,
+		// 	want:   "[{\"FrameType\":\"DataSetHeader\",\"IsProgressive\":true,\"Version\":\"v2.0\"},{\"FrameType\":\"DataTable\",\"TableId\":<NUM>,\"TableKind\":\"QueryProperties\",\"TableName\":\"@ExtendedProperties\",\"Columns\":[{\"ColumnName\":\"TableId\",\"ColumnType\":\"int\"},{\"ColumnName\":\"Key\",\"ColumnType\":\"string\"},{\"ColumnName\":\"Value\",\"ColumnType\":\"dynamic\"}],\"Rows\":[[1,\"Visualization\",\"{\\\"Visualization\\\":null,\\\"Title\\\":null,\\\"XColumn\\\":null,\\\"Series\\\":null,\\\"YColumns\\\":null,\\\"AnomalyColumns\\\":null,\\\"XTitle\\\":null,\\\"YTitle\\\":null,\\\"XAxis\\\":null,\\\"YAxis\\\":null,\\\"Legend\\\":null,\\\"YSplit\\\":null,\\\"Accumulate\\\":false,\\\"IsQuerySorted\\\":false,\\\"Kind\\\":null,\\\"Ymin\\\":\\\"NaN\\\",\\\"Ymax\\\":\\\"NaN\\\",\\\"Xmin\\\":null,\\\"Xmax\\\":null}\"]]},{\"FrameType\":\"TableHeader\",\"TableId\":<NUM>,\"TableKind\":\"PrimaryResult\",\"TableName\":\"PrimaryResult\",\"Columns\":[{\"ColumnName\":\"Count\",\"ColumnType\":\"long\"}]},{\"FrameType\":\"TableFragment\",\"TableFragmentType\":\"DataAppend\",\"TableId\":<NUM>,\"Rows\":[[1]]},{\"FrameType\":\"TableProgress\",\"TableId\":<NUM>,\"TableProgress\"<TIME>},{\"FrameType\":\"TableCompletion\",\"TableId\":<NUM>,\"RowCount\":1},{\"FrameType\":\"DataTable\",\"TableId\":<NUM>,\"TableKind\":\"QueryCompletionInformation\",\"TableName\":\"QueryCompletionInformation\",\"Columns\":[{\"ColumnName\":\"Timestamp\",\"ColumnType\":\"datetime\"},{\"ColumnName\":\"ClientRequestId\",\"ColumnType\":\"string\"},{\"ColumnName\":\"ActivityId\",\"ColumnType\":\"guid\"},{\"ColumnName\":\"SubActivityId\",\"ColumnType\":\"guid\"},{\"ColumnName\":\"ParentActivityId\",\"ColumnType\":\"guid\"},{\"ColumnName\":\"Level\",\"ColumnType\":\"int\"},{\"ColumnName\":\"LevelName\",\"ColumnType\":\"string\"},{\"ColumnName\":\"StatusCode\",\"ColumnType\":\"int\"},{\"ColumnName\":\"StatusCodeName\",\"ColumnType\":\"string\"},{\"ColumnName\":\"EventType\",\"ColumnType\":\"int\"},{\"ColumnName\":\"EventTypeName\",\"ColumnType\":\"string\"},{\"ColumnName\":\"Payload\",\"ColumnType\":\"string\"}],\"Rows\":[[\"<TIME>\",\"KGC.execute;<GUID>\",\"<GUID>\",\"<GUID>\",\"<GUID>\",4,\"Info\",0,\"S_OK (0)\",4,\"QueryInfo\",\"{\\\"Count\\\":<NUM>,\\\"Text\\\":\\\"Query completed successfully\\\"}\"],[\"<TIME>\",\"KGC.execute;<GUID>\",\"<GUID>\",\"<GUID>\",\"<GUID>\",4,\"Info\",0,\"S_OK (0)\",5,\"WorkloadGroup\",\"{\\\"Count\\\":<NUM>,\\\"Text\\\":\\\"default\\\"}\"],[\"<TIME>\",\"KGC.execute;<GUID>\",\"<GUID>\",\"<GUID>\",\"<GUID>\",4,\"Info\",0,\"S_OK (0)\",6,\"EffectiveRequestOptions\",\"{\\\"Count\\\":<NUM>,\\\"Text\\\":\\\"{\\\\\\\"DataScope\\\\\\\":\\\\\\\"All\\\\\\\",\\\\\\\"QueryConsistency\\\\\\\":\\\\\\\"strongconsistency\\\\\\\",\\\\\\\"MaxMemoryConsumptionPerIterator\\\\\\\":<NUM>,\\\\\\\"MaxMemoryConsumptionPerQueryPerNode\\\\\\\":<NUM>,\\\\\\\"QueryFanoutNodesPercent\\\\\\\":<NUM>,\\\\\\\"QueryFanoutThreadsPercent\\\\\\\":100}\\\"}\"],[\"<TIME>\",\"KGC.execute;<GUID>\",\"<GUID>\",\"<GUID>\",\"<GUID>\",6,\"Stats\",0,\"S_OK (0)\",0,\"QueryResourceConsumption\",\"{\\\"ExecutionTime\\\"<TIME>,\\\"resource_usage\\\":{\\\"cache\\\":{\\\"memory\\\":{\\\"hits\\\":<NUM>,\\\"misses\\\":<NUM>,\\\"total\\\":0},\\\"disk\\\":{\\\"hits\\\":<NUM>,\\\"misses\\\":<NUM>,\\\"total\\\":0},\\\"shards\\\":{\\\"hot\\\":{\\\"hitbytes\\\":<NUM>,\\\"missbytes\\\":<NUM>,\\\"retrievebytes\\\":0},\\\"cold\\\":{\\\"hitbytes\\\":<NUM>,\\\"missbytes\\\":<NUM>,\\\"retrievebytes\\\":0},\\\"bypassbytes\\\":0}},\\\"cpu\\\":{\\\"user\\\":\\\"00:00:00\\\",\\\"kernel\\\":\\\"00:00:00\\\",\\\"total cpu\\\":\\\"00:00:00\\\"},\\\"memory\\\":{\\\"peak_per_node\\\":524384},\\\"network\\\":{\\\"inter_cluster_total_bytes\\\":<NUM>,\\\"cross_cluster_total_bytes\\\":0}},\\\"input_dataset_statistics\\\":{\\\"extents\\\":{\\\"total\\\":<NUM>,\\\"scanned\\\":<NUM>,\\\"scanned_min_datetime\\\":\\\"<TIME>\\\",\\\"scanned_max_datetime\\\":\\\"<TIME>\\\"},\\\"rows\\\":{\\\"total\\\":<NUM>,\\\"scanned\\\":0},\\\"rowstores\\\":{\\\"scanned_rows\\\":<NUM>,\\\"scanned_values_size\\\":0},\\\"shards\\\":{\\\"queries_generic\\\":<NUM>,\\\"queries_specialized\\\":0}},\\\"dataset_statistics\\\":[{\\\"table_row_count\\\":<NUM>,\\\"table_size\\\":9}],\\\"cross_cluster_resource_usage\\\":{}}\"]]},{\"FrameType\":\"DataSetCompletion\",\"HasErrors\":false,\"Cancelled\":false}]",
+		// },
 	}
 
 	for _, test := range tests {
@@ -380,6 +584,28 @@ func TestQueries(t *testing.T) {
 				iter, err = test.mcall(context.Background(), testConfig.Database, test.stmt, options...)
 
 				require.Nilf(t, err, "TestQueries(%s): had test.mcall error: %s", test.desc, err)
+
+			case test.qjcall != nil:
+				var options []kusto.QueryOption
+				if test.options != nil {
+					options = test.options.([]kusto.QueryOption)
+				}
+				json, err := test.qjcall(context.Background(), testConfig.Database, test.stmt, options...)
+				require.Nilf(t, err, "TestQueries(%s): had test.qjcall error: %s", test.desc, err)
+
+				// replace guids with <GUID>
+				guidRegex := regexp.MustCompile(`(\w+-){4}\w+`)
+				json = guidRegex.ReplaceAllString(json, "<GUID>")
+
+				timeRegex := regexp.MustCompile(`([0:]+\.(\d)+)|([\d\-]+T[\d\-.:]+Z)`)
+				json = timeRegex.ReplaceAllString(json, "<TIME>")
+
+				numRegex := regexp.MustCompile(`":\d+,`)
+				json = numRegex.ReplaceAllString(json, `":<NUM>,`)
+
+				require.Equal(t, test.want, json)
+				return
+
 			default:
 				require.Fail(t, "test setup failure")
 			}
@@ -387,7 +613,7 @@ func TestQueries(t *testing.T) {
 			defer iter.Stop()
 
 			var got = test.gotInit()
-			err = iter.Do(func(row *table.Row) error {
+			err = iter.DoOnRowOrError(func(row *table.Row, e *errors.Error) error {
 				return test.doer(row, got)
 			})
 
@@ -398,14 +624,270 @@ func TestQueries(t *testing.T) {
 	}
 }
 
-func TestFileIngestion(t *testing.T) {
+func TestStatement(t *testing.T) {
 	t.Parallel()
 
 	if skipETOE || testing.Short() {
 		t.Skipf("end to end tests disabled: missing config.json file in etoe directory")
 	}
 
-	client, err := kusto.New(testConfig.Endpoint, testConfig.Authorizer)
+	_, cancel := context.WithCancel(context.Background())
+	defer cancel()
+
+	client, err := kusto.New(testConfig.kcsb)
+	if err != nil {
+		panic(err)
+	}
+
+	t.Cleanup(func() {
+		t.Log("Closing client")
+		require.NoError(t, client.Close())
+		t.Log("Closed client")
+	})
+
+	allDataTypesTable := fmt.Sprintf("goe2e_all_data_types_%d_%d", time.Now().UnixNano(), rand.Int())
+	require.NoError(t, createIngestionTable(t, client, allDataTypesTable, true))
+	dt, err := time.Parse(time.RFC3339Nano, "2020-03-04T14:05:01.3109965Z")
+	require.NoError(t, err)
+	ts, err := time.ParseDuration("1h23m45.6789s")
+	require.NoError(t, err)
+	guid, err := uuid.Parse("74be27de-1e4e-49d9-b579-fe0b331d3642")
+	require.NoError(t, err)
+	tests := []struct {
+		// desc is a description of a test.
+		desc string
+		// stmt is the Kusot Stmt that will be sent.
+		stmt kusto.Statement
+		// setup is a function that will be called before the test runs.
+		setup func() error
+		// teardown is a functiont that will be called before the test ends.
+		teardown func() error
+		qcall    queryFunc
+		mcall    mgmtFunc
+		qjcall   queryJsonFunc
+		options  interface{} // either []kusto.QueryOption or []kusto.MgmtOption
+		// doer is called from within the function passed to RowIterator.Do(). It allows us to collect the data we receive.
+		doer func(row *table.Row, update interface{}) error
+		// gotInit creates the variable that will be used by doer's update argument.
+		gotInit func() interface{}
+		// want is the data we want to receive from the query.
+		want interface{}
+		// should the test fail
+		failFlag bool
+	}{
+		{
+			desc: "Complex query with Builder Builder",
+			stmt: kql.New("").
+				AddDatabase(testConfig.Database).AddLiteral(".").
+				AddTable(allDataTypesTable).AddLiteral(" | where ").
+				AddColumn("vnum").AddLiteral(" == ").AddInt(1).AddLiteral(" and ").
+				AddColumn("vdec").AddLiteral(" == ").AddDecimal(decimal.RequireFromString("2.00000000000001")).AddLiteral(" and ").
+				AddColumn("vdate").AddLiteral(" == ").AddDateTime(dt).AddLiteral(" and ").
+				AddColumn("vspan").AddLiteral(" == ").AddTimespan(ts).AddLiteral(" and ").
+				AddFunction("tostring").AddLiteral("(").AddColumn("vobj").AddLiteral(")").
+				AddLiteral(" == ").AddFunction("tostring").AddLiteral("(").
+				AddDynamic(map[string]interface{}{"moshe": "value"}).AddLiteral(")").AddLiteral(" and ").
+				AddColumn("vb").AddLiteral(" == ").AddBool(true).AddLiteral(" and ").
+				AddColumn("vreal").AddLiteral(" == ").AddReal(0.01).AddLiteral(" and ").
+				AddColumn("vstr").AddLiteral(" == ").AddString("asdf").AddLiteral(" and ").
+				AddColumn("vlong").AddLiteral(" == ").AddLong(9223372036854775807).AddLiteral(" and ").
+				AddColumn("vguid").AddLiteral(" == ").AddGUID(guid),
+			options: []kusto.QueryOption{},
+			qcall:   client.Query,
+			doer: func(row *table.Row, update interface{}) error {
+				rec := AllDataType{}
+				if err := row.ToStruct(&rec); err != nil {
+					return err
+				}
+
+				valuesRec := AllDataType{}
+
+				err := row.ExtractValues(&valuesRec.Vnum,
+					&valuesRec.Vdec,
+					&valuesRec.Vdate,
+					&valuesRec.Vspan,
+					&valuesRec.Vobj,
+					&valuesRec.Vb,
+					&valuesRec.Vreal,
+					&valuesRec.Vstr,
+					&valuesRec.Vlong,
+					&valuesRec.Vguid,
+				)
+
+				if err != nil {
+					return err
+				}
+
+				assert.Equal(t, rec, valuesRec)
+
+				recs := update.(*[]AllDataType)
+				*recs = append(*recs, rec)
+				return nil
+			},
+			gotInit: func() interface{} {
+				ad := []AllDataType{}
+				return &ad
+			},
+			failFlag: false,
+			want:     &[]AllDataType{getExpectedResult()},
+		},
+		{
+			desc: "Complex query with Builder Builder and parameters",
+			stmt: kql.New("table(tableName) | where vnum == num and vdec == dec and vdate == dt and vspan == span and tostring(vobj) == tostring(obj) and vb == b and vreal == rl and vstr == str and vlong == lg and vguid == guid"),
+			options: []kusto.QueryOption{kusto.QueryParameters(kql.NewParameters().
+				AddString("tableName", allDataTypesTable).
+				AddInt("num", 1).
+				AddDecimal("dec", decimal.RequireFromString("2.00000000000001")).
+				AddDateTime("dt", dt).
+				AddTimespan("span", ts).
+				AddDynamic("obj", map[string]interface{}{
+					"moshe": "value",
+				}).
+				AddBool("b", true).
+				AddReal("rl", 0.01).
+				AddString("str", "asdf").
+				AddLong("lg", 9223372036854775807).
+				AddGUID("guid", guid))},
+			qcall: client.Query,
+			doer: func(row *table.Row, update interface{}) error {
+				rec := AllDataType{}
+				if err := row.ToStruct(&rec); err != nil {
+					return err
+				}
+
+				valuesRec := AllDataType{}
+
+				err := row.ExtractValues(&valuesRec.Vnum,
+					&valuesRec.Vdec,
+					&valuesRec.Vdate,
+					&valuesRec.Vspan,
+					&valuesRec.Vobj,
+					&valuesRec.Vb,
+					&valuesRec.Vreal,
+					&valuesRec.Vstr,
+					&valuesRec.Vlong,
+					&valuesRec.Vguid,
+				)
+
+				if err != nil {
+					return err
+				}
+
+				assert.Equal(t, rec, valuesRec)
+
+				recs := update.(*[]AllDataType)
+				*recs = append(*recs, rec)
+				return nil
+			},
+			gotInit: func() interface{} {
+				ad := []AllDataType{}
+				return &ad
+			},
+			failFlag: false,
+			want:     &[]AllDataType{getExpectedResult()},
+		},
+		{
+			desc: "Complex query with Builder Builder - Fail due to wrong table name (escaped)",
+			stmt: kql.New("table(tableName) | where vstr == txt"),
+			options: []kusto.QueryOption{kusto.QueryParameters(kql.NewParameters().
+				AddString("tableName", "goe2e_all_data_types\"").
+				AddString("txt", "asdf"))},
+			qcall: client.Query,
+			doer: func(row *table.Row, update interface{}) error {
+				rec := AllDataType{}
+				if err := row.ToStruct(&rec); err != nil {
+					return err
+				}
+
+				valuesRec := AllDataType{}
+
+				err := row.ExtractValues(&valuesRec.Vnum,
+					&valuesRec.Vdec,
+					&valuesRec.Vdate,
+					&valuesRec.Vspan,
+					&valuesRec.Vobj,
+					&valuesRec.Vb,
+					&valuesRec.Vreal,
+					&valuesRec.Vstr,
+					&valuesRec.Vlong,
+					&valuesRec.Vguid,
+				)
+
+				if err != nil {
+					return err
+				}
+
+				assert.Equal(t, rec, valuesRec)
+
+				recs := update.(*[]AllDataType)
+				*recs = append(*recs, rec)
+				return nil
+			},
+			gotInit: func() interface{} {
+				ad := []AllDataType{}
+				return &ad
+			},
+			failFlag: true,
+			want:     &[]AllDataType{},
+		},
+	}
+
+	for _, test := range tests {
+		test := test // capture
+		t.Run(test.desc, func(t *testing.T) {
+			t.Parallel()
+			if test.setup != nil {
+				if err := test.setup(); err != nil {
+					panic(err)
+				}
+			}
+			if test.teardown != nil {
+				defer func() {
+					if err := test.teardown(); err != nil {
+						panic(err)
+					}
+				}()
+			}
+
+			var iter *kusto.RowIterator
+			var err error
+			switch {
+			case test.qcall != nil:
+				var options []kusto.QueryOption
+				if test.options != nil {
+					options = test.options.([]kusto.QueryOption)
+				}
+				iter, err = test.qcall(context.Background(), testConfig.Database, test.stmt, options...)
+				if (!test.failFlag && err != nil) || (test.failFlag && err == nil) {
+					require.Nilf(t, err, "TestQueries(%s): had iter.Do() error: %s.", test.desc, err)
+				}
+
+			default:
+				require.Fail(t, "test setup failure")
+			}
+
+			var got = test.gotInit()
+			if iter != nil {
+				defer iter.Stop()
+				err = iter.DoOnRowOrError(func(row *table.Row, e *errors.Error) error {
+					return test.doer(row, got)
+				})
+				require.Nilf(t, err, "TestQueries(%s): had iter.Do() error: %s.", test.desc, err)
+			}
+
+			require.Equal(t, test.want, got)
+		})
+	}
+}
+
+func TestFileIngestion(t *testing.T) { //ok
+	t.Parallel()
+
+	if skipETOE || testing.Short() {
+		t.Skipf("end to end tests disabled: missing config.json file in etoe directory")
+	}
+
+	client, err := kusto.New(testConfig.kcsb)
 	if err != nil {
 		panic(err)
 	}
@@ -464,7 +946,7 @@ func TestFileIngestion(t *testing.T) {
 		// options are options used on ingesting.
 		options []ingest.FileOption
 		// stmt is used to query for the results.
-		stmt kusto.Stmt
+		stmt kusto.Statement
 		// table is the name of the table to create and use as a parameter.
 		table string
 		// teardown is a function that will be called before the test ends.
@@ -490,18 +972,11 @@ func TestFileIngestion(t *testing.T) {
 			}),
 		},
 		{
-			desc:     "Ingest from blob with streaming ingestion should fail",
-			ingestor: streamingIngestor,
-			src:      "https://adxingestiondemo.blob.core.windows.net/data/demo.json",
-			options:  []ingest.FileOption{ingest.IngestionMappingRef("Logs_mapping", ingest.JSON)},
-			wantErr:  ingest.FileIsBlobErr,
-		},
-		{
 			desc:     "Ingest from blob with existing mapping",
 			ingestor: queuedIngestor,
 			src:      "https://adxingestiondemo.blob.core.windows.net/data/demo.json",
 			options:  []ingest.FileOption{ingest.IngestionMappingRef("Logs_mapping", ingest.JSON)},
-			stmt:     pCountStmt,
+			stmt:     countStatement,
 			table:    queuedTable,
 			doer: func(row *table.Row, update interface{}) error {
 				rec := CountResult{}
@@ -519,11 +994,33 @@ func TestFileIngestion(t *testing.T) {
 			want: &[]CountResult{{Count: 500}},
 		},
 		{
+			desc:     "Ingest from csv with ignore first record",
+			ingestor: queuedIngestor,
+			src:      csvFileFromString(t),
+			options:  []ingest.FileOption{ingest.IgnoreFirstRecord()},
+			stmt:     countStatement,
+			table:    queuedTable,
+			doer: func(row *table.Row, update interface{}) error {
+				rec := CountResult{}
+				if err := row.ToStruct(&rec); err != nil {
+					return err
+				}
+				recs := update.(*[]CountResult)
+				*recs = append(*recs, rec)
+				return nil
+			},
+			gotInit: func() interface{} {
+				v := []CountResult{}
+				return &v
+			},
+			want: &[]CountResult{{Count: 2}},
+		},
+		{
 			desc:     "Ingest from blob with existing mapping managed",
 			ingestor: managedIngestor,
 			src:      "https://adxingestiondemo.blob.core.windows.net/data/demo.json",
 			options:  []ingest.FileOption{ingest.IngestionMappingRef("Logs_mapping", ingest.JSON)},
-			stmt:     pCountStmt,
+			stmt:     countStatement,
 			table:    managedTable,
 			doer: func(row *table.Row, update interface{}) error {
 				rec := CountResult{}
@@ -550,8 +1047,8 @@ func TestFileIngestion(t *testing.T) {
 					ingest.JSON,
 				),
 			},
+			stmt:  countStatement,
 			table: queuedTable,
-			stmt:  pCountStmt,
 			doer: func(row *table.Row, update interface{}) error {
 				rec := CountResult{}
 				if err := row.ToStruct(&rec); err != nil {
@@ -571,7 +1068,7 @@ func TestFileIngestion(t *testing.T) {
 			desc:     "Ingestion from local file queued",
 			ingestor: queuedIngestor,
 			src:      csvFileFromString(t),
-			stmt:     pCountStmt,
+			stmt:     countStatement,
 			table:    queuedTable,
 			doer: func(row *table.Row, update interface{}) error {
 				rec := CountResult{}
@@ -592,7 +1089,7 @@ func TestFileIngestion(t *testing.T) {
 			desc:     "Ingestion from local file test 2 queued",
 			ingestor: queuedIngestor,
 			src:      createCsvFileFromData(t, mockRows),
-			stmt:     pTableStmt.Add(" | order by header_api_version asc"),
+			stmt:     kql.New("table(tableName) | order by header_api_version asc"),
 			table:    queuedTable,
 			doer: func(row *table.Row, update interface{}) error {
 				rec := LogRow{}
@@ -614,12 +1111,8 @@ func TestFileIngestion(t *testing.T) {
 			ingestor: streamingIngestor,
 			src:      "testdata/demo.json",
 			options:  []ingest.FileOption{ingest.IngestionMappingRef("Logs_mapping", ingest.JSON)},
-			stmt: pCountStmt.MustParameters(
-				kusto.NewParameters().Must(
-					kusto.QueryValues{"tableName": streamingTable},
-				),
-			),
-			table: streamingTable,
+			stmt:     countStatement,
+			table:    streamingTable,
 			doer: func(row *table.Row, update interface{}) error {
 				rec := CountResult{}
 				if err := row.ToStruct(&rec); err != nil {
@@ -639,7 +1132,7 @@ func TestFileIngestion(t *testing.T) {
 			desc:     "Ingestion from local file streaming",
 			ingestor: streamingIngestor,
 			src:      csvFileFromString(t),
-			stmt:     pCountStmt,
+			stmt:     countStatement,
 			table:    streamingTable,
 			doer: func(row *table.Row, update interface{}) error {
 				rec := CountResult{}
@@ -660,7 +1153,7 @@ func TestFileIngestion(t *testing.T) {
 			desc:     "Ingestion from local file test 2 streaming",
 			ingestor: streamingIngestor,
 			src:      createCsvFileFromData(t, mockRows),
-			stmt:     pTableStmt.Add(" | order by header_api_version asc"),
+			stmt:     kql.New("table(tableName)  | order by header_api_version asc"),
 			table:    streamingTable,
 			doer: func(row *table.Row, update interface{}) error {
 				rec := LogRow{}
@@ -682,7 +1175,7 @@ func TestFileIngestion(t *testing.T) {
 			ingestor: managedIngestor,
 			src:      "testdata/demo.json",
 			options:  []ingest.FileOption{ingest.IngestionMappingRef("Logs_mapping", ingest.JSON)},
-			stmt:     pCountStmt,
+			stmt:     countStatement,
 			table:    managedTable,
 			doer: func(row *table.Row, update interface{}) error {
 				rec := CountResult{}
@@ -704,7 +1197,7 @@ func TestFileIngestion(t *testing.T) {
 			ingestor: managedIngestor,
 			src:      bigCsvFileFromString(t),
 			options:  []ingest.FileOption{ingest.DontCompress()},
-			stmt:     pCountStmt,
+			stmt:     countStatement,
 			table:    managedTable,
 			doer: func(row *table.Row, update interface{}) error {
 				rec := CountResult{}
@@ -721,6 +1214,50 @@ func TestFileIngestion(t *testing.T) {
 			},
 			want: &[]CountResult{{Count: 3}},
 		},
+		{
+			desc:     "Streaming ingest from blob",
+			ingestor: streamingIngestor,
+			src:      "https://adxingestiondemo.blob.core.windows.net/data/demo.json",
+			options:  []ingest.FileOption{ingest.IngestionMappingRef("Logs_mapping", ingest.JSON)},
+			stmt:     countStatement,
+			table:    streamingTable,
+			doer: func(row *table.Row, update interface{}) error {
+				rec := CountResult{}
+				if err := row.ToStruct(&rec); err != nil {
+					return err
+				}
+				recs := update.(*[]CountResult)
+				*recs = append(*recs, rec)
+				return nil
+			},
+			gotInit: func() interface{} {
+				v := []CountResult{}
+				return &v
+			},
+			want: &[]CountResult{{Count: 500}},
+		},
+		{
+			desc:     "Managed streaming ingest from blob",
+			ingestor: managedIngestor,
+			src:      "https://adxingestiondemo.blob.core.windows.net/data/demo.json",
+			options:  []ingest.FileOption{ingest.IngestionMappingRef("Logs_mapping", ingest.JSON)},
+			stmt:     countStatement,
+			table:    managedTable,
+			doer: func(row *table.Row, update interface{}) error {
+				rec := CountResult{}
+				if err := row.ToStruct(&rec); err != nil {
+					return err
+				}
+				recs := update.(*[]CountResult)
+				*recs = append(*recs, rec)
+				return nil
+			},
+			gotInit: func() interface{} {
+				v := []CountResult{}
+				return &v
+			},
+			want: &[]CountResult{{Count: 500}},
+		},
 	}
 
 	for _, test := range tests {
@@ -731,14 +1268,11 @@ func TestFileIngestion(t *testing.T) {
 			ctx, cancel := context.WithCancel(context.Background())
 			defer cancel()
 
+			fTable := ""
 			if test.table != "" {
-				fTable := fmt.Sprintf("%s_%d_%d", test.table, time.Now().UnixNano(), rand.Int())
+				fTable = fmt.Sprintf("%s_%d_%d", test.table, time.Now().UnixNano(), rand.Int())
 				require.NoError(t, createIngestionTable(t, client, fTable, false))
 				test.options = append(test.options, ingest.Table(fTable))
-				test.stmt = test.stmt.MustParameters(
-					kusto.NewParameters().Must(
-						kusto.QueryValues{"tableName": fTable},
-					))
 			}
 
 			if test.teardown != nil {
@@ -769,12 +1303,12 @@ func TestFileIngestion(t *testing.T) {
 				return
 			}
 
-			require.NoError(t, waitForIngest(t, ctx, client, testConfig.Database, test.stmt, test.doer, test.want, test.gotInit))
+			require.NoError(t, waitForIngest(t, ctx, client, testConfig.Database, fTable, test.stmt, test.doer, test.want, test.gotInit))
 		})
 	}
 }
 
-func TestReaderIngestion(t *testing.T) {
+func TestReaderIngestion(t *testing.T) { // ok
 	t.Parallel()
 
 	if skipETOE || testing.Short() {
@@ -785,7 +1319,7 @@ func TestReaderIngestion(t *testing.T) {
 	streamingTable := "goe2e_streaming_reader_logs"
 	managedTable := "goe2e_managed_streaming_reader_logs"
 
-	client, err := kusto.New(testConfig.Endpoint, testConfig.Authorizer)
+	client, err := kusto.New(testConfig.kcsb)
 	if err != nil {
 		panic(err)
 	}
@@ -841,7 +1375,7 @@ func TestReaderIngestion(t *testing.T) {
 		// options are options used on ingesting.
 		options []ingest.FileOption
 		// stmt is used to query for the results.
-		stmt kusto.Stmt
+		stmt kusto.Statement
 		// table is the name of the table to create and use as a parameter.
 		table string
 		// teardown is a function that will be called before the test ends.
@@ -874,7 +1408,7 @@ func TestReaderIngestion(t *testing.T) {
 				ingest.FileFormat(ingest.JSON),
 				ingest.IngestionMappingRef("Logs_mapping", ingest.JSON),
 			},
-			stmt:  pCountStmt,
+			stmt:  countStatement,
 			table: queuedTable,
 			doer: func(row *table.Row, update interface{}) error {
 				rec := CountResult{}
@@ -902,7 +1436,7 @@ func TestReaderIngestion(t *testing.T) {
 					ingest.JSON,
 				),
 			},
-			stmt:  pCountStmt,
+			stmt:  countStatement,
 			table: queuedTable,
 			doer: func(row *table.Row, update interface{}) error {
 				rec := CountResult{}
@@ -926,7 +1460,7 @@ func TestReaderIngestion(t *testing.T) {
 			options: []ingest.FileOption{
 				ingest.FileFormat(ingest.CSV),
 			},
-			stmt:  pTableStmt.Add(" | order by header_api_version asc"),
+			stmt:  kql.New("table(tableName) | order by header_api_version asc"),
 			table: queuedTable,
 			doer: func(row *table.Row, update interface{}) error {
 				rec := LogRow{}
@@ -951,7 +1485,7 @@ func TestReaderIngestion(t *testing.T) {
 				ingest.IngestionMappingRef("Logs_mapping", ingest.JSON),
 				ingest.FileFormat(ingest.JSON),
 			},
-			stmt:  pCountStmt,
+			stmt:  countStatement,
 			table: streamingTable,
 			doer: func(row *table.Row, update interface{}) error {
 				rec := CountResult{}
@@ -975,7 +1509,7 @@ func TestReaderIngestion(t *testing.T) {
 			options: []ingest.FileOption{
 				ingest.FileFormat(ingest.CSV),
 			},
-			stmt:  pCountStmt,
+			stmt:  countStatement,
 			table: streamingTable,
 			doer: func(row *table.Row, update interface{}) error {
 				rec := CountResult{}
@@ -999,7 +1533,7 @@ func TestReaderIngestion(t *testing.T) {
 				ingest.FileFormat(ingest.CSV),
 			},
 			src:   createCsvFileFromData(t, mockRows),
-			stmt:  pTableStmt.Add(" | order by header_api_version asc"),
+			stmt:  kql.New("table(tableName) | order by header_api_version asc"),
 			table: streamingTable,
 			doer: func(row *table.Row, update interface{}) error {
 				rec := LogRow{}
@@ -1024,7 +1558,7 @@ func TestReaderIngestion(t *testing.T) {
 				ingest.IngestionMappingRef("Logs_mapping", ingest.JSON),
 				ingest.FileFormat(ingest.JSON),
 			},
-			stmt:  pCountStmt,
+			stmt:  countStatement,
 			table: managedTable,
 			doer: func(row *table.Row, update interface{}) error {
 				rec := CountResult{}
@@ -1051,14 +1585,11 @@ func TestReaderIngestion(t *testing.T) {
 			ctx, cancel := context.WithCancel(context.Background())
 			defer cancel()
 
+			var fTable string
 			if test.table != "" {
-				fTable := fmt.Sprintf("%s_%d_%d", test.table, time.Now().UnixNano(), rand.Int())
+				fTable = fmt.Sprintf("%s_%d_%d", test.table, time.Now().UnixNano(), rand.Int())
 				require.NoError(t, createIngestionTable(t, client, fTable, false))
 				test.options = append(test.options, ingest.Table(fTable))
-				test.stmt = test.stmt.MustParameters(
-					kusto.NewParameters().Must(
-						kusto.QueryValues{"tableName": fTable},
-					))
 			}
 
 			if test.teardown != nil {
@@ -1082,6 +1613,7 @@ func TestReaderIngestion(t *testing.T) {
 				panic(err)
 			}
 
+			defer f.Close()
 			// We could do this other ways that are simplier for testing, but this mimics what the user will likely do.
 			reader, writer := io.Pipe()
 			go func() {
@@ -1111,12 +1643,12 @@ func TestReaderIngestion(t *testing.T) {
 				return
 			}
 
-			require.NoError(t, waitForIngest(t, ctx, client, testConfig.Database, test.stmt, test.doer, test.want, test.gotInit))
+			require.NoError(t, waitForIngest(t, ctx, client, testConfig.Database, fTable, test.stmt, test.doer, test.want, test.gotInit))
 		})
 	}
 }
 
-func TestMultipleClusters(t *testing.T) {
+func TestMultipleClusters(t *testing.T) { //ok
 	t.Parallel()
 
 	if skipETOE || testing.Short() {
@@ -1126,7 +1658,7 @@ func TestMultipleClusters(t *testing.T) {
 		t.Skipf("multiple clusters tests diasbled: needs SecondaryEndpoint and SecondaryDatabase")
 	}
 
-	client, err := kusto.New(testConfig.Endpoint, testConfig.Authorizer)
+	client, err := kusto.New(testConfig.kcsb)
 	if err != nil {
 		panic(err)
 	}
@@ -1137,7 +1669,9 @@ func TestMultipleClusters(t *testing.T) {
 		t.Log("Closed client")
 	})
 
-	secondaryClient, err := kusto.New(testConfig.SecondaryEndpoint, testConfig.Authorizer)
+	skcsb := kusto.NewConnectionStringBuilder(testConfig.SecondaryEndpoint).WithAadAppKey(testConfig.ClientID, testConfig.ClientSecret, testConfig.TenantID)
+
+	secondaryClient, err := kusto.New(skcsb)
 	if err != nil {
 		panic(err)
 	}
@@ -1209,7 +1743,7 @@ func TestMultipleClusters(t *testing.T) {
 		// src represents where we are getting our data.
 		src string
 		// stmt is used to query for the results.
-		stmt kusto.Stmt
+		stmt kusto.Statement
 		// doer is called from within the function passed to RowIterator.Do(). It allows us to collect the data we receive.
 		doer func(row *table.Row, update interface{}) error
 		// gotInit creates the variable that will be used by doer's update argument.
@@ -1224,7 +1758,7 @@ func TestMultipleClusters(t *testing.T) {
 			ingestor:          queuedIngestor,
 			secondaryIngestor: secondaryQueuedIngestor,
 			src:               csvFileFromString(t),
-			stmt:              pCountStmt,
+			stmt:              countStatement,
 			doer: func(row *table.Row, update interface{}) error {
 				rec := CountResult{}
 				if err := row.ToStruct(&rec); err != nil {
@@ -1247,7 +1781,7 @@ func TestMultipleClusters(t *testing.T) {
 			ingestor:          streamingIngestor,
 			secondaryIngestor: secondaryStreamingIngestor,
 			src:               csvFileFromString(t),
-			stmt:              pCountStmt,
+			stmt:              countStatement,
 			doer: func(row *table.Row, update interface{}) error {
 				rec := CountResult{}
 				if err := row.ToStruct(&rec); err != nil {
@@ -1275,63 +1809,83 @@ func TestMultipleClusters(t *testing.T) {
 
 			fTable := fmt.Sprintf("%s_%d_%d", test.table, time.Now().UnixNano(), rand.Int())
 			fSecondaryTable := fmt.Sprintf("%s_%d_%d", test.secondaryTable, time.Now().UnixNano(), rand.Int())
-			require.NoError(t, createIngestionTableWithDB(t, client, testConfig.Database, fTable, false))
-			require.NoError(t, createIngestionTableWithDB(t, secondaryClient, testConfig.SecondaryDatabase, fSecondaryTable, false))
 
-			test.stmt = test.stmt.MustParameters(
-				kusto.NewParameters().Must(
-					kusto.QueryValues{"tableName": fTable},
-				))
-			secondaryStmt := test.stmt.MustParameters(
-				kusto.NewParameters().Must(
-					kusto.QueryValues{"tableName": fSecondaryTable},
-				))
+			var wg sync.WaitGroup
+			var primaryErr error
+			var secondaryErr error
 
-			var options []ingest.FileOption
-			if _, ok := test.ingestor.(*ingest.Ingestion); ok {
-				options = append(options, ingest.FlushImmediately(), ingest.ReportResultToTable())
+			// Run ingestion to primary database in a Goroutine
+			wg.Add(1)
+			go func() {
+				defer wg.Done()
+
+				require.NoError(t, createIngestionTableWithDB(t, client, testConfig.Database, fTable, false))
+
+				var options []ingest.FileOption
+				if _, ok := test.ingestor.(*ingest.Ingestion); ok {
+					options = append(options, ingest.FlushImmediately(), ingest.ReportResultToTable())
+				}
+				firstOptions := append(options, ingest.Database(testConfig.Database), ingest.Table(fTable))
+
+				res, err := test.ingestor.FromFile(ctx, test.src, firstOptions...)
+				if err == nil {
+					err = <-res.Wait(ctx)
+				}
+
+				primaryErr = err
+
+				if !assertErrorsMatch(t, err, nil) {
+					t.Errorf("TestMultipleClusters(%s): ingestor.FromFile(): got err == %v, want err == %v", test.desc, err, nil)
+				}
+
+				require.NoError(t, waitForIngest(t, ctx, client, testConfig.Database, fTable, test.stmt, test.doer, test.want, test.gotInit))
+			}()
+
+			// Run ingestion to secondary database in a Goroutine
+			wg.Add(1)
+			go func() {
+				defer wg.Done()
+
+				require.NoError(t, createIngestionTableWithDB(t, secondaryClient, testConfig.SecondaryDatabase, fSecondaryTable, false))
+
+				var options []ingest.FileOption
+				if _, ok := test.secondaryIngestor.(*ingest.Ingestion); ok {
+					options = append(options, ingest.FlushImmediately(), ingest.ReportResultToTable())
+				}
+				secondaryOptions := append(options, ingest.Database(testConfig.SecondaryDatabase), ingest.Table(fSecondaryTable))
+
+				res, err := test.secondaryIngestor.FromFile(ctx, test.src, secondaryOptions...)
+				if err == nil {
+					err = <-res.Wait(ctx)
+				}
+
+				secondaryErr = err
+
+				if !assertErrorsMatch(t, err, nil) {
+					t.Errorf("TestMultipleClusters(%s): ingestor.FromFile(): got err == %v, want err == %v", test.desc, err, nil)
+				}
+
+				require.NoError(t, waitForIngest(t, ctx, secondaryClient, testConfig.SecondaryDatabase, fSecondaryTable, test.stmt, test.doer, test.want, test.gotInit))
+			}()
+
+			// Wait for both Goroutines to finish
+			wg.Wait()
+
+			// Check if there were any errors during ingestion
+			if primaryErr != nil || secondaryErr != nil {
+				t.Errorf("TestMultipleClusters(%s): Got errors during ingestion. primaryErr: %v, secondaryErr: %v", test.desc, primaryErr, secondaryErr)
 			}
-			firstOptions := append(options, ingest.Database(testConfig.Database), ingest.Table(fTable))
-
-			res, err := test.ingestor.FromFile(ctx, test.src, firstOptions...)
-			if err == nil {
-				err = <-res.Wait(ctx)
-			}
-
-			if !assertErrorsMatch(t, err, nil) {
-				t.Errorf("TestMultipleClusters(%s): ingestor.FromFile(): got err == %v, want err == %v", test.desc, err, nil)
-				return
-			}
-
-			secondaryOptions := append(options, ingest.Database(testConfig.SecondaryDatabase), ingest.Table(fSecondaryTable))
-			res, err = test.secondaryIngestor.FromFile(ctx, test.src, secondaryOptions...)
-			if err == nil {
-				err = <-res.Wait(ctx)
-			}
-
-			if !assertErrorsMatch(t, err, nil) {
-				t.Errorf("TestMultipleClusters(%s): ingestor.FromFile(): got err == %v, want err == %v", test.desc, err, nil)
-				return
-			}
-
-			if err != nil {
-				return
-			}
-
-			require.NoError(t, waitForIngest(t, ctx, client, testConfig.Database, test.stmt, test.doer, test.want, test.gotInit))
-			require.NoError(t, waitForIngest(t, ctx, secondaryClient, testConfig.SecondaryDatabase, secondaryStmt, test.doer, test.want, test.gotInit))
 		})
 	}
 }
 
-func TestStreamingIngestion(t *testing.T) {
+func TestStreamingIngestion(t *testing.T) { //OK
 	t.Parallel()
 
 	if skipETOE || testing.Short() {
 		t.SkipNow()
 	}
-
-	client, err := kusto.New(testConfig.Endpoint, testConfig.Authorizer)
+	client, err := kusto.New(testConfig.kcsb)
 	if err != nil {
 		panic(err)
 	}
@@ -1356,7 +1910,7 @@ func TestStreamingIngestion(t *testing.T) {
 		// mapping is the name of the mapping reference to be used.
 		mapping string
 		// stmt is used to query for the results.
-		stmt kusto.Stmt
+		stmt kusto.Statement
 		// doer is called from within the function passed to RowIterator.Do(). It allows us to collect the data we receive.
 		doer func(row *table.Row, update interface{}) error
 		// gotInit creates the variable that will be used by doer's update argument.
@@ -1376,7 +1930,7 @@ func TestStreamingIngestion(t *testing.T) {
 			desc:    "Test successful streaming ingestion",
 			segment: []byte(createStringyLogsData()),
 			mapping: "Logs_mapping",
-			stmt:    pCountStmt,
+			stmt:    countStatement,
 			doer: func(row *table.Row, update interface{}) error {
 				rec := CountResult{}
 				if err := row.ToStruct(&rec); err != nil {
@@ -1413,7 +1967,7 @@ func TestStreamingIngestion(t *testing.T) {
 				panic(err)
 			}
 
-			err = ingestor.Stream(
+			err = ingestor.Stream( //nolint:staticcheck // It is deprecated, but we want to test it.
 				context.Background(),
 				test.segment,
 				ingest.JSON,
@@ -1429,13 +1983,7 @@ func TestStreamingIngestion(t *testing.T) {
 				return
 			}
 
-			stmt := test.stmt.MustParameters(
-				kusto.NewParameters().Must(
-					kusto.QueryValues{"tableName": tableName},
-				),
-			)
-
-			if err := waitForIngest(t, ctx, client, testConfig.Database, stmt, test.doer, test.want, test.gotInit); err != nil {
+			if err := waitForIngest(t, ctx, client, testConfig.Database, tableName, test.stmt, test.doer, test.want, test.gotInit); err != nil {
 				t.Errorf("TestStreamingIngestion(%s): %s", test.desc, err)
 			}
 		})
@@ -1444,7 +1992,8 @@ func TestStreamingIngestion(t *testing.T) {
 
 func TestError(t *testing.T) {
 	t.Parallel()
-	client, err := kusto.New(testConfig.Endpoint, testConfig.Authorizer)
+
+	client, err := kusto.New(testConfig.kcsb)
 	require.NoError(t, err)
 
 	t.Cleanup(func() {
@@ -1453,12 +2002,11 @@ func TestError(t *testing.T) {
 		t.Log("Closed client")
 	})
 
-	_, err = client.Query(context.Background(), testConfig.Database, pCountStmt.MustParameters(
-		kusto.NewParameters().Must(kusto.QueryValues{"tableName": uuid.New().String()}),
-	))
+	_, err = client.Query(context.Background(), testConfig.Database, kql.New("table(tableName) | count"),
+		kusto.QueryParameters(kql.NewParameters().AddString("tableName", uuid.NewString())))
 
 	kustoError, ok := errors.GetKustoError(err)
-	assert.True(t, ok)
+	require.True(t, ok)
 	assert.Equal(t, errors.OpQuery, kustoError.Op)
 	assert.Equal(t, errors.KHTTPError, kustoError.Kind)
 	assert.True(t, strings.Contains(kustoError.Error(), "Failed to resolve table expression"))
@@ -1497,6 +2045,44 @@ func assertErrorsMatch(t *testing.T, got, want error) bool {
 	return assert.Equal(t, want, got)
 }
 
+func TestNoRedirects(t *testing.T) {
+	redirectCodes := []int{301, 302, 307, 308}
+	for _, code := range redirectCodes {
+		code := code
+		t.Run(fmt.Sprintf("Fail at cloud %d", code), func(t *testing.T) {
+			t.Parallel()
+			client, err := kusto.New(kusto.NewConnectionStringBuilder(fmt.Sprintf("https://statusreturner.azurewebsites.net/nocloud/%d", code)).WithDefaultAzureCredential())
+			require.NoError(t, err)
+			t.Cleanup(func() {
+				t.Log("Closing client")
+				require.NoError(t, client.Close())
+				t.Log("Closed client")
+			})
+
+			_, err = client.Query(context.Background(), "db", kql.New("table"))
+			require.Error(t, err)
+			assert.Contains(t, err.Error(), fmt.Sprintf("%d", code))
+		})
+
+		t.Run(fmt.Sprintf("Fail at client %d", code), func(t *testing.T) {
+			t.Parallel()
+			client, err := kusto.New(kusto.NewConnectionStringBuilder(fmt.Sprintf("https://statusreturner.azurewebsites.net/%d", code)).WithDefaultAzureCredential())
+			require.NoError(t, err)
+			t.Cleanup(func() {
+				t.Log("Closing client")
+				require.NoError(t, client.Close())
+				t.Log("Closed client")
+			})
+
+			_, err = client.Query(context.Background(), "db", kql.New("table"))
+			require.Error(t, err)
+			convErr, ok := err.(*errors.HttpError)
+			require.True(t, ok)
+			assert.Equal(t, code, convErr.StatusCode)
+		})
+	}
+}
+
 func getExpectedResult() AllDataType {
 	t, err := time.Parse(time.RFC3339Nano, "2020-03-04T14:05:01.3109965Z")
 	if err != nil {
@@ -1533,30 +2119,31 @@ func getExpectedResult() AllDataType {
 	}
 }
 
-func createIngestionTable(t *testing.T, client *kusto.Client, tableName string, withInitialRow bool) error {
-	return createIngestionTableWithDB(t, client, testConfig.Database, tableName, withInitialRow)
+func createIngestionTable(t *testing.T, client *kusto.Client, tableName string, isAllTypes bool) error {
+	return createIngestionTableWithDB(t, client, testConfig.Database, tableName, isAllTypes)
 }
 
-func createIngestionTableWithDB(t *testing.T, client *kusto.Client, database string, tableName string, withInitialRow bool) error {
+func createIngestionTableWithDB(t *testing.T, client *kusto.Client, database string, tableName string, isAllTypes bool) error {
 	defaultScheme := "(header_time: datetime, header_id: guid, header_api_version: string, payload_data: string, payload_user: string)"
-	return createIngestionTableWithDBAndScheme(t, client, database, tableName, withInitialRow, defaultScheme)
+	return createIngestionTableWithDBAndScheme(t, client, database, tableName, isAllTypes, defaultScheme)
 }
 
-func createIngestionTableWithDBAndScheme(t *testing.T, client *kusto.Client, database string, tableName string, withInitialRow bool, scheme string) error {
+func createIngestionTableWithDBAndScheme(t *testing.T, client *kusto.Client, database string, tableName string, isAllTypes bool, scheme string) error {
 	t.Logf("Creating ingestion table %s", tableName)
-	dropUnsafe := kusto.NewStmt(".drop table ", kusto.UnsafeStmt(unsafe.Stmt{Add: true})).UnsafeAdd(tableName).Add(" ifexists")
-	var createUnsafe kusto.Stmt
-	if withInitialRow {
-		createUnsafe = kusto.NewStmt(".set ", kusto.UnsafeStmt(unsafe.Stmt{Add: true})).UnsafeAdd(tableName).Add(" <| AllDataTypes")
+	dropUnsafe := kql.New(".drop table ").AddTable(tableName).AddLiteral(" ifexists")
+	var createUnsafe kusto.Statement
+	if isAllTypes {
+		createUnsafe = kql.New(".set ").AddTable(tableName).AddLiteral(" <| datatable(vnum:int, vdec:decimal, vdate:datetime, vspan:timespan, vobj:dynamic, vb:bool, vreal:real, vstr:string, vlong:long, vguid:guid)\n[\n    1, decimal(2.00000000000001), datetime(2020-03-04T14:05:01.3109965Z), time(01:23:45.6789000), dynamic({\n  \"moshe\": \"value\"\n}), true, 0.01, \"asdf\", 9223372036854775807, guid(74be27de-1e4e-49d9-b579-fe0b331d3642), \n]")
 	} else {
-		createUnsafe = kusto.NewStmt(".create table ", kusto.UnsafeStmt(unsafe.Stmt{Add: true})).UnsafeAdd(tableName).UnsafeAdd(" " + scheme + " ")
+		createUnsafe = kql.New(".create table ").AddTable(tableName).AddUnsafe(" " + scheme + " ")
 	}
 
-	addMappingUnsafe := kusto.NewStmt(".create table ", kusto.UnsafeStmt(unsafe.Stmt{Add: true})).UnsafeAdd(tableName).Add(" ingestion json mapping 'Logs_mapping' '[{\"column\":\"header_time\",\"path\":\"$.header.time\",\"datatype\":\"datetime\"},{\"column\":\"header_id\",\"path\":\"$.header.id\",\"datatype\":\"guid\"},{\"column\":\"header_api_version\",\"path\":\"$.header.api_version\",\"datatype\":\"string\"},{\"column\":\"payload_data\",\"path\":\"$.payload.data\",\"datatype\":\"string\"},{\"column\":\"payload_user\",\"path\":\"$.payload.user\",\"datatype\":\"string\"}]'")
+	addMappingUnsafe := kql.New(".create table ").AddTable(tableName).AddLiteral(" ingestion json mapping 'Logs_mapping' '[{\"column\":\"header_time\",\"path\":\"$.header.time\",\"datatype\":\"datetime\"},{\"column\":\"header_id\",\"path\":\"$.header.id\",\"datatype\":\"guid\"},{\"column\":\"header_api_version\",\"path\":\"$.header.api_version\",\"datatype\":\"string\"},{\"column\":\"payload_data\",\"path\":\"$.payload.data\",\"datatype\":\"string\"},{\"column\":\"payload_user\",\"path\":\"$.payload.user\",\"datatype\":\"string\"}]'")
 
 	t.Cleanup(func() {
 		t.Logf("Dropping ingestion table %s", tableName)
 		_ = executeCommands(client, database, dropUnsafe)
+		t.Logf("Dropped ingestion table %s", tableName)
 	})
 
 	return executeCommands(client, database, dropUnsafe, createUnsafe, addMappingUnsafe, clearStreamingCacheStatement)
@@ -1675,9 +2262,9 @@ func createStringyLogsData() string {
 		"{\"header\":{\"time\":\"24-Aug-18 09:42:56\", \"id\":\"e52cd01e-6984-4821-a4aa-a97c334517e5\", \"api_version\":\"v2\"}, \"payload\":{\"data\":\"LEWDDGKXFGMRTFITKCWYH\", \"user\":\"owild@fabrikam.com\"}}\n"
 }
 
-func executeCommands(client *kusto.Client, database string, commandsToRun ...kusto.Stmt) error {
+func executeCommands(client *kusto.Client, database string, commandsToRun ...kusto.Statement) error {
 	for _, cmd := range commandsToRun {
-		if _, err := client.Mgmt(context.Background(), database, cmd, kusto.AllowWrite()); err != nil {
+		if _, err := client.Mgmt(context.Background(), database, cmd); err != nil {
 			return err
 		}
 	}
@@ -1685,7 +2272,7 @@ func executeCommands(client *kusto.Client, database string, commandsToRun ...kus
 	return nil
 }
 
-func waitForIngest(t *testing.T, ctx context.Context, client *kusto.Client, database string, stmt kusto.Stmt, doer func(row *table.Row, update interface{}) error, want interface{}, gotInit func() interface{}) error {
+func waitForIngest(t *testing.T, ctx context.Context, client *kusto.Client, database string, tableName string, stmt kusto.Statement, doer func(row *table.Row, update interface{}) error, want interface{}, gotInit func() interface{}) error {
 
 	deadline := time.Now().Add(1 * time.Minute)
 
@@ -1701,7 +2288,15 @@ func waitForIngest(t *testing.T, ctx context.Context, client *kusto.Client, data
 			}
 			failed = false
 
-			iter, err := client.Query(ctx, database, stmt)
+			var iter *kusto.RowIterator
+			var err error
+
+			if tableName != "" {
+				params := kusto.QueryParameters(kql.NewParameters().AddString("tableName", tableName))
+				iter, err = client.Query(ctx, database, stmt, params)
+			} else {
+				iter, err = client.Query(ctx, database, stmt)
+			}
 			if err != nil {
 				return false, err
 			}
@@ -1761,4 +2356,8 @@ func isASCII(s string) bool {
 		}
 	}
 	return true
+}
+
+func TestMain(m *testing.M) {
+	goleak.VerifyTestMain(m)
 }

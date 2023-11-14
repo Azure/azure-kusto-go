@@ -2,6 +2,7 @@
 package v2
 
 import (
+	"fmt"
 	"github.com/Azure/azure-kusto-go/kusto/data/errors"
 	"github.com/Azure/azure-kusto-go/kusto/data/table"
 	"github.com/Azure/azure-kusto-go/kusto/data/value"
@@ -85,9 +86,10 @@ type DataSetCompletion struct {
 	// Cancelled indicates that the request was cancelled.
 	Cancelled bool
 	// OneAPIErrors is a list of errors encountered.
-	OneAPIErrors []string `json:"OneApiErrors"`
+	OneAPIErrors []interface{} `json:"OneApiErrors"`
 
-	Op errors.Op `json:"-"`
+	Error errors.Error
+	Op    errors.Op `json:"-"`
 }
 
 // IsFrame implements frame.Frame.
@@ -95,7 +97,16 @@ func (DataSetCompletion) IsFrame() {}
 
 // UnmarshalRaw unmarshals the raw JSON representing a DataSetCompletion.
 func (d *DataSetCompletion) UnmarshalRaw(raw json.RawMessage) error {
-	return json.Unmarshal(raw, &d)
+	err := json.Unmarshal(raw, &d)
+	if err != nil {
+		err = errors.GetCombinedError(fmt.Errorf("json parsing failed: %v", string(raw)), err)
+	} else {
+		if d.HasErrors {
+			d.Error = *errors.OneToErr(map[string]interface{}{"OneApiErrors": d.OneAPIErrors}, d.Op)
+		}
+	}
+
+	return err
 }
 
 // TableHeader indicates that instead of receiving a dataTable, we will receive a

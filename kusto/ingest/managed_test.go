@@ -6,7 +6,6 @@ import (
 	goErrors "errors"
 	"fmt"
 	"io"
-	"io/ioutil"
 	"strings"
 	"testing"
 	"time"
@@ -22,9 +21,9 @@ import (
 	"github.com/stretchr/testify/require"
 )
 
-type testMgmtFunc func(t *testing.T, ctx context.Context, db string, query kusto.Stmt, options ...kusto.MgmtOption) (*kusto.RowIterator, error)
+type testMgmtFunc func(t *testing.T, ctx context.Context, db string, query kusto.Statement, options ...kusto.MgmtOption) (*kusto.RowIterator, error)
 
-func failIfQueuedCalled(t *testing.T, _ context.Context, _ string, query kusto.Stmt, _ ...kusto.MgmtOption) (*kusto.RowIterator, error) {
+func failIfQueuedCalled(t *testing.T, _ context.Context, _ string, query kusto.Statement, _ ...kusto.MgmtOption) (*kusto.RowIterator, error) {
 	// .get ingestion resources is always called in the ctor
 	if query.String() == ".get ingestion resources" {
 		return nil, nil
@@ -45,7 +44,7 @@ func TestManaged(t *testing.T) {
 	bigData, _ := initFile(t, bigReader)
 	counter := 0
 
-	someBlobPath := "https://some-blob.windows.net/some-container/some-blob"
+	someBlobPath := "https://some-blob.blob.core.windows.net/some-container/some-blob;Managed_Identity="
 
 	tests := []struct {
 		name            string
@@ -64,11 +63,11 @@ func TestManaged(t *testing.T) {
 		{
 			name:    "TestManagedStreamingDefault",
 			options: []FileOption{},
-			onStreamIngest: func(t *testing.T, ctx context.Context, db, table string, payload io.Reader, format properties.DataFormat, mappingName string,
-				clientRequestId string) error {
+			onStreamIngest: func(t *testing.T, ctx context.Context, db, table string, payload io.Reader, format kusto.DataFormatForStreaming, mappingName string,
+				clientRequestId string, isBlobUri bool) error {
 				assert.Equal(t, "defaultDb", db)
 				assert.Equal(t, "defaultTable", table)
-				payloadBytes, err := ioutil.ReadAll(payload)
+				payloadBytes, err := io.ReadAll(payload)
 				assert.NoError(t, err)
 				assert.Equal(t, compressedBytes, payloadBytes)
 				assert.Equal(t, properties.CSV, format)
@@ -88,11 +87,11 @@ func TestManaged(t *testing.T) {
 				Database("otherDb"),
 				Table("otherTable"),
 			},
-			onStreamIngest: func(t *testing.T, ctx context.Context, db, table string, payload io.Reader, format properties.DataFormat, mappingName string,
-				clientRequestId string) error {
+			onStreamIngest: func(t *testing.T, ctx context.Context, db, table string, payload io.Reader, format kusto.DataFormatForStreaming, mappingName string,
+				clientRequestId string, isBlobUri bool) error {
 				assert.Equal(t, "otherDb", db)
 				assert.Equal(t, "otherTable", table)
-				payloadBytes, err := ioutil.ReadAll(payload)
+				payloadBytes, err := io.ReadAll(payload)
 				assert.NoError(t, err)
 				assert.Equal(t, compressedBytes, payloadBytes)
 				assert.Equal(t, properties.CSV, format)
@@ -100,7 +99,7 @@ func TestManaged(t *testing.T) {
 				parts := strings.Split(clientRequestId, ";")
 				assert.Equal(t, "KGC.executeManagedStreamingIngest", parts[0])
 				_, err = uuid.Parse(parts[1])
-				return nil
+				return err
 			},
 			onMgmt:          failIfQueuedCalled,
 			expectedCounter: 1,
@@ -110,11 +109,11 @@ func TestManaged(t *testing.T) {
 			options: []FileOption{
 				FileFormat(properties.JSON),
 			},
-			onStreamIngest: func(t *testing.T, ctx context.Context, db, table string, payload io.Reader, format properties.DataFormat, mappingName string,
-				clientRequestId string) error {
+			onStreamIngest: func(t *testing.T, ctx context.Context, db, table string, payload io.Reader, format kusto.DataFormatForStreaming, mappingName string,
+				clientRequestId string, isBlobUri bool) error {
 				assert.Equal(t, "defaultDb", db)
 				assert.Equal(t, "defaultTable", table)
-				payloadBytes, err := ioutil.ReadAll(payload)
+				payloadBytes, err := io.ReadAll(payload)
 				assert.NoError(t, err)
 				assert.Equal(t, compressedBytes, payloadBytes)
 				assert.Equal(t, properties.JSON, format)
@@ -122,7 +121,7 @@ func TestManaged(t *testing.T) {
 				parts := strings.Split(clientRequestId, ";")
 				assert.Equal(t, "KGC.executeManagedStreamingIngest", parts[0])
 				_, err = uuid.Parse(parts[1])
-				return nil
+				return err
 			},
 			onMgmt:          failIfQueuedCalled,
 			expectedCounter: 1,
@@ -133,11 +132,11 @@ func TestManaged(t *testing.T) {
 				IngestionMappingRef("mapping", properties.CSV),
 				ClientRequestId("clientRequestId"),
 			},
-			onStreamIngest: func(t *testing.T, ctx context.Context, db, table string, payload io.Reader, format properties.DataFormat, mappingName string,
-				clientRequestId string) error {
+			onStreamIngest: func(t *testing.T, ctx context.Context, db, table string, payload io.Reader, format kusto.DataFormatForStreaming, mappingName string,
+				clientRequestId string, isBlobUri bool) error {
 				assert.Equal(t, "defaultDb", db)
 				assert.Equal(t, "defaultTable", table)
-				payloadBytes, err := ioutil.ReadAll(payload)
+				payloadBytes, err := io.ReadAll(payload)
 				assert.NoError(t, err)
 				assert.Equal(t, compressedBytes, payloadBytes)
 				assert.Equal(t, properties.CSV, format)
@@ -151,11 +150,11 @@ func TestManaged(t *testing.T) {
 		{
 			name:    "TestPermanentError",
 			options: []FileOption{},
-			onStreamIngest: func(t *testing.T, ctx context.Context, db, table string, payload io.Reader, format properties.DataFormat, mappingName string,
-				clientRequestId string) error {
+			onStreamIngest: func(t *testing.T, ctx context.Context, db, table string, payload io.Reader, format kusto.DataFormatForStreaming, mappingName string,
+				clientRequestId string, isBlobUri bool) error {
 				assert.Equal(t, "defaultDb", db)
 				assert.Equal(t, "defaultTable", table)
-				payloadBytes, err := ioutil.ReadAll(payload)
+				payloadBytes, err := io.ReadAll(payload)
 				assert.NoError(t, err)
 				assert.Equal(t, compressedBytes, payloadBytes)
 				assert.Equal(t, properties.CSV, format)
@@ -173,11 +172,11 @@ func TestManaged(t *testing.T) {
 		{
 			name:    "TestPermanentErrorNotKusto",
 			options: []FileOption{},
-			onStreamIngest: func(t *testing.T, ctx context.Context, db, table string, payload io.Reader, format properties.DataFormat, mappingName string,
-				clientRequestId string) error {
+			onStreamIngest: func(t *testing.T, ctx context.Context, db, table string, payload io.Reader, format kusto.DataFormatForStreaming, mappingName string,
+				clientRequestId string, isBlobUri bool) error {
 				assert.Equal(t, "defaultDb", db)
 				assert.Equal(t, "defaultTable", table)
-				payloadBytes, err := ioutil.ReadAll(payload)
+				payloadBytes, err := io.ReadAll(payload)
 				assert.NoError(t, err)
 				assert.Equal(t, compressedBytes, payloadBytes)
 				assert.Equal(t, properties.CSV, format)
@@ -195,11 +194,11 @@ func TestManaged(t *testing.T) {
 		{
 			name:    "TestSingleTransientError",
 			options: []FileOption{},
-			onStreamIngest: func(t *testing.T, ctx context.Context, db, table string, payload io.Reader, format properties.DataFormat, mappingName string,
-				clientRequestId string) error {
+			onStreamIngest: func(t *testing.T, ctx context.Context, db, table string, payload io.Reader, format kusto.DataFormatForStreaming, mappingName string,
+				clientRequestId string, isBlobUri bool) error {
 				assert.Equal(t, "defaultDb", db)
 				assert.Equal(t, "defaultTable", table)
-				payloadBytes, err := ioutil.ReadAll(payload)
+				payloadBytes, err := io.ReadAll(payload)
 				assert.NoError(t, err)
 				assert.Equal(t, compressedBytes, payloadBytes)
 				assert.Equal(t, properties.CSV, format)
@@ -219,11 +218,11 @@ func TestManaged(t *testing.T) {
 		{
 			name:    "TestMultipleTransientErrors",
 			options: []FileOption{},
-			onStreamIngest: func(t *testing.T, ctx context.Context, db, table string, payload io.Reader, format properties.DataFormat, mappingName string,
-				clientRequestId string) error {
+			onStreamIngest: func(t *testing.T, ctx context.Context, db, table string, payload io.Reader, format kusto.DataFormatForStreaming, mappingName string,
+				clientRequestId string, isBlobUri bool) error {
 				assert.Equal(t, "defaultDb", db)
 				assert.Equal(t, "defaultTable", table)
-				payloadBytes, err := ioutil.ReadAll(payload)
+				payloadBytes, err := io.ReadAll(payload)
 				assert.NoError(t, err)
 				assert.Equal(t, compressedBytes, payloadBytes)
 				assert.Equal(t, properties.CSV, format)
@@ -234,7 +233,7 @@ func TestManaged(t *testing.T) {
 				assert.NoError(t, err)
 				return errors.E(errors.OpIngestStream, errors.KHTTPError, fmt.Errorf("error"))
 			},
-			onMgmt: func(t *testing.T, ctx context.Context, db string, query kusto.Stmt, options ...kusto.MgmtOption) (*kusto.RowIterator, error) {
+			onMgmt: func(t *testing.T, ctx context.Context, db string, query kusto.Statement, options ...kusto.MgmtOption) (*kusto.RowIterator, error) {
 				// .get ingestion resources is always called in the ctor
 				if query.String() == ".get ingestion resources" {
 					return resources.SuccessfulFakeResources().Mgmt(ctx, db, query, options...)
@@ -250,7 +249,7 @@ func TestManaged(t *testing.T) {
 				counter++
 				assert.Equal(t, "defaultDb", props.Ingestion.DatabaseName)
 				assert.Equal(t, "defaultTable", props.Ingestion.TableName)
-				all, err := ioutil.ReadAll(reader)
+				all, err := io.ReadAll(reader)
 				assert.NoError(t, err)
 				assert.Equal(t, compressedBytes, all)
 				return "", nil
@@ -262,12 +261,12 @@ func TestManaged(t *testing.T) {
 			name:      "TestBigFile",
 			options:   []FileOption{},
 			isBigFile: true,
-			onStreamIngest: func(t *testing.T, ctx context.Context, db, table string, payload io.Reader, format properties.DataFormat, mappingName string,
-				clientRequestId string) error {
+			onStreamIngest: func(t *testing.T, ctx context.Context, db, table string, payload io.Reader, format kusto.DataFormatForStreaming, mappingName string,
+				clientRequestId string, isBlobUri bool) error {
 				require.Fail(t, "Big file shouldn't try to stream")
 				return errors.E(errors.OpIngestStream, errors.KHTTPError, fmt.Errorf("error"))
 			},
-			onMgmt: func(t *testing.T, ctx context.Context, db string, query kusto.Stmt, options ...kusto.MgmtOption) (*kusto.RowIterator, error) {
+			onMgmt: func(t *testing.T, ctx context.Context, db string, query kusto.Statement, options ...kusto.MgmtOption) (*kusto.RowIterator, error) {
 				// .get ingestion resources is always called in the ctor
 				if query.String() == ".get ingestion resources" {
 					return resources.SuccessfulFakeResources().Mgmt(ctx, db, query, options...)
@@ -283,7 +282,7 @@ func TestManaged(t *testing.T) {
 				counter++
 				assert.Equal(t, "defaultDb", props.Ingestion.DatabaseName)
 				assert.Equal(t, "defaultTable", props.Ingestion.TableName)
-				all, err := ioutil.ReadAll(reader)
+				all, err := io.ReadAll(reader)
 				assert.NoError(t, err)
 				assert.Equal(t, bigData, all)
 				return "", nil
@@ -293,14 +292,12 @@ func TestManaged(t *testing.T) {
 		},
 		{
 			name:     "TestBlob",
-			options:  []FileOption{},
 			blobPath: someBlobPath,
-			onStreamIngest: func(t *testing.T, ctx context.Context, db, table string, payload io.Reader, format properties.DataFormat, mappingName string,
-				clientRequestId string) error {
-				require.Fail(t, "Big file shouldn't try to stream")
+			onStreamIngest: func(t *testing.T, ctx context.Context, db, table string, payload io.Reader, format kusto.DataFormatForStreaming, mappingName string,
+				clientRequestId string, isBlobUri bool) error {
 				return errors.E(errors.OpIngestStream, errors.KHTTPError, fmt.Errorf("error"))
 			},
-			onMgmt: func(t *testing.T, ctx context.Context, db string, query kusto.Stmt, options ...kusto.MgmtOption) (*kusto.RowIterator, error) {
+			onMgmt: func(t *testing.T, ctx context.Context, db string, query kusto.Statement, options ...kusto.MgmtOption) (*kusto.RowIterator, error) {
 				// .get ingestion resources is always called in the ctor
 				if query.String() == ".get ingestion resources" {
 					return resources.SuccessfulFakeResources().Mgmt(ctx, db, query, options...)
@@ -327,8 +324,8 @@ func TestManaged(t *testing.T) {
 	for _, test := range tests {
 		t.Run(test.name, func(t *testing.T) {
 			streamIngestor := fakeStreamIngestor{
-				onStreamIngest: func(ctx context.Context, db, table string, payload io.Reader, format properties.DataFormat, mappingName string, clientRequestId string) error {
-					err := test.onStreamIngest(t, ctx, db, table, payload, format, mappingName, clientRequestId)
+				onStreamIngest: func(ctx context.Context, db, table string, payload io.Reader, format kusto.DataFormatForStreaming, mappingName string, clientRequestId string, isBlobUri bool) error {
+					err := test.onStreamIngest(t, ctx, db, table, payload, format, mappingName, clientRequestId, isBlobUri)
 					counter++
 					return err
 				},
@@ -336,7 +333,7 @@ func TestManaged(t *testing.T) {
 			mockClient := mockClient{
 				endpoint: "https://test.kusto.windows.net",
 				auth:     kusto.Authorization{},
-				onMgmt: func(ctx context.Context, db string, query kusto.Stmt, options ...kusto.MgmtOption) (*kusto.RowIterator, error) {
+				onMgmt: func(ctx context.Context, db string, query kusto.Statement, options ...kusto.MgmtOption) (*kusto.RowIterator, error) {
 					if test.onMgmt == nil {
 						return nil, nil
 					}
@@ -433,13 +430,13 @@ func TestManaged(t *testing.T) {
 }
 
 func initFile(t *testing.T, reader *bytes.Reader) ([]byte, []byte) {
-	data, err := ioutil.ReadAll(reader)
+	data, err := io.ReadAll(reader)
 
 	require.NoError(t, err)
 
 	compressedBuffer := gzip.New()
 	compressedBuffer.Reset(io.NopCloser(bytes.NewReader(data)))
-	compressedBytes, err := ioutil.ReadAll(compressedBuffer)
+	compressedBytes, err := io.ReadAll(compressedBuffer)
 	require.NoError(t, err)
 
 	seek, err := reader.Seek(0, io.SeekStart)

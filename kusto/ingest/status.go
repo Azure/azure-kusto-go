@@ -58,7 +58,7 @@ func (i StatusCode) IsSuccess() bool {
 	}
 }
 
-// FailureStatusCode indicates the status of failuted ingestion attempts
+// FailureStatusCode indicates the status of failed ingestion attempts
 type FailureStatusCode string
 
 const (
@@ -83,7 +83,7 @@ func (i FailureStatusCode) IsRetryable() bool {
 	}
 }
 
-// statusRecord is a record containing information regarding the status of an ingation command
+// statusRecord is a record containing information regarding the status of an ingestion command
 type statusRecord struct {
 	// Status is The ingestion status returned from the service. Status remains 'Pending' during the ingestion process and
 	// is updated by the service once the ingestion completes. When <see cref="IngestionReportMethod"/> is set to 'Queue', the ingestion status
@@ -162,7 +162,7 @@ func (r *statusRecord) FromProps(props properties.All) {
 	r.UpdatedOn = time.Now()
 
 	if props.Ingestion.BlobPath != "" && r.IngestionSourcePath == undefinedString {
-		r.IngestionSourcePath = props.Ingestion.BlobPath
+		r.IngestionSourcePath = properties.RemoveQueryParamsFromUrl(props.Ingestion.BlobPath)
 	}
 }
 
@@ -178,7 +178,7 @@ func (r *statusRecord) FromMap(data map[string]interface{}) {
 		r.FailureStatus = FailureStatusCode(strStatus)
 	}
 
-	r.IngestionSourcePath = safeGetString(data, "IngestionSourcePath")
+	r.IngestionSourcePath = properties.RemoveQueryParamsFromUrl(safeGetString(data, "IngestionSourcePath"))
 	r.Database = safeGetString(data, "Database")
 	r.Table = safeGetString(data, "Table")
 	r.ErrorCode = safeGetString(data, "ErrorCode")
@@ -217,7 +217,7 @@ func (r *statusRecord) ToMap() map[string]interface{} {
 	// Those will be read from the server if they have data in them
 	data["Status"] = r.Status
 	data["IngestionSourceId"] = r.IngestionSourceID
-	data["IngestionSourcePath"] = r.IngestionSourcePath
+	data["IngestionSourcePath"] = properties.RemoveQueryParamsFromUrl(r.IngestionSourcePath)
 	data["Database"] = r.Database
 	data["Table"] = r.Table
 	data["UpdatedOn"] = r.UpdatedOn.Format(time.RFC3339Nano)
@@ -248,12 +248,12 @@ func (r statusRecord) Error() string {
 }
 
 func getTimeFromInterface(x interface{}) (time.Time, error) {
-	switch x.(type) {
+	switch x := x.(type) {
 	case string:
-		return time.Parse(time.RFC3339Nano, x.(string))
+		return time.Parse(time.RFC3339Nano, x)
 
 	case time.Time:
-		return x.(time.Time), nil
+		return x, nil
 
 	default:
 		return time.Now(), fmt.Errorf("getTimeFromInterface: Unexpected format %T", x)
@@ -267,12 +267,12 @@ func getGoogleUUIDFromInterface(data map[string]interface{}, key string) uuid.UU
 		return uuid.Nil
 	}
 
-	switch x.(type) {
+	switch x := x.(type) {
 	case uuid.UUID:
-		return x.(uuid.UUID)
+		return x
 
 	case string:
-		uid, err := uuid.Parse(x.(string))
+		uid, err := uuid.Parse(x)
 		if err != nil {
 			return uuid.Nil
 		}
@@ -280,7 +280,7 @@ func getGoogleUUIDFromInterface(data map[string]interface{}, key string) uuid.UU
 		return uid
 
 	case storageuid.UUID:
-		uid, err := uuid.ParseBytes(x.(storageuid.UUID).Bytes())
+		uid, err := uuid.ParseBytes(x.Bytes())
 		if err != nil {
 			return uuid.Nil
 		}

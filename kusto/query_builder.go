@@ -27,8 +27,6 @@ import (
 // This allows us to enforce the use of constants or strings built with injection protection.
 type stringConstant string
 
-func (s stringConstant) isStringConstant() {}
-
 // String implements fmt.Stringer.
 func (s stringConstant) String() string {
 	return string(s)
@@ -147,13 +145,13 @@ func (p ParamType) string() string {
 			return p.name + ":bool"
 		}
 		v := p.Default.(bool)
-		return fmt.Sprintf("%s:bool = %v", p.name, v)
+		return fmt.Sprintf("%s:bool = bool(%v)", p.name, v)
 	case types.DateTime:
 		if p.Default == nil {
 			return p.name + ":datetime"
 		}
 		v := p.Default.(time.Time)
-		return fmt.Sprintf("%s:datetime = %s", p.name, v.Format(time.RFC3339Nano))
+		return fmt.Sprintf("%s:datetime = datetime(%s)", p.name, v.Format(time.RFC3339Nano))
 	case types.Dynamic:
 		return p.name + ":dynamic"
 	case types.GUID:
@@ -161,37 +159,37 @@ func (p ParamType) string() string {
 			return p.name + ":guid"
 		}
 		v := p.Default.(uuid.UUID)
-		return fmt.Sprintf("%s:guid = %s", p.name, v.String())
+		return fmt.Sprintf("%s:guid = guid(%s)", p.name, v.String())
 	case types.Int:
 		if p.Default == nil {
 			return p.name + ":int"
 		}
 		v := p.Default.(int32)
-		return fmt.Sprintf("%s:int = %d", p.name, v)
+		return fmt.Sprintf("%s:int = int(%d)", p.name, v)
 	case types.Long:
 		if p.Default == nil {
 			return p.name + ":long"
 		}
 		v := p.Default.(int64)
-		return fmt.Sprintf("%s:long = %d", p.name, v)
+		return fmt.Sprintf("%s:long = long(%d)", p.name, v)
 	case types.Real:
 		if p.Default == nil {
 			return p.name + ":real"
 		}
 		v := p.Default.(float64)
-		return fmt.Sprintf("%s:real = %f", p.name, v)
+		return fmt.Sprintf("%s:real = real(%f)", p.name, v)
 	case types.String:
 		if p.Default == nil {
 			return p.name + ":string"
 		}
 		v := p.Default.(string)
-		return fmt.Sprintf(`%s:string = "%s"`, p.name, v)
+		return fmt.Sprintf(`%s:string = "%s"`, p.name, v) // TODO - escape the string when we have the functionaity
 	case types.Timespan:
 		if p.Default == nil {
 			return p.name + ":timespan"
 		}
 		v := p.Default.(time.Duration)
-		return fmt.Sprintf("%s:timespan = %s", p.name, value.Timespan{Value: v, Valid: true}.Marshal())
+		return fmt.Sprintf("%s:timespan = timespan(%s)", p.name, value.Timespan{Value: v, Valid: true}.Marshal())
 	case types.Decimal:
 		if p.Default == nil {
 			return p.name + ":decimal"
@@ -204,7 +202,7 @@ func (p ParamType) string() string {
 		case *big.Float:
 			sval = v.String()
 		}
-		return fmt.Sprintf("%s:decimal = %s", p.name, sval)
+		return fmt.Sprintf("%s:decimal = decimal(%s)", p.name, sval)
 	}
 	panic("internal bug: ParamType.string() called without a call to .validate()")
 }
@@ -338,10 +336,7 @@ func NewParameters() Parameters {
 
 // IsZero returns if Parameters is the zero value.
 func (q Parameters) IsZero() bool {
-	if len(q.m) == 0 {
-		return true
-	}
-	return false
+	return len(q.m) == 0
 }
 
 // With returns a Parameters set to "values". values' keys represents Definitions names
@@ -452,11 +447,11 @@ func (q Parameters) validate(p Definitions) (Parameters, error) {
 			if !ok {
 				return q, fmt.Errorf("Parameters[%s](string) = %T, which is not a string", k, v)
 			}
-			out[k] = fmt.Sprintf("%s", s)
+			out[k] = fmt.Sprint(s)
 		case types.Timespan:
 			d, ok := v.(time.Duration)
 			if !ok {
-				return q, fmt.Errorf("Parameters[%s](timespan) = %T, which is not a time.Duration", k, v)
+				return q, fmt.Errorf("parameters[%s](timespan) = %T, which is not a time.Duration", k, v)
 			}
 			out[k] = fmt.Sprintf("timespan(%s)", value.Timespan{Value: d, Valid: true}.Marshal())
 		case types.Decimal:
@@ -478,6 +473,13 @@ func (q Parameters) validate(p Definitions) (Parameters, error) {
 	return q, nil
 }
 
+// Statement is an interface designated to generalize query/management objects - both Stmt, and kql.StatementBuilder
+type Statement interface {
+	fmt.Stringer
+	GetParameters() (map[string]string, error)
+	SupportsInlineParameters() bool
+}
+
 // Stmt is a Kusto Query statement. A Stmt is thread-safe, but methods on the Stmt are not.
 // All methods on a Stmt do not alter the statement, they return a new Stmt object with the changes.
 // This includes a copy of the Definitions and Parameters objects, if provided.  This allows a
@@ -492,6 +494,13 @@ type Stmt struct {
 // StmtOption is an optional argument to NewStmt().
 type StmtOption func(s *Stmt)
 
+func (s Stmt) GetParameters() (map[string]string, error) {
+	return s.params.toParameters(s.defs)
+}
+func (s Stmt) SupportsInlineParameters() bool {
+	return true
+}
+
 // UnsafeStmt enables unsafe actions on a Stmt and all Stmts derived from that Stmt.
 // This turns off safety features that could allow a service client to compromise your data store.
 // USE AT YOUR OWN RISK!
@@ -502,6 +511,7 @@ func UnsafeStmt(options unsafe.Stmt) StmtOption {
 	}
 }
 
+// Deprecated: Use kql.New and kql.NewParameters instead.
 // NewStmt creates a Stmt from a string constant.
 func NewStmt(query stringConstant, options ...StmtOption) Stmt {
 	s := Stmt{queryStr: query.String()}

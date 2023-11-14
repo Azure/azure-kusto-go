@@ -7,8 +7,9 @@ import (
 	"io"
 	"sync"
 
+	"github.com/Azure/azure-kusto-go/kusto"
+
 	"github.com/Azure/azure-kusto-go/kusto/data/errors"
-	"github.com/Azure/azure-kusto-go/kusto/ingest/internal/conn"
 	"github.com/Azure/azure-kusto-go/kusto/ingest/internal/properties"
 	"github.com/Azure/azure-kusto-go/kusto/ingest/internal/queued"
 	"github.com/Azure/azure-kusto-go/kusto/ingest/internal/resources"
@@ -32,7 +33,7 @@ type Ingestion struct {
 	fs queued.Queued
 
 	connMu     sync.Mutex
-	streamConn *conn.Conn
+	streamConn streamIngestor
 
 	bufferSize int
 	maxBuffers int
@@ -67,7 +68,7 @@ func New(client QueryClient, db, table string, options ...Option) (*Ingestion, e
 		option(i)
 	}
 
-	fs, err := queued.New(db, table, mgr, queued.WithStaticBuffer(i.bufferSize, i.maxBuffers))
+	fs, err := queued.New(db, table, mgr, client.HttpClient(), queued.WithStaticBuffer(i.bufferSize, i.maxBuffers))
 	if err != nil {
 		return nil, err
 	}
@@ -93,6 +94,18 @@ func (i *Ingestion) prepForIngestion(ctx context.Context, options []FileOption, 
 		}
 	}
 
+	if source == FromReader && props.Ingestion.Additional.Format == DFUnknown {
+		props.Ingestion.Additional.Format = CSV
+	}
+
+	if props.Ingestion.Additional.IngestionMappingType != DFUnknown && props.Ingestion.Additional.Format != props.Ingestion.Additional.IngestionMappingType {
+		return nil, properties.All{}, errors.ES(
+			errors.OpUnknown,
+			errors.KClientArgs,
+			"format and ingestion mapping type must match (hint: using ingestion mapping sets the format automatically)",
+		).SetNoRetry()
+	}
+
 	if props.Ingestion.ReportLevel != properties.None {
 		if props.Source.ID == uuid.Nil {
 			props.Source.ID = uuid.New()
@@ -112,7 +125,6 @@ func (i *Ingestion) prepForIngestion(ctx context.Context, options []FileOption, 
 			props.Ingestion.TableEntryRef.TableConnectionString = managerResources.Tables[0].URL().String()
 			props.Ingestion.TableEntryRef.PartitionKey = props.Source.ID.String()
 			props.Ingestion.TableEntryRef.RowKey = uuid.Nil.String()
-			break
 		}
 	}
 
@@ -151,7 +163,6 @@ func (i *Ingestion) fromFile(ctx context.Context, fPath string, options []FileOp
 	if local {
 		err = i.fs.Local(ctx, fPath, props)
 	} else {
-
 		err = i.fs.Blob(ctx, fPath, 0, props)
 	}
 
@@ -177,10 +188,6 @@ func (i *Ingestion) fromReader(ctx context.Context, reader io.Reader, options []
 		return nil, err
 	}
 
-	if props.Ingestion.Additional.Format == DFUnknown {
-		props.Ingestion.Additional.Format = CSV
-	}
-
 	path, err := i.fs.Reader(ctx, reader, props)
 	if err != nil {
 		return nil, err
@@ -191,7 +198,7 @@ func (i *Ingestion) fromReader(ctx context.Context, reader io.Reader, options []
 	return result, nil
 }
 
-// Deprecated: Stream usea streaming ingest client instead - `ingest.NewStreaming`.
+// Deprecated: Stream use a streaming ingest client instead - `ingest.NewStreaming`.
 // takes a payload that is encoded in format with a server stored mappingName, compresses it and uploads it to Kusto.
 // More information can be found here:
 // https://docs.microsoft.com/en-us/azure/kusto/management/create-ingestion-mapping-command
@@ -213,12 +220,12 @@ func (i *Ingestion) Stream(ctx context.Context, payload []byte, format DataForma
 		},
 	}
 
-	_, err = streamImpl(c, ctx, bytes.NewReader(payload), props)
+	_, err = streamImpl(c, ctx, bytes.NewReader(payload), props, false)
 
 	return err
 }
 
-func (i *Ingestion) getStreamConn() (*conn.Conn, error) {
+func (i *Ingestion) getStreamConn() (streamIngestor, error) {
 	i.connMu.Lock()
 	defer i.connMu.Unlock()
 
@@ -226,7 +233,7 @@ func (i *Ingestion) getStreamConn() (*conn.Conn, error) {
 		return i.streamConn, nil
 	}
 
-	sc, err := conn.New(i.client.Endpoint(), i.client.Auth(), i.client.HttpClient())
+	sc, err := kusto.NewConn(removeIngestPrefix(i.client.Endpoint()), i.client.Auth(), i.client.HttpClient(), i.client.ClientDetails())
 	if err != nil {
 		return nil, err
 	}

@@ -2,6 +2,7 @@ package kusto
 
 import (
 	"fmt"
+	"github.com/stretchr/testify/require"
 	"math/big"
 	"testing"
 	"time"
@@ -17,10 +18,14 @@ func TestParamType(t *testing.T) {
 	now := time.Now()
 	uu := uuid.New()
 
+	duration, err := time.ParseDuration("1h3m2s")
+	require.NoError(t, err)
+
 	tests := []struct {
 		desc    string
 		param   ParamType
 		err     bool
+		panic   bool
 		wantStr string
 	}{
 		{
@@ -28,7 +33,7 @@ func TestParamType(t *testing.T) {
 			param: ParamType{
 				Type: "notValid",
 			},
-			err: true,
+			panic: true,
 		},
 		{
 			desc: "Bad Default for types.Bool",
@@ -36,7 +41,7 @@ func TestParamType(t *testing.T) {
 				Type:    types.Bool,
 				Default: 1,
 			},
-			err: true,
+			panic: true,
 		},
 		{
 			desc: "Bad Default for types.DateTime",
@@ -44,7 +49,7 @@ func TestParamType(t *testing.T) {
 				Type:    types.DateTime,
 				Default: time.Duration(1),
 			},
-			err: true,
+			panic: true,
 		},
 		{
 			desc: "Bad Default for types.Dynamic",
@@ -52,7 +57,7 @@ func TestParamType(t *testing.T) {
 				Type:    types.Dynamic,
 				Default: `{}`, // This is valid JSON, but Dynamic can't have a default type
 			},
-			err: true,
+			panic: true,
 		},
 		{
 			desc: "Bad Default for types.GUID",
@@ -60,7 +65,7 @@ func TestParamType(t *testing.T) {
 				Type:    types.GUID,
 				Default: 1,
 			},
-			err: true,
+			panic: true,
 		},
 		{
 			desc: "Bad Default for types.Int",
@@ -68,7 +73,7 @@ func TestParamType(t *testing.T) {
 				Type:    types.Int,
 				Default: int64(1),
 			},
-			err: true,
+			panic: true,
 		},
 		{
 			desc: "Bad Default for types.Long",
@@ -76,7 +81,7 @@ func TestParamType(t *testing.T) {
 				Type:    "notValid",
 				Default: 1, // Should be an int
 			},
-			err: true,
+			panic: true,
 		},
 		{
 			desc: "Bad Default for types.Real",
@@ -84,7 +89,7 @@ func TestParamType(t *testing.T) {
 				Type:    types.Real,
 				Default: 1,
 			},
-			err: true,
+			panic: true,
 		},
 		{
 			desc: "Bad Default for types.String",
@@ -92,7 +97,7 @@ func TestParamType(t *testing.T) {
 				Type:    types.String,
 				Default: 1,
 			},
-			err: true,
+			panic: true,
 		},
 		{
 			desc: "Bad Default for types.Timespan",
@@ -100,7 +105,7 @@ func TestParamType(t *testing.T) {
 				Type:    types.Timespan,
 				Default: 1,
 			},
-			err: true,
+			panic: true,
 		},
 		{
 			desc: "Bad Default for types.Decimal",
@@ -108,7 +113,7 @@ func TestParamType(t *testing.T) {
 				Type:    types.Decimal,
 				Default: "hello",
 			},
-			err: true,
+			panic: true,
 		},
 		{
 			desc: "Bad Default for types.Decimal - only decimal point",
@@ -116,7 +121,7 @@ func TestParamType(t *testing.T) {
 				Type:    types.Decimal,
 				Default: ".",
 			},
-			err: true,
+			panic: true,
 		},
 		{
 			desc: "Bad Default for types.Decimal - nil big.Float",
@@ -124,7 +129,7 @@ func TestParamType(t *testing.T) {
 				Type:    types.Decimal,
 				Default: (*big.Float)(nil),
 			},
-			err: true,
+			panic: true,
 		},
 		{
 			desc: "Bad Default for types.Decimal - nil big.Int",
@@ -132,7 +137,7 @@ func TestParamType(t *testing.T) {
 				Type:    types.Decimal,
 				Default: (*big.Int)(nil),
 			},
-			err: true,
+			panic: true,
 		},
 		{
 			desc: "Success Default for types.Bool",
@@ -141,7 +146,7 @@ func TestParamType(t *testing.T) {
 				Default: true,
 				name:    "my_value",
 			},
-			wantStr: "my_value:bool = true",
+			wantStr: "my_value:bool = bool(true)",
 		},
 		{
 			desc: "Success Default for types.DateTime",
@@ -150,7 +155,7 @@ func TestParamType(t *testing.T) {
 				Default: now,
 				name:    "my_value",
 			},
-			wantStr: fmt.Sprintf("my_value:datetime = %s", now.Format(time.RFC3339Nano)),
+			wantStr: fmt.Sprintf("my_value:datetime = datetime(%s)", now.Format(time.RFC3339Nano)),
 		},
 		{
 			desc: "Success Default for types.Dynamic",
@@ -167,7 +172,7 @@ func TestParamType(t *testing.T) {
 				Default: uu,
 				name:    "my_value",
 			},
-			wantStr: fmt.Sprintf("my_value:guid = %s", uu.String()),
+			wantStr: fmt.Sprintf("my_value:guid = guid(%s)", uu.String()),
 		},
 		{
 			desc: "Success Default for types.Int",
@@ -176,7 +181,7 @@ func TestParamType(t *testing.T) {
 				Default: int32(1),
 				name:    "my_value",
 			},
-			wantStr: "my_value:int = 1",
+			wantStr: "my_value:int = int(1)",
 		},
 		{
 			desc: "Success Default for types.Long",
@@ -185,7 +190,7 @@ func TestParamType(t *testing.T) {
 				Default: int64(1),
 				name:    "my_value",
 			},
-			wantStr: "my_value:long = 1",
+			wantStr: "my_value:long = long(1)",
 		},
 		{
 			desc: "Success Default for types.Real",
@@ -194,7 +199,7 @@ func TestParamType(t *testing.T) {
 				Default: 1.0,
 				name:    "my_value",
 			},
-			wantStr: "my_value:real = 1.000000",
+			wantStr: "my_value:real = real(1.000000)",
 		},
 		{
 			desc: "Success Default for types.String",
@@ -205,17 +210,15 @@ func TestParamType(t *testing.T) {
 			},
 			wantStr: "my_value:string = \"hello\"",
 		},
-		/*
-			{
-				desc: "Success Default for types.Timespan",
-				param: ParamType{
-					Type:    types.Decimal,
-					Default: ....,
-					name: "my_value"
-				},
-				wantStr: "my_value:timespan = true",
+		{
+			desc: "Success Default for types.Timespan",
+			param: ParamType{
+				Type:    types.Timespan,
+				Default: duration,
+				name:    "my_value:timespan = timespan(03.01:03:00)",
 			},
-		*/
+			wantStr: "my_value:timespan = timespan(1000)",
+		},
 		{
 			desc: "Success Default for types.Decimal",
 			param: ParamType{
@@ -223,7 +226,7 @@ func TestParamType(t *testing.T) {
 				Default: "1.349",
 				name:    "my_value",
 			},
-			wantStr: "my_value:decimal = 1.349",
+			wantStr: "my_value:decimal = decimal(1.349)",
 		},
 		{
 			desc: "Success no decimal point for types.Decimal",
@@ -232,7 +235,7 @@ func TestParamType(t *testing.T) {
 				Default: "1",
 				name:    "my_value",
 			},
-			wantStr: "my_value:decimal = 1",
+			wantStr: "my_value:decimal = decimal(1)",
 		},
 		{
 			desc: "Success elided left side for types.Decimal",
@@ -241,7 +244,7 @@ func TestParamType(t *testing.T) {
 				Default: ".1",
 				name:    "my_value",
 			},
-			wantStr: "my_value:decimal = .1",
+			wantStr: "my_value:decimal = decimal(.1)",
 		},
 		{
 			desc: "Success elided right side for types.Decimal",
@@ -250,26 +253,28 @@ func TestParamType(t *testing.T) {
 				Default: "1.",
 				name:    "my_value",
 			},
-			wantStr: "my_value:decimal = 1.",
+			wantStr: "my_value:decimal = decimal(1.)",
 		},
 	}
 
 	for _, test := range tests {
-		err := test.param.validate()
-		switch {
-		case err == nil && test.err:
-			t.Errorf("TestParamType(%s): got err == nil, want err != nil", test.desc)
-			continue
-		case err != nil && !test.err:
-			t.Errorf("TestParamType(%s): got err == %s, want err != nil", test.desc, err)
-			continue
-		case err != nil:
-			continue
-		}
-
-		if test.wantStr != test.param.string() {
-			t.Errorf("TestParamType(%s): got %q, want %q", test.desc, test.param.string(), test.wantStr)
-		}
+		test := test // capture
+		t.Run(test.desc, func(t *testing.T) {
+			t.Parallel()
+			err := test.param.validate()
+			switch {
+			case err == nil && test.err:
+				assert.NoError(t, err)
+			case err != nil && !test.err:
+				assert.Error(t, err)
+			case err != nil:
+				if test.panic {
+					assert.Panicsf(t, func() { test.param.string() }, "panic: internal bug: ParamType.string() called without a call to .validate()")
+					return
+				}
+				assert.Equal(t, test.wantStr, test.param.string())
+			}
+		})
 	}
 }
 
@@ -306,7 +311,7 @@ func TestDefinitions(t *testing.T) {
 				"HasLicense": ParamType{Type: types.Bool, Default: false},
 				"FirstName":  ParamType{Type: types.String},
 			},
-			wantStr: "declare query_parameters(FirstName:string, HasLicense:bool = false);",
+			wantStr: "declare query_parameters(FirstName:string, HasLicense:bool = bool(false));",
 		},
 	}
 

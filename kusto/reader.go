@@ -92,15 +92,19 @@ func newRowIterator(ctx context.Context, cancel context.CancelFunc, execResp exe
 		RequestHeader:  execResp.reqHeader,
 		ResponseHeader: execResp.respHeader,
 
-		op:           op,
-		ctx:          ctx,
-		cancel:       cancel,
-		progressive:  header.IsProgressive,
-		inColumns:    make(chan send, 1),
+		op:          op,
+		ctx:         ctx,
+		cancel:      cancel,
+		progressive: header.IsProgressive,
+		// There could be a case where the rows channel fires before the columns channel
+		// So now the rows channel assumes the columns have been recieved, but the loop on the other side is blocked.
+		// Raising the buffer size solves this issue in practice - since inColumns never has to wait, it always compeletes first.
+		// This isn't a perfect solution, but this code is going to be discarded for v2 anyway.
+		inColumns:    make(chan send, 5),
 		inRows:       make(chan send, 100),
-		inProgress:   make(chan send, 1),
-		inNonPrimary: make(chan send, 1),
-		inCompletion: make(chan send, 1),
+		inProgress:   make(chan send, 5),
+		inNonPrimary: make(chan send, 5),
+		inCompletion: make(chan send, 5),
 		inErr:        make(chan send),
 
 		rows:       make(chan Row, 1000),
@@ -233,7 +237,6 @@ func (r *RowIterator) DoOnRowOrError(f func(r *table.Row, e *errors.Error) error
 // receiving a RowIterator.
 func (r *RowIterator) Stop() {
 	r.cancel()
-	return
 }
 
 // Deprecated: Use NextRowOrError() instead for more robust error handling. In a future version, this will be removed, and NextRowOrError will replace it.
@@ -340,8 +343,5 @@ func (r *RowIterator) GetQueryCompletionInformation() (v2.DataTable, error) {
 }
 
 func isTest() bool {
-	if flag.Lookup("test.v") == nil {
-		return false
-	}
-	return true
+	return flag.Lookup("test.v") != nil
 }
