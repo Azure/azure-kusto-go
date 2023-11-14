@@ -11,8 +11,8 @@ import (
 	"github.com/Azure/azure-kusto-go/kusto/ingest/internal/gzip"
 	"github.com/Azure/azure-kusto-go/kusto/ingest/internal/properties"
 	"github.com/Azure/azure-kusto-go/kusto/ingest/internal/queued"
-	"github.com/Azure/azure-kusto-go/kusto/ingest/source"
 	"github.com/Azure/azure-kusto-go/kusto/ingest/internal/utils"
+	"github.com/Azure/azure-kusto-go/kusto/ingest/source"
 
 	"github.com/cenkalti/backoff/v4"
 	"github.com/google/uuid"
@@ -152,7 +152,6 @@ func (m *Managed) FromReader(ctx context.Context, reader io.Reader, options ...F
 
 	return m.managedStreamImpl(ctx, io.NopCloser(reader), props)
 }
-
 
 func (m *Managed) managedStreamImpl(ctx context.Context, payload io.ReadCloser, props properties.All) (*Result, error) {
 	defer payload.Close()

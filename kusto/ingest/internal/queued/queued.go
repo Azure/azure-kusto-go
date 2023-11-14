@@ -151,7 +151,7 @@ func (i *Ingestion) Reader(ctx context.Context, reader io.Reader, props properti
 	if len(mgrResources.Queues) == 0 {
 		return "", errors.ES(errors.OpFileIngest, errors.KBlobstore, "no Kusto queue resources are defined, there is no queue to upload to").SetNoRetry()
 	}
-  
+
 	compression := CompressionDiscovery(props.Source.OriginalSource)
 	shouldCompress := ShouldCompress(&props, compression)
 	blobName := GenBlobName(i.db, i.table, nower(), filepath.Base(uuid.New().String()), filepath.Base(props.Source.OriginalSource), compression, shouldCompress, props.Ingestion.Additional.Format.String())
