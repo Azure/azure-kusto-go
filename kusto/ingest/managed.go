@@ -102,7 +102,7 @@ func (m *Managed) FromFile(ctx context.Context, fPath string, options ...FileOpt
 
 	if !local {
 		var size int64
-		var compressionTypeForEstimation properties.CompressionType
+		var compressionTypeForEstimation source.CompressionType
 		if size = props.Ingestion.RawDataSize; size == 0 {
 			size, err = utils.FetchBlobSize(fPath, ctx, m.queued.client.HttpClient())
 			if err != nil {
@@ -113,7 +113,7 @@ func (m *Managed) FromFile(ctx context.Context, fPath string, options ...FileOpt
 			props.Ingestion.RawDataSize = utils.EstimateRawDataSize(compressionTypeForEstimation, size)
 		} else {
 			// If user sets raw data size we always want to devide it for estimation
-			compressionTypeForEstimation = properties.CTNone
+			compressionTypeForEstimation = source.CTNone
 		}
 
 		// File is not compressed and user says its compressed, raw 10 mb -> do
@@ -131,9 +131,9 @@ func (m *Managed) FromFile(ctx context.Context, fPath string, options ...FileOpt
 	return m.managedStreamImpl(ctx, file, props)
 }
 
-func shouldUseQueuedIngestBySize(compression properties.CompressionType, fileSize int64) bool {
+func shouldUseQueuedIngestBySize(compression source.CompressionType, fileSize int64) bool {
 	switch compression {
-	case properties.GZIP, properties.ZIP:
+	case source.GZIP, source.ZIP:
 		return fileSize > maxStreamingSize
 	}
 
@@ -156,7 +156,7 @@ func (m *Managed) FromReader(ctx context.Context, reader io.Reader, options ...F
 
 func (m *Managed) managedStreamImpl(ctx context.Context, payload io.ReadCloser, props properties.All) (*Result, error) {
 	defer payload.Close()
-	compress := queued.ShouldCompress(&props, types.CTUnknown)
+	compress := queued.ShouldCompress(&props, source.CTUnknown)
 	var compressed io.Reader = payload
 	if compress {
 		compressed = gzip.Compress(io.NopCloser(payload))
@@ -170,7 +170,7 @@ func (m *Managed) managedStreamImpl(ctx context.Context, payload io.ReadCloser, 
 		return nil, err
 	}
 
-	if shouldUseQueuedIngestBySize(properties.GZIP, int64(len(buf))) {
+	if shouldUseQueuedIngestBySize(source.GZIP, int64(len(buf))) {
 		combinedBuf := io.MultiReader(bytes.NewReader(buf), compressed)
 		return m.queued.fromReader(ctx, combinedBuf, []FileOption{}, props)
 	}

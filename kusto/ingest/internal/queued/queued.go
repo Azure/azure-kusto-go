@@ -11,13 +11,14 @@ import (
 	"net/url"
 	"os"
 	"path/filepath"
+	"strings"
 	"time"
 
 	"github.com/Azure/azure-kusto-go/kusto/data/errors"
 	"github.com/Azure/azure-kusto-go/kusto/ingest/internal/gzip"
 	"github.com/Azure/azure-kusto-go/kusto/ingest/internal/properties"
 	"github.com/Azure/azure-kusto-go/kusto/ingest/internal/resources"
-	"github.com/Azure/azure-kusto-go/kusto/ingest/internal/utils"
+	"github.com/Azure/azure-kusto-go/kusto/ingest/source"
 
 	"github.com/Azure/azure-pipeline-go/pipeline"
 	"github.com/Azure/azure-sdk-for-go/sdk/azcore"
@@ -382,31 +383,31 @@ func (i *Ingestion) localToBlob(ctx context.Context, from string, client *azblob
 // CompressionDiscovery looks at the file extension. If it is one we support, we return that
 // CompressionType that represents that value. Otherwise we return CTNone to indicate that the
 // file should not be compressed.
-func CompressionDiscovery(fName string) types.CompressionType {
+func CompressionDiscovery(fName string) source.CompressionType {
 	if fName == "" {
-		return types.CTUnknown
+		return source.CTUnknown
 	}
 
 	var ext string
 	if strings.HasPrefix(strings.ToLower(fName), "http") {
-		ext = strings.ToLower(filepath.Ext(path.Base(fName)))
+		ext = strings.ToLower(filepath.Ext(filepath.Base(fName)))
 	} else {
 		ext = strings.ToLower(filepath.Ext(fName))
 	}
 
 	switch ext {
 	case ".gz":
-		return types.GZIP
+		return source.GZIP
 	case ".zip":
-		return types.ZIP
+		return source.ZIP
 	}
-	return types.CTNone
+	return source.CTNone
 }
 
-func GenBlobName(databaseName string, tableName string, time time.Time, guid string, fileName string, compressionFileExtension types.CompressionType, shouldCompress bool, dataFormat string) string {
+func GenBlobName(databaseName string, tableName string, time time.Time, guid string, fileName string, compressionFileExtension source.CompressionType, shouldCompress bool, dataFormat string) string {
 	extension := "gz"
 	if !shouldCompress {
-		if compressionFileExtension == types.CTNone {
+		if compressionFileExtension == source.CTNone {
 			extension = dataFormat
 		} else {
 			extension = compressionFileExtension.String()
@@ -422,17 +423,17 @@ func GenBlobName(databaseName string, tableName string, time time.Time, guid str
 
 // Do not compress if user specified in DontCompress or CompressionType,
 // if the file extension shows compression, or if the format is binary.
-func ShouldCompress(props *properties.All, compressionFileExtension types.CompressionType) bool {
+func ShouldCompress(props *properties.All, compressionFileExtension source.CompressionType) bool {
 	if props.Source.DontCompress {
 		return false
 	}
 
-	if props.Source.CompressionType != types.CTUnknown {
-		if props.Source.CompressionType != types.CTNone {
+	if props.Source.CompressionType != source.CTUnknown {
+		if props.Source.CompressionType != source.CTNone {
 			return false
 		}
 	} else {
-		if compressionFileExtension == types.CTNone {
+		if compressionFileExtension == source.CTNone {
 			return false
 		}
 	}

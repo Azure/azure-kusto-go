@@ -14,6 +14,7 @@ import (
 
 	"github.com/Azure/azure-kusto-go/kusto"
 	"github.com/Azure/azure-kusto-go/kusto/data/errors"
+	"github.com/Azure/azure-kusto-go/kusto/ingest/source"
 	"github.com/cenkalti/backoff/v4"
 	"github.com/google/uuid"
 )
@@ -231,7 +232,7 @@ type SourceOptions struct {
 	OriginalSource string
 
 	// CompressionType is the type of compression used on the file.
-	CompressionType types.CompressionType
+	CompressionType source.CompressionType
 }
 
 // Ingestion is a JSON serializable set of options that must be provided to the service.
