@@ -12,6 +12,7 @@ import (
 	"github.com/Azure/azure-kusto-go/kusto/data/errors"
 	"github.com/Azure/azure-kusto-go/kusto/ingest/internal/properties"
 	"github.com/Azure/azure-kusto-go/kusto/ingest/internal/utils"
+	"github.com/Azure/azure-kusto-go/kusto/ingest/source"
 
 	"github.com/stretchr/testify/assert"
 
@@ -57,13 +58,13 @@ func TestCompressionDiscovery(t *testing.T) {
 
 	tests := []struct {
 		input string
-		want  types.CompressionType
+		want  source.CompressionType
 	}{
-		{"https://somehost.somedomain.com:8080/v1/somestuff/file.gz", properties.GZIP},
-		{"https://somehost.somedomain.com:8080/v1/somestuff/file.zip", properties.ZIP},
-		{"/path/to/a/file.gz", properties.GZIP},
-		{"/path/to/a/file.zip", properties.ZIP},
-		{"/path/to/a/file", properties.CTNone},
+		{"https://somehost.somedomain.com:8080/v1/somestuff/file.gz", source.GZIP},
+		{"https://somehost.somedomain.com:8080/v1/somestuff/file.zip", source.ZIP},
+		{"/path/to/a/file.gz", source.GZIP},
+		{"/path/to/a/file.zip", source.ZIP},
+		{"/path/to/a/file", source.CTNone},
 	}
 
 	for _, test := range tests {

@@ -1605,7 +1605,7 @@ func TestReaderIngestion(t *testing.T) { // ok
 			if isQueued || isManaged {
 				test.options = append(test.options, ingest.FlushImmediately(),
 					ingest.ReportResultToTable(), ingest.RawDataSize(1024*1024*1024*10),
-					ingest.CompressionType(types.CTNone))
+					ingest.CompressionType(source.CTNone))
 			}
 
 			f, err := os.Open(test.src)
