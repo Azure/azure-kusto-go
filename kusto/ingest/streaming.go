@@ -93,7 +93,7 @@ func prepFileAndProps(fPath string, props *properties.All, options []FileOption,
 
 	props.Source.OriginalSource = fPath
 	compression := queued.CompressionDiscovery(fPath)
-	props.Source.DontCompress = queued.ShouldCompress(props, compression)
+	props.Source.DontCompress = !queued.ShouldCompress(props, compression)
 
 	err = queued.CompleteFormatFromFileName(props, fPath)
 	if err != nil {
