@@ -240,8 +240,8 @@ func TestIngestionStatus(t *testing.T) {
 		defer cancel()
 
 		f, err := os.Open(csvFile)
-		defer f.Close()
 		require.NoError(t, err)
+		defer f.Close()
 
 		reader, writer := io.Pipe()
 		go func() {

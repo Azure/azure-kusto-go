@@ -26,7 +26,6 @@ import (
 	"github.com/Azure/azure-kusto-go/kusto/data/types"
 	"github.com/Azure/azure-kusto-go/kusto/data/value"
 	"github.com/Azure/azure-kusto-go/kusto/ingest"
-	"github.com/Azure/azure-kusto-go/kusto/ingest/source"
 	"github.com/Azure/azure-kusto-go/kusto/internal/frames"
 	"github.com/Azure/azure-kusto-go/kusto/kql"
 	"github.com/Azure/azure-kusto-go/kusto/utils"
@@ -1601,8 +1600,7 @@ func TestReaderIngestion(t *testing.T) { // ok
 			_, isManaged := test.ingestor.(*ingest.Managed)
 			if isQueued || isManaged {
 				test.options = append(test.options, ingest.FlushImmediately(),
-					ingest.ReportResultToTable(), ingest.RawDataSize(1024*1024*1024*10),
-					ingest.CompressionType(source.CTNone))
+					ingest.ReportResultToTable())
 			}
 
 			f, err := os.Open(test.src)
@@ -1626,7 +1624,7 @@ func TestReaderIngestion(t *testing.T) { // ok
 				}
 			}()
 
-			res, err := test.ingestor.FromReader(ctx, reader, ingest.DontCompress())
+			res, err := test.ingestor.FromReader(ctx, reader, test.options...)
 			if err == nil {
 				err = <-res.Wait(ctx)
 			}
