@@ -433,7 +433,7 @@ func ShouldCompress(props *properties.All, compressionFileExtension source.Compr
 			return false
 		}
 	} else {
-		if compressionFileExtension != source.CTNone {
+		if compressionFileExtension != source.CTUnknown && compressionFileExtension != source.CTNone {
 			return false
 		}
 	}
