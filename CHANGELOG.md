@@ -11,6 +11,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
     * azkustodata - contains querying, management APIs.
     * azkustoingest - contains ingestion in all its forms.
 * [BREAKING] [MAJOR] Constructing ingest clients is now done using a KustoConnectionStringBuilder, and not a client struct.
+* [BREAKING] [MAJOR] Changes in the kusto type system
+    * Decimal values are now represented as `decimal.Decimal` instead of `string`. This is to maintain efficiency and ease of use.
 * In addition, passing a default database and table for ingestion is not necessary anymore, and can be done using Options.
    ```go
    // before:
@@ -25,9 +27,22 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 * Removed the old deprecated Stream() method on queued ingest client, instead use azkustoingest.NewStreaming() or azkustoingest.NewManaged() for proper streaming ingest client.
 * Removed `QueryIngestion()` option for Query client. If you want to perform commands against the dm, create a query client with the "ingest-" endpoint.
 
+## [0.14.2] - 2023-11-08
+
+### Fixed
+
+-  Size used for RawDataSize taken from gzip reader was of the gzip size and not the original reader size 
+
+## [0.14.1] - 2023-09-27
+
+### Added
+- Support new playfab domain
+
+
 ### Fixed
 
 - Fixed deadlock when having high number of concurrent queries
+- Fixed wrong endpoint error not triggering
 
 ## [0.14.0] - 2023-08-10
 
