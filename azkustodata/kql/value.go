@@ -22,9 +22,7 @@ func QuoteValue(v value.Kusto) string {
 	case types.Timespan:
 		val = FormatTimespan(val.(time.Duration))
 	case types.Dynamic:
-		got := value.Dynamic{}
-		_ = got.Unmarshal(val)
-		val = got
+		val = string(val.([]byte))
 	}
 
 	return fmt.Sprintf("%v(%v)", t, val)

@@ -5,27 +5,8 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
-## Unreleased
-### Added
-* [BREAKING] [MAJOR] Split the main module into two packages:
-    * azkustodata - contains querying, management APIs.
-    * azkustoingest - contains ingestion in all its forms.
-* [BREAKING] [MAJOR] Constructing ingest clients is now done using a KustoConnectionStringBuilder, and not a client struct.
-* [BREAKING] [MAJOR] Changes in the kusto type system
-    * Decimal values are now represented as `decimal.Decimal` instead of `string`. This is to maintain efficiency and ease of use.
-* In addition, passing a default database and table for ingestion is not necessary anymore, and can be done using Options.
-   ```go
-   // before:
-  	queryClient := kusto.New("https://ingest-somecluster.kusto.windows.net")
-    client := ingest.New(quetryClient, "some-db", "some-table")
-  
-    // after:
-    client := azkustoingest.New("https://ingest-somecluster.kusto.windows.net", azkustoingest.WithDefaultDatabase("someDb"), azkustoingest.WithDefaultTable("someTable"))
-  ```
-* Added autocorrection for endpoints for ingest clients. When creating a client, the "ingest-" will be added or removed as needed. To avoid this behavior, use the `azkustoingest.WithoutEndpointCorrection()` option.
-* ManagedStreamingClient constructor now only requires the query endpoint, and will infer the ingest endpoint from it. If you want to use a different endpoint, use the `azkustoingest.WithCustomIngestConnectionString()` option.
-* Removed the old deprecated Stream() method on queued ingest client, instead use azkustoingest.NewStreaming() or azkustoingest.NewManaged() for proper streaming ingest client.
-* Removed `QueryIngestion()` option for Query client. If you want to perform commands against the dm, create a query client with the "ingest-" endpoint.
+
+
 
 ## [0.14.2] - 2023-11-08
 

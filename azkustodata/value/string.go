@@ -14,6 +14,14 @@ type String struct {
 	Valid bool
 }
 
+func NewString(v string) *String {
+	return &String{Value: v, Valid: true}
+}
+
+func NewNullString() *String {
+	return &String{Valid: false}
+}
+
 func (*String) isKustoVal() {}
 
 // String implements fmt.Stringer.

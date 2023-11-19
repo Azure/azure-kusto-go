@@ -29,6 +29,11 @@ func TestFieldsConvert(t *testing.T) {
 		ID:   1,
 	}
 
+	emptyStruct := SomeJSON{
+		Name: "",
+		ID:   0,
+	}
+
 	myArrayOfStruct := []SomeJSON{
 		{
 			Name: "Adam",
@@ -82,7 +87,7 @@ func TestFieldsConvert(t *testing.T) {
 				{Type: types.Bool, Name: "kBool"},
 				{Type: types.Bool, Name: "PtrkBool"},
 			},
-			k: value.Bool{Value: true, Valid: true},
+			k: value.NewBool(true),
 			ptrStruct: &struct {
 				Bool     bool       `kusto:"bool"`
 				PtrBool  *bool      `kusto:"ptrbool"`
@@ -95,7 +100,7 @@ func TestFieldsConvert(t *testing.T) {
 				PtrBool  *bool      `kusto:"ptrbool"`
 				KBool    value.Bool `kusto:"kBool"`
 				PtrkBool *value.Bool
-			}{true, boolPtr(true), value.Bool{Value: true, Valid: true}, &value.Bool{Value: true, Valid: true}},
+			}{true, boolPtr(true), *value.NewBool(true), value.NewBool(true)},
 		},
 		{
 			desc: "non-valid Bool",
@@ -105,7 +110,7 @@ func TestFieldsConvert(t *testing.T) {
 				{Type: types.Bool, Name: "kBool"},
 				{Type: types.Bool, Name: "PtrkBool"},
 			},
-			k: value.Bool{Value: false, Valid: false},
+			k: value.NewNullBool(),
 			ptrStruct: &struct {
 				Bool     bool       `kusto:"bool"`
 				PtrBool  *bool      `kusto:"ptrbool"`
@@ -118,7 +123,7 @@ func TestFieldsConvert(t *testing.T) {
 				PtrBool  *bool      `kusto:"ptrbool"`
 				KBool    value.Bool `kusto:"kBool"`
 				PtrkBool *value.Bool
-			}{false, nil, value.Bool{Value: false, Valid: false}, &value.Bool{Value: false, Valid: false}},
+			}{false, nil, *value.NewNullBool(), value.NewNullBool()},
 		},
 		{
 			desc: "valid DateTime",
@@ -128,7 +133,7 @@ func TestFieldsConvert(t *testing.T) {
 				{Type: types.DateTime, Name: "dateTime"},
 				{Type: types.DateTime, Name: "PtrDateTime"},
 			},
-			k: value.DateTime{Value: now, Valid: true},
+			k: value.NewDateTime(now),
 			ptrStruct: &struct {
 				Time        time.Time      `kusto:"time"`
 				PtrTime     *time.Time     `kusto:"ptrtime"`
@@ -141,7 +146,7 @@ func TestFieldsConvert(t *testing.T) {
 				PtrTime     *time.Time     `kusto:"ptrtime"`
 				DateTime    value.DateTime `kusto:"dateTime"`
 				PtrDateTime *value.DateTime
-			}{now, &now, value.DateTime{Value: now, Valid: true}, &value.DateTime{Value: now, Valid: true}},
+			}{now, &now, *value.NewDateTime(now), value.NewDateTime(now)},
 		},
 		{
 			desc: "non-valid DateTime",
@@ -151,7 +156,7 @@ func TestFieldsConvert(t *testing.T) {
 				{Type: types.DateTime, Name: "dateTime"},
 				{Type: types.DateTime, Name: "PtrDateTime"},
 			},
-			k: value.DateTime{Value: time.Time{}, Valid: false},
+			k: value.NewNullDateTime(),
 			ptrStruct: &struct {
 				Time        time.Time      `kusto:"time"`
 				PtrTime     *time.Time     `kusto:"ptrtime"`
@@ -164,7 +169,7 @@ func TestFieldsConvert(t *testing.T) {
 				PtrTime     *time.Time     `kusto:"ptrtime"`
 				DateTime    value.DateTime `kusto:"dateTime"`
 				PtrDateTime *value.DateTime
-			}{time.Time{}, nil, value.DateTime{Value: time.Time{}, Valid: false}, &value.DateTime{Value: time.Time{}, Valid: false}},
+			}{time.Time{}, nil, *value.NewNullDateTime(), value.NewNullDateTime()},
 		},
 		{
 			desc: "valid Dynamic",
@@ -178,7 +183,7 @@ func TestFieldsConvert(t *testing.T) {
 				{Type: types.Dynamic, Name: "Dynamic"},
 				{Type: types.Dynamic, Name: "PtrDynamic"},
 			},
-			k: value.Dynamic{Value: myJSON, Valid: true},
+			k: value.NewDynamic(myJSON),
 			ptrStruct: &struct {
 				Struct     SomeJSON
 				PtrStruct  *SomeJSON
@@ -212,8 +217,8 @@ func TestFieldsConvert(t *testing.T) {
 					"Name": "Adam",
 					"ID":   float64(1),
 				},
-				value.Dynamic{Value: myJSON, Valid: true},
-				&value.Dynamic{Value: myJSON, Valid: true},
+				*value.NewDynamic(myJSON),
+				value.NewDynamic(myJSON),
 			},
 		},
 		{
@@ -228,7 +233,7 @@ func TestFieldsConvert(t *testing.T) {
 				{Type: types.Dynamic, Name: "Dynamic"},
 				{Type: types.Dynamic, Name: "PtrDynamic"},
 			},
-			k: value.Dynamic{Value: myJSONArray, Valid: true},
+			k: value.NewDynamic(myJSONArray),
 			ptrStruct: &struct {
 				Struct     []SomeJSON
 				PtrStruct  *[]SomeJSON
@@ -274,8 +279,8 @@ func TestFieldsConvert(t *testing.T) {
 						"ID":   float64(2),
 					},
 				},
-				value.Dynamic{Value: myJSONArray, Valid: true},
-				&value.Dynamic{Value: myJSONArray, Valid: true},
+				*value.NewDynamic(myJSONArray),
+				value.NewDynamic(myJSONArray),
 			},
 		},
 		{
@@ -290,7 +295,7 @@ func TestFieldsConvert(t *testing.T) {
 				{Type: types.Dynamic, Name: "Dynamic"},
 				{Type: types.Dynamic, Name: "PtrDynamic"},
 			},
-			k: value.Dynamic{Value: myJSON, Valid: false},
+			k: value.NewNullDynamic(),
 			ptrStruct: &struct {
 				Struct     SomeJSON
 				PtrStruct  *SomeJSON
@@ -312,14 +317,14 @@ func TestFieldsConvert(t *testing.T) {
 				Dynamic    value.Dynamic
 				PtrDynamic *value.Dynamic
 			}{
-				myStruct,
-				&myStruct,
-				myJSONStr,
-				myJSONStrPtr,
+				emptyStruct,
+				nil,
+				"",
 				nil,
 				nil,
-				value.Dynamic{Value: myJSON, Valid: false},
-				&value.Dynamic{Value: myJSON, Valid: false},
+				nil,
+				*value.NewNullDynamic(),
+				nil,
 			},
 		},
 		{
@@ -334,7 +339,7 @@ func TestFieldsConvert(t *testing.T) {
 				{Type: types.Dynamic, Name: "Dynamic"},
 				{Type: types.Dynamic, Name: "PtrDynamic"},
 			},
-			k: value.Dynamic{Value: myJSONArray, Valid: false},
+			k: value.NewNullDynamic(),
 			ptrStruct: &struct {
 				Struct     []SomeJSON
 				PtrStruct  *[]SomeJSON
@@ -358,12 +363,12 @@ func TestFieldsConvert(t *testing.T) {
 			}{
 				nil,
 				nil,
-				myJSONArrayStr,
-				myJSONArrayStrPtr,
+				"",
 				nil,
 				nil,
-				value.Dynamic{Value: myJSONArray, Valid: false},
-				&value.Dynamic{Value: myJSONArray, Valid: false},
+				nil,
+				*value.NewNullDynamic(),
+				nil,
 			},
 		},
 		{
@@ -374,7 +379,7 @@ func TestFieldsConvert(t *testing.T) {
 				{Type: types.GUID, Name: "kGUID"},
 				{Type: types.GUID, Name: "PtrKGUID"},
 			},
-			k: value.GUID{Value: guid, Valid: true},
+			k: value.NewGUID(guid),
 			ptrStruct: &struct {
 				GUID     uuid.UUID  `kusto:"guid"`
 				PtrGUID  *uuid.UUID `kusto:"ptrguid"`
@@ -387,7 +392,7 @@ func TestFieldsConvert(t *testing.T) {
 				PtrGUID  *uuid.UUID `kusto:"ptrguid"`
 				KGUID    value.GUID `kusto:"kGUID"`
 				PtrKGUID *value.GUID
-			}{guid, &guid, value.GUID{Value: guid, Valid: true}, &value.GUID{Value: guid, Valid: true}},
+			}{guid, &guid, *value.NewGUID(guid), value.NewGUID(guid)},
 		},
 		{
 			desc: "non-valid GUID",
@@ -397,7 +402,7 @@ func TestFieldsConvert(t *testing.T) {
 				{Type: types.GUID, Name: "kGUID"},
 				{Type: types.GUID, Name: "PtrKGUID"},
 			},
-			k: value.GUID{Value: uuid.UUID{}, Valid: false},
+			k: value.NewNullGUID(),
 			ptrStruct: &struct {
 				GUID     uuid.UUID  `kusto:"guid"`
 				PtrGUID  *uuid.UUID `kusto:"ptrguid"`
@@ -410,7 +415,7 @@ func TestFieldsConvert(t *testing.T) {
 				PtrGUID  *uuid.UUID `kusto:"ptrguid"`
 				KGUID    value.GUID `kusto:"kGUID"`
 				PtrKGUID *value.GUID
-			}{uuid.UUID{}, nil, value.GUID{Value: uuid.UUID{}, Valid: false}, &value.GUID{Value: uuid.UUID{}, Valid: false}},
+			}{uuid.UUID{}, nil, *value.NewNullGUID(), value.NewNullGUID()},
 		},
 		{
 			desc: "valid Int",
@@ -420,7 +425,7 @@ func TestFieldsConvert(t *testing.T) {
 				{Type: types.Int, Name: "kInt"},
 				{Type: types.Int, Name: "PtrkInt"},
 			},
-			k: value.Int{Value: 1, Valid: true},
+			k: value.NewInt(1),
 			ptrStruct: &struct {
 				Int     int32     `kusto:"int"`
 				PtrInt  *int32    `kusto:"ptrint"`
@@ -433,7 +438,7 @@ func TestFieldsConvert(t *testing.T) {
 				PtrInt  *int32    `kusto:"ptrint"`
 				KInt    value.Int `kusto:"kInt"`
 				PtrkInt *value.Int
-			}{1, int32Ptr(1), value.Int{Value: 1, Valid: true}, &value.Int{Value: 1, Valid: true}},
+			}{1, int32Ptr(1), *value.NewInt(1), value.NewInt(1)},
 		},
 		{
 			desc: "non-valid Int",
@@ -443,7 +448,7 @@ func TestFieldsConvert(t *testing.T) {
 				{Type: types.Int, Name: "kInt"},
 				{Type: types.Int, Name: "PtrkInt"},
 			},
-			k: value.Int{Value: 0, Valid: false},
+			k: value.NewNullInt(),
 			ptrStruct: &struct {
 				Int     int32     `kusto:"int"`
 				PtrInt  *int32    `kusto:"ptrint"`
@@ -456,7 +461,7 @@ func TestFieldsConvert(t *testing.T) {
 				PtrInt  *int32    `kusto:"ptrint"`
 				KInt    value.Int `kusto:"kInt"`
 				PtrkInt *value.Int
-			}{0, nil, value.Int{Value: 0, Valid: false}, &value.Int{Value: 0, Valid: false}},
+			}{0, nil, *value.NewNullInt(), value.NewNullInt()},
 		},
 		{
 			desc: "valid Long",
@@ -466,7 +471,7 @@ func TestFieldsConvert(t *testing.T) {
 				{Type: types.Long, Name: "kLong"},
 				{Type: types.Long, Name: "PtrkLong"},
 			},
-			k: value.Long{Value: 1, Valid: true},
+			k: value.NewLong(1),
 			ptrStruct: &struct {
 				Long     int64      `kusto:"long"`
 				PtrLong  *int64     `kusto:"ptrLong"`
@@ -479,7 +484,7 @@ func TestFieldsConvert(t *testing.T) {
 				PtrLong  *int64     `kusto:"ptrLong"`
 				KLong    value.Long `kusto:"kLong"`
 				PtrkLong *value.Long
-			}{1, int64Ptr(1), value.Long{Value: 1, Valid: true}, &value.Long{Value: 1, Valid: true}},
+			}{1, int64Ptr(1), *value.NewLong(1), value.NewLong(1)},
 		},
 		{
 			desc: "non-valid Long",
@@ -489,7 +494,7 @@ func TestFieldsConvert(t *testing.T) {
 				{Type: types.Long, Name: "kLong"},
 				{Type: types.Long, Name: "PtrkLong"},
 			},
-			k: value.Long{Value: 0, Valid: false},
+			k: value.NewNullLong(),
 			ptrStruct: &struct {
 				Long     int64      `kusto:"long"`
 				PtrLong  *int64     `kusto:"ptrLong"`
@@ -502,7 +507,7 @@ func TestFieldsConvert(t *testing.T) {
 				PtrLong  *int64     `kusto:"ptrLong"`
 				KLong    value.Long `kusto:"kLong"`
 				PtrkLong *value.Long
-			}{0, nil, value.Long{Value: 0, Valid: false}, &value.Long{Value: 0, Valid: false}},
+			}{0, nil, *value.NewNullLong(), value.NewNullLong()},
 		},
 		{
 			desc: "valid real",
@@ -512,7 +517,7 @@ func TestFieldsConvert(t *testing.T) {
 				{Type: types.Real, Name: "kReal"},
 				{Type: types.Real, Name: "PtrkReal"},
 			},
-			k: value.Real{Value: 3.2, Valid: true},
+			k: value.NewReal(3.2),
 			ptrStruct: &struct {
 				Real     float64    `kusto:"real"`
 				PtrReal  *float64   `kusto:"ptrReal"`
@@ -525,7 +530,7 @@ func TestFieldsConvert(t *testing.T) {
 				PtrReal  *float64   `kusto:"ptrReal"`
 				KReal    value.Real `kusto:"kReal"`
 				PtrkReal *value.Real
-			}{3.2, float64Ptr(3.2), value.Real{Value: 3.2, Valid: true}, &value.Real{Value: 3.2, Valid: true}},
+			}{3.2, float64Ptr(3.2), *value.NewReal(3.2), value.NewReal(3.2)},
 		},
 		{
 			desc: "non-valid real",
@@ -535,7 +540,7 @@ func TestFieldsConvert(t *testing.T) {
 				{Type: types.Real, Name: "kReal"},
 				{Type: types.Real, Name: "PtrkReal"},
 			},
-			k: value.Real{Value: 0.0, Valid: false},
+			k: value.NewNullReal(),
 			ptrStruct: &struct {
 				Real     float64    `kusto:"real"`
 				PtrReal  *float64   `kusto:"ptrReal"`
@@ -548,7 +553,7 @@ func TestFieldsConvert(t *testing.T) {
 				PtrReal  *float64   `kusto:"ptrReal"`
 				KReal    value.Real `kusto:"kReal"`
 				PtrkReal *value.Real
-			}{0.0, nil, value.Real{Value: 0.0, Valid: false}, &value.Real{Value: 0.0, Valid: false}},
+			}{0.0, nil, *value.NewNullReal(), value.NewNullReal()},
 		},
 		{
 			desc: "valid String",
@@ -558,7 +563,7 @@ func TestFieldsConvert(t *testing.T) {
 				{Type: types.String, Name: "kString"},
 				{Type: types.String, Name: "PtrkString"},
 			},
-			k: value.String{Value: "hello", Valid: true},
+			k: value.NewString("hello"),
 			ptrStruct: &struct {
 				String     string       `kusto:"string"`
 				PtrString  *string      `kusto:"ptrString"`
@@ -571,7 +576,7 @@ func TestFieldsConvert(t *testing.T) {
 				PtrString  *string      `kusto:"ptrString"`
 				KString    value.String `kusto:"kString"`
 				PtrkString *value.String
-			}{"hello", stringPtr("hello"), value.String{Value: "hello", Valid: true}, &value.String{Value: "hello", Valid: true}},
+			}{"hello", stringPtr("hello"), *value.NewString("hello"), value.NewString("hello")},
 		},
 		{
 			desc: "non-valid String",
@@ -581,7 +586,7 @@ func TestFieldsConvert(t *testing.T) {
 				{Type: types.String, Name: "kString"},
 				{Type: types.String, Name: "PtrkString"},
 			},
-			k: value.String{Value: "", Valid: false},
+			k: value.NewNullString(),
 			ptrStruct: &struct {
 				String     string       `kusto:"string"`
 				PtrString  *string      `kusto:"ptrString"`
@@ -594,7 +599,7 @@ func TestFieldsConvert(t *testing.T) {
 				PtrString  *string      `kusto:"ptrString"`
 				KString    value.String `kusto:"kString"`
 				PtrkString *value.String
-			}{"", nil, value.String{Value: "", Valid: false}, &value.String{Value: "", Valid: false}},
+			}{"", nil, *value.NewNullString(), value.NewNullString()},
 		},
 		{
 			desc: "valid Timespan",
@@ -604,7 +609,7 @@ func TestFieldsConvert(t *testing.T) {
 				{Type: types.Timespan, Name: "kTimespan"},
 				{Type: types.Timespan, Name: "PtrkTimespan"},
 			},
-			k: value.Timespan{Value: 2 * time.Minute, Valid: true},
+			k: value.NewTimespan(2 * time.Minute),
 			ptrStruct: &struct {
 				Timespan     time.Duration  `kusto:"timespan"`
 				PtrTimespan  *time.Duration `kusto:"ptrTimespan"`
@@ -617,7 +622,7 @@ func TestFieldsConvert(t *testing.T) {
 				PtrTimespan  *time.Duration `kusto:"ptrTimespan"`
 				KTimespan    value.Timespan `kusto:"kTimespan"`
 				PtrkTimespan *value.Timespan
-			}{2 * time.Minute, durationPtr(2 * time.Minute), value.Timespan{Value: 2 * time.Minute, Valid: true}, &value.Timespan{Value: 2 * time.Minute, Valid: true}},
+			}{2 * time.Minute, durationPtr(2 * time.Minute), *value.NewTimespan(2 * time.Minute), value.NewTimespan(2 * time.Minute)},
 		},
 		{
 			desc: "non-valid Timespan",
@@ -627,7 +632,7 @@ func TestFieldsConvert(t *testing.T) {
 				{Type: types.Timespan, Name: "kTimespan"},
 				{Type: types.Timespan, Name: "PtrkTimespan"},
 			},
-			k: value.Timespan{Value: 0, Valid: false},
+			k: value.NewNullTimespan(),
 			ptrStruct: &struct {
 				Timespan     time.Duration  `kusto:"timespan"`
 				PtrTimespan  *time.Duration `kusto:"ptrTimespan"`
@@ -640,7 +645,7 @@ func TestFieldsConvert(t *testing.T) {
 				PtrTimespan  *time.Duration `kusto:"ptrTimespan"`
 				KTimespan    value.Timespan `kusto:"kTimespan"`
 				PtrkTimespan *value.Timespan
-			}{0, nil, value.Timespan{Value: 0, Valid: false}, &value.Timespan{Value: 0, Valid: false}},
+			}{0, nil, *value.NewNullTimespan(), value.NewNullTimespan()},
 		},
 		{
 			desc: "valid Decimal",
@@ -650,7 +655,7 @@ func TestFieldsConvert(t *testing.T) {
 				{Type: types.Decimal, Name: "kDecimal"},
 				{Type: types.Decimal, Name: "PtrkDecimal"},
 			},
-			k: value.Decimal{Value: "0.1", Valid: true},
+			k: value.DecimalFromString("0.1"),
 			ptrStruct: &struct {
 				Decimal     string        `kusto:"decimal"`
 				PtrDecimal  *string       `kusto:"ptrDecimal"`
@@ -663,7 +668,7 @@ func TestFieldsConvert(t *testing.T) {
 				PtrDecimal  *string       `kusto:"ptrDecimal"`
 				KDecimal    value.Decimal `kusto:"kDecimal"`
 				PtrkDecimal *value.Decimal
-			}{"0.1", stringPtr("0.1"), value.Decimal{Value: "0.1", Valid: true}, &value.Decimal{Value: "0.1", Valid: true}},
+			}{"0.1", stringPtr("0.1"), *value.DecimalFromString("0.1"), value.DecimalFromString("0.1")},
 		},
 	}
 

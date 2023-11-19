@@ -17,6 +17,14 @@ type Int struct {
 	Valid bool
 }
 
+func NewInt(i int32) *Int {
+	return &Int{Value: i, Valid: true}
+}
+
+func NewNullInt() *Int {
+	return &Int{Valid: false}
+}
+
 func (*Int) isKustoVal() {}
 
 // String implements fmt.Stringer.

@@ -120,7 +120,7 @@ func ExampleMockRows() { // nolint:govet // Example code
 			id:        1,
 			wantQuery: "systemNodes | project CollectionTime, NodeId | where NodeId == 1",
 			rows: []value.Values{
-				{value.Long{Valid: true, Value: 1}, value.DateTime{Valid: true, Value: now}},
+				{value.NewLong(1), value.NewDateTime(now)},
 			},
 			want: NodeRec{ID: 1, CollectionTime: now},
 		},

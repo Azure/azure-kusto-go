@@ -2,7 +2,6 @@ package value
 
 import (
 	"encoding/json"
-	"github.com/shopspring/decimal"
 	"math"
 	"strings"
 	"testing"
@@ -29,17 +28,17 @@ func TestBool(t *testing.T) {
 		{
 			desc: "value is nil",
 			i:    nil,
-			want: Bool{},
+			want: *NewNullBool(),
 		},
 		{
 			desc: "value is false",
 			i:    false,
-			want: Bool{Valid: true},
+			want: *NewBool(false),
 		},
 		{
 			desc: "value is true",
 			i:    true,
-			want: Bool{Value: true, Valid: true},
+			want: *NewBool(true),
 		},
 	}
 
@@ -84,15 +83,12 @@ func TestDateTime(t *testing.T) {
 		{
 			desc: "value is nil",
 			i:    nil,
-			want: DateTime{},
+			want: *NewNullDateTime(),
 		},
 		{
 			desc: "value is RFC3339Nano",
 			i:    "2019-08-27T04:14:55.302919Z",
-			want: DateTime{
-				Value: timeMustParse(time.RFC3339Nano, "2019-08-27T04:14:55.302919Z"),
-				Valid: true,
-			},
+			want: *NewDateTime(timeMustParse(time.RFC3339Nano, "2019-08-27T04:14:55.302919Z")),
 		},
 	}
 
@@ -127,39 +123,27 @@ func TestDynamic(t *testing.T) {
 		{
 			desc: "value is nil",
 			i:    nil,
-			want: Dynamic{},
+			want: *NewNullDynamic(),
 		},
 		{
 			desc: "value is string",
 			i:    `{"Visualization":null}`,
-			want: Dynamic{
-				Value: []byte(`{"Visualization":null}`),
-				Valid: true,
-			},
+			want: *NewDynamic([]byte(`{"Visualization":null}`)),
 		},
 		{
 			desc: "value is []byte",
 			i:    []byte(`{"Visualization":null}`),
-			want: Dynamic{
-				Value: []byte(`{"Visualization":null}`),
-				Valid: true,
-			},
+			want: *NewDynamic([]byte(`{"Visualization":null}`)),
 		},
 		{
 			desc: "value is map[string]interface{}",
 			i:    map[string]interface{}{"Visualization": nil},
-			want: Dynamic{
-				Value: []byte(`{"Visualization":null}`),
-				Valid: true,
-			},
+			want: *NewDynamic([]byte(`{"Visualization":null}`)),
 		},
 		{
 			desc: "value is a []interface{}",
 			i:    []interface{}{1, "hello", 2.3},
-			want: Dynamic{
-				Value: []byte(`[1,"hello",2.3]`),
-				Valid: true,
-			},
+			want: *NewDynamic([]byte(`[1,"hello",2.3]`)),
 		},
 	}
 
@@ -205,15 +189,12 @@ func TestGUID(t *testing.T) {
 		{
 			desc: "value is nil",
 			i:    nil,
-			want: GUID{},
+			want: *NewNullGUID(),
 		},
 		{
 			desc: "value is a UUID",
 			i:    goodUUID.String(),
-			want: GUID{Value: uuid.NullUUID{
-				UUID:  goodUUID,
-				Valid: true,
-			}},
+			want: *NewGUID(goodUUID),
 		},
 	}
 
@@ -263,17 +244,17 @@ func TestInt(t *testing.T) {
 		{
 			desc: "value is nil",
 			i:    nil,
-			want: Int{},
+			want: *NewNullInt(),
 		},
 		{
 			desc: "value is int",
 			i:    2,
-			want: Int{Value: 2, Valid: true},
+			want: *NewInt(2),
 		},
 		{
 			desc: "value is json.Number",
 			i:    json.Number("23"),
-			want: Int{Value: 23, Valid: true},
+			want: *NewInt(23),
 		},
 	}
 
@@ -318,17 +299,17 @@ func TestLong(t *testing.T) {
 		{
 			desc: "value is nil",
 			i:    nil,
-			want: Long{},
+			want: *NewNullLong(),
 		},
 		{
 			desc: "value is int",
 			i:    2,
-			want: Long{Value: 2, Valid: true},
+			want: *NewLong(2),
 		},
 		{
 			desc: "value is json.Number",
 			i:    json.Number("23"),
-			want: Long{Value: 23, Valid: true},
+			want: *NewLong(23),
 		},
 	}
 
@@ -368,22 +349,22 @@ func TestReal(t *testing.T) {
 		{
 			desc: "value is json.Number that is an int, which will convert to a float64",
 			i:    json.Number("3"),
-			want: Real{Value: 3.0, Valid: true},
+			want: *NewReal(3.0),
 		},
 		{
 			desc: "value is nil",
 			i:    nil,
-			want: Real{},
+			want: *NewNullReal(),
 		},
 		{
 			desc: "value is float64",
 			i:    2.3,
-			want: Real{Value: 2.3, Valid: true},
+			want: *NewReal(2.3),
 		},
 		{
 			desc: "value is json.Number",
 			i:    json.Number("23.2"),
-			want: Real{Value: 23.2, Valid: true},
+			want: *NewReal(23.2),
 		},
 	}
 
@@ -423,12 +404,12 @@ func TestString(t *testing.T) {
 		{
 			desc: "value is nil",
 			i:    nil,
-			want: String{},
+			want: *NewNullString(),
 		},
 		{
 			desc: "value is string",
 			i:    "hello world",
-			want: String{Value: "hello world", Valid: true},
+			want: *NewString("hello world"),
 		},
 	}
 
@@ -468,7 +449,7 @@ func TestTimespan(t *testing.T) {
 		{
 			desc: "value is nil",
 			i:    nil,
-			want: Timespan{},
+			want: *NewNullTimespan(),
 		},
 		{
 			desc: "value is string, but doesn't represent a time",
@@ -481,20 +462,20 @@ func TestTimespan(t *testing.T) {
 			err:  true,
 		},
 		{i: "00:00:00", want: Timespan{Valid: true}},
-		{i: "00:00:03", want: Timespan{Value: 3 * time.Second, Valid: true}},
-		{i: "00:04:03", want: Timespan{Value: 4*time.Minute + 3*time.Second, Valid: true}},
-		{i: "02:04:03", want: Timespan{Value: 2*time.Hour + 4*time.Minute + 3*time.Second, Valid: true}},
-		{i: "00:00:00.099", want: Timespan{Value: 99 * time.Millisecond, Valid: true}},
-		{i: "02:04:03.0123", want: Timespan{Value: 2*time.Hour + 4*time.Minute + 3*time.Second + 12300*time.Microsecond, Valid: true}},
-		{i: "01.00:00:00", want: Timespan{Value: 24 * time.Hour, Valid: true}},
-		{i: "02.04:05:07", want: Timespan{Value: 2*24*time.Hour + 4*time.Hour + 5*time.Minute + 7*time.Second, Valid: true}},
-		{i: "-01.00:00:00", want: Timespan{Value: -24 * time.Hour, Valid: true}},
-		{i: "-02.04:05:07", want: Timespan{Value: time.Duration(-1) * (2*24*time.Hour + 4*time.Hour + 5*time.Minute + 7*time.Second), Valid: true}},
+		{i: "00:00:03", want: *NewTimespan(3 * time.Second)},
+		{i: "00:04:03", want: *NewTimespan(4*time.Minute + 3*time.Second)},
+		{i: "02:04:03", want: *NewTimespan(2*time.Hour + 4*time.Minute + 3*time.Second)},
+		{i: "00:00:00.099", want: *NewTimespan(99 * time.Millisecond)},
+		{i: "02:04:03.0123", want: *NewTimespan(2*time.Hour + 4*time.Minute + 3*time.Second + 12300*time.Microsecond)},
+		{i: "01.00:00:00", want: *NewTimespan(24 * time.Hour)},
+		{i: "02.04:05:07", want: *NewTimespan(2*24*time.Hour + 4*time.Hour + 5*time.Minute + 7*time.Second)},
+		{i: "-01.00:00:00", want: *NewTimespan(-24 * time.Hour)},
+		{i: "-02.04:05:07", want: *NewTimespan(time.Duration(-1) * (2*24*time.Hour + 4*time.Hour + 5*time.Minute + 7*time.Second))},
 		{i: "00.00:00.00:00.000", want: Timespan{Valid: true}},
-		{i: "02.04:05:07.789", want: Timespan{Value: 2*24*time.Hour + 4*time.Hour + 5*time.Minute + 7*time.Second + 789*time.Millisecond, Valid: true}},
-		{i: "03.00:00:00.111", want: Timespan{Value: 3*24*time.Hour + 111*time.Millisecond, Valid: true}},
-		{i: "03.00:00:00.111", want: Timespan{Value: 3*24*time.Hour + 111*time.Millisecond, Valid: true}},
-		{i: "364.23:59:59.9999999", want: Timespan{Value: 364*day + 23*time.Hour + 59*time.Minute + 59*time.Second + 9999999*100*time.Nanosecond, Valid: true}},
+		{i: "02.04:05:07.789", want: *NewTimespan(2*24*time.Hour + 4*time.Hour + 5*time.Minute + 7*time.Second + 789*time.Millisecond)},
+		{i: "03.00:00:00.111", want: *NewTimespan(3*24*time.Hour + 111*time.Millisecond)},
+		{i: "03.00:00:00.111", want: *NewTimespan(3*24*time.Hour + 111*time.Millisecond)},
+		{i: "364.23:59:59.9999999", want: *NewTimespan(364*day + 23*time.Hour + 59*time.Minute + 59*time.Second + 9999999*100*time.Nanosecond)},
 	}
 
 	for _, test := range tests {
@@ -548,11 +529,11 @@ func TestDecimal(t *testing.T) {
 			i:    3.0,
 			err:  true,
 		},
-		{desc: "Conversion of '1',", i: "1", want: Decimal{Value: decimal.NewNullDecimal(decimal.RequireFromString("1"))}},
-		{desc: "Conversion of '.1',", i: ".1", want: Decimal{Value: decimal.NewNullDecimal(decimal.RequireFromString(".1"))}},
-		{desc: "Conversion of '1.',", i: "1.", want: Decimal{Value: decimal.NewNullDecimal(decimal.RequireFromString("1."))}},
-		{desc: "Conversion of '0.1',", i: "0.1", want: Decimal{Value: decimal.NewNullDecimal(decimal.RequireFromString("0.1"))}},
-		{desc: "Conversion of '3.07',", i: "3.07", want: Decimal{Value: decimal.NewNullDecimal(decimal.RequireFromString("3.07"))}},
+		{desc: "Conversion of '1',", i: "1", want: *DecimalFromString("1")},
+		{desc: "Conversion of '.1',", i: ".1", want: *DecimalFromString(".1")},
+		{desc: "Conversion of '1.',", i: "1.", want: *DecimalFromString("1.")},
+		{desc: "Conversion of '0.1',", i: "0.1", want: *DecimalFromString("0.1")},
+		{desc: "Conversion of '3.07',", i: "3.07", want: *DecimalFromString("3.07")},
 	}
 
 	for _, test := range tests {

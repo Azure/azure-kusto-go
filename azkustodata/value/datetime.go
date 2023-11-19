@@ -15,6 +15,14 @@ type DateTime struct {
 	Valid bool
 }
 
+func NewDateTime(v time.Time) *DateTime {
+	return &DateTime{Value: v, Valid: true}
+}
+
+func NewNullDateTime() *DateTime {
+	return &DateTime{Valid: false}
+}
+
 // String implements fmt.Stringer.
 func (d *DateTime) String() string {
 	if !d.Valid {

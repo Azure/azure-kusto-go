@@ -13,6 +13,26 @@ type Decimal struct {
 	Value decimal.NullDecimal
 }
 
+func NewDecimal(v decimal.Decimal) *Decimal {
+	return &Decimal{Value: decimal.NullDecimal{Decimal: v, Valid: true}}
+}
+
+func NewNullDecimal() *Decimal {
+	return &Decimal{Value: decimal.NullDecimal{Valid: false}}
+}
+
+func DecimalFromFloat(f float64) *Decimal {
+	return NewDecimal(decimal.NewFromFloat(f))
+}
+
+func DecimalFromString(s string) *Decimal {
+	dec, err := decimal.NewFromString(s)
+	if err != nil {
+		return NewNullDecimal()
+	}
+	return NewDecimal(dec)
+}
+
 func (*Decimal) isKustoVal() {}
 
 // String implements fmt.Stringer.
@@ -35,11 +55,12 @@ func (d *Decimal) ParseFloat(base int, prec uint, mode big.RoundingMode) (f *big
 func (d *Decimal) Unmarshal(i interface{}) error {
 	if i == nil {
 		d.Value = decimal.NullDecimal{}
+		return nil
 	}
 
 	v, ok := i.(string)
 	if !ok {
-		return fmt.Errorf("Column with type 'decimal' had type %T", i)
+		return fmt.Errorf("column with type 'decimal' had type %T", i)
 	}
 
 	dec, err := decimal.NewFromString(v)

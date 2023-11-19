@@ -107,14 +107,14 @@ func TestNormalDecode(t *testing.T) {
 			},
 			KustoRows: []value.Values{
 				{
-					value.DateTime{Value: timeMustParse(time.RFC3339Nano, "2019-08-27T04:14:55.302919Z"), Valid: true},
-					value.String{Value: "KPC.execute;752dd747-5f6a-45c6-9ee2-e6662530ecc3", Valid: true},
-					value.GUID{Value: uuid.MustParse("011e7e1b-3c8f-4e91-a04b-0fa5f7be6100"), Valid: true},
+					value.NewDateTime(timeMustParse(time.RFC3339Nano, "2019-08-27T04:14:55.302919Z")),
+					value.NewString("KPC.execute;752dd747-5f6a-45c6-9ee2-e6662530ecc3"),
+					value.NewGUID(uuid.MustParse("011e7e1b-3c8f-4e91-a04b-0fa5f7be6100")),
 				},
 				{
-					value.DateTime{Value: timeMustParse(time.RFC3339Nano, "2020-08-27T04:14:55.302919Z"), Valid: true},
-					value.String{Value: "KPE.execute;752dd747-5f6a-45c6-9ee2-e6662530ecc3", Valid: true},
-					value.GUID{Value: uuid.MustParse("211e7e1b-3c8f-4e91-a04b-0fa5f7be6100"), Valid: true},
+					value.NewDateTime(timeMustParse(time.RFC3339Nano, "2020-08-27T04:14:55.302919Z")),
+					value.NewString("KPE.execute;752dd747-5f6a-45c6-9ee2-e6662530ecc3"),
+					value.NewGUID(uuid.MustParse("211e7e1b-3c8f-4e91-a04b-0fa5f7be6100")),
 				},
 			},
 			Op: errors.OpQuery,
@@ -137,14 +137,14 @@ func TestNormalDecode(t *testing.T) {
 			},
 			KustoRows: []value.Values{
 				{
-					value.DateTime{Value: timeMustParse(time.RFC3339Nano, "2021-08-27T04:14:55.302919Z"), Valid: true},
-					value.String{Value: "KPF.execute;752dd747-5f6a-45c6-9ee2-e6662530ecc3", Valid: true},
-					value.GUID{Value: uuid.MustParse("311e7e1b-3c8f-4e91-a04b-0fa5f7be6100"), Valid: true},
+					value.NewDateTime(timeMustParse(time.RFC3339Nano, "2021-08-27T04:14:55.302919Z")),
+					value.NewString("KPF.execute;752dd747-5f6a-45c6-9ee2-e6662530ecc3"),
+					value.NewGUID(uuid.MustParse("311e7e1b-3c8f-4e91-a04b-0fa5f7be6100")),
 				},
 				{
-					value.DateTime{Value: timeMustParse(time.RFC3339Nano, "2022-08-27T04:14:55.302919Z"), Valid: true},
-					value.String{Value: "KPG.execute;752dd747-5f6a-45c6-9ee2-e6662530ecc3", Valid: true},
-					value.GUID{Value: uuid.MustParse("411e7e1b-3c8f-4e91-a04b-0fa5f7be6100"), Valid: true},
+					value.NewDateTime(timeMustParse(time.RFC3339Nano, "2022-08-27T04:14:55.302919Z")),
+					value.NewString("KPG.execute;752dd747-5f6a-45c6-9ee2-e6662530ecc3"),
+					value.NewGUID(uuid.MustParse("411e7e1b-3c8f-4e91-a04b-0fa5f7be6100")),
 				},
 			},
 			Op: errors.OpQuery,
@@ -277,14 +277,14 @@ func TestErrorDecode(t *testing.T) {
 			},
 			KustoRows: []value.Values{
 				{
-					value.DateTime{Value: timeMustParse(time.RFC3339Nano, "2019-08-27T04:14:55.302919Z"), Valid: true},
-					value.String{Value: "KPC.execute;752dd747-5f6a-45c6-9ee2-e6662530ecc3", Valid: true},
-					value.GUID{Value: uuid.MustParse("011e7e1b-3c8f-4e91-a04b-0fa5f7be6100"), Valid: true},
+					value.NewDateTime(timeMustParse(time.RFC3339Nano, "2019-08-27T04:14:55.302919Z")),
+					value.NewString("KPC.execute;752dd747-5f6a-45c6-9ee2-e6662530ecc3"),
+					value.NewGUID(uuid.MustParse("011e7e1b-3c8f-4e91-a04b-0fa5f7be6100")),
 				},
 				{
-					value.DateTime{Value: timeMustParse(time.RFC3339Nano, "2020-08-27T04:14:55.302919Z"), Valid: true},
-					value.String{Value: "KPE.execute;752dd747-5f6a-45c6-9ee2-e6662530ecc3", Valid: true},
-					value.GUID{Value: uuid.MustParse("211e7e1b-3c8f-4e91-a04b-0fa5f7be6100"), Valid: true},
+					value.NewDateTime(timeMustParse(time.RFC3339Nano, "2020-08-27T04:14:55.302919Z")),
+					value.NewString("KPE.execute;752dd747-5f6a-45c6-9ee2-e6662530ecc3"),
+					value.NewGUID(uuid.MustParse("211e7e1b-3c8f-4e91-a04b-0fa5f7be6100")),
 				},
 			},
 			RowErrors: []errors.Error{
@@ -311,14 +311,14 @@ func TestErrorDecode(t *testing.T) {
 			},
 			KustoRows: []value.Values{
 				{
-					value.DateTime{Value: timeMustParse(time.RFC3339Nano, "2021-08-27T04:14:55.302919Z"), Valid: true},
-					value.String{Value: "KPF.execute;752dd747-5f6a-45c6-9ee2-e6662530ecc3", Valid: true},
-					value.GUID{Value: uuid.MustParse("311e7e1b-3c8f-4e91-a04b-0fa5f7be6100"), Valid: true},
+					value.NewDateTime(timeMustParse(time.RFC3339Nano, "2021-08-27T04:14:55.302919Z")),
+					value.NewString("KPF.execute;752dd747-5f6a-45c6-9ee2-e6662530ecc3"),
+					value.NewGUID(uuid.MustParse("311e7e1b-3c8f-4e91-a04b-0fa5f7be6100")),
 				},
 				{
-					value.DateTime{Value: timeMustParse(time.RFC3339Nano, "2022-08-27T04:14:55.302919Z"), Valid: true},
-					value.String{Value: "KPG.execute;752dd747-5f6a-45c6-9ee2-e6662530ecc3", Valid: true},
-					value.GUID{Value: uuid.MustParse("411e7e1b-3c8f-4e91-a04b-0fa5f7be6100"), Valid: true},
+					value.NewDateTime(timeMustParse(time.RFC3339Nano, "2022-08-27T04:14:55.302919Z")),
+					value.NewString("KPG.execute;752dd747-5f6a-45c6-9ee2-e6662530ecc3"),
+					value.NewGUID(uuid.MustParse("411e7e1b-3c8f-4e91-a04b-0fa5f7be6100")),
 				},
 			},
 			Op: errors.OpQuery,

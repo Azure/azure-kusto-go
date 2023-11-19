@@ -18,6 +18,10 @@ func NewBool(v bool) *Bool {
 	return &Bool{Value: v, Valid: true}
 }
 
+func NewNullBool() *Bool {
+	return &Bool{Valid: false}
+}
+
 func (*Bool) isKustoVal() {}
 
 // String implements fmt.Stringer.

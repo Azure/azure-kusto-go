@@ -17,6 +17,14 @@ type Long struct {
 	Valid bool
 }
 
+func NewLong(i int64) *Long {
+	return &Long{Value: i, Valid: true}
+}
+
+func NewNullLong() *Long {
+	return &Long{Valid: false}
+}
+
 func (*Long) isKustoVal() {}
 
 // String implements fmt.Stringer.

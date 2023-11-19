@@ -177,9 +177,9 @@ func TestNonProgressive(t *testing.T) {
 					},
 					KustoRows: []value.Values{
 						{
-							value.Int{Value: 1, Valid: true},
-							value.String{Value: "Visualization", Valid: true},
-							value.Dynamic{Value: []byte(`{"Visualization":null,"Title":null,"XColumn":null,"Series":null,"YColumns":null,"XTitle":null}`), Valid: true},
+							value.NewInt(1),
+							value.NewString("Visualization"),
+							value.NewDynamic([]byte(`{"Visualization":null,"Title":null,"XColumn":null,"Series":null,"YColumns":null,"XTitle":null}`)),
 						},
 					},
 				},
@@ -194,14 +194,14 @@ func TestNonProgressive(t *testing.T) {
 					},
 					KustoRows: []value.Values{
 						{
-							value.DateTime{Value: nowish, Valid: true},
-							value.String{Value: "Doak", Valid: true},
-							value.Long{Value: 10, Valid: true},
+							value.NewDateTime(nowish),
+							value.NewString("Doak"),
+							value.NewLong(10),
 						},
 						{
-							value.DateTime{Value: nowish, Valid: true},
-							value.String{Value: "Dubovski", Valid: true},
-							value.Long{Value: 0, Valid: false},
+							value.NewDateTime(nowish),
+							value.NewString("Dubovski"),
+							value.NewNullLong(),
 						},
 					},
 				},
@@ -225,9 +225,9 @@ func TestNonProgressive(t *testing.T) {
 					},
 					KustoRows: []value.Values{
 						{
-							value.DateTime{Value: nowish, Valid: true},
-							value.String{Value: "KPC.execute;752dd747-5f6a-45c6-9ee2-e6662530ecc3", Valid: true},
-							value.GUID{Value: uuid.MustParse("011e7e1b-3c8f-4e91-a04b-0fa5f7be6100"), Valid: true},
+							value.NewDateTime(nowish),
+							value.NewString("KPC.execute;752dd747-5f6a-45c6-9ee2-e6662530ecc3"),
+							value.NewGUID(uuid.MustParse("011e7e1b-3c8f-4e91-a04b-0fa5f7be6100")),
 						},
 					},
 				},
@@ -241,9 +241,9 @@ func TestNonProgressive(t *testing.T) {
 						{Name: "ID", Type: "long"},
 					},
 					Values: value.Values{
-						value.DateTime{Value: nowish, Valid: true},
-						value.String{Value: "Doak", Valid: true},
-						value.Long{Value: 10, Valid: true},
+						value.NewDateTime(nowish),
+						value.NewString("Doak"),
+						value.NewLong(10),
 					},
 					Op: errors.OpQuery,
 				},
@@ -254,9 +254,9 @@ func TestNonProgressive(t *testing.T) {
 						{Name: "ID", Type: "long"},
 					},
 					Values: value.Values{
-						value.DateTime{Value: nowish, Valid: true},
-						value.String{Value: "Dubovski", Valid: true},
-						value.Long{Value: 0, Valid: false},
+						value.NewDateTime(nowish),
+						value.NewString("Dubovski"),
+						value.NewNullLong(),
 					},
 					Op: errors.OpQuery,
 				},
@@ -273,9 +273,9 @@ func TestNonProgressive(t *testing.T) {
 					},
 					KustoRows: []value.Values{
 						{
-							value.Int{Value: 1, Valid: true},
-							value.String{Value: "Visualization", Valid: true},
-							value.Dynamic{Value: []byte(`{"Visualization":null,"Title":null,"XColumn":null,"Series":null,"YColumns":null,"XTitle":null}`), Valid: true},
+							value.NewInt(1),
+							value.NewString("Visualization"),
+							value.NewDynamic([]byte(`{"Visualization":null,"Title":null,"XColumn":null,"Series":null,"YColumns":null,"XTitle":null}`)),
 						},
 					},
 				},
@@ -299,10 +299,9 @@ func TestNonProgressive(t *testing.T) {
 					},
 					KustoRows: []value.Values{
 						{
-							value.DateTime{Value: nowish, Valid: true},
-							value.String{Value: "KPC.execute;752dd747-5f6a-45c6-9ee2-e6662530ecc3", Valid: true},
-							value.GUID{Value: uuid.MustParse("011e7e1b-3c8f-4e91-a04b-0fa5f7be6100"),
-								Valid: true},
+							value.NewDateTime(nowish),
+							value.NewString("KPC.execute;752dd747-5f6a-45c6-9ee2-e6662530ecc3"),
+							value.NewGUID(uuid.MustParse("011e7e1b-3c8f-4e91-a04b-0fa5f7be6100")),
 						},
 					},
 				},
@@ -322,9 +321,9 @@ func TestNonProgressive(t *testing.T) {
 					},
 					KustoRows: []value.Values{
 						{
-							value.Int{Value: 1, Valid: true},
-							value.String{Value: "Visualization", Valid: true},
-							value.Dynamic{Value: []byte(`{"Visualization":null,"Title":null,"XColumn":null,"Series":null,"YColumns":null,"XTitle":null}`), Valid: true},
+							value.NewInt(1),
+							value.NewString("Visualization"),
+							value.NewDynamic([]byte(`{"Visualization":null,"Title":null,"XColumn":null,"Series":null,"YColumns":null,"XTitle":null}`)),
 						},
 					},
 					RowErrors: []errors.Error{
@@ -344,14 +343,14 @@ func TestNonProgressive(t *testing.T) {
 					},
 					KustoRows: []value.Values{
 						{
-							value.DateTime{Value: nowish, Valid: true},
-							value.String{Value: "Doak", Valid: true},
-							value.Long{Value: 10, Valid: true},
+							value.NewDateTime(nowish),
+							value.NewString("Doak"),
+							value.NewLong(10),
 						},
 						{
-							value.DateTime{Value: nowish, Valid: true},
-							value.String{Value: "Dubovski", Valid: true},
-							value.Long{Value: 0, Valid: false},
+							value.NewDateTime(nowish),
+							value.NewString("Dubovski"),
+							value.NewNullLong(),
 						},
 					},
 					RowErrors: []errors.Error{
@@ -380,9 +379,9 @@ func TestNonProgressive(t *testing.T) {
 					},
 					KustoRows: []value.Values{
 						{
-							value.DateTime{Value: nowish, Valid: true},
-							value.String{Value: "KPC.execute;752dd747-5f6a-45c6-9ee2-e6662530ecc3", Valid: true},
-							value.GUID{Value: uuid.MustParse("011e7e1b-3c8f-4e91-a04b-0fa5f7be6100"), Valid: true},
+							value.NewDateTime(nowish),
+							value.NewString("KPC.execute;752dd747-5f6a-45c6-9ee2-e6662530ecc3"),
+							value.NewGUID(uuid.MustParse("011e7e1b-3c8f-4e91-a04b-0fa5f7be6100")),
 						},
 					},
 				},
@@ -396,9 +395,9 @@ func TestNonProgressive(t *testing.T) {
 						{Name: "ID", Type: "long"},
 					},
 					Values: value.Values{
-						value.DateTime{Value: nowish, Valid: true},
-						value.String{Value: "Doak", Valid: true},
-						value.Long{Value: 10, Valid: true},
+						value.NewDateTime(nowish),
+						value.NewString("Doak"),
+						value.NewLong(10),
 					},
 					Op: errors.OpQuery,
 				},
@@ -409,9 +408,9 @@ func TestNonProgressive(t *testing.T) {
 						{Name: "ID", Type: "long"},
 					},
 					Values: value.Values{
-						value.DateTime{Value: nowish, Valid: true},
-						value.String{Value: "Dubovski", Valid: true},
-						value.Long{Value: 0, Valid: false},
+						value.NewDateTime(nowish),
+						value.NewString("Dubovski"),
+						value.NewNullLong(),
 					},
 					Op: errors.OpQuery,
 				},
@@ -428,9 +427,9 @@ func TestNonProgressive(t *testing.T) {
 					},
 					KustoRows: []value.Values{
 						{
-							value.Int{Value: 1, Valid: true},
-							value.String{Value: "Visualization", Valid: true},
-							value.Dynamic{Value: []byte(`{"Visualization":null,"Title":null,"XColumn":null,"Series":null,"YColumns":null,"XTitle":null}`), Valid: true},
+							value.NewInt(1),
+							value.NewString("Visualization"),
+							value.NewDynamic([]byte(`{"Visualization":null,"Title":null,"XColumn":null,"Series":null,"YColumns":null,"XTitle":null}`)),
 						},
 					},
 					RowErrors: []errors.Error{
@@ -459,10 +458,9 @@ func TestNonProgressive(t *testing.T) {
 					},
 					KustoRows: []value.Values{
 						{
-							value.DateTime{Value: nowish, Valid: true},
-							value.String{Value: "KPC.execute;752dd747-5f6a-45c6-9ee2-e6662530ecc3", Valid: true},
-							value.GUID{Value: uuid.MustParse("011e7e1b-3c8f-4e91-a04b-0fa5f7be6100"),
-								Valid: true},
+							value.NewDateTime(nowish),
+							value.NewString("KPC.execute;752dd747-5f6a-45c6-9ee2-e6662530ecc3"),
+							value.NewGUID(uuid.MustParse("011e7e1b-3c8f-4e91-a04b-0fa5f7be6100")),
 						},
 					},
 				},
@@ -604,9 +602,9 @@ func TestProgressive(t *testing.T) {
 					},
 					KustoRows: []value.Values{
 						{
-							value.Int{Value: 1, Valid: true},
-							value.String{Value: "Visualization", Valid: true},
-							value.Dynamic{Value: []byte(`{"Visualization":null,"Title":null,"XColumn":null,"Series":null,"YColumns":null,"XTitle":null}`), Valid: true},
+							value.NewInt(1),
+							value.NewString("Visualization"),
+							value.NewDynamic([]byte(`{"Visualization":null,"Title":null,"XColumn":null,"Series":null,"YColumns":null,"XTitle":null}`)),
 						},
 					},
 				},
@@ -621,14 +619,14 @@ func TestProgressive(t *testing.T) {
 					},
 					KustoRows: []value.Values{
 						{
-							value.DateTime{Value: nowish, Valid: true},
-							value.String{Value: "Doak", Valid: true},
-							value.Long{Value: 10, Valid: true},
+							value.NewDateTime(nowish),
+							value.NewString("Doak"),
+							value.NewLong(10),
 						},
 						{
-							value.DateTime{Value: nowish, Valid: true},
-							value.String{Value: "Dubovski", Valid: true},
-							value.Long{Value: 0, Valid: false},
+							value.NewDateTime(nowish),
+							value.NewString("Dubovski"),
+							value.NewNullLong(),
 						},
 					},
 				},
@@ -650,23 +648,23 @@ func TestProgressive(t *testing.T) {
 				v2.TableFragment{
 					KustoRows: []value.Values{
 						{
-							value.DateTime{Value: nowish, Valid: true},
-							value.String{Value: "Doak", Valid: true},
-							value.Long{Value: 10, Valid: true},
+							value.NewDateTime(nowish),
+							value.NewString("Doak"),
+							value.NewLong(10),
 						},
 					},
 				},
 				v2.TableFragment{
 					KustoRows: []value.Values{
 						{
-							value.DateTime{Value: nowish, Valid: true},
-							value.String{Value: "Dubovski", Valid: true},
-							value.Long{Value: 0, Valid: false},
+							value.NewDateTime(nowish),
+							value.NewString("Dubovski"),
+							value.NewNullLong(),
 						},
 						{
-							value.DateTime{Value: nowish, Valid: true},
-							value.String{Value: "Evcpwtlj", Valid: true},
-							value.Long{Value: 1, Valid: true},
+							value.NewDateTime(nowish),
+							value.NewString("Evcpwtlj"),
+							value.NewLong(1),
 						},
 					},
 					TableFragmentType: "DataReplace",
@@ -683,9 +681,9 @@ func TestProgressive(t *testing.T) {
 					},
 					KustoRows: []value.Values{
 						{
-							value.Int{Value: 1, Valid: true},
-							value.String{Value: "Visualization", Valid: true},
-							value.Dynamic{Value: []byte(`{"Visualization":null,"Title":null,"XColumn":null,"Series":null,"YColumns":null,"XTitle":null}`), Valid: true},
+							value.NewInt(1),
+							value.NewString("Visualization"),
+							value.NewDynamic([]byte(`{"Visualization":null,"Title":null,"XColumn":null,"Series":null,"YColumns":null,"XTitle":null}`)),
 						},
 					},
 				},
@@ -709,9 +707,9 @@ func TestProgressive(t *testing.T) {
 					},
 					KustoRows: []value.Values{
 						{
-							value.DateTime{Value: nowish, Valid: true},
-							value.String{Value: "KPC.execute;752dd747-5f6a-45c6-9ee2-e6662530ecc3", Valid: true},
-							value.GUID{Value: uuid.MustParse("011e7e1b-3c8f-4e91-a04b-0fa5f7be6100"), Valid: true},
+							value.NewDateTime(nowish),
+							value.NewString("KPC.execute;752dd747-5f6a-45c6-9ee2-e6662530ecc3"),
+							value.NewGUID(uuid.MustParse("011e7e1b-3c8f-4e91-a04b-0fa5f7be6100")),
 						},
 					},
 				},
@@ -725,9 +723,9 @@ func TestProgressive(t *testing.T) {
 						{Name: "ID", Type: "long"},
 					},
 					Values: value.Values{
-						value.DateTime{Value: nowish, Valid: true},
-						value.String{Value: "Doak", Valid: true},
-						value.Long{Value: 10, Valid: true},
+						value.NewDateTime(nowish),
+						value.NewString("Doak"),
+						value.NewLong(10),
 					},
 					Op: errors.OpQuery,
 				},
@@ -738,9 +736,9 @@ func TestProgressive(t *testing.T) {
 						{Name: "ID", Type: "long"},
 					},
 					Values: value.Values{
-						value.DateTime{Value: nowish, Valid: true},
-						value.String{Value: "Dubovski", Valid: true},
-						value.Long{Value: 0, Valid: false},
+						value.NewDateTime(nowish),
+						value.NewString("Dubovski"),
+						value.NewNullLong(),
 					},
 					Replace: true,
 					Op:      errors.OpQuery,
@@ -752,9 +750,9 @@ func TestProgressive(t *testing.T) {
 						{Name: "ID", Type: "long"},
 					},
 					Values: value.Values{
-						value.DateTime{Value: nowish, Valid: true},
-						value.String{Value: "Evcpwtlj", Valid: true},
-						value.Long{Value: 1, Valid: true},
+						value.NewDateTime(nowish),
+						value.NewString("Evcpwtlj"),
+						value.NewLong(1),
 					},
 					Op: errors.OpQuery,
 				},
@@ -771,9 +769,9 @@ func TestProgressive(t *testing.T) {
 					},
 					KustoRows: []value.Values{
 						{
-							value.Int{Value: 1, Valid: true},
-							value.String{Value: "Visualization", Valid: true},
-							value.Dynamic{Value: []byte(`{"Visualization":null,"Title":null,"XColumn":null,"Series":null,"YColumns":null,"XTitle":null}`), Valid: true},
+							value.NewInt(1),
+							value.NewString("Visualization"),
+							value.NewDynamic([]byte(`{"Visualization":null,"Title":null,"XColumn":null,"Series":null,"YColumns":null,"XTitle":null}`)),
 						},
 					},
 				},
@@ -797,10 +795,9 @@ func TestProgressive(t *testing.T) {
 					},
 					KustoRows: []value.Values{
 						{
-							value.DateTime{Value: nowish, Valid: true},
-							value.String{Value: "KPC.execute;752dd747-5f6a-45c6-9ee2-e6662530ecc3", Valid: true},
-							value.GUID{Value: uuid.MustParse("011e7e1b-3c8f-4e91-a04b-0fa5f7be6100"),
-								Valid: true},
+							value.NewDateTime(nowish),
+							value.NewString("KPC.execute;752dd747-5f6a-45c6-9ee2-e6662530ecc3"),
+							value.NewGUID(uuid.MustParse("011e7e1b-3c8f-4e91-a04b-0fa5f7be6100")),
 						},
 					},
 				},
@@ -821,9 +818,9 @@ func TestProgressive(t *testing.T) {
 				v2.TableFragment{
 					KustoRows: []value.Values{
 						{
-							value.DateTime{Value: nowish, Valid: true},
-							value.String{Value: "Doak", Valid: true},
-							value.Long{Value: 10, Valid: true},
+							value.NewDateTime(nowish),
+							value.NewString("Doak"),
+							value.NewLong(10),
 						},
 					},
 					RowErrors: []errors.Error{
@@ -835,14 +832,14 @@ func TestProgressive(t *testing.T) {
 				v2.TableFragment{
 					KustoRows: []value.Values{
 						{
-							value.DateTime{Value: nowish, Valid: true},
-							value.String{Value: "Dubovski", Valid: true},
-							value.Long{Value: 0, Valid: false},
+							value.NewDateTime(nowish),
+							value.NewString("Dubovski"),
+							value.NewNullLong(),
 						},
 						{
-							value.DateTime{Value: nowish, Valid: true},
-							value.String{Value: "Evcpwtlj", Valid: true},
-							value.Long{Value: 1, Valid: true},
+							value.NewDateTime(nowish),
+							value.NewString("Evcpwtlj"),
+							value.NewLong(1),
 						},
 					},
 					RowErrors: []errors.Error{
@@ -862,9 +859,9 @@ func TestProgressive(t *testing.T) {
 					},
 					KustoRows: []value.Values{
 						{
-							value.Int{Value: 1, Valid: true},
-							value.String{Value: "Visualization", Valid: true},
-							value.Dynamic{Value: []byte(`{"Visualization":null,"Title":null,"XColumn":null,"Series":null,"YColumns":null,"XTitle":null}`), Valid: true},
+							value.NewInt(1),
+							value.NewString("Visualization"),
+							value.NewDynamic([]byte(`{"Visualization":null,"Title":null,"XColumn":null,"Series":null,"YColumns":null,"XTitle":null}`)),
 						},
 					},
 				},
@@ -888,9 +885,9 @@ func TestProgressive(t *testing.T) {
 					},
 					KustoRows: []value.Values{
 						{
-							value.DateTime{Value: nowish, Valid: true},
-							value.String{Value: "KPC.execute;752dd747-5f6a-45c6-9ee2-e6662530ecc3", Valid: true},
-							value.GUID{Value: uuid.MustParse("011e7e1b-3c8f-4e91-a04b-0fa5f7be6100"), Valid: true},
+							value.NewDateTime(nowish),
+							value.NewString("KPC.execute;752dd747-5f6a-45c6-9ee2-e6662530ecc3"),
+							value.NewGUID(uuid.MustParse("011e7e1b-3c8f-4e91-a04b-0fa5f7be6100")),
 						},
 					},
 				},
@@ -904,9 +901,9 @@ func TestProgressive(t *testing.T) {
 						{Name: "ID", Type: "long"},
 					},
 					Values: value.Values{
-						value.DateTime{Value: nowish, Valid: true},
-						value.String{Value: "Doak", Valid: true},
-						value.Long{Value: 10, Valid: true},
+						value.NewDateTime(nowish),
+						value.NewString("Doak"),
+						value.NewLong(10),
 					},
 					Op: errors.OpQuery,
 				},
@@ -917,9 +914,9 @@ func TestProgressive(t *testing.T) {
 						{Name: "ID", Type: "long"},
 					},
 					Values: value.Values{
-						value.DateTime{Value: nowish, Valid: true},
-						value.String{Value: "Dubovski", Valid: true},
-						value.Long{Value: 0, Valid: false},
+						value.NewDateTime(nowish),
+						value.NewString("Dubovski"),
+						value.NewNullLong(),
 					},
 					Replace: true,
 					Op:      errors.OpQuery,
@@ -931,9 +928,9 @@ func TestProgressive(t *testing.T) {
 						{Name: "ID", Type: "long"},
 					},
 					Values: value.Values{
-						value.DateTime{Value: nowish, Valid: true},
-						value.String{Value: "Evcpwtlj", Valid: true},
-						value.Long{Value: 1, Valid: true},
+						value.NewDateTime(nowish),
+						value.NewString("Evcpwtlj"),
+						value.NewLong(1),
 					},
 					Op: errors.OpQuery,
 				},
@@ -946,9 +943,9 @@ func TestProgressive(t *testing.T) {
 						{Name: "ID", Type: "long"},
 					},
 					Values: value.Values{
-						value.DateTime{Value: nowish, Valid: true},
-						value.String{Value: "Doak", Valid: true},
-						value.Long{Value: 10, Valid: true},
+						value.NewDateTime(nowish),
+						value.NewString("Doak"),
+						value.NewLong(10),
 					},
 					Op: errors.OpQuery,
 				},
@@ -965,9 +962,9 @@ func TestProgressive(t *testing.T) {
 					},
 					KustoRows: []value.Values{
 						{
-							value.Int{Value: 1, Valid: true},
-							value.String{Value: "Visualization", Valid: true},
-							value.Dynamic{Value: []byte(`{"Visualization":null,"Title":null,"XColumn":null,"Series":null,"YColumns":null,"XTitle":null}`), Valid: true},
+							value.NewInt(1),
+							value.NewString("Visualization"),
+							value.NewDynamic([]byte(`{"Visualization":null,"Title":null,"XColumn":null,"Series":null,"YColumns":null,"XTitle":null}`)),
 						},
 					},
 				},
@@ -991,10 +988,9 @@ func TestProgressive(t *testing.T) {
 					},
 					KustoRows: []value.Values{
 						{
-							value.DateTime{Value: nowish, Valid: true},
-							value.String{Value: "KPC.execute;752dd747-5f6a-45c6-9ee2-e6662530ecc3", Valid: true},
-							value.GUID{Value: uuid.MustParse("011e7e1b-3c8f-4e91-a04b-0fa5f7be6100"),
-								Valid: true},
+							value.NewDateTime(nowish),
+							value.NewString("KPC.execute;752dd747-5f6a-45c6-9ee2-e6662530ecc3"),
+							value.NewGUID(uuid.MustParse("011e7e1b-3c8f-4e91-a04b-0fa5f7be6100")),
 						},
 					},
 				},
@@ -1100,9 +1096,9 @@ func TestV1SM(t *testing.T) {
 					},
 					KustoRows: []value.Values{
 						{
-							value.DateTime{Value: nowish, Valid: true},
-							value.String{Value: "Doak", Valid: true},
-							value.Long{Value: 10, Valid: true},
+							value.NewDateTime(nowish),
+							value.NewString("Doak"),
+							value.NewLong(10),
 						},
 					},
 				},
@@ -1115,9 +1111,9 @@ func TestV1SM(t *testing.T) {
 						{Name: "ID", Type: "long"},
 					},
 					Values: value.Values{
-						value.DateTime{Value: nowish, Valid: true},
-						value.String{Value: "Doak", Valid: true},
-						value.Long{Value: 10, Valid: true},
+						value.NewDateTime(nowish),
+						value.NewString("Doak"),
+						value.NewLong(10),
 					},
 					Op: errors.OpQuery,
 				},
@@ -1134,9 +1130,9 @@ func TestV1SM(t *testing.T) {
 					},
 					KustoRows: []value.Values{
 						{
-							value.DateTime{Value: nowish, Valid: true},
-							value.String{Value: "Doak", Valid: true},
-							value.Long{Value: 10, Valid: true},
+							value.NewDateTime(nowish),
+							value.NewString("Doak"),
+							value.NewLong(10),
 						},
 					},
 				},
@@ -1146,7 +1142,7 @@ func TestV1SM(t *testing.T) {
 					},
 					KustoRows: []value.Values{
 						{
-							value.String{Value: "{\"Visualization\":null,\"Title\":null,\"XColumn\":null,\"Series\":null,\"YColumns\":null,\"AnomalyColumns\":null,\"XTitle\":null,\"YTitle\":null,\"XAxis\":null,\"YAxis\":null,\"Legend\":null,\"YSplit\":null,\"Accumulate\":false,\"IsQuerySorted\":false,\"Kind\":null,\"Ymin\":\"NaN\",\"Ymax\":\"NaN\"}", Valid: true},
+							value.NewString("{\"Visualization\":null,\"Title\":null,\"XColumn\":null,\"Series\":null,\"YColumns\":null,\"AnomalyColumns\":null,\"XTitle\":null,\"YTitle\":null,\"XAxis\":null,\"YAxis\":null,\"Legend\":null,\"YSplit\":null,\"Accumulate\":false,\"IsQuerySorted\":false,\"Kind\":null,\"Ymin\":\"NaN\",\"Ymax\":\"NaN\"}"),
 						},
 					},
 				},
@@ -1159,9 +1155,9 @@ func TestV1SM(t *testing.T) {
 						{Name: "ID", Type: "long"},
 					},
 					Values: value.Values{
-						value.DateTime{Value: nowish, Valid: true},
-						value.String{Value: "Doak", Valid: true},
-						value.Long{Value: 10, Valid: true},
+						value.NewDateTime(nowish),
+						value.NewString("Doak"),
+						value.NewLong(10),
 					},
 					Op: errors.OpQuery,
 				},
@@ -1178,9 +1174,9 @@ func TestV1SM(t *testing.T) {
 					},
 					KustoRows: []value.Values{
 						{
-							value.DateTime{Value: nowish, Valid: true},
-							value.String{Value: "Doak", Valid: true},
-							value.Long{Value: 10, Valid: true},
+							value.NewDateTime(nowish),
+							value.NewString("Doak"),
+							value.NewLong(10),
 						},
 					},
 				},
@@ -1190,7 +1186,7 @@ func TestV1SM(t *testing.T) {
 					},
 					KustoRows: []value.Values{
 						{
-							value.String{Value: "{\"Visualization\":null,\"Title\":null,\"XColumn\":null,\"Series\":null,\"YColumns\":null,\"AnomalyColumns\":null,\"XTitle\":null,\"YTitle\":null,\"XAxis\":null,\"YAxis\":null,\"Legend\":null,\"YSplit\":null,\"Accumulate\":false,\"IsQuerySorted\":false,\"Kind\":null,\"Ymin\":\"NaN\",\"Ymax\":\"NaN\"}", Valid: true},
+							value.NewString("{\"Visualization\":null,\"Title\":null,\"XColumn\":null,\"Series\":null,\"YColumns\":null,\"AnomalyColumns\":null,\"XTitle\":null,\"YTitle\":null,\"XAxis\":null,\"YAxis\":null,\"Legend\":null,\"YSplit\":null,\"Accumulate\":false,\"IsQuerySorted\":false,\"Kind\":null,\"Ymin\":\"NaN\",\"Ymax\":\"NaN\"}"),
 						},
 					},
 				},
@@ -1204,18 +1200,18 @@ func TestV1SM(t *testing.T) {
 					},
 					KustoRows: []value.Values{
 						{
-							value.Long{Value: 0, Valid: true},
-							value.String{Value: "QueryResult", Valid: true},
-							value.String{Value: "PrimaryResult", Valid: true},
-							value.String{Value: "07dd9603-3e06-4c62-986b-dfc3d586b05a", Valid: true},
-							value.String{Value: "", Valid: true},
+							value.NewLong(0),
+							value.NewString("QueryResult"),
+							value.NewString("PrimaryResult"),
+							value.NewString("07dd9603-3e06-4c62-986b-dfc3d586b05a"),
+							value.NewString(""),
 						},
 						{
-							value.Long{Value: 1, Valid: true},
-							value.String{Value: "QueryProperties", Valid: true},
-							value.String{Value: "@ExtendedProperties", Valid: true},
-							value.String{Value: "309c015e-5693-4b66-92e7-4a4f98c3155b", Valid: true},
-							value.String{Value: "", Valid: true},
+							value.NewLong(1),
+							value.NewString("QueryProperties"),
+							value.NewString("@ExtendedProperties"),
+							value.NewString("309c015e-5693-4b66-92e7-4a4f98c3155b"),
+							value.NewString(""),
 						},
 					},
 				},
@@ -1228,9 +1224,9 @@ func TestV1SM(t *testing.T) {
 						{Name: "ID", Type: "long"},
 					},
 					Values: value.Values{
-						value.DateTime{Value: nowish, Valid: true},
-						value.String{Value: "Doak", Valid: true},
-						value.Long{Value: 10, Valid: true},
+						value.NewDateTime(nowish),
+						value.NewString("Doak"),
+						value.NewLong(10),
 					},
 					Op: errors.OpQuery,
 				},
@@ -1247,9 +1243,9 @@ func TestV1SM(t *testing.T) {
 					},
 					KustoRows: []value.Values{
 						{
-							value.DateTime{Value: nowish, Valid: true},
-							value.String{Value: "Doak", Valid: true},
-							value.Long{Value: 10, Valid: true},
+							value.NewDateTime(nowish),
+							value.NewString("Doak"),
+							value.NewLong(10),
 						},
 					},
 				},
@@ -1259,7 +1255,7 @@ func TestV1SM(t *testing.T) {
 					},
 					KustoRows: []value.Values{
 						{
-							value.String{Value: "{\"Visualization\":null,\"Title\":null,\"XColumn\":null,\"Series\":null,\"YColumns\":null,\"AnomalyColumns\":null,\"XTitle\":null,\"YTitle\":null,\"XAxis\":null,\"YAxis\":null,\"Legend\":null,\"YSplit\":null,\"Accumulate\":false,\"IsQuerySorted\":false,\"Kind\":null,\"Ymin\":\"NaN\",\"Ymax\":\"NaN\"}", Valid: true},
+							value.NewString("{\"Visualization\":null,\"Title\":null,\"XColumn\":null,\"Series\":null,\"YColumns\":null,\"AnomalyColumns\":null,\"XTitle\":null,\"YTitle\":null,\"XAxis\":null,\"YAxis\":null,\"Legend\":null,\"YSplit\":null,\"Accumulate\":false,\"IsQuerySorted\":false,\"Kind\":null,\"Ymin\":\"NaN\",\"Ymax\":\"NaN\"}"),
 						},
 					},
 				},
@@ -1271,9 +1267,9 @@ func TestV1SM(t *testing.T) {
 					},
 					KustoRows: []value.Values{
 						{
-							value.DateTime{Value: nowish, Valid: true},
-							value.String{Value: "DD", Valid: true},
-							value.Long{Value: 101, Valid: true},
+							value.NewDateTime(nowish),
+							value.NewString("DD"),
+							value.NewLong(101),
 						},
 					},
 				},
@@ -1287,25 +1283,25 @@ func TestV1SM(t *testing.T) {
 					},
 					KustoRows: []value.Values{
 						{
-							value.Long{Value: 0, Valid: true},
-							value.String{Value: "QueryResult", Valid: true},
-							value.String{Value: "PrimaryResult", Valid: true},
-							value.String{Value: "07dd9603-3e06-4c62-986b-dfc3d586b05a", Valid: true},
-							value.String{Value: "", Valid: true},
+							value.NewLong(0),
+							value.NewString("QueryResult"),
+							value.NewString("PrimaryResult"),
+							value.NewString("07dd9603-3e06-4c62-986b-dfc3d586b05a"),
+							value.NewString(""),
 						},
 						{
-							value.Long{Value: 1, Valid: true},
-							value.String{Value: "QueryProperties", Valid: true},
-							value.String{Value: "@ExtendedProperties", Valid: true},
-							value.String{Value: "309c015e-5693-4b66-92e7-4a4f98c3155b", Valid: true},
-							value.String{Value: "", Valid: true},
+							value.NewLong(1),
+							value.NewString("QueryProperties"),
+							value.NewString("@ExtendedProperties"),
+							value.NewString("309c015e-5693-4b66-92e7-4a4f98c3155b"),
+							value.NewString(""),
 						},
 						{
-							value.Long{Value: 2, Valid: true},
-							value.String{Value: "QueryResult", Valid: true},
-							value.String{Value: "PrimaryResult", Valid: true},
-							value.String{Value: "07dd9603-3e06-4c62-986b-dfc3d586b05a", Valid: true},
-							value.String{Value: "", Valid: true},
+							value.NewLong(2),
+							value.NewString("QueryResult"),
+							value.NewString("PrimaryResult"),
+							value.NewString("07dd9603-3e06-4c62-986b-dfc3d586b05a"),
+							value.NewString(""),
 						},
 					},
 				},
@@ -1318,9 +1314,9 @@ func TestV1SM(t *testing.T) {
 						{Name: "ID", Type: "long"},
 					},
 					Values: value.Values{
-						value.DateTime{Value: nowish, Valid: true},
-						value.String{Value: "Doak", Valid: true},
-						value.Long{Value: 10, Valid: true},
+						value.NewDateTime(nowish),
+						value.NewString("Doak"),
+						value.NewLong(10),
 					},
 					Op: errors.OpQuery,
 				},
@@ -1331,9 +1327,9 @@ func TestV1SM(t *testing.T) {
 						{Name: "ID", Type: "long"},
 					},
 					Values: value.Values{
-						value.DateTime{Value: nowish, Valid: true},
-						value.String{Value: "DD", Valid: true},
-						value.Long{Value: 101, Valid: true},
+						value.NewDateTime(nowish),
+						value.NewString("DD"),
+						value.NewLong(101),
 					},
 					Op: errors.OpQuery,
 				},
@@ -1350,9 +1346,9 @@ func TestV1SM(t *testing.T) {
 					},
 					KustoRows: []value.Values{
 						{
-							value.DateTime{Value: nowish, Valid: true},
-							value.String{Value: "Doak", Valid: true},
-							value.Long{Value: 10, Valid: true},
+							value.NewDateTime(nowish),
+							value.NewString("Doak"),
+							value.NewLong(10),
 						},
 					},
 					RowErrors: []errors.Error{
@@ -1367,7 +1363,7 @@ func TestV1SM(t *testing.T) {
 					},
 					KustoRows: []value.Values{
 						{
-							value.String{Value: "{\"Visualization\":null,\"Title\":null,\"XColumn\":null,\"Series\":null,\"YColumns\":null,\"AnomalyColumns\":null,\"XTitle\":null,\"YTitle\":null,\"XAxis\":null,\"YAxis\":null,\"Legend\":null,\"YSplit\":null,\"Accumulate\":false,\"IsQuerySorted\":false,\"Kind\":null,\"Ymin\":\"NaN\",\"Ymax\":\"NaN\"}", Valid: true},
+							value.NewString("{\"Visualization\":null,\"Title\":null,\"XColumn\":null,\"Series\":null,\"YColumns\":null,\"AnomalyColumns\":null,\"XTitle\":null,\"YTitle\":null,\"XAxis\":null,\"YAxis\":null,\"Legend\":null,\"YSplit\":null,\"Accumulate\":false,\"IsQuerySorted\":false,\"Kind\":null,\"Ymin\":\"NaN\",\"Ymax\":\"NaN\"}"),
 						},
 					},
 				},
@@ -1379,9 +1375,9 @@ func TestV1SM(t *testing.T) {
 					},
 					KustoRows: []value.Values{
 						{
-							value.DateTime{Value: nowish, Valid: true},
-							value.String{Value: "DD", Valid: true},
-							value.Long{Value: 101, Valid: true},
+							value.NewDateTime(nowish),
+							value.NewString("DD"),
+							value.NewLong(101),
 						},
 					},
 					RowErrors: []errors.Error{
@@ -1398,25 +1394,25 @@ func TestV1SM(t *testing.T) {
 					},
 					KustoRows: []value.Values{
 						{
-							value.Long{Value: 0, Valid: true},
-							value.String{Value: "QueryResult", Valid: true},
-							value.String{Value: "PrimaryResult", Valid: true},
-							value.String{Value: "07dd9603-3e06-4c62-986b-dfc3d586b05a", Valid: true},
-							value.String{Value: "", Valid: true},
+							value.NewLong(0),
+							value.NewString("QueryResult"),
+							value.NewString("PrimaryResult"),
+							value.NewString("07dd9603-3e06-4c62-986b-dfc3d586b05a"),
+							value.NewString(""),
 						},
 						{
-							value.Long{Value: 1, Valid: true},
-							value.String{Value: "QueryProperties", Valid: true},
-							value.String{Value: "@ExtendedProperties", Valid: true},
-							value.String{Value: "309c015e-5693-4b66-92e7-4a4f98c3155b", Valid: true},
-							value.String{Value: "", Valid: true},
+							value.NewLong(1),
+							value.NewString("QueryProperties"),
+							value.NewString("@ExtendedProperties"),
+							value.NewString("309c015e-5693-4b66-92e7-4a4f98c3155b"),
+							value.NewString(""),
 						},
 						{
-							value.Long{Value: 2, Valid: true},
-							value.String{Value: "QueryResult", Valid: true},
-							value.String{Value: "PrimaryResult", Valid: true},
-							value.String{Value: "07dd9603-3e06-4c62-986b-dfc3d586b05a", Valid: true},
-							value.String{Value: "", Valid: true},
+							value.NewLong(2),
+							value.NewString("QueryResult"),
+							value.NewString("PrimaryResult"),
+							value.NewString("07dd9603-3e06-4c62-986b-dfc3d586b05a"),
+							value.NewString(""),
 						},
 					},
 				},
@@ -1429,9 +1425,9 @@ func TestV1SM(t *testing.T) {
 						{Name: "ID", Type: "long"},
 					},
 					Values: value.Values{
-						value.DateTime{Value: nowish, Valid: true},
-						value.String{Value: "Doak", Valid: true},
-						value.Long{Value: 10, Valid: true},
+						value.NewDateTime(nowish),
+						value.NewString("Doak"),
+						value.NewLong(10),
 					},
 					Op: errors.OpQuery,
 				},
@@ -1442,9 +1438,9 @@ func TestV1SM(t *testing.T) {
 						{Name: "ID", Type: "long"},
 					},
 					Values: value.Values{
-						value.DateTime{Value: nowish, Valid: true},
-						value.String{Value: "DD", Valid: true},
-						value.Long{Value: 101, Valid: true},
+						value.NewDateTime(nowish),
+						value.NewString("DD"),
+						value.NewLong(101),
 					},
 					Op: errors.OpQuery,
 				},
@@ -1457,9 +1453,9 @@ func TestV1SM(t *testing.T) {
 						{Name: "ID", Type: "long"},
 					},
 					Values: value.Values{
-						value.DateTime{Value: nowish, Valid: true},
-						value.String{Value: "Doak", Valid: true},
-						value.Long{Value: 10, Valid: true},
+						value.NewDateTime(nowish),
+						value.NewString("Doak"),
+						value.NewLong(10),
 					},
 					Op: errors.OpQuery,
 				},

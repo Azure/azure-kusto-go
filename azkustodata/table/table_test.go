@@ -78,7 +78,7 @@ func TestRowToStruct(t *testing.T) {
 				{Name: "Id", Type: types.Long},
 			},
 			row: value.Values{
-				value.Long{Value: 1, Valid: true},
+				value.NewLong(1),
 			},
 			got: struct {
 				ID int64 `kusto:"Id"`
@@ -91,7 +91,7 @@ func TestRowToStruct(t *testing.T) {
 				{Name: "Id", Type: types.Long},
 			},
 			row: value.Values{
-				value.Long{Value: 1, Valid: true},
+				value.NewLong(1),
 			},
 			got: firstName,
 			err: true,
@@ -102,8 +102,8 @@ func TestRowToStruct(t *testing.T) {
 				{Name: "Id", Type: types.Long},
 			},
 			row: value.Values{
-				value.Long{Value: 1, Valid: true},
-				value.Long{Value: 1, Valid: true},
+				value.NewLong(1),
+				value.NewLong(1),
 			},
 			err: true,
 		},
@@ -118,12 +118,12 @@ func TestRowToStruct(t *testing.T) {
 				{Name: "NullString", Type: types.String},
 			},
 			row: value.Values{
-				value.Long{Value: 1, Valid: true},
-				value.String{Value: "John", Valid: true},
-				value.String{Value: "Doak", Valid: true},
-				value.DateTime{Value: time.Now(), Valid: true},
-				value.Real{Valid: false},
-				value.String{Valid: false},
+				value.NewLong(1),
+				value.NewString("John"),
+				value.NewString("Doak"),
+				value.NewDateTime(time.Now()),
+				value.NewNullReal(),
+				value.NewNullString(),
 			},
 			got: &struct {
 				ID         int64 `kusto:"Id"`
@@ -170,12 +170,12 @@ func TestExtractValuePartial(t *testing.T) {
 	row := &Row{
 		ColumnTypes: columns,
 		Values: value.Values{
-			value.Long{Value: 1, Valid: true},
-			value.String{Value: "John", Valid: true},
-			value.String{Value: "Doak", Valid: true},
-			value.DateTime{Value: time.Now(), Valid: true},
-			value.Real{Valid: false},
-			value.String{Valid: false},
+			value.NewLong(1),
+			value.NewString("John"),
+			value.NewString("Doak"),
+			value.NewDateTime(time.Now()),
+			value.NewNullReal(),
+			value.NewNullString(),
 		},
 	}
 	var id int64
@@ -208,16 +208,16 @@ func TestExtractValueAll(t *testing.T) {
 	row := &Row{
 		ColumnTypes: columns,
 		Values: value.Values{
-			value.Bool{Value: true, Valid: true},
-			value.DateTime{Value: time.Time{}, Valid: true},
-			value.Dynamic{Value: make([]byte, 0), Valid: true},
-			value.GUID{Value: uuid.UUID{}, Valid: true},
-			value.Int{Value: 1, Valid: true},
-			value.Long{Value: 2, Valid: true},
-			value.Real{Value: 3.4, Valid: true},
-			value.String{Value: "test", Valid: true},
-			value.Timespan{Value: 10, Valid: true},
-			value.Decimal{Value: "5.6", Valid: true},
+			value.NewBool(true),
+			value.NewDateTime(time.Time{}),
+			value.NewDynamic(make([]byte, 0)),
+			value.NewGUID(uuid.UUID{}),
+			value.NewInt(1),
+			value.NewLong(2),
+			value.NewReal(3.4),
+			value.NewString("test"),
+			value.NewTimespan(10),
+			value.DecimalFromString("5.6"),
 		},
 	}
 	var boolVar bool

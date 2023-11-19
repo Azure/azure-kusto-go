@@ -2,6 +2,7 @@ package azkustodata
 
 import (
 	"context"
+	"github.com/Azure/azure-kusto-go/azkustodata/kql"
 	"io"
 	"net/http"
 	"sync"
@@ -11,6 +12,8 @@ import (
 	"github.com/Azure/azure-kusto-go/azkustodata/internal/frames"
 	v2 "github.com/Azure/azure-kusto-go/azkustodata/internal/frames/v2"
 )
+
+type Statement = *kql.Builder
 
 // queryer provides for getting a stream of Kusto frames. Exists to allow fake Kusto streams in tests.
 type queryer interface {
@@ -200,12 +203,6 @@ func (c *Client) QueryToJson(ctx context.Context, db string, query Statement, op
 // Note that the server has a timeout of 10 minutes for a management call by default unless the context deadline is set.
 // There is a maximum of 1 hour.
 func (c *Client) Mgmt(ctx context.Context, db string, query Statement, options ...QueryOption) (*RowIterator, error) {
-	if stmt, ok := query.(Stmt); ok {
-		if !stmt.params.IsZero() || !stmt.defs.IsZero() {
-			return nil, errors.ES(errors.OpMgmt, errors.KClientArgs, "a Mgmt() call cannot accept a Stmt object that has Definitions or Parameters attached")
-		}
-	}
-
 	ctx, cancel := contextSetup(ctx) // Note: cancel is called when *RowIterator has Stop() called.
 
 	opts, err := setQueryOptions(ctx, errors.OpQuery, query, mgmtCall, options...)

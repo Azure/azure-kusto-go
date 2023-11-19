@@ -19,6 +19,14 @@ type Timespan struct {
 	Valid bool
 }
 
+func NewTimespan(v time.Duration) *Timespan {
+	return &Timespan{Value: v, Valid: true}
+}
+
+func NewNullTimespan() *Timespan {
+	return &Timespan{Valid: false}
+}
+
 func (*Timespan) isKustoVal() {}
 
 // String implements fmt.Stringer.

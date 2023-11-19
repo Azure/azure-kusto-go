@@ -16,6 +16,14 @@ type Real struct {
 	Valid bool
 }
 
+func NewReal(i float64) *Real {
+	return &Real{Value: i, Valid: true}
+}
+
+func NewNullReal() *Real {
+	return &Real{Valid: false}
+}
+
 func (*Real) isKustoVal() {}
 
 // String implements fmt.Stringer.

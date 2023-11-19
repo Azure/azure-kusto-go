@@ -81,7 +81,7 @@ func TestRow(t *testing.T) {
 				{Name: "Long", Type: types.Long},
 			},
 			input: []interface{}{
-				value.Values{value.Int{Value: 2, Valid: true}, value.String{}, value.Long{}},
+				value.Values{value.NewInt(2), value.NewNullString(), value.NewNullLong()},
 				value.Values{},
 			},
 			err: true,
@@ -90,12 +90,12 @@ func TestRow(t *testing.T) {
 			desc: "Columns and Rows don't match up",
 			columns: table.Columns{
 				{Name: "Int", Type: types.Int},
-				{Name: "String", Type: types.Real}, // CTReal won't match the value.String{} in input
+				{Name: "String", Type: types.Real}, // CTReal won't match the value.NewNullString() in input
 				{Name: "Long", Type: types.Long},
 			},
 			input: []interface{}{
-				value.Values{value.Int{Value: 2, Valid: true}, value.String{}, value.Long{}},
-				value.Values{value.Int{Value: 2, Valid: true}, value.String{}, value.Long{}},
+				value.Values{value.NewInt(2), value.NewNullString(), value.NewNullLong()},
+				value.Values{value.NewInt(2), value.NewNullString(), value.NewNullLong()},
 			},
 			err: true,
 		},
@@ -107,8 +107,8 @@ func TestRow(t *testing.T) {
 				{Name: "Long", Type: types.Long},
 			},
 			input: []interface{}{
-				value.Values{value.Int{Value: 2, Valid: true}, value.String{}, value.Long{}},
-				value.Values{value.Int{Value: 1, Valid: true}, value.String{}, value.Long{}},
+				value.Values{value.NewInt(2), value.NewNullString(), value.NewNullLong()},
+				value.Values{value.NewInt(1), value.NewNullString(), value.NewNullLong()},
 				fmt.Errorf("non io.EOF error"),
 			},
 			nextRowErr: true,
@@ -121,12 +121,12 @@ func TestRow(t *testing.T) {
 				{Name: "Long", Type: types.Long},
 			},
 			input: []interface{}{
-				value.Values{value.Int{Value: 2, Valid: true}, value.String{}, value.Long{}},
-				value.Values{value.Int{Value: 1, Valid: true}, value.String{}, value.Long{}},
+				value.Values{value.NewInt(2), value.NewNullString(), value.NewNullLong()},
+				value.Values{value.NewInt(1), value.NewNullString(), value.NewNullLong()},
 			},
 			want: []value.Values{
-				{value.Int{Value: 2, Valid: true}, value.String{}, value.Long{}},
-				{value.Int{Value: 1, Valid: true}, value.String{}, value.Long{}},
+				{value.NewInt(2), value.NewNullString(), value.NewNullLong()},
+				{value.NewInt(1), value.NewNullString(), value.NewNullLong()},
 			},
 		},
 	}

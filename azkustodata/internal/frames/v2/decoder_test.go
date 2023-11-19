@@ -146,12 +146,11 @@ func TestNormalDecode(t *testing.T) {
 			},
 			KustoRows: []value.Values{
 				{
-					value.Int{Value: 1, Valid: true},
-					value.String{Value: "Visualization", Valid: true},
-					value.Dynamic{
-						Value: []byte("{\"Visualization\":null,\"Title\":null,\"XColumn\":null,\"Series\":null,\"YColumns\":null,\"AnomalyColumns\":null,\"XTitle\":null,\"YTitle\":null,\"XAxis\":null,\"YAxis\":null,\"Legend\":null,\"YSplit\":null,\"Accumulate\":false,\"IsQuerySorted\":false,\"Kind\":null,\"Ymin\":\"NaN\",\"Ymax\":\"NaN\"}"),
-						Valid: true,
-					},
+					value.NewInt(1),
+					value.NewString("Visualization"),
+					value.NewDynamic(
+						[]byte("{\"Visualization\":null,\"Title\":null,\"XColumn\":null,\"Series\":null,\"YColumns\":null,\"AnomalyColumns\":null,\"XTitle\":null,\"YTitle\":null,\"XAxis\":null,\"YAxis\":null,\"Legend\":null,\"YSplit\":null,\"Accumulate\":false,\"IsQuerySorted\":false,\"Kind\":null,\"Ymin\":\"NaN\",\"Ymax\":\"NaN\"}"),
+					),
 				},
 			},
 			RowErrors: nil,
@@ -169,11 +168,11 @@ func TestNormalDecode(t *testing.T) {
 				},
 			},
 			KustoRows: []value.Values{
-				{value.Long{Value: 1, Valid: true}},
-				{value.Long{Value: 2, Valid: true}},
-				{value.Long{Value: 3, Valid: true}},
-				{value.Long{Value: 4, Valid: true}},
-				{value.Long{Value: 5, Valid: true}},
+				{value.NewLong(1)},
+				{value.NewLong(2)},
+				{value.NewLong(3)},
+				{value.NewLong(4)},
+				{value.NewLong(5)},
 			},
 			Op: errors.OpQuery,
 		},
@@ -198,9 +197,9 @@ func TestNormalDecode(t *testing.T) {
 			},
 			KustoRows: []value.Values{
 				{
-					value.DateTime{Value: timeMustParse(time.RFC3339Nano, "2019-08-27T04:14:55.302919Z"), Valid: true},
-					value.String{Value: "KPC.execute;752dd747-5f6a-45c6-9ee2-e6662530ecc3", Valid: true},
-					value.GUID{Value: uuid.MustParse("011e7e1b-3c8f-4e91-a04b-0fa5f7be6100"), Valid: true},
+					value.NewDateTime(timeMustParse(time.RFC3339Nano, "2019-08-27T04:14:55.302919Z")),
+					value.NewString("KPC.execute;752dd747-5f6a-45c6-9ee2-e6662530ecc3"),
+					value.NewGUID(uuid.MustParse("011e7e1b-3c8f-4e91-a04b-0fa5f7be6100")),
 				},
 			},
 			RowErrors: nil,
@@ -402,12 +401,11 @@ func TestErrorDecode(t *testing.T) {
 			},
 			KustoRows: []value.Values{
 				{
-					value.Int{Value: 1, Valid: true},
-					value.String{Value: "Visualization", Valid: true},
-					value.Dynamic{
-						Value: []byte("{\"Visualization\":null,\"Title\":null,\"XColumn\":null,\"Series\":null,\"YColumns\":null,\"AnomalyColumns\":null,\"XTitle\":null,\"YTitle\":null,\"XAxis\":null,\"YAxis\":null,\"Legend\":null,\"YSplit\":null,\"Accumulate\":false,\"IsQuerySorted\":false,\"Kind\":null,\"Ymin\":\"NaN\",\"Ymax\":\"NaN\"}"),
-						Valid: true,
-					},
+					value.NewInt(1),
+					value.NewString("Visualization"),
+					value.NewDynamic(
+						[]byte("{\"Visualization\":null,\"Title\":null,\"XColumn\":null,\"Series\":null,\"YColumns\":null,\"AnomalyColumns\":null,\"XTitle\":null,\"YTitle\":null,\"XAxis\":null,\"YAxis\":null,\"Legend\":null,\"YSplit\":null,\"Accumulate\":false,\"IsQuerySorted\":false,\"Kind\":null,\"Ymin\":\"NaN\",\"Ymax\":\"NaN\"}"),
+					),
 				},
 			},
 			Op: errors.OpQuery,
@@ -424,11 +422,11 @@ func TestErrorDecode(t *testing.T) {
 				},
 			},
 			KustoRows: []value.Values{
-				{value.Long{Value: 1, Valid: true}},
-				{value.Long{Value: 2, Valid: true}},
-				{value.Long{Value: 3, Valid: true}},
-				{value.Long{Value: 4, Valid: true}},
-				{value.Long{Value: 5, Valid: true}},
+				{value.NewLong(1)},
+				{value.NewLong(2)},
+				{value.NewLong(3)},
+				{value.NewLong(4)},
+				{value.NewLong(5)},
 			},
 			RowErrors: []errors.Error{
 				*errors.ES(errors.OpUnknown, errors.KLimitsExceeded, "Request is invalid and cannot be executed.;See https://docs.microsoft."+
@@ -457,9 +455,9 @@ func TestErrorDecode(t *testing.T) {
 			},
 			KustoRows: []value.Values{
 				{
-					value.DateTime{Value: timeMustParse(time.RFC3339Nano, "2019-08-27T04:14:55.302919Z"), Valid: true},
-					value.String{Value: "KPC.execute;752dd747-5f6a-45c6-9ee2-e6662530ecc3", Valid: true},
-					value.GUID{Value: uuid.MustParse("011e7e1b-3c8f-4e91-a04b-0fa5f7be6100"), Valid: true},
+					value.NewDateTime(timeMustParse(time.RFC3339Nano, "2019-08-27T04:14:55.302919Z")),
+					value.NewString("KPC.execute;752dd747-5f6a-45c6-9ee2-e6662530ecc3"),
+					value.NewGUID(uuid.MustParse("011e7e1b-3c8f-4e91-a04b-0fa5f7be6100")),
 				},
 			},
 			Op: errors.OpQuery,

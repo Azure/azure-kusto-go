@@ -15,6 +15,22 @@ type Dynamic struct {
 	Valid bool
 }
 
+func NewDynamic(v []byte) *Dynamic {
+	return &Dynamic{Value: v, Valid: true}
+}
+
+func NewNullDynamic() *Dynamic {
+	return &Dynamic{Valid: false}
+}
+func DynamicFromInterface(v interface{}) *Dynamic {
+	marshal, err := json.Marshal(v)
+	if err != nil {
+		return NewNullDynamic()
+	}
+
+	return NewDynamic(marshal)
+}
+
 func (*Dynamic) isKustoVal() {}
 
 // String implements fmt.Stringer.
@@ -63,6 +79,10 @@ func (d *Dynamic) Convert(v reflect.Value) error {
 		t = t.Elem()
 	}
 
+	if !d.Valid {
+		return nil
+	}
+
 	var valueToSet reflect.Value
 	switch {
 	case t.ConvertibleTo(reflect.TypeOf(Dynamic{})):
@@ -75,9 +95,6 @@ func (d *Dynamic) Convert(v reflect.Value) error {
 			valueToSet = reflect.ValueOf(d.Value)
 		}
 	case t.Kind() == reflect.Slice || t.Kind() == reflect.Map:
-		if !d.Valid {
-			return nil
-		}
 
 		ptr := reflect.New(t)
 		if err := json.Unmarshal([]byte(d.Value), ptr.Interface()); err != nil {

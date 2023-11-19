@@ -43,9 +43,9 @@ func TestStructToKustoValues(t *testing.T) {
 				Long:   1,
 			},
 			want: value.Values{
-				value.Int{Value: 2, Valid: true},
-				value.String{Value: "hello", Valid: true},
-				value.Long{Value: 1, Valid: true},
+				value.NewInt(2),
+				value.NewString("hello"),
+				value.NewLong(1),
 			},
 		},
 		{
@@ -61,9 +61,9 @@ func TestStructToKustoValues(t *testing.T) {
 				Long:   1,
 			},
 			want: value.Values{
-				value.Int{Value: 0, Valid: false},
-				value.String{Value: "hello", Valid: true},
-				value.Long{Value: 1, Valid: true},
+				value.NewNullInt(),
+				value.NewString("hello"),
+				value.NewLong(1),
 			},
 		},
 		{
@@ -131,16 +131,16 @@ func TestDefaultRow(t *testing.T) {
 		table.Column{Type: types.Decimal},
 	}
 	want := value.Values{
-		value.Bool{},
-		value.DateTime{},
-		value.Dynamic{},
-		value.GUID{},
-		value.Int{},
-		value.Long{},
-		value.Real{},
-		value.String{},
-		value.Timespan{},
-		value.Decimal{},
+		value.NewNullBool(),
+		value.NewNullDateTime(),
+		value.NewNullDynamic(),
+		value.NewNullGUID(),
+		value.NewNullInt(),
+		value.NewNullLong(),
+		value.NewNullReal(),
+		value.NewNullString(),
+		value.NewNullTimespan(),
+		value.NewNullDecimal(),
 	}
 
 	got, err := defaultRow(columns)
@@ -160,16 +160,16 @@ func TestColToValueCheck(t *testing.T) {
 		column table.Column
 		kt     value.Kusto
 	}{
-		{table.Column{Type: types.Bool}, value.Bool{}},
-		{table.Column{Type: types.DateTime}, value.DateTime{}},
-		{table.Column{Type: types.Dynamic}, value.Dynamic{}},
-		{table.Column{Type: types.GUID}, value.GUID{}},
-		{table.Column{Type: types.Int}, value.Int{}},
-		{table.Column{Type: types.Long}, value.Long{}},
-		{table.Column{Type: types.Real}, value.Real{}},
-		{table.Column{Type: types.String}, value.String{}},
-		{table.Column{Type: types.Timespan}, value.Timespan{}},
-		{table.Column{Type: types.Decimal}, value.Decimal{}},
+		{table.Column{Type: types.Bool}, value.NewNullBool()},
+		{table.Column{Type: types.DateTime}, value.NewNullDateTime()},
+		{table.Column{Type: types.Dynamic}, value.NewNullDynamic()},
+		{table.Column{Type: types.GUID}, value.NewNullGUID()},
+		{table.Column{Type: types.Int}, value.NewNullInt()},
+		{table.Column{Type: types.Long}, value.NewNullLong()},
+		{table.Column{Type: types.Real}, value.NewNullReal()},
+		{table.Column{Type: types.String}, value.NewNullString()},
+		{table.Column{Type: types.Timespan}, value.NewNullTimespan()},
+		{table.Column{Type: types.Decimal}, value.NewNullDecimal()},
 	}
 
 	for _, match := range matchers {
@@ -178,10 +178,10 @@ func TestColToValueCheck(t *testing.T) {
 		}
 
 		var v value.Kusto
-		if reflect.TypeOf(match.kt) != reflect.TypeOf(value.Bool{}) {
-			v = value.Bool{}
+		if reflect.TypeOf(match.kt) != reflect.TypeOf(value.NewNullBool()) {
+			v = value.NewNullBool()
 		} else {
-			v = value.Int{}
+			v = value.NewNullInt()
 		}
 		if err := colToValueCheck(table.Columns{match.column}, value.Values{v}); err == nil {
 			t.Errorf("TestColToValueCheck(%s): did not handle the incorrect type match, got err == %s", match.column, err)
@@ -195,7 +195,7 @@ func TestConvertBool(t *testing.T) {
 	var (
 		val = true
 		ptr = new(bool)
-		ty  = value.Bool{Value: true, Valid: true}
+		ty  = value.NewBool(true)
 	)
 	*ptr = true
 
@@ -205,9 +205,9 @@ func TestConvertBool(t *testing.T) {
 		err   bool
 	}{
 		{value: 1, err: true},
-		{value: val, want: value.Bool{Value: true, Valid: true}},
-		{value: ptr, want: value.Bool{Value: true, Valid: true}},
-		{value: ty, want: value.Bool{Value: true, Valid: true}},
+		{value: val, want: *value.NewBool(true)},
+		{value: ptr, want: *value.NewBool(true)},
+		{value: ty, want: *value.NewBool(true)},
 	}
 	for _, test := range tests {
 		got, err := convertBool(reflect.ValueOf(test.value))
@@ -231,7 +231,7 @@ func TestConvertDateTime(t *testing.T) {
 	var (
 		val = now
 		ptr = new(time.Time)
-		ty  = value.DateTime{Value: now, Valid: true}
+		ty  = value.NewDateTime(now)
 	)
 	*ptr = now
 
@@ -241,9 +241,9 @@ func TestConvertDateTime(t *testing.T) {
 		err   bool
 	}{
 		{value: 1, err: true},
-		{value: val, want: value.DateTime{Value: now, Valid: true}},
-		{value: ptr, want: value.DateTime{Value: now, Valid: true}},
-		{value: ty, want: value.DateTime{Value: now, Valid: true}},
+		{value: val, want: *value.NewDateTime(now)},
+		{value: ptr, want: *value.NewDateTime(now)},
+		{value: ty, want: *value.NewDateTime(now)},
 	}
 	for _, test := range tests {
 		got, err := convertDateTime(reflect.ValueOf(test.value))
@@ -268,7 +268,7 @@ func TestConvertTimespan(t *testing.T) {
 	var (
 		val = 1 * time.Second
 		ptr = new(time.Duration)
-		ty  = value.Timespan{Value: 1 * time.Second, Valid: true}
+		ty  = value.NewTimespan(1 * time.Second)
 	)
 	*ptr = val
 
@@ -278,9 +278,9 @@ func TestConvertTimespan(t *testing.T) {
 		err   bool
 	}{
 		{value: "hello", err: true},
-		{value: val, want: value.Timespan{Value: 1 * time.Second, Valid: true}},
-		{value: ptr, want: value.Timespan{Value: 1 * time.Second, Valid: true}},
-		{value: ty, want: value.Timespan{Value: 1 * time.Second, Valid: true}},
+		{value: val, want: *value.NewTimespan(1 * time.Second)},
+		{value: ptr, want: *value.NewTimespan(1 * time.Second)},
+		{value: ty, want: *value.NewTimespan(1 * time.Second)},
 	}
 	for _, test := range tests {
 		got, err := convertTimespan(reflect.ValueOf(test.value))
@@ -316,13 +316,13 @@ func TestConvertDynamic(t *testing.T) {
 	var (
 		val    = v
 		ptr    = &v
-		ty     = value.Dynamic{Value: j, Valid: true}
+		ty     = value.NewDynamic(j)
 		str    = string(j)
 		ptrStr = &str
 		m      = mustMapInter(j)
 		ptrM   = &m
 
-		want = value.Dynamic{Value: j, Valid: true}
+		want = value.NewDynamic(j)
 	)
 
 	tests := []struct {
@@ -330,7 +330,7 @@ func TestConvertDynamic(t *testing.T) {
 		want  value.Dynamic
 		err   bool
 	}{
-		{value: 1, want: value.Dynamic{Value: mustMarshal(1), Valid: true}},
+		{value: 1, want: *value.NewDynamic(mustMarshal(1))},
 		{value: val},
 		{value: ptr},
 		{value: ty},
@@ -338,7 +338,7 @@ func TestConvertDynamic(t *testing.T) {
 		{value: ptrStr},
 		{value: m},
 		{value: ptrM},
-		{value: []SampleDynamic{v, v}, want: value.Dynamic{Value: mustMarshal([]SampleDynamic{v, v}), Valid: true}},
+		{value: []SampleDynamic{v, v}, want: *value.NewDynamic(mustMarshal([]SampleDynamic{v, v}))},
 	}
 	for _, test := range tests {
 		got, err := convertDynamic(reflect.ValueOf(test.value))
@@ -352,7 +352,7 @@ func TestConvertDynamic(t *testing.T) {
 			continue
 		}
 		if test.want.Value == nil {
-			test.want = want
+			test.want = *want
 		}
 		if diff := pretty.Compare(test.want, got); diff != "" {
 			t.Errorf("TestConvertDynamic(%v): -want/+got:\n%s", test.value, diff)
@@ -369,7 +369,7 @@ func TestConvertGUID(t *testing.T) {
 	var (
 		val = u
 		ptr = new(uuid.UUID)
-		ty  = value.GUID{Value: u, Valid: true}
+		ty  = value.NewGUID(u)
 	)
 	*ptr = u
 
@@ -379,9 +379,9 @@ func TestConvertGUID(t *testing.T) {
 		err   bool
 	}{
 		{value: 1, err: true},
-		{value: val, want: value.GUID{Value: u, Valid: true}},
-		{value: ptr, want: value.GUID{Value: u, Valid: true}},
-		{value: ty, want: value.GUID{Value: u, Valid: true}},
+		{value: val, want: *value.NewGUID(u)},
+		{value: ptr, want: *value.NewGUID(u)},
+		{value: ty, want: *value.NewGUID(u)},
 	}
 	for _, test := range tests {
 		got, err := convertGUID(reflect.ValueOf(test.value))
@@ -406,7 +406,7 @@ func TestConvertInt(t *testing.T) {
 	var (
 		val = int32(1)
 		ptr = new(int32)
-		ty  = value.Int{Value: 1, Valid: true}
+		ty  = value.NewInt(1)
 	)
 	*ptr = val
 
@@ -416,9 +416,9 @@ func TestConvertInt(t *testing.T) {
 		err   bool
 	}{
 		{value: "hello", err: true},
-		{value: val, want: value.Int{Value: 1, Valid: true}},
-		{value: ptr, want: value.Int{Value: 1, Valid: true}},
-		{value: ty, want: value.Int{Value: 1, Valid: true}},
+		{value: val, want: *value.NewInt(1)},
+		{value: ptr, want: *value.NewInt(1)},
+		{value: ty, want: *value.NewInt(1)},
 	}
 	for _, test := range tests {
 		got, err := convertInt(reflect.ValueOf(test.value))
@@ -443,7 +443,7 @@ func TestConvertLong(t *testing.T) {
 	var (
 		val = int64(1)
 		ptr = new(int64)
-		ty  = value.Long{Value: 1, Valid: true}
+		ty  = value.NewLong(1)
 	)
 	*ptr = val
 
@@ -453,9 +453,9 @@ func TestConvertLong(t *testing.T) {
 		err   bool
 	}{
 		{value: "hello", err: true},
-		{value: val, want: value.Long{Value: 1, Valid: true}},
-		{value: ptr, want: value.Long{Value: 1, Valid: true}},
-		{value: ty, want: value.Long{Value: 1, Valid: true}},
+		{value: val, want: *value.NewLong(1)},
+		{value: ptr, want: *value.NewLong(1)},
+		{value: ty, want: *value.NewLong(1)},
 	}
 	for _, test := range tests {
 		got, err := convertLong(reflect.ValueOf(test.value))
@@ -480,7 +480,7 @@ func TestConvertReal(t *testing.T) {
 	var (
 		val = float64(1.0)
 		ptr = new(float64)
-		ty  = value.Real{Value: 1.0, Valid: true}
+		ty  = value.NewReal(1.0)
 	)
 	*ptr = val
 
@@ -490,9 +490,9 @@ func TestConvertReal(t *testing.T) {
 		err   bool
 	}{
 		{value: "hello", err: true},
-		{value: val, want: value.Real{Value: 1.0, Valid: true}},
-		{value: ptr, want: value.Real{Value: 1.0, Valid: true}},
-		{value: ty, want: value.Real{Value: 1.0, Valid: true}},
+		{value: val, want: *value.NewReal(1.0)},
+		{value: ptr, want: *value.NewReal(1.0)},
+		{value: ty, want: *value.NewReal(1.0)},
 	}
 	for _, test := range tests {
 		got, err := convertReal(reflect.ValueOf(test.value))
@@ -517,7 +517,7 @@ func TestConvertString(t *testing.T) {
 	var (
 		val = string("hello")
 		ptr = new(string)
-		ty  = value.String{Value: "hello", Valid: true}
+		ty  = value.NewString("hello")
 	)
 	*ptr = val
 
@@ -527,9 +527,9 @@ func TestConvertString(t *testing.T) {
 		err   bool
 	}{
 		{value: 1, err: true},
-		{value: val, want: value.String{Value: "hello", Valid: true}},
-		{value: ptr, want: value.String{Value: "hello", Valid: true}},
-		{value: ty, want: value.String{Value: "hello", Valid: true}},
+		{value: val, want: *value.NewString("hello")},
+		{value: ptr, want: *value.NewString("hello")},
+		{value: ty, want: *value.NewString("hello")},
 	}
 	for _, test := range tests {
 		got, err := convertString(reflect.ValueOf(test.value))
@@ -554,7 +554,7 @@ func TestConvertDecimal(t *testing.T) {
 	var (
 		val = string("1.3333333333")
 		ptr = new(string)
-		ty  = value.Decimal{Value: "1.3333333333", Valid: true}
+		ty  = value.DecimalFromString("1.3333333333")
 	)
 	*ptr = val
 
@@ -564,9 +564,9 @@ func TestConvertDecimal(t *testing.T) {
 		err   bool
 	}{
 		{value: 1, err: true},
-		{value: val, want: value.Decimal{Value: "1.3333333333", Valid: true}},
-		{value: ptr, want: value.Decimal{Value: "1.3333333333", Valid: true}},
-		{value: ty, want: value.Decimal{Value: "1.3333333333", Valid: true}},
+		{value: val, want: *value.DecimalFromString("1.3333333333")},
+		{value: ptr, want: *value.DecimalFromString("1.3333333333")},
+		{value: ty, want: *value.DecimalFromString("1.3333333333")},
 	}
 	for _, test := range tests {
 		got, err := convertDecimal(reflect.ValueOf(test.value))

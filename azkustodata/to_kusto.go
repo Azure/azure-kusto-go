@@ -165,44 +165,44 @@ func colToValueCheck(cols table.Columns, values value.Values) error {
 
 		switch col.Type {
 		case types.Bool:
-			if reflect.TypeOf(v) != reflect.TypeOf(value.Bool{}) {
-				return fmt.Errorf("value[%d] was expected to be of a value.Bool, was %T", i, v)
+			if reflect.TypeOf(v) != reflect.TypeOf(&value.Bool{}) {
+				return fmt.Errorf("value[%d] was expected to be of a &value.Bool, was %T", i, v)
 			}
 		case types.DateTime:
-			if reflect.TypeOf(v) != reflect.TypeOf(value.DateTime{}) {
-				return fmt.Errorf("value[%d] was expected to be of a value.DateTime, was %T", i, v)
+			if reflect.TypeOf(v) != reflect.TypeOf(&value.DateTime{}) {
+				return fmt.Errorf("value[%d] was expected to be of a &value.DateTime, was %T", i, v)
 			}
 		case types.Dynamic:
-			if reflect.TypeOf(v) != reflect.TypeOf(value.Dynamic{}) {
-				return fmt.Errorf("value[%d] was expected to be of a value.Dynamic, was %T", i, v)
+			if reflect.TypeOf(v) != reflect.TypeOf(&value.Dynamic{}) {
+				return fmt.Errorf("value[%d] was expected to be of a &value.Dynamic, was %T", i, v)
 			}
 		case types.GUID:
-			if reflect.TypeOf(v) != reflect.TypeOf(value.GUID{}) {
-				return fmt.Errorf("value[%d] was expected to be of a value.GUID, was %T", i, v)
+			if reflect.TypeOf(v) != reflect.TypeOf(&value.GUID{}) {
+				return fmt.Errorf("value[%d] was expected to be of a &value.GUID, was %T", i, v)
 			}
 		case types.Int:
-			if reflect.TypeOf(v) != reflect.TypeOf(value.Int{}) {
-				return fmt.Errorf("value[%d] was expected to be of a value.Int, was %T", i, v)
+			if reflect.TypeOf(v) != reflect.TypeOf(&value.Int{}) {
+				return fmt.Errorf("value[%d] was expected to be of a &value.Int, was %T", i, v)
 			}
 		case types.Long:
-			if reflect.TypeOf(v) != reflect.TypeOf(value.Long{}) {
-				return fmt.Errorf("value[%d] was expected to be of a value.Long, was %T", i, v)
+			if reflect.TypeOf(v) != reflect.TypeOf(&value.Long{}) {
+				return fmt.Errorf("value[%d] was expected to be of a &value.Long, was %T", i, v)
 			}
 		case types.Real:
-			if reflect.TypeOf(v) != reflect.TypeOf(value.Real{}) {
-				return fmt.Errorf("value[%d] was expected to be of a value.Real, was %T", i, v)
+			if reflect.TypeOf(v) != reflect.TypeOf(&value.Real{}) {
+				return fmt.Errorf("value[%d] was expected to be of a &value.Real, was %T", i, v)
 			}
 		case types.String:
-			if reflect.TypeOf(v) != reflect.TypeOf(value.String{}) {
-				return fmt.Errorf("value[%d] was expected to be of a value.String, was %T", i, v)
+			if reflect.TypeOf(v) != reflect.TypeOf(&value.String{}) {
+				return fmt.Errorf("value[%d] was expected to be of a &value.String, was %T", i, v)
 			}
 		case types.Timespan:
-			if reflect.TypeOf(v) != reflect.TypeOf(value.Timespan{}) {
-				return fmt.Errorf("value[%d] was expected to be of a value.Timespan, was %T", i, v)
+			if reflect.TypeOf(v) != reflect.TypeOf(&value.Timespan{}) {
+				return fmt.Errorf("value[%d] was expected to be of a &value.Timespan, was %T", i, v)
 			}
 		case types.Decimal:
-			if reflect.TypeOf(v) != reflect.TypeOf(value.Decimal{}) {
-				return fmt.Errorf("value[%d] was expected to be of a value.Decimal, was %T", i, v)
+			if reflect.TypeOf(v) != reflect.TypeOf(&value.Decimal{}) {
+				return fmt.Errorf("value[%d] was expected to be of a &value.Decimal, was %T", i, v)
 			}
 		default:
 			return fmt.Errorf("value[%d] was for a column type that MockRow doesn't understand(%s)", i, col.Type)

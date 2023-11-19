@@ -14,6 +14,14 @@ type GUID struct {
 	Value uuid.NullUUID
 }
 
+func NewGUID(v uuid.UUID) *GUID {
+	return &GUID{Value: uuid.NullUUID{UUID: v, Valid: true}}
+}
+
+func NewNullGUID() *GUID {
+	return &GUID{Value: uuid.NullUUID{Valid: false}}
+}
+
 func (*GUID) isKustoVal() {}
 
 // String implements fmt.Stringer.

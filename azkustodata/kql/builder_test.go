@@ -75,7 +75,14 @@ func TestBuilder(t *testing.T) {
 			"Test add dynamic",
 			New(
 				"MyTable | where i != ",
-			).AddDynamic(`{"a": 3, "b": 5.4}`),
+			).AddDynamic(map[string]interface{}{"a": 3, "b": 5.4}),
+			`MyTable | where i != dynamic({"a":3,"b":5.4})`,
+		},
+		{
+			"Test add serialized dynamic",
+			New(
+				"MyTable | where i != ",
+			).AddSerializedDynamic([]byte(`{"a": 3, "b": 5.4}`)),
 			`MyTable | where i != dynamic({"a": 3, "b": 5.4})`,
 		},
 		{
