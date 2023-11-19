@@ -54,9 +54,7 @@ func TestFileIngestion(t *testing.T) { //ok
 	}
 
 	client, err := azkustodata.New(testConfig.kcsb)
-	if err != nil {
-		panic(err)
-	}
+	require.NoError(t, err)
 
 	t.Cleanup(func() {
 		t.Log("Closing client")
@@ -69,9 +67,7 @@ func TestFileIngestion(t *testing.T) { //ok
 	managedTable := "goe2e_managed_streaming_file_logs"
 
 	queuedIngestor, err := azkustoingest.New(testConfig.kcsb, azkustoingest.WithDefaultDatabase(testConfig.Database), azkustoingest.WithDefaultTable(queuedTable))
-	if err != nil {
-		panic(err)
-	}
+	require.NoError(t, err)
 	t.Cleanup(func() {
 		t.Log("Closing queuedIngestor")
 		require.NoError(t, queuedIngestor.Close())
@@ -79,9 +75,7 @@ func TestFileIngestion(t *testing.T) { //ok
 	})
 
 	streamingIngestor, err := azkustoingest.NewStreaming(testConfig.kcsb, azkustoingest.WithDefaultDatabase(testConfig.Database), azkustoingest.WithDefaultTable(streamingTable))
-	if err != nil {
-		panic(err)
-	}
+	require.NoError(t, err)
 
 	t.Cleanup(func() {
 		t.Log("Closing streamingIngestor")
@@ -90,9 +84,7 @@ func TestFileIngestion(t *testing.T) { //ok
 	})
 
 	managedIngestor, err := azkustoingest.NewManaged(testConfig.kcsb, azkustoingest.WithDefaultDatabase(testConfig.Database), azkustoingest.WithDefaultTable(managedTable))
-	if err != nil {
-		panic(err)
-	}
+	require.NoError(t, err)
 
 	t.Cleanup(func() {
 		t.Log("Closing managedIngestor")
@@ -154,7 +146,7 @@ func TestFileIngestion(t *testing.T) { //ok
 				return nil
 			},
 			gotInit: func() interface{} {
-				v := []testshared.CountResult{}
+				var v []testshared.CountResult
 				return &v
 			},
 			want: &[]testshared.CountResult{{Count: 500}},
@@ -176,7 +168,7 @@ func TestFileIngestion(t *testing.T) { //ok
 				return nil
 			},
 			gotInit: func() interface{} {
-				v := []testshared.CountResult{}
+				var v []testshared.CountResult
 				return &v
 			},
 			want: &[]testshared.CountResult{{Count: 500}},
@@ -198,7 +190,7 @@ func TestFileIngestion(t *testing.T) { //ok
 				return nil
 			},
 			gotInit: func() interface{} {
-				v := []testshared.CountResult{}
+				var v []testshared.CountResult
 				return &v
 			},
 			want: &[]testshared.CountResult{{Count: 500}},
@@ -220,7 +212,7 @@ func TestFileIngestion(t *testing.T) { //ok
 				return nil
 			},
 			gotInit: func() interface{} {
-				v := []testshared.CountResult{}
+				var v []testshared.CountResult
 				return &v
 			},
 			want: &[]testshared.CountResult{{Count: 2}},
@@ -242,7 +234,7 @@ func TestFileIngestion(t *testing.T) { //ok
 				return nil
 			},
 			gotInit: func() interface{} {
-				v := []testshared.CountResult{}
+				var v []testshared.CountResult
 				return &v
 			},
 			want: &[]testshared.CountResult{{Count: 500}},
@@ -269,7 +261,7 @@ func TestFileIngestion(t *testing.T) { //ok
 				return nil
 			},
 			gotInit: func() interface{} {
-				v := []testshared.CountResult{}
+				var v []testshared.CountResult
 				return &v
 			},
 			want: &[]testshared.CountResult{{Count: 500}},
@@ -290,7 +282,7 @@ func TestFileIngestion(t *testing.T) { //ok
 				return nil
 			},
 			gotInit: func() interface{} {
-				v := []testshared.CountResult{}
+				var v []testshared.CountResult
 				return &v
 			},
 			want: &[]testshared.CountResult{{Count: 3}},
@@ -311,7 +303,7 @@ func TestFileIngestion(t *testing.T) { //ok
 				return nil
 			},
 			gotInit: func() interface{} {
-				v := []LogRow{}
+				var v []LogRow
 				return &v
 			},
 			want: &mockRows,
@@ -333,7 +325,7 @@ func TestFileIngestion(t *testing.T) { //ok
 				return nil
 			},
 			gotInit: func() interface{} {
-				v := []testshared.CountResult{}
+				var v []testshared.CountResult
 				return &v
 			},
 			want: &[]testshared.CountResult{{Count: 500}},
@@ -354,7 +346,7 @@ func TestFileIngestion(t *testing.T) { //ok
 				return nil
 			},
 			gotInit: func() interface{} {
-				v := []testshared.CountResult{}
+				var v []testshared.CountResult
 				return &v
 			},
 			want: &[]testshared.CountResult{{Count: 3}},
@@ -375,7 +367,7 @@ func TestFileIngestion(t *testing.T) { //ok
 				return nil
 			},
 			gotInit: func() interface{} {
-				v := []LogRow{}
+				var v []LogRow
 				return &v
 			},
 			want: &mockRows,
@@ -397,7 +389,7 @@ func TestFileIngestion(t *testing.T) { //ok
 				return nil
 			},
 			gotInit: func() interface{} {
-				v := []testshared.CountResult{}
+				var v []testshared.CountResult
 				return &v
 			},
 			want: &[]testshared.CountResult{{Count: 500}},
@@ -419,7 +411,7 @@ func TestFileIngestion(t *testing.T) { //ok
 				return nil
 			},
 			gotInit: func() interface{} {
-				v := []testshared.CountResult{}
+				var v []testshared.CountResult
 				return &v
 			},
 			want: &[]testshared.CountResult{{Count: 3}},
@@ -586,7 +578,7 @@ func TestReaderIngestion(t *testing.T) { // ok
 				return nil
 			},
 			gotInit: func() interface{} {
-				v := []testshared.CountResult{}
+				var v []testshared.CountResult
 				return &v
 			},
 			want: &[]testshared.CountResult{{Count: 500}},
@@ -614,7 +606,7 @@ func TestReaderIngestion(t *testing.T) { // ok
 				return nil
 			},
 			gotInit: func() interface{} {
-				v := []testshared.CountResult{}
+				var v []testshared.CountResult
 				return &v
 			},
 			want: &[]testshared.CountResult{{Count: 500}},
@@ -638,7 +630,7 @@ func TestReaderIngestion(t *testing.T) { // ok
 				return nil
 			},
 			gotInit: func() interface{} {
-				v := []LogRow{}
+				var v []LogRow
 				return &v
 			},
 			want: &mockRows,
@@ -663,7 +655,7 @@ func TestReaderIngestion(t *testing.T) { // ok
 				return nil
 			},
 			gotInit: func() interface{} {
-				v := []testshared.CountResult{}
+				var v []testshared.CountResult
 				return &v
 			},
 			want: &[]testshared.CountResult{{Count: 500}},
@@ -687,7 +679,7 @@ func TestReaderIngestion(t *testing.T) { // ok
 				return nil
 			},
 			gotInit: func() interface{} {
-				v := []testshared.CountResult{}
+				var v []testshared.CountResult
 				return &v
 			},
 			want: &[]testshared.CountResult{{Count: 3}},
@@ -711,7 +703,7 @@ func TestReaderIngestion(t *testing.T) { // ok
 				return nil
 			},
 			gotInit: func() interface{} {
-				v := []LogRow{}
+				var v []LogRow
 				return &v
 			},
 			want: &mockRows,
@@ -736,7 +728,7 @@ func TestReaderIngestion(t *testing.T) { // ok
 				return nil
 			},
 			gotInit: func() interface{} {
-				v := []testshared.CountResult{}
+				var v []testshared.CountResult
 				return &v
 			},
 			want: &[]testshared.CountResult{{Count: 500}},
@@ -933,7 +925,7 @@ func TestMultipleClusters(t *testing.T) { //ok
 				return nil
 			},
 			gotInit: func() interface{} {
-				v := []testshared.CountResult{}
+				var v []testshared.CountResult
 				return &v
 			},
 			want: &[]testshared.CountResult{{Count: 3}},
@@ -956,7 +948,7 @@ func TestMultipleClusters(t *testing.T) { //ok
 				return nil
 			},
 			gotInit: func() interface{} {
-				v := []testshared.CountResult{}
+				var v []testshared.CountResult
 				return &v
 			},
 			want: &[]testshared.CountResult{{Count: 3}},
@@ -1090,7 +1082,7 @@ func createMockLogRows() []LogRow {
 		// One full line
 		{
 			HeaderTime:       value.DateTime{Value: fakeTime, Valid: true},
-			HeaderId:         value.GUID{Value: fakeUid, Valid: true},
+			HeaderId:         value.GUID{Value: uuid.NullUUID{UUID: fakeUid, Valid: true}},
 			HeaderApiVersion: value.String{Value: "v0.0.1", Valid: true},
 			PayloadData:      value.String{Value: "Hello world!", Valid: true},
 			PayloadUser:      value.String{Value: "Daniel Dubovski", Valid: true},

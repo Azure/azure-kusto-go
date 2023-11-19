@@ -2,36 +2,43 @@ module github.com/Azure/azure-kusto-go/quickstart
 
 go 1.19
 
-require github.com/Azure/azure-kusto-go/azkustodata v0.0.0-20230601105621-25ff51d13bbc
+require github.com/Azure/azure-kusto-go/azkustodata v0.0.0-20230719090435-cf35a15d5673
 
 require github.com/Azure/azure-kusto-go/azkustoingest v0.0.0-20230605084522-81916992dde3
 
 require (
-	github.com/Azure/azure-pipeline-go v0.1.8 // indirect
-	github.com/Azure/azure-sdk-for-go v67.1.0+incompatible // indirect
-	github.com/Azure/azure-sdk-for-go/sdk/azcore v1.3.0 // indirect
-	github.com/Azure/azure-sdk-for-go/sdk/azidentity v1.2.0 // indirect
-	github.com/Azure/azure-sdk-for-go/sdk/internal v1.1.1 // indirect
-	github.com/Azure/azure-sdk-for-go/sdk/storage/azblob v1.0.0 // indirect
-	github.com/Azure/azure-storage-queue-go v0.0.0-20191125232315-636801874cdd // indirect
+	github.com/Azure/azure-pipeline-go v0.2.3 // indirect
+	github.com/Azure/azure-sdk-for-go v68.0.0+incompatible // indirect
+	github.com/Azure/azure-sdk-for-go/sdk/azcore v1.9.0 // indirect
+	github.com/Azure/azure-sdk-for-go/sdk/azidentity v1.4.0 // indirect
+	github.com/Azure/azure-sdk-for-go/sdk/internal v1.5.0 // indirect
+	github.com/Azure/azure-sdk-for-go/sdk/storage/azblob v1.2.0 // indirect
+	github.com/Azure/azure-storage-queue-go v0.0.0-20230927153703-648530c9aaf2 // indirect
 	github.com/Azure/go-autorest v14.2.0+incompatible // indirect
-	github.com/Azure/go-autorest/autorest v0.11.28 // indirect
+	github.com/Azure/go-autorest/autorest v0.11.29 // indirect
 	github.com/Azure/go-autorest/autorest/adal v0.9.23 // indirect
 	github.com/Azure/go-autorest/autorest/date v0.3.0 // indirect
 	github.com/Azure/go-autorest/logger v0.2.1 // indirect
 	github.com/Azure/go-autorest/tracing v0.6.0 // indirect
-	github.com/AzureAD/microsoft-authentication-library-for-go v0.7.0 // indirect
-	github.com/cenkalti/backoff/v4 v4.2.0 // indirect
-	github.com/gofrs/uuid v4.2.0+incompatible // indirect
+	github.com/AzureAD/microsoft-authentication-library-for-go v1.2.0 // indirect
+	github.com/cenkalti/backoff/v4 v4.2.1 // indirect
+	github.com/gofrs/uuid v4.4.0+incompatible // indirect
 	github.com/golang-jwt/jwt/v4 v4.5.0 // indirect
-	github.com/google/uuid v1.3.0 // indirect
+	github.com/golang-jwt/jwt/v5 v5.1.0 // indirect
+	github.com/google/uuid v1.4.0 // indirect
 	github.com/kylelemons/godebug v1.1.0 // indirect
-	github.com/pkg/browser v0.0.0-20210115035449-ce105d075bb4 // indirect
-	github.com/samber/lo v1.37.0 // indirect
+	github.com/mattn/go-ieproxy v0.0.11 // indirect
+	github.com/pkg/browser v0.0.0-20210911075715-681adbf594b8 // indirect
+	github.com/samber/lo v1.38.1 // indirect
 	github.com/shopspring/decimal v1.3.1 // indirect
-	golang.org/x/crypto v0.6.0 // indirect
-	golang.org/x/exp v0.0.0-20220303212507-bbda1eaf7a17 // indirect
-	golang.org/x/net v0.6.0 // indirect
-	golang.org/x/sys v0.5.0 // indirect
-	golang.org/x/text v0.7.0 // indirect
+	golang.org/x/crypto v0.15.0 // indirect
+	golang.org/x/exp v0.0.0-20231110203233-9a3e6036ecaa // indirect
+	golang.org/x/net v0.18.0 // indirect
+	golang.org/x/sys v0.14.0 // indirect
+	golang.org/x/text v0.14.0 // indirect
+)
+
+replace (
+	github.com/Azure/azure-kusto-go/azkustodata => ../azkustodata
+	github.com/Azure/azure-kusto-go/azkustoingest => ../azkustoingest
 )
