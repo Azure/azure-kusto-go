@@ -9,13 +9,17 @@ import (
 	"github.com/Azure/azure-kusto-go/azkustodata/table"
 	"github.com/Azure/azure-kusto-go/azkustodata/testshared"
 	"github.com/Azure/azure-kusto-go/azkustodata/types"
+	"github.com/Azure/azure-kusto-go/azkustodata/utils"
 	"github.com/Azure/azure-kusto-go/azkustodata/value"
+	"github.com/Azure/azure-sdk-for-go/sdk/azcore"
+	"github.com/Azure/azure-sdk-for-go/sdk/azidentity"
 	"github.com/google/uuid"
 	"github.com/shopspring/decimal"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 	"go.uber.org/goleak"
 	"math/rand"
+	"net/http"
 	"regexp"
 	"strings"
 	"testing"
@@ -70,63 +74,64 @@ func isASCII(s string) bool {
 	return true
 }
 
-//func TestAuth(t *testing.T) {
-//	t.Parallel()
-//	transporter := utils.Transporter{ // using custom transporter to make sure it closes
-//		Http: &http.Client{
-//			Transport: &http.Transport{
-//				IdleConnTimeout:   0,
-//				DisableKeepAlives: true,
-//			},
-//		},
-//	}
-//	defaultCred, err := azidentity.NewDefaultAzureCredential(&azidentity.DefaultAzureCredentialOptions{
-//		ClientOptions: azcore.ClientOptions{
-//			Transport: &transporter,
-//		},
-//	})
-//	credential, err := azidentity.NewChainedTokenCredential([]azcore.TokenCredential{
-//		defaultCred,
-//	}, &azidentity.ChainedTokenCredentialOptions{})
-//	require.NoError(t, err)
-//
-//	tests := []struct {
-//		desc string
-//		kcsb *azkustodata.ConnectionStringBuilder
-//	}{
-//		{
-//			desc: "Default",
-//			kcsb: azkustodata.NewConnectionStringBuilder(testConfig.Endpoint).WithDefaultAzureCredential(),
-//		},
-//		{
-//			desc: "With TokenCredential",
-//			kcsb: azkustodata.NewConnectionStringBuilder(testConfig.Endpoint).WithTokenCredential(credential),
-//		},
-//	}
-//
-//	for _, test := range tests {
-//		test := test
-//		t.Run(test.desc, func(t *testing.T) {
-//			t.Parallel()
-//			client, err := azkustodata.New(test.kcsb)
-//			require.NoError(t, err)
-//			defer client.Close()
-//
-//			query, err := client.Query(context.Background(), testConfig.Database, kql.New("print 1"))
-//			defer func() {
-//				query.Stop()
-//				_, _ = query.GetQueryCompletionInformation() // make sure it stops
-//			}()
-//			require.NoError(t, err)
-//
-//			row, inlineError, err := query.NextRowOrError()
-//			require.NoError(t, err)
-//			require.Nil(t, inlineError)
-//			assert.Equal(t, "1\n", row.String())
-//		})
-//	}
-//
-//}
+func TestAuth(t *testing.T) {
+	t.Parallel()
+	transporter := utils.Transporter{ // using custom transporter to make sure it closes
+		Http: &http.Client{
+			Transport: &http.Transport{
+				IdleConnTimeout:   0,
+				DisableKeepAlives: true,
+			},
+		},
+	}
+	defaultCred, err := azidentity.NewDefaultAzureCredential(&azidentity.DefaultAzureCredentialOptions{
+		ClientOptions: azcore.ClientOptions{
+			Transport: &transporter,
+		},
+	})
+	require.NoError(t, err)
+	credential, err := azidentity.NewChainedTokenCredential([]azcore.TokenCredential{
+		defaultCred,
+	}, &azidentity.ChainedTokenCredentialOptions{})
+	require.NoError(t, err)
+
+	tests := []struct {
+		desc string
+		kcsb *azkustodata.ConnectionStringBuilder
+	}{
+		{
+			desc: "Default",
+			kcsb: azkustodata.NewConnectionStringBuilder(testConfig.Endpoint).WithDefaultAzureCredential(),
+		},
+		{
+			desc: "With TokenCredential",
+			kcsb: azkustodata.NewConnectionStringBuilder(testConfig.Endpoint).WithTokenCredential(credential),
+		},
+	}
+
+	for _, test := range tests {
+		test := test
+		t.Run(test.desc, func(t *testing.T) {
+			t.Parallel()
+			client, err := azkustodata.New(test.kcsb)
+			require.NoError(t, err)
+			defer client.Close()
+
+			query, err := client.Query(context.Background(), testConfig.Database, kql.New("print 1"))
+			defer func() {
+				query.Stop()
+				_, _ = query.GetQueryCompletionInformation() // make sure it stops
+			}()
+			require.NoError(t, err)
+
+			row, inlineError, err := query.NextRowOrError()
+			require.NoError(t, err)
+			require.Nil(t, inlineError)
+			assert.Equal(t, "1\n", row.String())
+		})
+	}
+
+}
 
 func TestQueries(t *testing.T) {
 	t.Parallel()
@@ -611,8 +616,11 @@ func TestStatement(t *testing.T) {
 	allDataTypesTable := fmt.Sprintf("goe2e_all_data_types_%d_%d", time.Now().UnixNano(), rand.Int())
 	require.NoError(t, testshared.CreateTestTable(t, client, allDataTypesTable, true))
 	dt, err := time.Parse(time.RFC3339Nano, "2020-03-04T14:05:01.3109965Z")
+	require.NoError(t, err)
 	ts, err := time.ParseDuration("1h23m45.6789s")
+	require.NoError(t, err)
 	guid, err := uuid.Parse("74be27de-1e4e-49d9-b579-fe0b331d3642")
+	require.NoError(t, err)
 	tests := []struct {
 		// desc is a description of a test.
 		desc string
@@ -901,8 +909,7 @@ func getExpectedResult() AllDataType {
 	return AllDataType{
 		Vnum: 1,
 		Vdec: value.Decimal{
-			Value: "2.00000000000001",
-			Valid: true,
+			Value: decimal.NewNullDecimal(decimal.RequireFromString("2.00000000000001")),
 		},
 		Vdate: t,
 		Vspan: value.Timespan{Value: d, Valid: true},
@@ -914,8 +921,7 @@ func getExpectedResult() AllDataType {
 		Vstr:  "asdf",
 		Vlong: 9223372036854775807,
 		Vguid: value.GUID{
-			Value: g,
-			Valid: true,
+			Value: uuid.NullUUID{UUID: g, Valid: true},
 		},
 	}
 }
