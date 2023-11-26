@@ -27,6 +27,15 @@ func NewNullTimespan() *Timespan {
 	return &Timespan{Valid: false}
 }
 
+func TimespanFromString(s string) (*Timespan, error) {
+	t := &Timespan{}
+	err := t.Unmarshal(s)
+	if err != nil {
+		return nil, err
+	}
+	return t, nil
+}
+
 func (*Timespan) isKustoVal() {}
 
 // String implements fmt.Stringer.

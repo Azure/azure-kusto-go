@@ -37,7 +37,12 @@ func (d *DataSet) ReadFrames() {
 }
 
 func (d *DataSet) DecodeTables() {
-	defer close(d.tables)
+	defer func() {
+		close(d.tables)
+		if d.currentStreamingTable != nil {
+			d.currentStreamingTable.close([]OneApiError{})
+		}
+	}()
 	for {
 		var f Frame = nil
 

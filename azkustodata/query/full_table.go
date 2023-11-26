@@ -16,6 +16,7 @@ func NewFullTable(dt *DataTable) (FullTable, error) {
 		baseTable: baseTable{
 			id:      dt.TableId,
 			name:    dt.TableName,
+			kind:    dt.TableKind,
 			columns: make([]Column, len(dt.Columns)),
 		},
 		rows: make([]Row, len(dt.Rows)),

@@ -676,9 +676,8 @@ func TestFieldsConvert(t *testing.T) {
 		test := test // Capture
 		t.Run(test.desc, func(t *testing.T) {
 			t.Parallel()
-			fields := newFields(test.columns, reflect.TypeOf(test.ptrStruct))
+			fields := newFields(reflect.TypeOf(test.ptrStruct))
 
-			ty := reflect.TypeOf(test.ptrStruct)
 			v := reflect.ValueOf(test.ptrStruct)
 			for _, column := range test.columns {
 				err := fields.convert(column, test.k, v)

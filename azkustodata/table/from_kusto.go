@@ -16,10 +16,10 @@ import (
 func decodeToStruct(cols Columns, row value.Values, p interface{}) error {
 	t := reflect.TypeOf(p)
 	v := reflect.ValueOf(p)
-	fields := newFields(cols, t)
+	fields := newFields(t)
 
 	for i, col := range cols {
-		if err := fields.convert(col, row[i], t, v); err != nil {
+		if err := fields.convert(col, row[i], v); err != nil {
 			return err
 		}
 	}
@@ -32,7 +32,7 @@ type fields struct {
 }
 
 // newFields takes in the Columns from our row and the reflect.Type of our *struct.
-func newFields(cols Columns, ptr reflect.Type) fields {
+func newFields(ptr reflect.Type) fields {
 	nFields := fields{colNameToFieldName: map[string]string{}}
 	for i := 0; i < ptr.Elem().NumField(); i++ {
 		field := ptr.Elem().Field(i)
@@ -47,7 +47,7 @@ func newFields(cols Columns, ptr reflect.Type) fields {
 }
 
 // convert converts a KustoValue that is for Column col into "v" reflect.Value with reflect.Type "t".
-func (f fields) convert(col Column, k value.Kusto, t reflect.Type, v reflect.Value) error {
+func (f fields) convert(col Column, k value.Kusto, v reflect.Value) error {
 	fieldName, ok := f.colNameToFieldName[col.Name]
 	if !ok {
 		return nil

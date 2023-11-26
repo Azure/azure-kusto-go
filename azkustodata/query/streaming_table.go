@@ -76,10 +76,12 @@ func (t *streamingTable) ColumnByName(name string) *Column {
 func (t *streamingTable) close(errors []OneApiError) {
 	close(t.rawRows)
 
-	<-t.end
+	b := <-t.end
 
-	for _, e := range errors {
-		t.rows <- RowResult{Row: Row{}, Err: &e}
+	if b {
+		for _, e := range errors {
+			t.rows <- RowResult{Row: Row{}, Err: &e}
+		}
 	}
 
 	close(t.rows)
