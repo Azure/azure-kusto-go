@@ -70,3 +70,22 @@ func TestDataSet_DecodeTables_WithInvalidTableCompletion(t *testing.T) {
 	assert.Error(t, tableResult.Err)
 	assert.Contains(t, tableResult.Err.Error(), "received a TableCompletion frame while no streaming table was open")
 }
+
+func TestDataSet_DecodeTables_StreamingTable_WithInvalidColumnType(t *testing.T) {
+	reader := strings.NewReader(`[{"FrameType": "TableHeader", "TableId": 1, "TableName": "TestTable", "Columns": [{"ColumnName": "TestColumn", "ColumnType": "invalid"}]}
+]`)
+	d := NewDataSet(context.Background(), reader, DefaultFrameCapacity)
+
+	tableResult := <-d.tables
+	assert.Error(t, tableResult.Err)
+	assert.Contains(t, tableResult.Err.Error(), "not valid")
+}
+
+func TestDataSet_DecodeTables_DataTable_WithInvalidColumnType(t *testing.T) {
+	reader := strings.NewReader(`[{"FrameType": "DataTable", "TableId": 1, "TableName": "TestTable", "Columns": [{"ColumnName": "TestColumn", "ColumnType": "invalid"}], "Rows": [["TestValue"]]}]`)
+	d := NewDataSet(context.Background(), reader, DefaultFrameCapacity)
+
+	tableResult := <-d.tables
+	assert.Error(t, tableResult.Err)
+	assert.Contains(t, tableResult.Err.Error(), "not valid")
+}
