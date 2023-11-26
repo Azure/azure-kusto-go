@@ -5,6 +5,7 @@ import (
 	"github.com/Azure/azure-kusto-go/azkustodata/value"
 	"github.com/google/uuid"
 	"github.com/stretchr/testify/assert"
+	"io"
 	"strings"
 	"testing"
 	"time"
@@ -13,7 +14,7 @@ import (
 func TestDataSet_ReadFrames_WithError(t *testing.T) {
 	reader := strings.NewReader("invalid")
 	d := &DataSet{
-		reader:       reader,
+		reader:       io.NopCloser(reader),
 		frames:       make(chan Frame, DefaultFrameCapacity),
 		errorChannel: make(chan error, 1),
 		tables:       make(chan TableResult, 1),
@@ -27,7 +28,7 @@ func TestDataSet_ReadFrames_WithError(t *testing.T) {
 
 func TestDataSet_DecodeTables_WithInvalidFrame(t *testing.T) {
 	reader := strings.NewReader(`[{"FrameType": "InvalidFrameType"}]`)
-	d := NewDataSet(context.Background(), reader, DefaultFrameCapacity)
+	d := NewDataSet(context.Background(), io.NopCloser(reader), DefaultFrameCapacity)
 
 	tableResult := <-d.tables
 	assert.Nil(t, tableResult.Table)
@@ -35,7 +36,7 @@ func TestDataSet_DecodeTables_WithInvalidFrame(t *testing.T) {
 
 func TestDataSet_DecodeTables_Skip(t *testing.T) {
 	reader := strings.NewReader(strings.TrimSpace(validFrames))
-	d := NewDataSet(context.Background(), reader, DefaultFrameCapacity)
+	d := NewDataSet(context.Background(), io.NopCloser(reader), DefaultFrameCapacity)
 
 	for tableResult := range d.tables {
 		assert.NoError(t, tableResult.Err)
@@ -49,7 +50,7 @@ func TestDataSet_DecodeTables_Skip(t *testing.T) {
 
 func TestDataSet_DecodeTables_GetRows(t *testing.T) {
 	reader := strings.NewReader(strings.TrimSpace(validFrames))
-	d := NewDataSet(context.Background(), reader, DefaultFrameCapacity)
+	d := NewDataSet(context.Background(), io.NopCloser(reader), DefaultFrameCapacity)
 	ts, err := value.TimespanFromString("01:23:45.6789000")
 	assert.NoError(t, err)
 	u, err := uuid.Parse("123e27de-1e4e-49d9-b579-fe0b331d3642")
@@ -184,7 +185,7 @@ func TestDataSet_DecodeTables_GetRows(t *testing.T) {
 
 func TestDataSet_DecodeTables_WithInvalidDataSetHeader(t *testing.T) {
 	reader := strings.NewReader(`[{"FrameType": "DataSetHeader", "Version": "V1"}]`)
-	d := NewDataSet(context.Background(), reader, DefaultFrameCapacity)
+	d := NewDataSet(context.Background(), io.NopCloser(reader), DefaultFrameCapacity)
 
 	tableResult := <-d.tables
 	assert.Error(t, tableResult.Err)
@@ -193,7 +194,7 @@ func TestDataSet_DecodeTables_WithInvalidDataSetHeader(t *testing.T) {
 
 func TestDataSet_DecodeTables_WithInvalidTableFragment(t *testing.T) {
 	reader := strings.NewReader(`[{"FrameType": "TableFragment", "TableId": 1}]`)
-	d := NewDataSet(context.Background(), reader, DefaultFrameCapacity)
+	d := NewDataSet(context.Background(), io.NopCloser(reader), DefaultFrameCapacity)
 
 	tableResult := <-d.tables
 	assert.Error(t, tableResult.Err)
@@ -202,7 +203,7 @@ func TestDataSet_DecodeTables_WithInvalidTableFragment(t *testing.T) {
 
 func TestDataSet_DecodeTables_WithInvalidTableCompletion(t *testing.T) {
 	reader := strings.NewReader(`[{"FrameType": "TableCompletion", "TableId": 1}]`)
-	d := NewDataSet(context.Background(), reader, DefaultFrameCapacity)
+	d := NewDataSet(context.Background(), io.NopCloser(reader), DefaultFrameCapacity)
 
 	tableResult := <-d.tables
 	assert.Error(t, tableResult.Err)
@@ -212,7 +213,7 @@ func TestDataSet_DecodeTables_WithInvalidTableCompletion(t *testing.T) {
 func TestDataSet_DecodeTables_StreamingTable_WithInvalidColumnType(t *testing.T) {
 	reader := strings.NewReader(`[{"FrameType": "TableHeader", "TableId": 1, "TableName": "TestTable", "Columns": [{"ColumnName": "TestColumn", "ColumnType": "invalid"}]}
 ]`)
-	d := NewDataSet(context.Background(), reader, DefaultFrameCapacity)
+	d := NewDataSet(context.Background(), io.NopCloser(reader), DefaultFrameCapacity)
 
 	tableResult := <-d.tables
 	assert.Error(t, tableResult.Err)
@@ -221,7 +222,7 @@ func TestDataSet_DecodeTables_StreamingTable_WithInvalidColumnType(t *testing.T)
 
 func TestDataSet_DecodeTables_DataTable_WithInvalidColumnType(t *testing.T) {
 	reader := strings.NewReader(`[{"FrameType": "DataTable", "TableId": 1, "TableName": "TestTable", "Columns": [{"ColumnName": "TestColumn", "ColumnType": "invalid"}], "Rows": [["TestValue"]]}]`)
-	d := NewDataSet(context.Background(), reader, DefaultFrameCapacity)
+	d := NewDataSet(context.Background(), io.NopCloser(reader), DefaultFrameCapacity)
 
 	tableResult := <-d.tables
 	assert.Error(t, tableResult.Err)

@@ -56,9 +56,6 @@ func (f *EveryFrame) Decode() (Frame, error) {
 func ReadFrames(r io.Reader, ch chan<- Frame) error {
 	defer close(ch)
 
-	a, _ := io.ReadAll(&skipReader{r: r})
-	fmt.Println(string(a))
-
 	dec := json.NewDecoder(&skipReader{r: r})
 
 	for {

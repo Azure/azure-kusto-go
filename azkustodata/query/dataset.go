@@ -17,7 +17,7 @@ type TableResult struct {
 }
 
 type DataSet struct {
-	reader        io.Reader
+	reader        io.ReadCloser
 	DataSetHeader *DataSetHeader
 	Completion    *DataSetCompletion
 	frames        chan Frame
@@ -34,6 +34,8 @@ func (d *DataSet) ReadFrames() {
 	if err != nil {
 		d.errorChannel <- err
 	}
+
+	d.reader.Close()
 }
 
 func (d *DataSet) DecodeTables() {
@@ -151,7 +153,7 @@ func (d *DataSet) DecodeTables() {
 	}
 }
 
-func NewDataSet(ctx context.Context, r io.Reader, capacity int) *DataSet {
+func NewDataSet(ctx context.Context, r io.ReadCloser, capacity int) *DataSet {
 	d := &DataSet{
 		reader:       r,
 		frames:       make(chan Frame, capacity),
