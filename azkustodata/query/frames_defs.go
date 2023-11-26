@@ -25,12 +25,14 @@ type DataSetHeader struct {
 
 const DataTableFrameType = "DataTable"
 
+type RawRows [][]interface{}
+
 type DataTable struct {
-	TableId   int             `json:"TableId"`
-	TableKind string          `json:"TableKind"`
-	TableName string          `json:"TableName"`
-	Columns   []FrameColumn   `json:"Columns"`
-	Rows      [][]interface{} `json:"Rows"`
+	TableId   int           `json:"TableId"`
+	TableKind string        `json:"TableKind"`
+	TableName string        `json:"TableName"`
+	Columns   []FrameColumn `json:"Columns"`
+	Rows      RawRows       `json:"Rows"`
 }
 
 const TableHeaderFrameType = "TableHeader"

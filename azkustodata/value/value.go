@@ -48,6 +48,32 @@ type Kusto interface {
 	Convert(v reflect.Value) error
 	GetValue() interface{}
 	GetType() types.Column
+	Unmarshal(interface{}) error
+}
+
+func Default(t types.Column) Kusto {
+	switch t {
+	case types.Bool:
+		return &Bool{}
+	case types.Int:
+		return &Int{}
+	case types.Long:
+		return &Long{}
+	case types.Real:
+		return &Real{}
+	case types.Decimal:
+		return &Decimal{}
+	case types.String:
+		return &String{}
+	case types.Dynamic:
+		return &Dynamic{}
+	case types.DateTime:
+		return &DateTime{}
+	case types.Timespan:
+		return &Timespan{}
+	default:
+		return nil
+	}
 }
 
 // Values is a list of Kusto values, usually an ordered row.

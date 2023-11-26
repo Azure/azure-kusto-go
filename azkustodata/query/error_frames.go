@@ -3,7 +3,11 @@ package query
 import "fmt"
 
 type OneApiError struct {
-	Error ErrorMessage `json:"error"`
+	ErrorMessage ErrorMessage `json:"error"`
+}
+
+func (e *OneApiError) Error() string {
+	return e.String()
 }
 
 type ErrorMessage struct {
