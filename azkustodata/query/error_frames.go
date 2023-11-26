@@ -34,7 +34,7 @@ type ErrorContext struct {
 }
 
 func (e *OneApiError) String() string {
-	return fmt.Sprintf("OneApiError(Error=%v)", e.Error)
+	return fmt.Sprintf("OneApiError(Error=%v)", e.ErrorMessage)
 }
 
 func (e *ErrorMessage) String() string {

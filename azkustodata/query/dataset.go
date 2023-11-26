@@ -27,7 +27,6 @@ type DataSet struct {
 }
 
 func (d *DataSet) ReadFrames() {
-	defer close(d.frames)
 	err := ReadFrames(d.reader, d.frames)
 	if err != nil {
 		d.errorChannel <- err
