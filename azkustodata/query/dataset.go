@@ -1,9 +1,12 @@
 package query
 
 import (
+	"context"
 	"github.com/Azure/azure-kusto-go/azkustodata/errors"
 	"io"
 )
+
+const DefaultFrameCapacity = 5
 
 type TableResult struct {
 	Table Table
@@ -20,6 +23,7 @@ type DataSet struct {
 	tables chan TableResult
 
 	currentStreamingTable *streamingTable
+	ctx                   context.Context
 }
 
 func (d *DataSet) ReadFrames() {
@@ -43,6 +47,9 @@ func (d *DataSet) DecodeTables() {
 		select {
 		case err := <-d.errorChannel:
 			d.tables <- TableResult{Table: nil, Err: err}
+			break
+		case <-d.ctx.Done():
+			d.tables <- TableResult{Table: nil, Err: errors.ES(errors.OpUnknown, errors.KInternal, "context cancelled")}
 			break
 		case fc, ok := <-d.frames:
 			if !ok {
@@ -132,12 +139,13 @@ func (d *DataSet) DecodeTables() {
 	}
 }
 
-func NewDataSet(r io.Reader, capacity int) *DataSet {
+func NewDataSet(ctx context.Context, r io.Reader, capacity int) *DataSet {
 	d := &DataSet{
 		reader:       r,
 		frames:       make(chan Frame, capacity),
 		errorChannel: make(chan error, 1),
 		tables:       make(chan TableResult, 1),
+		ctx:          ctx,
 	}
 	go d.ReadFrames()
 

@@ -3,6 +3,7 @@ package azkustodata
 import (
 	"context"
 	"github.com/Azure/azure-kusto-go/azkustodata/kql"
+	"github.com/Azure/azure-kusto-go/azkustodata/query"
 	"io"
 	"net/http"
 	"sync"
@@ -20,7 +21,7 @@ type queryer interface {
 	io.Closer
 	query(ctx context.Context, db string, query Statement, options *queryOptions) (execResp, error)
 	mgmt(ctx context.Context, db string, query Statement, options *queryOptions) (execResp, error)
-	queryToJson(ctx context.Context, db string, query Statement, options *queryOptions) (string, error)
+	rawQuery(ctx context.Context, db string, query Statement, options *queryOptions) (io.ReadCloser, error)
 }
 
 // Authorization provides the TokenProvider needed to acquire the auth token.
@@ -175,6 +176,38 @@ func (c *Client) Query(ctx context.Context, db string, query Statement, options 
 	return iter, nil
 }
 
+func (c *Client) QueryV2(ctx context.Context, db string, kqlQuery Statement, options ...QueryOption) (*query.DataSet, error) {
+	ctx, cancel := contextSetup(ctx)
+
+	options = append(options, V2NewlinesBetweenFrames())
+	options = append(options, V2FragmentPrimaryTables())
+	options = append(options, ResultsErrorReportingPlacement(ResultsErrorReportingPlacementEndOfTable))
+
+	opts, err := setQueryOptions(ctx, errors.OpQuery, kqlQuery, queryCall, options...)
+	if err != nil {
+		return nil, err
+	}
+
+	conn, err := c.getConn(queryCall, connOptions{queryOptions: opts})
+	if err != nil {
+		return nil, err
+	}
+
+	res, err := conn.rawQuery(ctx, db, kqlQuery, opts)
+
+	if err != nil {
+		cancel()
+		return nil, err
+	}
+
+	capacity := query.DefaultFrameCapacity
+	if opts.v2FrameCapacity != -1 {
+		capacity = opts.v2FrameCapacity
+	}
+
+	return query.NewDataSet(ctx, res, capacity), nil
+}
+
 func (c *Client) QueryToJson(ctx context.Context, db string, query Statement, options ...QueryOption) (string, error) {
 	ctx, cancel := contextSetup(ctx) // Note: cancel is called when *RowIterator has Stop() called.
 
@@ -188,13 +221,18 @@ func (c *Client) QueryToJson(ctx context.Context, db string, query Statement, op
 		return "", err
 	}
 
-	json, err := conn.queryToJson(ctx, db, query, opts)
+	r, err := conn.rawQuery(ctx, db, query, opts)
 	if err != nil {
 		cancel()
 		return "", err
 	}
 
-	return json, nil
+	all, err := io.ReadAll(r)
+	if err != nil {
+		return "", err
+	}
+
+	return string(all), nil
 }
 
 // Mgmt is used to do management queries to Kusto.
@@ -242,6 +280,7 @@ func setQueryOptions(ctx context.Context, op errors.Op, query Statement, queryTy
 		requestProperties: &requestProperties{
 			Options: map[string]interface{}{},
 		},
+		v2FrameCapacity: -1,
 	}
 
 	if op == errors.OpQuery {

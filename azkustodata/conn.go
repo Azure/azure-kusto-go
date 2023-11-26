@@ -98,15 +98,13 @@ func (c *Conn) mgmt(ctx context.Context, db string, query Statement, options *qu
 	return c.execute(ctx, execMgmt, db, query, *options.requestProperties)
 }
 
-func (c *Conn) queryToJson(ctx context.Context, db string, query Statement, options *queryOptions) (string, error) {
+func (c *Conn) rawQuery(ctx context.Context, db string, query Statement, options *queryOptions) (io.ReadCloser, error) {
 	_, _, _, body, e := c.doRequest(ctx, execQuery, db, query, *options.requestProperties)
 	if e != nil {
-		return "", e
+		return nil, e
 	}
 
-	defer body.Close()
-	all, e := io.ReadAll(body)
-	return string(all), e
+	return body, nil
 }
 
 const (

@@ -25,6 +25,7 @@ type requestProperties struct {
 type queryOptions struct {
 	requestProperties *requestProperties
 	queryIngestion    bool
+	v2FrameCapacity   int
 }
 
 const RequestProgressiveEnabledValue = "results_progressive_enabled"
@@ -78,6 +79,50 @@ const RequestUserValue = "request_user"
 const TruncationMaxRecordsValue = "truncation_max_records"
 const TruncationMaxSizeValue = "truncation_max_size"
 const ValidatePermissionsValue = "validate_permissions"
+
+const V2NewlinesBetweenFramesValue = "results_v2_newlines_between_frames"
+
+const V2FragmentPrimaryTablesValue = "results_v2_fragment_primary_tables"
+
+const ResultsErrorReportingPlacementValue = "results_error_reporting_placement"
+
+const ResultsErrorReportingPlacementInData = "in_data"
+const ResultsErrorReportingPlacementEndOfTable = "end_of_table"
+const ResultsErrorReportingPlacementEndOfDataset = "end_of_dataset"
+
+func V2FrameCapacity(i int) QueryOption {
+	return func(q *queryOptions) error {
+		q.v2FrameCapacity = i
+		return nil
+	}
+}
+
+// V2NewlinesBetweenFrames Adds new lines between frames in the results, in order to make it easier to parse them.
+func V2NewlinesBetweenFrames() QueryOption {
+	return func(q *queryOptions) error {
+		q.requestProperties.Options[V2NewlinesBetweenFramesValue] = true
+		return nil
+	}
+}
+
+// V2FragmentPrimaryTables Causes primary tables to be sent in multiple fragments, each containing a subset of the rows.
+func V2FragmentPrimaryTables() QueryOption {
+	return func(q *queryOptions) error {
+		q.requestProperties.Options[V2FragmentPrimaryTablesValue] = true
+		return nil
+	}
+}
+
+// ResultsErrorReportingPlacement Decides the placement of errors in the result set:
+// 1. "in_data" (default) - errors are placed in the table or table fragment, within the array of data rows.
+// 2. "end_of_table" - errors are placed in the table completion frame, after the array of data rows. Only applies to queries that are progressive or fragmented.
+//  3. "end_of_dataset" - errors are placed in the dataset completion frame.
+func ResultsErrorReportingPlacement(s string) QueryOption {
+	return func(q *queryOptions) error {
+		q.requestProperties.Options[ResultsErrorReportingPlacementValue] = s
+		return nil
+	}
+}
 
 // ClientRequestID sets the x-ms-client-request-id header, and can be used to identify the request in the `.show queries` output.
 func ClientRequestID(clientRequestID string) QueryOption {

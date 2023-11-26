@@ -1,6 +1,7 @@
 package azkustodata
 
 import (
+	"bytes"
 	"context"
 	"fmt"
 	"github.com/Azure/azure-kusto-go/azkustodata/errors"
@@ -119,8 +120,8 @@ func (m *MockRows) Error(err error) error {
 type mockConn struct {
 }
 
-func (m mockConn) queryToJson(ctx context.Context, db string, query Statement, options *queryOptions) (string, error) {
-	return "[]", nil
+func (m mockConn) rawQuery(ctx context.Context, db string, query Statement, options *queryOptions) (io.ReadCloser, error) {
+	return io.NopCloser(bytes.NewReader([]byte("[]"))), nil
 }
 
 func (m mockConn) Close() error {
