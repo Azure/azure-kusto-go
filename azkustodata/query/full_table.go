@@ -38,9 +38,11 @@ func NewFullTable(dt *DataTable) (FullTable, error) {
 		values := make(value.Values, len(r))
 		for j, v := range r {
 			parsed := value.Default(t.columns[j].Type)
-			err := parsed.Unmarshal(v)
-			if err != nil {
-				return nil, errors.ES(errors.OpUnknown, errors.KInternal, "unable to unmarshal column %s into a %s value: %s", t.columns[j].Name, t.columns[j].Type, err)
+			if v != nil {
+				err := parsed.Unmarshal(v)
+				if err != nil {
+					return nil, errors.ES(errors.OpUnknown, errors.KInternal, "unable to unmarshal column %s into a %s value: %s", t.columns[j].Name, t.columns[j].Type, err)
+				}
 			}
 			values[j] = parsed
 		}
@@ -66,10 +68,15 @@ func (t *fullTable) Kind() string {
 	return t.baseTable.Kind()
 }
 
+func (t *fullTable) ColumnByName(name string) *Column {
+	return t.baseTable.ColumnByName(name)
+}
+
 func (t *fullTable) Rows() []Row {
 	return t.rows
 }
 
 type FullTable interface {
 	Table
+	Rows() []Row
 }

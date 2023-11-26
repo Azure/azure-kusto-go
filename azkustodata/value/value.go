@@ -54,23 +54,25 @@ type Kusto interface {
 func Default(t types.Column) Kusto {
 	switch t {
 	case types.Bool:
-		return &Bool{}
+		return NewNullBool()
 	case types.Int:
-		return &Int{}
+		return NewNullInt()
 	case types.Long:
-		return &Long{}
+		return NewNullLong()
 	case types.Real:
-		return &Real{}
+		return NewNullReal()
 	case types.Decimal:
-		return &Decimal{}
+		return NewNullDecimal()
 	case types.String:
-		return &String{}
+		return NewNullString()
 	case types.Dynamic:
-		return &Dynamic{}
+		return NewNullDynamic()
 	case types.DateTime:
-		return &DateTime{}
+		return NewNullDateTime()
 	case types.Timespan:
-		return &Timespan{}
+		return NewNullTimespan()
+	case types.GUID:
+		return NewNullGUID()
 	default:
 		return nil
 	}

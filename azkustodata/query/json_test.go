@@ -90,6 +90,8 @@ func TestReadFramesWithValidInput(t *testing.T) {
 	assert.Equal(t, dataSetCompletion.Cancelled, false)
 	assert.Equal(t, len(dataSetCompletion.OneApiErrors), 1)
 
+	assert.Nil(t, <-ch)
+
 	require.NoError(t, err)
 }
 

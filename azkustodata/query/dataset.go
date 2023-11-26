@@ -8,6 +8,9 @@ import (
 
 const DefaultFrameCapacity = 5
 
+const version = "v2.0"
+const errorReportingPlacement = "EndOfTable"
+
 type TableResult struct {
 	Table Table
 	Err   error
@@ -36,12 +39,7 @@ func (d *DataSet) ReadFrames() {
 func (d *DataSet) DecodeTables() {
 	defer close(d.tables)
 	for {
-		var f Frame
-
-		if d.Completion != nil {
-			d.tables <- TableResult{Table: nil, Err: errors.ES(errors.OpUnknown, errors.KInternal, "received a frame after DataSetCompletion")}
-			break
-		}
+		var f Frame = nil
 
 		select {
 		case err := <-d.errorChannel:
@@ -51,16 +49,24 @@ func (d *DataSet) DecodeTables() {
 			d.tables <- TableResult{Table: nil, Err: errors.ES(errors.OpUnknown, errors.KInternal, "context cancelled")}
 			break
 		case fc, ok := <-d.frames:
-			if !ok {
-				break
+			if ok {
+				f = fc
 			}
-			f = fc
+		}
+
+		if f == nil {
+			break
+		}
+
+		if d.Completion != nil {
+			d.tables <- TableResult{Table: nil, Err: errors.ES(errors.OpUnknown, errors.KInternal, "received a frame after DataSetCompletion")}
+			break
 		}
 
 		// Dataset Frames
 		if header, ok := f.(*DataSetHeader); ok {
 			d.DataSetHeader = header
-			if d.DataSetHeader.Version != "V2" {
+			if d.DataSetHeader.Version != version {
 				d.tables <- TableResult{Table: nil, Err: errors.ES(errors.OpUnknown, errors.KInternal, "received a DataSetHeader frame that is not version 2")}
 				break
 			}
@@ -72,7 +78,7 @@ func (d *DataSet) DecodeTables() {
 				d.tables <- TableResult{Table: nil, Err: errors.ES(errors.OpUnknown, errors.KInternal, "received a DataSetHeader frame that is progressive")}
 				break
 			}
-			const EndOfTableErrorPlacement = "EndOfTable"
+			const EndOfTableErrorPlacement = errorReportingPlacement
 			if d.DataSetHeader.ErrorReportingPlacement != EndOfTableErrorPlacement {
 				d.tables <- TableResult{Table: nil, Err: errors.ES(errors.OpUnknown, errors.KInternal, "received a DataSetHeader frame that does not report errors at the end of the table")}
 				break
@@ -100,6 +106,7 @@ func (d *DataSet) DecodeTables() {
 				break
 			}
 			d.currentStreamingTable = t.(*streamingTable)
+			d.tables <- TableResult{Table: t, Err: nil}
 		} else if tf, ok := f.(*TableFragment); ok {
 			if d.currentStreamingTable == nil {
 				err := errors.ES(errors.OpUnknown, errors.KInternal, "received a TableFragment frame while no streaming table was open")
@@ -123,15 +130,16 @@ func (d *DataSet) DecodeTables() {
 				d.tables <- TableResult{Table: nil, Err: err}
 			}
 
+			d.currentStreamingTable.close(tc.OneApiErrors)
+
 			if d.currentStreamingTable.rowCount != tc.RowCount {
 				err := errors.ES(errors.OpUnknown, errors.KInternal, "received a TableCompletion frame for table %d with row count %d while %d rows were received", tc.TableId, tc.RowCount, d.currentStreamingTable.rowCount)
 				d.tables <- TableResult{Table: nil, Err: err}
 			}
 
-			d.currentStreamingTable.close(tc.OneApiErrors)
 			d.currentStreamingTable = nil
 		} else {
-			err := errors.ES(errors.OpUnknown, errors.KInternal, "unknown frame type: %s", f.GetFrameType())
+			err := errors.ES(errors.OpUnknown, errors.KInternal, "unknown frame type")
 			d.tables <- TableResult{Table: nil, Err: err}
 			break
 		}

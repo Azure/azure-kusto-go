@@ -35,6 +35,7 @@ type Table interface {
 	Name() string
 	Columns() []Column
 	Kind() string
+	ColumnByName(name string) *Column
 }
 
 func (t *baseTable) Id() int {
@@ -51,4 +52,13 @@ func (t *baseTable) Columns() []Column {
 
 func (t *baseTable) Kind() string {
 	return t.kind
+}
+
+func (t *baseTable) ColumnByName(name string) *Column {
+	for _, c := range t.columns {
+		if c.Name == name {
+			return &c
+		}
+	}
+	return nil
 }

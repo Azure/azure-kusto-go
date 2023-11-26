@@ -20,7 +20,7 @@ func (r *Row) Value(i int) value.Kusto {
 	return r.values[i]
 }
 
-func (r *Row) ValueByColumn(c Column) value.Kusto {
+func (r *Row) ValueByColumn(c *Column) value.Kusto {
 	return r.values[c.Ordinal]
 }
 
