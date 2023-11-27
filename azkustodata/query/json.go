@@ -81,9 +81,15 @@ func ReadFrames(r io.Reader, ch chan<- Frame) error {
 type skipReader struct {
 	r          io.Reader
 	afterStart bool
+	skipNext   bool
+	finished   bool
 }
 
 func (s *skipReader) Read(p []byte) (n int, err error) {
+	if s.finished {
+		return 0, io.EOF
+	}
+
 	// skip '[' at the beginning
 	if !s.afterStart {
 		s.afterStart = true
@@ -98,39 +104,28 @@ func (s *skipReader) Read(p []byte) (n int, err error) {
 		}
 	}
 
-	cp := make([]byte, len(p)+1)
+	cp := make([]byte, len(p))
 	amt, err := s.r.Read(cp[:len(p)])
 	pIndex := 0
-	skipNext := false
 
 	if err != nil {
 		return 0, err
 	}
 
-	if cp[amt-1] == '\n' {
-		_, err = s.r.Read(cp[amt:])
-		if err != nil {
-			return 0, err
-		}
-		if cp[amt] != ']' && cp[amt] != ',' {
-			return 0, fmt.Errorf("expected ']' or ',' at the end of the stream, got '%c'", cp[amt])
-		}
-		amt++
-	}
-
 	for i := 0; i < amt; i++ {
-		if skipNext {
-			skipNext = false
+		if s.skipNext {
+			s.skipNext = false
 			next := cp[i]
 			if next == ']' {
-				return i, io.EOF
+				s.finished = true
+				return pIndex, nil
 			} else if next != ',' {
 				return 0, fmt.Errorf("expected ',' between frames, got '%c'", next)
 			}
 			continue
 		}
 		if cp[i] == '\n' {
-			skipNext = true
+			s.skipNext = true
 		}
 		p[pIndex] = cp[i]
 		pIndex++

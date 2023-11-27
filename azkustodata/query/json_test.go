@@ -18,7 +18,7 @@ func TestReadFramesWithValidInput(t *testing.T) {
 	var err error
 
 	go func() {
-		err = ReadFrames(strings.NewReader(strings.TrimSpace(validFrames)), ch)
+		err = ReadFrames(strings.NewReader(validFrames), ch)
 		require.NoError(t, err)
 	}()
 

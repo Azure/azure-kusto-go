@@ -35,7 +35,7 @@ func TestDataSet_DecodeTables_WithInvalidFrame(t *testing.T) {
 }
 
 func TestDataSet_DecodeTables_Skip(t *testing.T) {
-	reader := strings.NewReader(strings.TrimSpace(validFrames))
+	reader := strings.NewReader(validFrames)
 	d := NewDataSet(context.Background(), io.NopCloser(reader), DefaultFrameCapacity)
 
 	for tableResult := range d.tables {
@@ -49,7 +49,7 @@ func TestDataSet_DecodeTables_Skip(t *testing.T) {
 }
 
 func TestDataSet_DecodeTables_GetRows(t *testing.T) {
-	reader := strings.NewReader(strings.TrimSpace(validFrames))
+	reader := strings.NewReader(validFrames)
 	d := NewDataSet(context.Background(), io.NopCloser(reader), DefaultFrameCapacity)
 	ts, err := value.TimespanFromString("01:23:45.6789000")
 	assert.NoError(t, err)
