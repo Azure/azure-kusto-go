@@ -9,12 +9,12 @@ import (
 type QueryProperties struct {
 	TableId int
 	Key     string
-	Value   interface{}
+	Value   map[string]interface{}
 }
 
 type QueryCompletionInformation struct {
 	Timestamp        time.Time
-	ClientRequestId  uuid.UUID
+	ClientRequestId  string
 	ActivityId       uuid.UUID
 	SubActivityId    uuid.UUID
 	ParentActivityId uuid.UUID
@@ -44,7 +44,7 @@ func (d *DataSet) QueryProperties() ([]QueryProperties, error) {
 	for _, t := range d.SecondaryResults {
 		if t.Kind() == QueryPropertiesKind {
 			rows := t.(FullTable).Rows()
-			d.queryProperties = make([]QueryProperties, 0, len(rows))
+			d.queryProperties = make([]QueryProperties, len(rows))
 			for i, r := range rows {
 				err := r.ToStruct(&d.queryProperties[i])
 				if err != nil {
@@ -71,7 +71,7 @@ func (d *DataSet) QueryCompletionInformation() ([]QueryCompletionInformation, er
 	for _, t := range d.SecondaryResults {
 		if t.Kind() == QueryCompletionInformationKind {
 			rows := t.(FullTable).Rows()
-			d.queryCompletionInformation = make([]QueryCompletionInformation, 0, len(rows))
+			d.queryCompletionInformation = make([]QueryCompletionInformation, len(rows))
 			for i, r := range rows {
 				err := r.ToStruct(&d.queryCompletionInformation[i])
 				if err != nil {

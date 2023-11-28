@@ -80,6 +80,16 @@ func (in *Int) Convert(v reflect.Value) error {
 			v.Set(reflect.ValueOf(in.Value))
 		}
 		return nil
+	case t.Kind() == reflect.Int:
+		if in.Valid {
+			val := int(in.Value)
+			if int32(val) != in.Value {
+				return fmt.Errorf("column with type 'int' had value that was greater than an int32 can hold, was %d", in.Value)
+			}
+
+			v.Set(reflect.ValueOf(val))
+		}
+		return nil
 	case t.ConvertibleTo(reflect.TypeOf(new(int32))):
 		if in.Valid {
 			i := &in.Value
@@ -94,6 +104,7 @@ func (in *Int) Convert(v reflect.Value) error {
 		return nil
 	}
 	return fmt.Errorf("Column was type Kusto.Int, receiver had base Kind %s ", t.Kind())
+
 }
 
 // GetValue returns the value of the type.
