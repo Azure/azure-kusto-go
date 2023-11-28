@@ -20,7 +20,7 @@ func TestDataSet_ReadFrames_WithError(t *testing.T) {
 		tables:       make(chan TableResult, 1),
 		ctx:          context.Background(),
 	}
-	go d.ReadFrames()
+	go d.readFrames()
 
 	err := <-d.errorChannel
 	assert.Error(t, err)
