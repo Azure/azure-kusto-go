@@ -2,6 +2,7 @@ package query
 
 import (
 	_ "embed"
+	"encoding/json"
 	"strings"
 	"testing"
 
@@ -44,7 +45,7 @@ func TestReadFramesWithValidInput(t *testing.T) {
 	})
 	assert.Equal(t, dataTable.Rows, RawRows{
 		{
-			float64(1),
+			json.Number("1"),
 			"Visualization",
 			`{"Visualization":null,"Title":null,"XColumn":null,"Series":null,"YColumns":null,"AnomalyColumns":null,"XTitle":null,"YTitle":null,"XAxis":null,"YAxis":null,"Legend":null,"YSplit":null,"Accumulate":false,"IsQuerySorted":false,"Kind":null,"Ymin":"NaN","Ymax":"NaN","Xmin":null,"Xmax":null}`,
 		}})
@@ -69,8 +70,8 @@ func TestReadFramesWithValidInput(t *testing.T) {
 	tableFragment := (<-ch).(*TableFragment)
 	assert.Equal(t, tableFragment.TableFragmentType, "DataAppend")
 	assert.Equal(t, tableFragment.TableId, 1)
-	assert.Equal(t, tableFragment.Rows, [][]interface{}{
-		{float64(1), "2.00000000000001", "2020-03-04T14:05:01.3109965Z", "01:23:45.6789000", map[string]interface{}{"moshe": "value"}, true, 0.01, "asdf", float64(9223372036854775807), "123e27de-1e4e-49d9-b579-fe0b331d3642"},
+	assert.Equal(t, tableFragment.Rows, RawRows{
+		{json.Number("1"), "2.00000000000001", "2020-03-04T14:05:01.3109965Z", "01:23:45.6789000", map[string]interface{}{"moshe": "value"}, true, json.Number("0.01"), "asdf", json.Number("9223372036854775807"), "123e27de-1e4e-49d9-b579-fe0b331d3642"},
 	})
 
 	tableCompletion := (<-ch).(*TableCompletion)
@@ -122,7 +123,7 @@ func TestReadFramesWithErrors(t *testing.T) {
 	})
 	assert.Equal(t, dataTable.Rows, RawRows{
 		{
-			float64(1),
+			json.Number("1"),
 			"Visualization",
 			`{"Visualization":null,"Title":null,"XColumn":null,"Series":null,"YColumns":null,"AnomalyColumns":null,"XTitle":null,"YTitle":null,"XAxis":null,"YAxis":null,"Legend":null,"YSplit":null,"Accumulate":false,"IsQuerySorted":false,"Kind":null,"Ymin":"NaN","Ymax":"NaN","Xmin":null,"Xmax":null}`,
 		}})
@@ -138,8 +139,8 @@ func TestReadFramesWithErrors(t *testing.T) {
 	tableFragment := (<-ch).(*TableFragment)
 	assert.Equal(t, tableFragment.TableFragmentType, "DataAppend")
 	assert.Equal(t, tableFragment.TableId, 1)
-	assert.Equal(t, tableFragment.Rows, [][]interface{}{
-		{float64(1)},
+	assert.Equal(t, tableFragment.Rows, RawRows{
+		{json.Number("1")},
 	})
 
 	tableCompletion := (<-ch).(*TableCompletion)

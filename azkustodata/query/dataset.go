@@ -35,72 +35,16 @@ type DataSet struct {
 	ctx                   context.Context
 }
 
-var errorTableUninitialized = errors.ES(errors.OpUnknown, errors.KInternal, "Table uninitialized")
-
-const QueryPropertiesKind = "QueryProperties"
-const QueryCompletionInformationKind = "QueryCompletionInformation"
-
-func (d *DataSet) QueryProperties() ([]QueryProperties, error) {
-	if d.SecondaryResults == nil {
-		return nil, errorTableUninitialized
-	}
-
-	if d.queryProperties != nil {
-		return d.queryProperties, nil
-	}
-
-	for _, t := range d.SecondaryResults {
-		if t.Kind() == QueryPropertiesKind {
-			rows := t.(FullTable).Rows()
-			d.queryProperties = make([]QueryProperties, 0, len(rows))
-			for i, r := range rows {
-				err := r.ToStruct(&d.queryProperties[i])
-				if err != nil {
-					return nil, err
-				}
-			}
-
-			return d.queryProperties, nil
-		}
-	}
-
-	return nil, errorTableUninitialized
-}
-
-func (d *DataSet) QueryCompletionInformation() ([]QueryCompletionInformation, error) {
-	if d.SecondaryResults == nil {
-		return nil, errorTableUninitialized
-	}
-
-	if d.queryCompletionInformation != nil {
-		return d.queryCompletionInformation, nil
-	}
-
-	for _, t := range d.SecondaryResults {
-		if t.Kind() == QueryCompletionInformationKind {
-			rows := t.(FullTable).Rows()
-			d.queryCompletionInformation = make([]QueryCompletionInformation, 0, len(rows))
-			for i, r := range rows {
-				err := r.ToStruct(&d.queryCompletionInformation[i])
-				if err != nil {
-					return nil, err
-				}
-			}
-
-			return d.queryCompletionInformation, nil
-		}
-	}
-
-	return nil, errorTableUninitialized
-}
-
 func (d *DataSet) ReadFrames() {
 	err := ReadFrames(d.reader, d.frames)
 	if err != nil {
 		d.errorChannel <- err
 	}
 
-	d.reader.Close()
+	err = d.reader.Close()
+	if err != nil {
+		d.errorChannel <- err
+	}
 }
 
 func (d *DataSet) DecodeTables() {

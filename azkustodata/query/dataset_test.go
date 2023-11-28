@@ -98,7 +98,7 @@ func TestDataSet_DecodeTables_GetRows(t *testing.T) {
 				{table: nil, values: value.Values{
 					value.NewInt(1),
 					value.DecimalFromString("2.00000000000001"),
-					value.DecimalFromString("2020-03-04T14:05:01.3109965Z"),
+					value.NewDateTime(time.Date(2020, 3, 4, 14, 5, 1, 310996500, time.UTC)),
 					ts,
 					value.NewDynamic([]byte("{\"moshe\":\"value\"}")),
 					value.NewBool(true),
@@ -164,19 +164,31 @@ func TestDataSet_DecodeTables_GetRows(t *testing.T) {
 	for tableResult := range d.tables {
 		assert.NoError(t, tableResult.Err)
 		if tableResult.Table != nil {
+			tb := tableResult.Table
+			expectedTable := tables[tb.Id()]
+			assert.Equal(t, expectedTable.Id(), tb.Id())
+			assert.Equal(t, expectedTable.Name(), tb.Name())
+			assert.Equal(t, expectedTable.Kind(), tb.Kind())
+			assert.Equal(t, expectedTable.Columns(), tb.Columns())
+
 			if tb, ok := tableResult.Table.(StreamingTable); ok {
-				tb.SkipToEnd()
+				i := 0
+				for rowResult := range tb.Rows() {
+					assert.NoError(t, rowResult.Err)
+					expectedRow := expectedTable.Rows()[i]
+					for j, val := range rowResult.Row.Values() {
+						assert.Equal(t, expectedRow.Values()[j].GetValue(), val.GetValue())
+					}
+					i++
+				}
 			}
 
 			if tb, ok := tableResult.Table.(FullTable); ok {
-				expectedTable := tables[tb.Id()]
-				assert.Equal(t, expectedTable.Id(), tb.Id())
-				assert.Equal(t, expectedTable.Name(), tb.Name())
-				assert.Equal(t, expectedTable.Kind(), tb.Kind())
-				assert.Equal(t, expectedTable.Columns(), tb.Columns())
 				for i, row := range tb.Rows() {
 					expectedRow := expectedTable.Rows()[i]
-					assert.Equal(t, expectedRow.Values(), row.Values())
+					for j, val := range row.Values() {
+						assert.Equal(t, expectedRow.Values()[j].GetValue(), val.GetValue())
+					}
 				}
 			}
 		}

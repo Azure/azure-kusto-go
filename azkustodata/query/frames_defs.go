@@ -47,9 +47,9 @@ type TableHeader struct {
 const TableFragmentFrameType = "TableFragment"
 
 type TableFragment struct {
-	TableFragmentType string          `json:"TableFragmentType"`
-	TableId           int             `json:"TableId"`
-	Rows              [][]interface{} `json:"Rows"`
+	TableFragmentType string  `json:"TableFragmentType"`
+	TableId           int     `json:"TableId"`
+	Rows              RawRows `json:"Rows"`
 }
 
 const TableCompletionFrameType = "TableCompletion"
@@ -69,19 +69,19 @@ type DataSetCompletion struct {
 }
 
 type EveryFrame struct {
-	FrameType               string          `json:"FrameType"`
-	IsProgressive           bool            `json:"IsProgressive"`
-	Version                 string          `json:"Version"`
-	IsFragmented            bool            `json:"IsFragmented"`
-	ErrorReportingPlacement string          `json:"ErrorReportingPlacement"`
-	TableId                 int             `json:"TableId"`
-	TableKind               string          `json:"TableKind"`
-	TableName               string          `json:"TableName"`
-	Columns                 []FrameColumn   `json:"Columns"`
-	Rows                    [][]interface{} `json:"Rows"`
-	TableFragmentType       string          `json:"TableFragmentType"`
-	RowCount                int             `json:"RowCount"`
-	OneApiErrors            []OneApiError   `json:"OneApiErrors"`
-	HasErrors               bool            `json:"HasErrors"`
-	Cancelled               bool            `json:"Cancelled"`
+	FrameType               string        `json:"FrameType"`
+	IsProgressive           bool          `json:"IsProgressive"`
+	Version                 string        `json:"Version"`
+	IsFragmented            bool          `json:"IsFragmented"`
+	ErrorReportingPlacement string        `json:"ErrorReportingPlacement"`
+	TableId                 int           `json:"TableId"`
+	TableKind               string        `json:"TableKind"`
+	TableName               string        `json:"TableName"`
+	Columns                 []FrameColumn `json:"Columns"`
+	Rows                    RawRows       `json:"Rows"`
+	TableFragmentType       string        `json:"TableFragmentType"`
+	RowCount                int           `json:"RowCount"`
+	OneApiErrors            []OneApiError `json:"OneApiErrors"`
+	HasErrors               bool          `json:"HasErrors"`
+	Cancelled               bool          `json:"Cancelled"`
 }

@@ -57,6 +57,7 @@ func ReadFrames(r io.Reader, ch chan<- Frame) error {
 	defer close(ch)
 
 	dec := json.NewDecoder(&skipReader{r: r})
+	dec.UseNumber()
 
 	for {
 		frame := EveryFrame{}
