@@ -32,7 +32,7 @@ func (r *Row) ValueByColumn(c *Column) value.Kusto {
 // some ptrs set and others not.
 func (r *Row) ExtractValues(ptrs ...interface{}) error {
 	if len(ptrs) != len(r.table.Columns()) {
-		return errors.ES(errors.OpUnknown, errors.KClientArgs, ".Columns() requires %d arguments for this row, had %d", len(r.table.Columns()), len(ptrs))
+		return errors.ES(r.table.op(), errors.KClientArgs, ".Columns() requires %d arguments for this row, had %d", len(r.table.Columns()), len(ptrs))
 	}
 
 	for i, val := range r.Values() {
@@ -64,14 +64,26 @@ func (r *Row) ExtractValues(ptrs ...interface{}) error {
 func (r *Row) ToStruct(p interface{}) error {
 	// Check if p is a pointer to a struct
 	if t := reflect.TypeOf(p); t == nil || t.Kind() != reflect.Ptr || t.Elem().Kind() != reflect.Struct {
-		//todo - op in ctx?
-		return errors.ES(errors.OpUnknown, errors.KClientArgs, "type %T is not a pointer to a struct", p)
+		return errors.ES(r.table.op(), errors.KClientArgs, "type %T is not a pointer to a struct", p)
 	}
 	if len(r.table.Columns()) != len(r.Values()) {
-		return errors.ES(errors.OpUnknown, errors.KClientArgs, "row does not have the correct number of values(%d) for the number of columns(%d)", len(r.Values()), len(r.table.Columns()))
+		return errors.ES(r.table.op(), errors.KClientArgs, "row does not have the correct number of values(%d) for the number of columns(%d)", len(r.Values()), len(r.table.Columns()))
 	}
 
 	return decodeToStruct(r.table.Columns(), r.Values(), p)
+}
+
+func ToStructs[T any](rows []Row) ([]T, error) {
+	if len(rows) == 0 {
+		return nil, nil
+	}
+	out := make([]T, len(rows))
+	for i, r := range rows {
+		if err := r.ToStruct(&out[i]); err != nil {
+			return nil, err
+		}
+	}
+	return out, nil
 }
 
 // String implements fmt.Stringer for a Row. This simply outputs a CSV version of the row.

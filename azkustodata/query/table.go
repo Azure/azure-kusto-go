@@ -1,6 +1,7 @@
 package query
 
 import (
+	"github.com/Azure/azure-kusto-go/azkustodata/errors"
 	"github.com/Azure/azure-kusto-go/azkustodata/types"
 	"github.com/Azure/azure-kusto-go/azkustodata/value"
 )
@@ -14,16 +15,19 @@ type Column struct {
 type Row struct {
 	table  Table
 	values value.Values
+	Index  int
 }
 
-func NewRow(t Table, values value.Values) *Row {
+func NewRow(t Table, index int, values value.Values) *Row {
 	return &Row{
 		table:  t,
+		Index:  index,
 		values: values,
 	}
 }
 
 type baseTable struct {
+	dataSet *DataSet
 	id      int
 	name    string
 	kind    string
@@ -37,6 +41,9 @@ type Table interface {
 	Kind() string
 	ColumnByName(name string) *Column
 	IsPrimaryResult() bool
+	Consume() ([]Row, []error)
+
+	op() errors.Op
 }
 
 func (t *baseTable) Id() int {
@@ -62,6 +69,10 @@ func (t *baseTable) ColumnByName(name string) *Column {
 		}
 	}
 	return nil
+}
+
+func (t *baseTable) op() errors.Op {
+	return t.dataSet.op()
 }
 
 const PrimaryResultTableKind = "PrimaryResult"

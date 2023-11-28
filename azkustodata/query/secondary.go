@@ -56,6 +56,7 @@ func (d *DataSet) QueryProperties() ([]QueryProperties, error) {
 		}
 	}
 
+	errorTableUninitialized.Op = d.op()
 	return nil, errorTableUninitialized
 }
 
@@ -83,5 +84,6 @@ func (d *DataSet) QueryCompletionInformation() ([]QueryCompletionInformation, er
 		}
 	}
 
+	errorTableUninitialized.Op = d.op()
 	return nil, errorTableUninitialized
 }

@@ -11,9 +11,10 @@ type fullTable struct {
 	rows []Row
 }
 
-func NewFullTable(dt *DataTable) (FullTable, error) {
+func NewFullTable(dataSet *DataSet, dt *DataTable) (FullTable, error) {
 	t := &fullTable{
 		baseTable: baseTable{
+			dataSet: dataSet,
 			id:      dt.TableId,
 			name:    dt.TableName,
 			kind:    dt.TableKind,
@@ -21,6 +22,8 @@ func NewFullTable(dt *DataTable) (FullTable, error) {
 		},
 		rows: make([]Row, len(dt.Rows)),
 	}
+
+	op := t.op()
 
 	for i, c := range dt.Columns {
 
@@ -31,7 +34,7 @@ func NewFullTable(dt *DataTable) (FullTable, error) {
 		}
 
 		if !t.columns[i].Type.Valid() {
-			return nil, errors.ES(errors.OpUnknown, errors.KClientArgs, "column[%d] if of type %q, which is not valid", i, c.ColumnType)
+			return nil, errors.ES(op, errors.KClientArgs, "column[%d] if of type %q, which is not valid", i, c.ColumnType)
 		}
 	}
 
@@ -42,12 +45,12 @@ func NewFullTable(dt *DataTable) (FullTable, error) {
 			if v != nil {
 				err := parsed.Unmarshal(v)
 				if err != nil {
-					return nil, errors.ES(errors.OpUnknown, errors.KInternal, "unable to unmarshal column %s into a %s value: %s", t.columns[j].Name, t.columns[j].Type, err)
+					return nil, errors.ES(op, errors.KInternal, "unable to unmarshal column %s into a %s value: %s", t.columns[j].Name, t.columns[j].Type, err)
 				}
 			}
 			values[j] = parsed
 		}
-		t.rows[i] = *NewRow(t, values)
+		t.rows[i] = *NewRow(t, i, values)
 	}
 
 	return t, nil
@@ -55,6 +58,10 @@ func NewFullTable(dt *DataTable) (FullTable, error) {
 
 func (t *fullTable) Rows() []Row {
 	return t.rows
+}
+
+func (t *fullTable) Consume() ([]Row, []error) {
+	return t.rows, nil
 }
 
 type FullTable interface {

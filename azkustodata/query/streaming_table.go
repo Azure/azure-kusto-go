@@ -19,11 +19,13 @@ type streamingTable struct {
 	rowCount int
 	skip     bool
 	end      chan bool
+	closed   bool
 }
 
 func NewStreamingTable(dataset *DataSet, th *TableHeader) (StreamingTable, *errors.Error) {
 	t := &streamingTable{
 		baseTable: baseTable{
+			dataSet: dataset,
 			id:      th.TableId,
 			name:    th.TableName,
 			kind:    th.TableKind,
@@ -44,7 +46,7 @@ func NewStreamingTable(dataset *DataSet, th *TableHeader) (StreamingTable, *erro
 		}
 
 		if !t.columns[i].Type.Valid() {
-			return nil, errors.ES(errors.OpUnknown, errors.KClientArgs, "column[%d] if of type %q, which is not valid", i, c.ColumnType)
+			return nil, errors.ES(dataset.op(), errors.KClientArgs, "column[%d] if of type %q, which is not valid", i, c.ColumnType)
 		}
 	}
 
@@ -54,6 +56,11 @@ func NewStreamingTable(dataset *DataSet, th *TableHeader) (StreamingTable, *erro
 }
 
 func (t *streamingTable) close(errors []OneApiError) {
+	if t.closed {
+		return
+	}
+	t.closed = true
+
 	close(t.rawRows)
 
 	b := <-t.end
@@ -67,25 +74,23 @@ func (t *streamingTable) close(errors []OneApiError) {
 	close(t.rows)
 }
 
-var skipError = errors.ES(errors.OpUnknown, errors.KInternal, "skipping row")
-
 func (t *streamingTable) readRows() {
 	for rows := range t.rawRows {
 		for _, r := range rows {
 			if t.skip {
-				t.rows <- RowResult{Row: Row{}, Err: skipError}
+				t.rows <- RowResult{Row: Row{}, Err: errors.ES(t.op(), errors.KInternal, "skipping row")}
 			} else {
 				values := make(value.Values, len(r))
 				for j, v := range r {
 					parsed := value.Default(t.columns[j].Type)
 					err := parsed.Unmarshal(v)
 					if err != nil {
-						t.rows <- RowResult{Row: Row{}, Err: errors.ES(errors.OpUnknown, errors.KInternal, "unable to unmarshal column %s into a %s value: %s", t.columns[j].Name, t.columns[j].Type, err)}
+						t.rows <- RowResult{Row: Row{}, Err: errors.ES(t.op(), errors.KInternal, "unable to unmarshal column %s into A %s value: %s", t.columns[j].Name, t.columns[j].Type, err)}
 						continue
 					}
 					values[j] = parsed
 				}
-				t.rows <- RowResult{Row: *NewRow(t, values), Err: nil}
+				t.rows <- RowResult{Row: *NewRow(t, t.rowCount, values), Err: nil}
 			}
 			t.rowCount++
 		}
@@ -108,10 +113,24 @@ func (t *streamingTable) SkipToEnd() []error {
 
 	var errs []error
 	for r := range t.rows {
-		if r.Err != skipError {
+		if r.Err != errors.ES(errors.OpUnknown, errors.KInternal, "skipping row") {
 			errs = append(errs, r.Err)
 		}
 	}
 
 	return errs
+}
+
+func (t *streamingTable) Consume() ([]Row, []error) {
+	var rows []Row
+	var errs []error
+	for r := range t.rows {
+		if r.Err != nil {
+			errs = append(errs, r.Err)
+		} else {
+			rows = append(rows, r.Row)
+		}
+	}
+
+	return rows, errs
 }

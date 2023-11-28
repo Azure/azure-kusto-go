@@ -243,6 +243,56 @@ func TestDataSet_DecodeTables_GetRows(t *testing.T) {
 	assert.Equal(t, expectedQueryProperties, properties)
 }
 
+func TestDataSet_MultiplePrimaryTables(t *testing.T) {
+	reader := strings.NewReader(twoTables)
+	d := NewDataSet(context.Background(), io.NopCloser(reader), DefaultFrameCapacity)
+	type Table1 struct {
+		A int
+	}
+	type Table2 struct {
+		A string
+		B int
+	}
+
+	table1Expected := []Table1{
+		{A: 1},
+		{A: 2},
+		{A: 3},
+	}
+
+	table2Expected := []Table2{
+		{A: "a", B: 1},
+		{A: "b", B: 2},
+		{A: "c", B: 3},
+	}
+
+	for tableResult := range d.tables {
+		assert.NoError(t, tableResult.Err)
+		if tableResult.Table != nil {
+			if tb, ok := tableResult.Table.(StreamingTable); ok {
+				assert.True(t, tb.IsPrimaryResult())
+				id := tb.Id()
+				for rowResult := range tb.Rows() {
+					assert.NoError(t, rowResult.Err)
+					if id == 1 {
+						var row Table1
+						err := rowResult.Row.ToStruct(&row)
+						assert.NoError(t, err)
+						assert.Equal(t, table1Expected[rowResult.Row.Index], row)
+					}
+					if id == 2 {
+						var row Table2
+						err := rowResult.Row.ToStruct(&row)
+						assert.NoError(t, err)
+						assert.Equal(t, table2Expected[rowResult.Row.Index], row)
+					}
+				}
+			}
+		}
+
+	}
+}
+
 func TestDataSet_DecodeTables_WithInvalidDataSetHeader(t *testing.T) {
 	reader := strings.NewReader(`[{"FrameType": "DataSetHeader", "Version": "V1"}]`)
 	d := NewDataSet(context.Background(), io.NopCloser(reader), DefaultFrameCapacity)

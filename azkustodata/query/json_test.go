@@ -16,6 +16,9 @@ var validFrames string
 //go:embed testData/error.json
 var errorFrames string
 
+//go:embed testData/twoTables.json
+var twoTables string
+
 func TestReadFramesWithValidInput(t *testing.T) {
 	ch := make(chan Frame)
 
