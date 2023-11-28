@@ -53,26 +53,6 @@ func NewStreamingTable(dataset *DataSet, th *TableHeader) (StreamingTable, *erro
 	return t, nil
 }
 
-func (t *streamingTable) Id() int {
-	return t.baseTable.Id()
-}
-
-func (t *streamingTable) Name() string {
-	return t.baseTable.Name()
-}
-
-func (t *streamingTable) Columns() []Column {
-	return t.baseTable.Columns()
-}
-
-func (t *streamingTable) Kind() string {
-	return t.baseTable.Kind()
-}
-
-func (t *streamingTable) ColumnByName(name string) *Column {
-	return t.baseTable.ColumnByName(name)
-}
-
 func (t *streamingTable) close(errors []OneApiError) {
 	close(t.rawRows)
 

@@ -53,26 +53,6 @@ func NewFullTable(dt *DataTable) (FullTable, error) {
 	return t, nil
 }
 
-func (t *fullTable) Id() int {
-	return t.baseTable.Id()
-}
-
-func (t *fullTable) Name() string {
-	return t.baseTable.Name()
-}
-
-func (t *fullTable) Columns() []Column {
-	return t.baseTable.Columns()
-}
-
-func (t *fullTable) Kind() string {
-	return t.baseTable.Kind()
-}
-
-func (t *fullTable) ColumnByName(name string) *Column {
-	return t.baseTable.ColumnByName(name)
-}
-
 func (t *fullTable) Rows() []Row {
 	return t.rows
 }

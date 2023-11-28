@@ -36,6 +36,7 @@ type Table interface {
 	Columns() []Column
 	Kind() string
 	ColumnByName(name string) *Column
+	IsPrimaryResult() bool
 }
 
 func (t *baseTable) Id() int {
@@ -61,4 +62,10 @@ func (t *baseTable) ColumnByName(name string) *Column {
 		}
 	}
 	return nil
+}
+
+const PrimaryResultTableKind = "PrimaryResult"
+
+func (t *baseTable) IsPrimaryResult() bool {
+	return t.kind == PrimaryResultTableKind
 }

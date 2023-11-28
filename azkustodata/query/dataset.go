@@ -20,13 +20,78 @@ type DataSet struct {
 	reader        io.ReadCloser
 	DataSetHeader *DataSetHeader
 	Completion    *DataSetCompletion
-	frames        chan Frame
-	errorChannel  chan error
+
+	queryProperties            []QueryProperties
+	queryCompletionInformation []QueryCompletionInformation
+
+	SecondaryResults []Table
+
+	frames       chan Frame
+	errorChannel chan error
 
 	tables chan TableResult
 
 	currentStreamingTable *streamingTable
 	ctx                   context.Context
+}
+
+var errorTableUninitialized = errors.ES(errors.OpUnknown, errors.KInternal, "Table uninitialized")
+
+const QueryPropertiesKind = "QueryProperties"
+const QueryCompletionInformationKind = "QueryCompletionInformation"
+
+func (d *DataSet) QueryProperties() ([]QueryProperties, error) {
+	if d.SecondaryResults == nil {
+		return nil, errorTableUninitialized
+	}
+
+	if d.queryProperties != nil {
+		return d.queryProperties, nil
+	}
+
+	for _, t := range d.SecondaryResults {
+		if t.Kind() == QueryPropertiesKind {
+			rows := t.(FullTable).Rows()
+			d.queryProperties = make([]QueryProperties, 0, len(rows))
+			for i, r := range rows {
+				err := r.ToStruct(&d.queryProperties[i])
+				if err != nil {
+					return nil, err
+				}
+			}
+
+			return d.queryProperties, nil
+		}
+	}
+
+	return nil, errorTableUninitialized
+}
+
+func (d *DataSet) QueryCompletionInformation() ([]QueryCompletionInformation, error) {
+	if d.SecondaryResults == nil {
+		return nil, errorTableUninitialized
+	}
+
+	if d.queryCompletionInformation != nil {
+		return d.queryCompletionInformation, nil
+	}
+
+	for _, t := range d.SecondaryResults {
+		if t.Kind() == QueryCompletionInformationKind {
+			rows := t.(FullTable).Rows()
+			d.queryCompletionInformation = make([]QueryCompletionInformation, 0, len(rows))
+			for i, r := range rows {
+				err := r.ToStruct(&d.queryCompletionInformation[i])
+				if err != nil {
+					return nil, err
+				}
+			}
+
+			return d.queryCompletionInformation, nil
+		}
+	}
+
+	return nil, errorTableUninitialized
 }
 
 func (d *DataSet) ReadFrames() {
@@ -98,6 +163,9 @@ func (d *DataSet) DecodeTables() {
 			d.tables <- TableResult{Table: t, Err: err}
 			if err != nil {
 				break
+			}
+			if !t.IsPrimaryResult() {
+				d.SecondaryResults = append(d.SecondaryResults, t)
 			}
 
 			// Streaming Frames

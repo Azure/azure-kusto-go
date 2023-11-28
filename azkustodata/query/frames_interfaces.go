@@ -23,11 +23,11 @@ func (f *TableFragment) String() string {
 }
 
 func (f *TableCompletion) String() string {
-	return fmt.Sprintf("TableCompletion(TableId=%d, RowCount=%d, OneApiErrors=%v)", f.TableId, f.RowCount, f.OneApiErrors)
+	return fmt.Sprintf("TableCompletion(TableId=%d, RowCount=%d, OneApiErrors=%#v)", f.TableId, f.RowCount, f.OneApiErrors)
 }
 
 func (f *DataSetCompletion) String() string {
-	return fmt.Sprintf("DataSetCompletion(HasErrors=%t, Cancelled=%t, OneApiErrors=%v)", f.HasErrors, f.Cancelled, f.OneApiErrors)
+	return fmt.Sprintf("DataSetCompletion(HasErrors=%t, Cancelled=%t, OneApiErrors=%#v)", f.HasErrors, f.Cancelled, f.OneApiErrors)
 }
 
 func (f *DataSetHeader) GetFrameType() string {
