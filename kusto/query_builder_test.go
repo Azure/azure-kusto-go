@@ -211,13 +211,22 @@ func TestParamType(t *testing.T) {
 			wantStr: "my_value:string = \"hello\"",
 		},
 		{
+			desc: "Quoted value default for types.String",
+			param: ParamType{
+				Type:    types.String,
+				Default: "h\\el\"l\t\no",
+				name:    "my_value",
+			},
+			wantStr: `my_value:string = "h\\el\"l\t\no"`,
+		},
+		{
 			desc: "Success Default for types.Timespan",
 			param: ParamType{
 				Type:    types.Timespan,
 				Default: duration,
-				name:    "my_value:timespan = timespan(03.01:03:00)",
+				name:    "my_value",
 			},
-			wantStr: "my_value:timespan = timespan(1000)",
+			wantStr: "my_value:timespan = timespan(01:03:02)",
 		},
 		{
 			desc: "Success Default for types.Decimal",
@@ -267,7 +276,7 @@ func TestParamType(t *testing.T) {
 				assert.NoError(t, err)
 			case err != nil && !test.err:
 				assert.Error(t, err)
-			case err != nil:
+			case err == nil:
 				if test.panic {
 					assert.Panicsf(t, func() { test.param.string() }, "panic: internal bug: ParamType.string() called without a call to .validate()")
 					return
