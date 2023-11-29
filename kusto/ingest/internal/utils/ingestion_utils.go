@@ -15,8 +15,8 @@ import (
 	"github.com/Azure/azure-sdk-for-go/sdk/storage/azblob/blob"
 	"github.com/Azure/azure-sdk-for-go/sdk/storage/azblob/service"
 
-	"github.com/Azure/azure-kusto-go/kusto/ingest/internal/resources"
 	"github.com/Azure/azure-kusto-go/kusto/ingest/ingestoptions"
+	"github.com/Azure/azure-kusto-go/kusto/ingest/internal/resources"
 )
 
 const EstimatedCompressionFactor = 11

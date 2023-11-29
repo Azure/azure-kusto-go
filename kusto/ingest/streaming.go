@@ -9,11 +9,11 @@ import (
 
 	"github.com/Azure/azure-kusto-go/kusto"
 	"github.com/Azure/azure-kusto-go/kusto/data/errors"
+	"github.com/Azure/azure-kusto-go/kusto/ingest/ingestoptions"
 	"github.com/Azure/azure-kusto-go/kusto/ingest/internal/gzip"
 	"github.com/Azure/azure-kusto-go/kusto/ingest/internal/properties"
 	"github.com/Azure/azure-kusto-go/kusto/ingest/internal/queued"
 	"github.com/Azure/azure-kusto-go/kusto/ingest/internal/utils"
-	"github.com/Azure/azure-kusto-go/kusto/ingest/ingestoptions"
 
 	"github.com/google/uuid"
 )
