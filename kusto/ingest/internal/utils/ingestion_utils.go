@@ -16,7 +16,7 @@ import (
 	"github.com/Azure/azure-sdk-for-go/sdk/storage/azblob/service"
 
 	"github.com/Azure/azure-kusto-go/kusto/ingest/internal/resources"
-	"github.com/Azure/azure-kusto-go/kusto/ingest/source"
+	"github.com/Azure/azure-kusto-go/kusto/ingest/ingestoptions"
 )
 
 const EstimatedCompressionFactor = 11
@@ -79,10 +79,10 @@ func FetchBlobSize(fPath string, ctx context.Context, client *http.Client) (size
 	return *properties.ContentLength, nil
 }
 
-func EstimateRawDataSize(compression source.CompressionType, fileSize int64) int64 {
+func EstimateRawDataSize(compression ingestoptions.CompressionType, fileSize int64) int64 {
 	switch compression {
-	case source.GZIP:
-	case source.ZIP:
+	case ingestoptions.GZIP:
+	case ingestoptions.ZIP:
 		return fileSize * EstimatedCompressionFactor
 	}
 
@@ -92,7 +92,7 @@ func EstimateRawDataSize(compression source.CompressionType, fileSize int64) int
 // CompressionDiscovery looks at the file extension. If it is one we support, we return that
 // CompressionType that represents that value. Otherwise we return CTNone to indicate that the
 // file should not be compressed.
-func CompressionDiscovery(fName string) source.CompressionType {
+func CompressionDiscovery(fName string) ingestoptions.CompressionType {
 	var ext string
 	if strings.HasPrefix(strings.ToLower(fName), "http") {
 		ext = strings.ToLower(filepath.Ext(path.Base(fName)))
@@ -102,9 +102,9 @@ func CompressionDiscovery(fName string) source.CompressionType {
 
 	switch ext {
 	case ".gz":
-		return source.GZIP
+		return ingestoptions.GZIP
 	case ".zip":
-		return source.ZIP
+		return ingestoptions.ZIP
 	}
-	return source.CTNone
+	return ingestoptions.CTNone
 }

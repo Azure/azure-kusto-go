@@ -2259,7 +2259,6 @@ func createStringyLogsData() string {
 
 func executeCommands(client *kusto.Client, database string, commandsToRun ...kusto.Statement) error {
 	for _, cmd := range commandsToRun {
-		time.Sleep(100 * time.Millisecond)
 		if _, err := client.Mgmt(context.Background(), database, cmd); err != nil {
 			return err
 		}

@@ -14,7 +14,8 @@ import (
 
 	"github.com/Azure/azure-kusto-go/kusto"
 	"github.com/Azure/azure-kusto-go/kusto/data/errors"
-	"github.com/Azure/azure-kusto-go/kusto/ingest/source"
+
+	"github.com/Azure/azure-kusto-go/kusto/ingest/ingestoptions"
 	"github.com/cenkalti/backoff/v4"
 	"github.com/google/uuid"
 )
@@ -72,27 +73,28 @@ type dfDescriptor struct {
 	jsonName         string
 	detectableExt    string
 	validMappingKind bool
+	shouldCompress   bool
 }
 
 var dfDescriptions = []dfDescriptor{
-	{"", "", "", false},
-	{"Avro", "avro", ".avro", true},
-	{"ApacheAvro", "avro", "", false},
-	{"Csv", "csv", ".csv", true},
-	{"Json", "json", ".json", true},
-	{"MultiJson", "multijson", "", false},
-	{"Orc", "orc", ".orc", true},
-	{"Parquet", "parquet", ".parquet", true},
-	{"Psv", "psv", ".psv", false},
-	{"Raw", "raw", ".raw", false},
-	{"Scsv", "scsv", ".scsv", false},
-	{"Sohsv", "sohsv", ".sohsv", false},
-	{"SStream", "sstream", ".ss", false},
-	{"Tsv", "tsv", ".tsv", false},
-	{"Tsve", "tsve", ".tsve", false},
-	{"Txt", "txt", ".txt", false},
-	{"W3cLogFile", "w3clogfile", ".w3clogfile", false},
-	{"SingleJson", "singlejson", "", false},
+	{"", "", "", false, false},
+	{"Avro", "avro", ".avro", true, false},
+	{"ApacheAvro", "avro", "", false, false},
+	{"Csv", "csv", ".csv", true, true},
+	{"Json", "json", ".json", true, true},
+	{"MultiJson", "multijson", "", false, true},
+	{"Orc", "orc", ".orc", true, false},
+	{"Parquet", "parquet", ".parquet", true, false},
+	{"Psv", "psv", ".psv", false, true},
+	{"Raw", "raw", ".raw", false, true},
+	{"Scsv", "scsv", ".scsv", false, true},
+	{"Sohsv", "sohsv", ".sohsv", false, true},
+	{"SStream", "sstream", ".ss", false, true},
+	{"Tsv", "tsv", ".tsv", false, true},
+	{"Tsve", "tsve", ".tsve", false, true},
+	{"Txt", "txt", ".txt", false, true},
+	{"W3cLogFile", "w3clogfile", ".w3clogfile", false, true},
+	{"SingleJson", "singlejson", "", false, true},
 }
 
 // IngestionReportLevel defines which ingestion statuses are reported by the DM.
@@ -168,6 +170,14 @@ func (d DataFormat) IsValidMappingKind() bool {
 	return false
 }
 
+func (d DataFormat) ShouldCompress() bool {
+	if d > 0 && int(d) < len(dfDescriptions) {
+		return dfDescriptions[d].shouldCompress
+	}
+
+	return false
+}
+
 // DataFormatDiscovery looks at the file name and tries to discern what the file format is.
 func DataFormatDiscovery(fName string) DataFormat {
 	name := fName
@@ -232,7 +242,7 @@ type SourceOptions struct {
 	OriginalSource string
 
 	// CompressionType is the type of compression used on the file.
-	CompressionType source.CompressionType
+	CompressionType ingestoptions.CompressionType
 }
 
 // Ingestion is a JSON serializable set of options that must be provided to the service.

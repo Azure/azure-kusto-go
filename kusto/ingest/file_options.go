@@ -6,8 +6,8 @@ import (
 	"time"
 
 	"github.com/Azure/azure-kusto-go/kusto/data/errors"
+	"github.com/Azure/azure-kusto-go/kusto/ingest/ingestoptions"
 	"github.com/Azure/azure-kusto-go/kusto/ingest/internal/properties"
-	"github.com/Azure/azure-kusto-go/kusto/ingest/source"
 	"github.com/cenkalti/backoff/v4"
 )
 
@@ -465,7 +465,7 @@ func ClientRequestId(clientRequestId string) FileOption {
 // CompressionType sets the compression type of the data.
 // Use this if the file name does not expose the compression type.
 // This sets DontCompress to true for compressed data.
-func CompressionType(compressionType source.CompressionType) FileOption {
+func CompressionType(compressionType ingestoptions.CompressionType) FileOption {
 	return option{
 		run: func(p *properties.All) error {
 			p.Source.CompressionType = compressionType

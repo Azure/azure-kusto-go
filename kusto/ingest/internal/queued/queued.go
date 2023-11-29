@@ -11,14 +11,14 @@ import (
 	"net/url"
 	"os"
 	"path/filepath"
-	"strings"
 	"time"
 
 	"github.com/Azure/azure-kusto-go/kusto/data/errors"
+	"github.com/Azure/azure-kusto-go/kusto/ingest/ingestoptions"
 	"github.com/Azure/azure-kusto-go/kusto/ingest/internal/gzip"
 	"github.com/Azure/azure-kusto-go/kusto/ingest/internal/properties"
 	"github.com/Azure/azure-kusto-go/kusto/ingest/internal/resources"
-	"github.com/Azure/azure-kusto-go/kusto/ingest/source"
+	"github.com/Azure/azure-kusto-go/kusto/ingest/internal/utils"
 
 	"github.com/Azure/azure-pipeline-go/pipeline"
 	"github.com/Azure/azure-sdk-for-go/sdk/azcore"
@@ -152,7 +152,7 @@ func (i *Ingestion) Reader(ctx context.Context, reader io.Reader, props properti
 		return "", errors.ES(errors.OpFileIngest, errors.KBlobstore, "no Kusto queue resources are defined, there is no queue to upload to").SetNoRetry()
 	}
 
-	compression := CompressionDiscovery(props.Source.OriginalSource)
+	compression := utils.CompressionDiscovery(props.Source.OriginalSource)
 	shouldCompress := ShouldCompress(&props, compression)
 	blobName := GenBlobName(i.db, i.table, nower(), filepath.Base(uuid.New().String()), filepath.Base(props.Source.OriginalSource), compression, shouldCompress, props.Ingestion.Additional.Format.String())
 
@@ -317,7 +317,7 @@ var nower = time.Now
 // localToBlob copies from a local to an Azure Blobstore blob. It returns the URL of the Blob, the local file info and an
 // error if there was one.
 func (i *Ingestion) localToBlob(ctx context.Context, from string, client *azblob.Client, container string, props *properties.All) (string, int64, error) {
-	compression := CompressionDiscovery(from)
+	compression := utils.CompressionDiscovery(from)
 	shouldCompress := ShouldCompress(props, compression)
 	blobName := GenBlobName(i.db, i.table, nower(), filepath.Base(uuid.New().String()), filepath.Base(from), compression, shouldCompress, props.Ingestion.Additional.Format.String())
 
@@ -380,34 +380,10 @@ func (i *Ingestion) localToBlob(ctx context.Context, from string, client *azblob
 	return fullUrl(client, container, blobName), stat.Size(), nil
 }
 
-// CompressionDiscovery looks at the file extension. If it is one we support, we return that
-// CompressionType that represents that value. Otherwise we return CTNone to indicate that the
-// file should not be compressed.
-func CompressionDiscovery(fName string) source.CompressionType {
-	if fName == "" {
-		return source.CTUnknown
-	}
-
-	var ext string
-	if strings.HasPrefix(strings.ToLower(fName), "http") {
-		ext = strings.ToLower(filepath.Ext(filepath.Base(fName)))
-	} else {
-		ext = strings.ToLower(filepath.Ext(fName))
-	}
-
-	switch ext {
-	case ".gz":
-		return source.GZIP
-	case ".zip":
-		return source.ZIP
-	}
-	return source.CTNone
-}
-
-func GenBlobName(databaseName string, tableName string, time time.Time, guid string, fileName string, compressionFileExtension source.CompressionType, shouldCompress bool, dataFormat string) string {
+func GenBlobName(databaseName string, tableName string, time time.Time, guid string, fileName string, compressionFileExtension ingestoptions.CompressionType, shouldCompress bool, dataFormat string) string {
 	extension := "gz"
 	if !shouldCompress {
-		if compressionFileExtension == source.CTNone {
+		if compressionFileExtension == ingestoptions.CTNone {
 			extension = dataFormat
 		} else {
 			extension = compressionFileExtension.String()
@@ -423,30 +399,22 @@ func GenBlobName(databaseName string, tableName string, time time.Time, guid str
 
 // Do not compress if user specified in DontCompress or CompressionType,
 // if the file extension shows compression, or if the format is binary.
-func ShouldCompress(props *properties.All, compressionFileExtension source.CompressionType) bool {
+func ShouldCompress(props *properties.All, compressionFileExtension ingestoptions.CompressionType) bool {
 	if props.Source.DontCompress {
 		return false
 	}
 
-	if props.Source.CompressionType != source.CTUnknown {
-		if props.Source.CompressionType != source.CTNone {
+	if props.Source.CompressionType != ingestoptions.CTUnknown {
+		if props.Source.CompressionType != ingestoptions.CTNone {
 			return false
 		}
 	} else {
-		if compressionFileExtension != source.CTUnknown && compressionFileExtension != source.CTNone {
+		if compressionFileExtension != ingestoptions.CTUnknown && compressionFileExtension != ingestoptions.CTNone {
 			return false
 		}
 	}
 
-	switch props.Ingestion.Additional.Format {
-	case properties.AVRO:
-	case properties.ApacheAVRO:
-	case properties.Parquet:
-	case properties.ORC:
-		return false
-	}
-
-	return true
+	return props.Ingestion.Additional.Format.ShouldCompress()
 }
 
 // This allows mocking the stat func later on

@@ -11,7 +11,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Queries are no longer progressive by default. 
 - `ResultsProgressiveDisable()` has been removed.
 - Use `ResultsProgressiveEnabled()` to enable progressive queries.
-
+- Add file options: RawDataSize, CompressionType
+- New package ingest/ingestoptions now contains Compression properties (in the future will hold DataFormat)
 
 ## [0.14.2] - 2023-11-08
 

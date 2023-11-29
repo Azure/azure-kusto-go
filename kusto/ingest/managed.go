@@ -8,11 +8,11 @@ import (
 	"time"
 
 	"github.com/Azure/azure-kusto-go/kusto/data/errors"
+	"github.com/Azure/azure-kusto-go/kusto/ingest/ingestoptions"
 	"github.com/Azure/azure-kusto-go/kusto/ingest/internal/gzip"
 	"github.com/Azure/azure-kusto-go/kusto/ingest/internal/properties"
 	"github.com/Azure/azure-kusto-go/kusto/ingest/internal/queued"
 	"github.com/Azure/azure-kusto-go/kusto/ingest/internal/utils"
-	"github.com/Azure/azure-kusto-go/kusto/ingest/source"
 
 	"github.com/cenkalti/backoff/v4"
 	"github.com/google/uuid"
@@ -102,7 +102,7 @@ func (m *Managed) FromFile(ctx context.Context, fPath string, options ...FileOpt
 
 	if !local {
 		var size int64
-		var compressionTypeForEstimation source.CompressionType
+		var compressionTypeForEstimation ingestoptions.CompressionType
 		if size = props.Ingestion.RawDataSize; size == 0 {
 			size, err = utils.FetchBlobSize(fPath, ctx, m.queued.client.HttpClient())
 			if err != nil {
@@ -113,7 +113,7 @@ func (m *Managed) FromFile(ctx context.Context, fPath string, options ...FileOpt
 			props.Ingestion.RawDataSize = utils.EstimateRawDataSize(compressionTypeForEstimation, size)
 		} else {
 			// If user sets raw data size we always want to devide it for estimation
-			compressionTypeForEstimation = source.CTNone
+			compressionTypeForEstimation = ingestoptions.CTNone
 		}
 
 		// File is not compressed and user says its compressed, raw 10 mb -> do
@@ -131,9 +131,9 @@ func (m *Managed) FromFile(ctx context.Context, fPath string, options ...FileOpt
 	return m.managedStreamImpl(ctx, file, props)
 }
 
-func shouldUseQueuedIngestBySize(compression source.CompressionType, fileSize int64) bool {
+func shouldUseQueuedIngestBySize(compression ingestoptions.CompressionType, fileSize int64) bool {
 	switch compression {
-	case source.GZIP, source.ZIP:
+	case ingestoptions.GZIP, ingestoptions.ZIP:
 		return fileSize > maxStreamingSize
 	}
 
@@ -155,7 +155,7 @@ func (m *Managed) FromReader(ctx context.Context, reader io.Reader, options ...F
 
 func (m *Managed) managedStreamImpl(ctx context.Context, payload io.ReadCloser, props properties.All) (*Result, error) {
 	defer payload.Close()
-	compress := queued.ShouldCompress(&props, source.CTUnknown)
+	compress := queued.ShouldCompress(&props, ingestoptions.CTUnknown)
 	var compressed io.Reader = payload
 	if compress {
 		compressed = gzip.Compress(io.NopCloser(payload))
@@ -169,7 +169,7 @@ func (m *Managed) managedStreamImpl(ctx context.Context, payload io.ReadCloser, 
 		return nil, err
 	}
 
-	if shouldUseQueuedIngestBySize(source.GZIP, int64(len(buf))) {
+	if shouldUseQueuedIngestBySize(ingestoptions.GZIP, int64(len(buf))) {
 		combinedBuf := io.MultiReader(bytes.NewReader(buf), compressed)
 		return m.queued.fromReader(ctx, combinedBuf, []FileOption{}, props)
 	}
