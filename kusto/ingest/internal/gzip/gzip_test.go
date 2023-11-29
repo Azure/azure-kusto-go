@@ -60,4 +60,8 @@ func TestStreamer(t *testing.T) {
 	if gotBuf.String() != str {
 		t.Fatalf("TestStreamer(input/output comparison): after compression/decompression the data was not the same")
 	}
+
+	if int64(len(str)) != streamer.InputSize() {
+		t.Fatalf("TestStreamer(InputSize): got %d, want %d", streamer.InputSize(), len(str))
+	}
 }
