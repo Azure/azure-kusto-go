@@ -7,7 +7,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## Unreleased
 ### Fixed
-- String quoting in default parameters
+- String quoting in default value of query parameters
 
 ## [0.14.1] - 2023-09-27
 
