@@ -163,7 +163,7 @@ func (d DataFormat) MarshalJSON() ([]byte, error) {
 
 // IsValidMappingKind returns true if a dataformat can be used as a MappingKind.
 func (d DataFormat) IsValidMappingKind() bool {
-	if d > 0 && int(d) < len(dfDescriptions) {
+	if int(d) < len(dfDescriptions) {
 		return dfDescriptions[d].validMappingKind
 	}
 
@@ -175,7 +175,7 @@ func (d DataFormat) ShouldCompress() bool {
 		return dfDescriptions[d].shouldCompress
 	}
 
-	return false
+	return true
 }
 
 // DataFormatDiscovery looks at the file name and tries to discern what the file format is.
