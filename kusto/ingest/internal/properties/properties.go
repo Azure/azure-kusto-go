@@ -77,7 +77,7 @@ type dfDescriptor struct {
 }
 
 var dfDescriptions = []dfDescriptor{
-	{"", "", "", false, false},
+	{"", "", "", false, true},
 	{"Avro", "avro", ".avro", true, false},
 	{"ApacheAvro", "avro", "", false, false},
 	{"Csv", "csv", ".csv", true, true},
