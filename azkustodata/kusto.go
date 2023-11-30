@@ -283,12 +283,6 @@ func setQueryOptions(ctx context.Context, op errors.Op, query Statement, queryTy
 		v2FrameCapacity: -1,
 	}
 
-	if op == errors.OpQuery {
-		// We want progressive frames by default for Query(), but not Mgmt() because it uses v1 framing and ingestion endpoints
-		// do not support it.
-		opt.requestProperties.Options[RequestProgressiveEnabledValue] = true
-	}
-
 	for _, o := range options {
 		if err := o(opt); err != nil {
 			return nil, errors.ES(op, errors.KClientArgs, "QueryValues in the the Stmt were incorrect: %s", err).SetNoRetry()

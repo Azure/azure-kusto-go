@@ -9,6 +9,7 @@ import (
 	"github.com/Azure/azure-kusto-go/azkustodata/table"
 	"github.com/Azure/azure-kusto-go/azkustodata/testshared"
 	"github.com/Azure/azure-kusto-go/azkustodata/utils"
+	"github.com/Azure/azure-kusto-go/azkustodata/utils"
 	"github.com/Azure/azure-kusto-go/azkustodata/value"
 	"github.com/Azure/azure-sdk-for-go/sdk/azcore"
 	"github.com/Azure/azure-sdk-for-go/sdk/azidentity"
@@ -105,7 +106,12 @@ func TestAuth(t *testing.T) {
 			t.Parallel()
 			client, err := azkustodata.New(test.kcsb)
 			require.NoError(t, err)
-			defer client.Close()
+			defer func(client *azkustodata.Client) {
+				err := client.Close()
+				if err != nil {
+					require.NoError(t, err)
+				}
+			}(client)
 
 			query, err := client.Query(context.Background(), testConfig.Database, kql.New("print 1"))
 			defer func() {
@@ -236,7 +242,48 @@ func TestQueries(t *testing.T) {
 			want: &[]MgmtProjectionResult{{A: "1"}, {A: "2"}},
 		},
 		{
-			desc:  "Query: Progressive query: make sure we can convert all data types from a row",
+			desc:    "Query: Progressive query: make sure we can convert all data types from a row",
+			stmt:    kql.New("").AddTable(allDataTypesTable),
+			qcall:   client.Query,
+			options: []azkustodata.QueryOption{azkustodata.ResultsProgressiveEnabled()},
+			doer: func(row *table.Row, update interface{}) error {
+				rec := AllDataType{}
+				if err := row.ToStruct(&rec); err != nil {
+					return err
+				}
+
+				valuesRec := AllDataType{}
+
+				err := row.ExtractValues(&valuesRec.Vnum,
+					&valuesRec.Vdec,
+					&valuesRec.Vdate,
+					&valuesRec.Vspan,
+					&valuesRec.Vobj,
+					&valuesRec.Vb,
+					&valuesRec.Vreal,
+					&valuesRec.Vstr,
+					&valuesRec.Vlong,
+					&valuesRec.Vguid,
+				)
+
+				if err != nil {
+					return err
+				}
+
+				assert.Equal(t, rec, valuesRec)
+
+				recs := update.(*[]AllDataType)
+				*recs = append(*recs, rec)
+				return nil
+			},
+			gotInit: func() interface{} {
+				ad := []AllDataType{}
+				return &ad
+			},
+			want: &[]AllDataType{getExpectedResult()},
+		},
+		{
+			desc:  "Query: Non-Progressive query: make sure we can convert all data types from a row",
 			stmt:  kql.New("").AddTable(allDataTypesTable),
 			qcall: client.Query,
 			doer: func(row *table.Row, update interface{}) error {
@@ -276,10 +323,37 @@ func TestQueries(t *testing.T) {
 			want: &[]AllDataType{getExpectedResult()},
 		},
 		{
-			desc:    "Query: Non-Progressive query: make sure we can convert all data types from a row",
-			stmt:    kql.New("").AddTable(allDataTypesTable),
-			qcall:   client.Query,
-			options: []azkustodata.QueryOption{azkustodata.ResultsProgressiveDisable()},
+			desc: "Query: All parameter types are working",
+			stmt: pTableStmtOld.Add(" | where  vnum == num and vdec == dec and vdate == dt and vspan == span and tostring(vobj) == tostring(obj) and vb == b and vreal" +
+				" == rl and vstr == str and vlong == lg and vguid == guid ").
+				MustDefinitions(azkustodata.NewDefinitions().Must(
+					azkustodata.ParamTypes{
+						"tableName": azkustodata.ParamType{Type: types.String},
+						"num":       azkustodata.ParamType{Type: types.Int},
+						"dec":       azkustodata.ParamType{Type: types.Decimal},
+						"dt":        azkustodata.ParamType{Type: types.DateTime},
+						"span":      azkustodata.ParamType{Type: types.Timespan},
+						"obj":       azkustodata.ParamType{Type: types.Dynamic},
+						"b":         azkustodata.ParamType{Type: types.Bool},
+						"rl":        azkustodata.ParamType{Type: types.Real},
+						"str":       azkustodata.ParamType{Type: types.String},
+						"lg":        azkustodata.ParamType{Type: types.Long},
+						"guid":      azkustodata.ParamType{Type: types.GUID},
+					})).
+				MustParameters(azkustodata.NewParameters().Must(azkustodata.QueryValues{
+					"tableName": allDataTypesTable,
+					"num":       int32(1),
+					"dec":       "2.00000000000001",
+					"dt":        time.Date(2020, 03, 04, 14, 05, 01, 310996500, time.UTC),
+					"span":      time.Hour + 23*time.Minute + 45*time.Second + 678900000*time.Nanosecond,
+					"obj":       map[string]interface{}{"moshe": "value"},
+					"b":         true,
+					"rl":        0.01,
+					"str":       "asdf",
+					"lg":        int64(9223372036854775807),
+					"guid":      uuid.MustParse("74be27de-1e4e-49d9-b579-fe0b331d3642"),
+				})),
+			qcall: client.Query,
 			doer: func(row *table.Row, update interface{}) error {
 				rec := AllDataType{}
 				if err := row.ToStruct(&rec); err != nil {
@@ -317,10 +391,62 @@ func TestQueries(t *testing.T) {
 			want: &[]AllDataType{getExpectedResult()},
 		},
 		{
-			desc:    "Query: make sure Dynamic data type variations can be parsed",
-			stmt:    kql.New(`print PlainValue = dynamic('1'), PlainArray = dynamic('[1,2,3]'), PlainJson= dynamic('{ "a": 1}'), JsonArray= dynamic('[{ "a": 1}, { "a": 2}]')`),
-			qcall:   client.Query,
-			options: []azkustodata.QueryOption{azkustodata.ResultsProgressiveDisable()},
+			desc: "Query: All parameter types are working with defaults",
+			stmt: pTableStmtOld.Add(" | where  vnum == num and vdec == dec and vdate == dt and vspan == span and vb == b and vreal == rl and vstr == str and vlong == lg and vguid == guid ").
+				MustDefinitions(azkustodata.NewDefinitions().Must(
+					azkustodata.ParamTypes{
+						"tableName": azkustodata.ParamType{Type: types.String, Default: allDataTypesTable},
+						"num":       azkustodata.ParamType{Type: types.Int, Default: int32(1)},
+						"dec":       azkustodata.ParamType{Type: types.Decimal, Default: "2.00000000000001"},
+						"dt":        azkustodata.ParamType{Type: types.DateTime, Default: time.Date(2020, 03, 04, 14, 05, 01, 310996500, time.UTC)},
+						"span":      azkustodata.ParamType{Type: types.Timespan, Default: time.Hour + 23*time.Minute + 45*time.Second + 678900000*time.Nanosecond},
+						"b":         azkustodata.ParamType{Type: types.Bool, Default: true},
+						"rl":        azkustodata.ParamType{Type: types.Real, Default: 0.01},
+						"str":       azkustodata.ParamType{Type: types.String, Default: "asdf"},
+						"lg":        azkustodata.ParamType{Type: types.Long, Default: int64(9223372036854775807)},
+						"guid":      azkustodata.ParamType{Type: types.GUID, Default: uuid.MustParse("74be27de-1e4e-49d9-b579-fe0b331d3642")},
+					})),
+			qcall: client.Query,
+			doer: func(row *table.Row, update interface{}) error {
+				rec := AllDataType{}
+				if err := row.ToStruct(&rec); err != nil {
+					return err
+				}
+
+				valuesRec := AllDataType{}
+
+				err := row.ExtractValues(&valuesRec.Vnum,
+					&valuesRec.Vdec,
+					&valuesRec.Vdate,
+					&valuesRec.Vspan,
+					&valuesRec.Vobj,
+					&valuesRec.Vb,
+					&valuesRec.Vreal,
+					&valuesRec.Vstr,
+					&valuesRec.Vlong,
+					&valuesRec.Vguid,
+				)
+
+				if err != nil {
+					return err
+				}
+
+				assert.Equal(t, rec, valuesRec)
+
+				recs := update.(*[]AllDataType)
+				*recs = append(*recs, rec)
+				return nil
+			},
+			gotInit: func() interface{} {
+				ad := []AllDataType{}
+				return &ad
+			},
+			want: &[]AllDataType{getExpectedResult()},
+		},
+		{
+			desc:  "Query: make sure Dynamic data type variations can be parsed",
+			stmt:  kql.New(`print PlainValue = dynamic('1'), PlainArray = dynamic('[1,2,3]'), PlainJson= dynamic('{ "a": 1}'), JsonArray= dynamic('[{ "a": 1}, { "a": 2}]')`),
+			qcall: client.Query,
 			doer: func(row *table.Row, update interface{}) error {
 				rec := DynamicTypeVariations{}
 				if err := row.ToStruct(&rec); err != nil {
