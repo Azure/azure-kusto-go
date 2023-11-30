@@ -39,6 +39,28 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Support new playfab domain
 
 
+### Changed (BREAKING)
+
+- Queries are no longer progressive by default. 
+- `ResultsProgressiveDisable()` has been removed.
+- Use `ResultsProgressiveEnabled()` to enable progressive queries.
+
+### Fixed
+
+- String quoting in default value of query parameters
+
+## [0.14.2] - 2023-11-08
+
+### Fixed
+
+-  Size used for RawDataSize taken from gzip reader was of the gzip size and not the original reader size 
+
+## [0.14.1] - 2023-09-27
+
+### Added
+
+- Support new playfab domain
+
 ### Fixed
 
 - Fixed deadlock when having high number of concurrent queries
