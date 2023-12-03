@@ -23,11 +23,12 @@ func TestReadFramesWithValidInput(t *testing.T) {
 	t.Parallel()
 	ch := make(chan Frame)
 
-	var err error
+	// err channel
+	errChan := make(chan error)
 
 	go func() {
-		err = ReadFrames(strings.NewReader(validFrames), ch)
-		require.NoError(t, err)
+		err := ReadFrames(strings.NewReader(validFrames), ch)
+		errChan <- err
 	}()
 
 	dataSetHeader := <-ch
@@ -95,6 +96,7 @@ func TestReadFramesWithValidInput(t *testing.T) {
 
 	assert.Nil(t, <-ch)
 
+	err := <-errChan
 	require.NoError(t, err)
 }
 
@@ -102,10 +104,12 @@ func TestReadFramesWithErrors(t *testing.T) {
 	t.Parallel()
 	ch := make(chan Frame)
 
-	var err error
+	// err channel
+	errChan := make(chan error)
 
 	go func() {
-		err = ReadFrames(strings.NewReader(errorFrames), ch)
+		err := ReadFrames(strings.NewReader(errorFrames), ch)
+		errChan <- err
 		require.NoError(t, err)
 	}()
 
@@ -206,6 +210,7 @@ func TestReadFramesWithErrors(t *testing.T) {
 
 	assert.Nil(t, <-ch)
 
+	err := <-errChan
 	require.NoError(t, err)
 }
 
@@ -214,16 +219,19 @@ func TestReadFramesWithEmptyInput(t *testing.T) {
 	src := ``
 
 	ch := make(chan Frame)
-	var err error
+	// err channel
+	errChan := make(chan error)
 
 	go func() {
-		err = ReadFrames(strings.NewReader(src), ch)
+		err := ReadFrames(strings.NewReader(src), ch)
+		errChan <- err
 	}()
 
 	for range ch {
 		assert.Fail(t, "should not receive any frames")
 	}
 
+	err := <-errChan
 	require.NoError(t, err)
 }
 
@@ -232,16 +240,19 @@ func TestReadFramesWithInvalidInput(t *testing.T) {
 	src := `[{]`
 
 	ch := make(chan Frame)
-	var err error
+	// err channel
+	errChan := make(chan error)
 
 	go func() {
-		err = ReadFrames(strings.NewReader(src), ch)
+		err := ReadFrames(strings.NewReader(src), ch)
+		errChan <- err
 	}()
 
 	for range ch {
 		assert.Fail(t, "should not receive any frames")
 	}
 
+	err := <-errChan
 	require.ErrorContains(t, err, "invalid character ']'")
 }
 
@@ -251,15 +262,18 @@ func TestReadFramesWithInvalidFrameType(t *testing.T) {
 ]`
 
 	ch := make(chan Frame)
-	var err error
+	// err channel
+	errChan := make(chan error)
 
 	go func() {
-		err = ReadFrames(strings.NewReader(src), ch)
+		err := ReadFrames(strings.NewReader(src), ch)
+		errChan <- err
 	}()
 
 	invalid := <-ch
 	assert.Nil(t, invalid)
 
+	err := <-errChan
 	require.ErrorContains(t, err, "unknown frame type: InvalidFrameType")
 }
 
@@ -269,14 +283,17 @@ func TestReadFramesWithInvalidFrame(t *testing.T) {
 ]`
 
 	ch := make(chan Frame)
-	var err error
+	// err channel
+	errChan := make(chan error)
 
 	go func() {
-		err = ReadFrames(strings.NewReader(src), ch)
+		err := ReadFrames(strings.NewReader(src), ch)
+		errChan <- err
 	}()
 
 	invalid := <-ch
 	assert.Nil(t, invalid)
 
+	err := <-errChan
 	require.ErrorContains(t, err, "json: cannot unmarshal string")
 }
