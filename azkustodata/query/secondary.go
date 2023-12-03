@@ -1,11 +1,7 @@
 package query
 
-import (
-	"github.com/Azure/azure-kusto-go/azkustodata/errors"
-	"github.com/google/uuid"
-	"time"
-)
-
+/*
+TODO: figure this out
 type QueryProperties struct {
 	TableId int
 	Key     string
@@ -87,3 +83,4 @@ func (d *DataSet) QueryCompletionInformation() ([]QueryCompletionInformation, er
 	errorTableUninitialized.Op = d.op()
 	return nil, errorTableUninitialized
 }
+*/

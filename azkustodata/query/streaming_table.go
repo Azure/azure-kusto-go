@@ -22,6 +22,30 @@ type streamingTable struct {
 	closed   bool
 }
 
+func (t *streamingTable) RowCount() int {
+	t.lock.RLock()
+	defer t.lock.RUnlock()
+	return t.rowCount
+}
+
+func (t *streamingTable) setRowCount(rowCount int) {
+	t.lock.Lock()
+	defer t.lock.Unlock()
+	t.rowCount = rowCount
+}
+
+func (t *streamingTable) Skip() bool {
+	t.lock.RLock()
+	defer t.lock.RUnlock()
+	return t.skip
+}
+
+func (t *streamingTable) setSkip(skip bool) {
+	t.lock.Lock()
+	defer t.lock.Unlock()
+	t.skip = skip
+}
+
 func NewStreamingTable(dataset *DataSet, th *TableHeader) (StreamingTable, *errors.Error) {
 	t := &streamingTable{
 		baseTable: baseTable{
@@ -56,9 +80,19 @@ func NewStreamingTable(dataset *DataSet, th *TableHeader) (StreamingTable, *erro
 }
 
 func (t *streamingTable) close(errors []OneApiError) {
-	if t.closed {
+	closed := func() bool {
+		t.lock.RLock()
+		defer t.lock.RUnlock()
+		return t.closed
+	}()
+
+	if closed {
 		return
 	}
+
+	t.lock.Lock()
+	defer t.lock.Unlock()
+
 	t.closed = true
 
 	close(t.rawRows)
@@ -77,7 +111,7 @@ func (t *streamingTable) close(errors []OneApiError) {
 func (t *streamingTable) readRows() {
 	for rows := range t.rawRows {
 		for _, r := range rows {
-			if t.skip {
+			if t.Skip() {
 				t.rows <- RowResult{Row: Row{}, Err: errors.ES(t.op(), errors.KInternal, "skipping row")}
 			} else {
 				values := make(value.Values, len(r))
@@ -109,7 +143,7 @@ func (t *streamingTable) Rows() <-chan RowResult {
 }
 
 func (t *streamingTable) SkipToEnd() []error {
-	t.skip = true
+	t.setSkip(true)
 
 	var errs []error
 	for r := range t.rows {

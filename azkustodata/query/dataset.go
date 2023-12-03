@@ -4,6 +4,7 @@ import (
 	"context"
 	"github.com/Azure/azure-kusto-go/azkustodata/errors"
 	"io"
+	"sync"
 )
 
 // DefaultFrameCapacity is the default capacity of the channel that receives frames from the Kusto service. Lower capacity means less memory usage, but might cause the channel to block if the frames are not consumed fast enough.
@@ -28,17 +29,14 @@ type DataSet struct {
 	// ctx is the context of the data set, as received from the request.
 	ctx context.Context
 	// DataSetHeader is the header of the data set. It's the first frame received.
-	DataSetHeader *DataSetHeader
+	header *DataSetHeader
 	// Completion is the completion status of the data set. It's the last frame received.
-	Completion *DataSetCompletion
-
-	// queryProperties contains the information from the "QueryProperties" table.
-	queryProperties []QueryProperties
-	// queryCompletionInformation contains the information from the "QueryCompletionInformation" table.
-	queryCompletionInformation []QueryCompletionInformation
-
-	// SecondaryResults is all the non-primary tables, which are always saved.
-	SecondaryResults []Table
+	completion *DataSetCompletion
+	/*
+		// queryProperties contains the information from the "QueryProperties" table.
+		queryProperties []QueryProperties
+		// queryCompletionInformation contains the information from the "QueryCompletionInformation" table.
+		queryCompletionInformation []QueryCompletionInformation*/
 
 	// frames is a channel that receives all the frames from the data set as they are parsed.
 	frames chan Frame
@@ -50,6 +48,44 @@ type DataSet struct {
 
 	// currentStreamingTable is a reference to the current streamed table, which is still receiving rows.
 	currentStreamingTable *streamingTable
+
+	lock sync.RWMutex
+}
+
+func (d *DataSet) Header() *DataSetHeader {
+	d.lock.RLock()
+	defer d.lock.RUnlock()
+	return d.header
+}
+
+func (d *DataSet) setHeader(dataSetHeader *DataSetHeader) {
+	d.lock.Lock()
+	defer d.lock.Unlock()
+	d.header = dataSetHeader
+}
+
+func (d *DataSet) Completion() *DataSetCompletion {
+	d.lock.RLock()
+	defer d.lock.RUnlock()
+	return d.completion
+}
+
+func (d *DataSet) setCompletion(completion *DataSetCompletion) {
+	d.lock.Lock()
+	defer d.lock.Unlock()
+	d.completion = completion
+}
+
+func (d *DataSet) getCurrentStreamingTable() *streamingTable {
+	d.lock.RLock()
+	defer d.lock.RUnlock()
+	return d.currentStreamingTable
+}
+
+func (d *DataSet) setCurrentStreamingTable(currentStreamingTable *streamingTable) {
+	d.lock.Lock()
+	defer d.lock.Unlock()
+	d.currentStreamingTable = currentStreamingTable
 }
 
 func (d *DataSet) Tables() chan TableResult {
@@ -82,8 +118,9 @@ func (d *DataSet) readFrames() {
 func (d *DataSet) decodeTables() {
 	defer func() {
 		close(d.tables)
-		if d.currentStreamingTable != nil {
-			d.currentStreamingTable.close([]OneApiError{})
+		table := d.getCurrentStreamingTable()
+		if table != nil {
+			table.close([]OneApiError{})
 		}
 	}()
 	op := d.op()
@@ -108,7 +145,7 @@ func (d *DataSet) decodeTables() {
 			break
 		}
 
-		if d.Completion != nil {
+		if d.Completion() != nil {
 			d.tables <- TableResult{Table: nil, Err: errors.ES(op, errors.KInternal, "received a frame after DataSetCompletion")}
 			break
 		}
@@ -118,15 +155,12 @@ func (d *DataSet) decodeTables() {
 				break
 			}
 		} else if completion, ok := f.(*DataSetCompletion); ok {
-			d.Completion = completion
+			d.setCompletion(completion)
 		} else if dt, ok := f.(*DataTable); ok {
 			t, err := NewFullTable(d, dt)
 			d.tables <- TableResult{Table: t, Err: err}
 			if err != nil {
 				break
-			}
-			if !t.IsPrimaryResult() {
-				d.SecondaryResults = append(d.SecondaryResults, t)
 			}
 		} else if d.parseStreamingTable(f, op) {
 			continue
@@ -139,8 +173,11 @@ func (d *DataSet) decodeTables() {
 }
 
 func (d *DataSet) parseStreamingTable(f Frame, op errors.Op) bool {
+
+	table := d.getCurrentStreamingTable()
+
 	if th, ok := f.(*TableHeader); ok {
-		if d.currentStreamingTable != nil {
+		if table != nil {
 			err := errors.ES(op, errors.KInternal, "received a TableHeader frame while a streaming table was still open")
 			d.tables <- TableResult{Table: nil, Err: err}
 			return false
@@ -150,63 +187,63 @@ func (d *DataSet) parseStreamingTable(f Frame, op errors.Op) bool {
 			d.tables <- TableResult{Table: nil, Err: err}
 			return false
 		}
-		d.currentStreamingTable = t.(*streamingTable)
+		d.setCurrentStreamingTable(t.(*streamingTable))
 		d.tables <- TableResult{Table: t, Err: nil}
 	} else if tf, ok := f.(*TableFragment); ok {
-		if d.currentStreamingTable == nil {
+		if table == nil {
 			err := errors.ES(op, errors.KInternal, "received a TableFragment frame while no streaming table was open")
 			d.tables <- TableResult{Table: nil, Err: err}
 			return false
 		}
-		if d.currentStreamingTable.Id() != tf.TableId {
-			err := errors.ES(op, errors.KInternal, "received a TableFragment frame for table %d while table %d was open", tf.TableId, d.currentStreamingTable.Id())
+		if table.Id() != tf.TableId {
+			err := errors.ES(op, errors.KInternal, "received a TableFragment frame for table %d while table %d was open", tf.TableId, table.Id())
 			d.tables <- TableResult{Table: nil, Err: err}
 		}
 
-		d.currentStreamingTable.rawRows <- tf.Rows
+		table.rawRows <- tf.Rows
 	} else if tc, ok := f.(*TableCompletion); ok {
-		if d.currentStreamingTable == nil {
+		if table == nil {
 			err := errors.ES(op, errors.KInternal, "received a TableCompletion frame while no streaming table was open")
 			d.tables <- TableResult{Table: nil, Err: err}
 			return false
 		}
-		if d.currentStreamingTable.Id() != tc.TableId {
-			err := errors.ES(op, errors.KInternal, "received a TableCompletion frame for table %d while table %d was open", tc.TableId, d.currentStreamingTable.Id())
+		if table.Id() != tc.TableId {
+			err := errors.ES(op, errors.KInternal, "received a TableCompletion frame for table %d while table %d was open", tc.TableId, table.Id())
 			d.tables <- TableResult{Table: nil, Err: err}
 		}
 
-		d.currentStreamingTable.close(tc.OneApiErrors)
+		table.close(tc.OneApiErrors)
 
-		if d.currentStreamingTable.rowCount != tc.RowCount {
-			err := errors.ES(op, errors.KInternal, "received a TableCompletion frame for table %d with row count %d while %d rows were received", tc.TableId, tc.RowCount, d.currentStreamingTable.rowCount)
+		if table.rowCount != tc.RowCount {
+			err := errors.ES(op, errors.KInternal, "received a TableCompletion frame for table %d with row count %d while %d rows were received", tc.TableId, tc.RowCount, table.rowCount)
 			d.tables <- TableResult{Table: nil, Err: err}
 		}
 
-		d.currentStreamingTable = nil
+		d.setCurrentStreamingTable(nil)
 	}
 
 	return true
 }
 
 func (d *DataSet) parseDatasetHeader(header *DataSetHeader, op errors.Op) bool {
-	d.DataSetHeader = header
-	if d.DataSetHeader.Version != version {
+	if header.Version != version {
 		d.tables <- TableResult{Table: nil, Err: errors.ES(op, errors.KInternal, "received a DataSetHeader frame that is not version 2")}
 		return false
 	}
-	if !d.DataSetHeader.IsFragmented {
+	if !header.IsFragmented {
 		d.tables <- TableResult{Table: nil, Err: errors.ES(op, errors.KInternal, "received a DataSetHeader frame that is not fragmented")}
 		return false
 	}
-	if d.DataSetHeader.IsProgressive {
+	if header.IsProgressive {
 		d.tables <- TableResult{Table: nil, Err: errors.ES(op, errors.KInternal, "received a DataSetHeader frame that is progressive")}
 		return false
 	}
 	const EndOfTableErrorPlacement = errorReportingPlacement
-	if d.DataSetHeader.ErrorReportingPlacement != EndOfTableErrorPlacement {
+	if header.ErrorReportingPlacement != EndOfTableErrorPlacement {
 		d.tables <- TableResult{Table: nil, Err: errors.ES(op, errors.KInternal, "received a DataSetHeader frame that does not report errors at the end of the table")}
 		return false
 	}
+	d.setHeader(header)
 
 	return true
 }
