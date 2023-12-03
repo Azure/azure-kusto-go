@@ -18,7 +18,7 @@ func TestDataSet_ReadFrames_WithError(t *testing.T) {
 		reader:       io.NopCloser(reader),
 		frames:       make(chan Frame, DefaultFrameCapacity),
 		errorChannel: make(chan error, 1),
-		tables:       make(chan TableResult, 1),
+		results:      make(chan TableResult, 1),
 		ctx:          context.Background(),
 	}
 	go d.readFrames()
@@ -33,7 +33,7 @@ func TestDataSet_DecodeTables_WithInvalidFrame(t *testing.T) {
 ]`)
 	d := NewDataSet(context.Background(), io.NopCloser(reader), DefaultFrameCapacity)
 
-	tableResult := <-d.tables
+	tableResult := <-d.results
 	assert.Nil(t, tableResult.Table)
 }
 
@@ -42,13 +42,9 @@ func TestDataSet_DecodeTables_Skip(t *testing.T) {
 	reader := strings.NewReader(validFrames)
 	d := NewDataSet(context.Background(), io.NopCloser(reader), DefaultFrameCapacity)
 
-	for tableResult := range d.tables {
+	for tableResult := range d.results {
 		assert.NoError(t, tableResult.Err)
-		if tableResult.Table != nil {
-			if t, ok := tableResult.Table.(StreamingTable); ok {
-				t.SkipToEnd()
-			}
-		}
+		tableResult.Table.SkipToEnd()
 	}
 }
 
@@ -166,7 +162,7 @@ func TestDataSet_DecodeTables_GetRows(t *testing.T) {
 		},
 	}
 
-	for tableResult := range d.tables {
+	for tableResult := range d.results {
 		assert.NoError(t, tableResult.Err)
 		if tableResult.Table != nil {
 			tb := tableResult.Table
@@ -176,25 +172,14 @@ func TestDataSet_DecodeTables_GetRows(t *testing.T) {
 			assert.Equal(t, expectedTable.Kind(), tb.Kind())
 			assert.Equal(t, expectedTable.Columns(), tb.Columns())
 
-			if tb, ok := tableResult.Table.(StreamingTable); ok {
-				i := 0
-				for rowResult := range tb.Rows() {
-					assert.NoError(t, rowResult.Err)
-					expectedRow := expectedTable.Rows()[i]
-					for j, val := range rowResult.Row.Values() {
-						assert.Equal(t, expectedRow.Values()[j].GetValue(), val.GetValue())
-					}
-					i++
+			i := 0
+			for rowResult := range tb.Rows() {
+				assert.NoError(t, rowResult.Err)
+				expectedRow := expectedTable.Rows()[i]
+				for j, val := range rowResult.Row.Values() {
+					assert.Equal(t, expectedRow.Values()[j].GetValue(), val.GetValue())
 				}
-			}
-
-			if tb, ok := tableResult.Table.(FullTable); ok {
-				for i, row := range tb.Rows() {
-					expectedRow := expectedTable.Rows()[i]
-					for j, val := range row.Values() {
-						assert.Equal(t, expectedRow.Values()[j].GetValue(), val.GetValue())
-					}
-				}
+				i++
 			}
 		}
 	}
@@ -272,30 +257,25 @@ func TestDataSet_MultiplePrimaryTables(t *testing.T) {
 		{A: "c", B: 3},
 	}
 
-	for tableResult := range d.tables {
+	for tableResult := range d.Results() {
 		assert.NoError(t, tableResult.Err)
-		if tableResult.Table != nil {
-			if tb, ok := tableResult.Table.(StreamingTable); ok {
-				assert.True(t, tb.IsPrimaryResult())
-				id := tb.Id()
-				for rowResult := range tb.Rows() {
-					assert.NoError(t, rowResult.Err)
-					if id == 1 {
-						var row Table1
-						err := rowResult.Row.ToStruct(&row)
-						assert.NoError(t, err)
-						assert.Equal(t, table1Expected[rowResult.Row.Index], row)
-					}
-					if id == 2 {
-						var row Table2
-						err := rowResult.Row.ToStruct(&row)
-						assert.NoError(t, err)
-						assert.Equal(t, table2Expected[rowResult.Row.Index], row)
-					}
-				}
+		tb := tableResult.Table
+		id := tb.Id()
+		for rowResult := range tb.Rows() {
+			assert.NoError(t, rowResult.Err)
+			if id == 1 {
+				var row Table1
+				err := rowResult.Row.ToStruct(&row)
+				assert.NoError(t, err)
+				assert.Equal(t, table1Expected[rowResult.Row.Index], row)
+			}
+			if id == 2 {
+				var row Table2
+				err := rowResult.Row.ToStruct(&row)
+				assert.NoError(t, err)
+				assert.Equal(t, table2Expected[rowResult.Row.Index], row)
 			}
 		}
-
 	}
 }
 
@@ -305,7 +285,7 @@ func TestDataSet_DecodeTables_WithInvalidDataSetHeader(t *testing.T) {
 ]`)
 	d := NewDataSet(context.Background(), io.NopCloser(reader), DefaultFrameCapacity)
 
-	tableResult := <-d.tables
+	tableResult := <-d.results
 	assert.Error(t, tableResult.Err)
 	assert.Contains(t, tableResult.Err.Error(), "received a DataSetHeader frame that is not version 2")
 }
@@ -316,7 +296,7 @@ func TestDataSet_DecodeTables_WithInvalidTableFragment(t *testing.T) {
 ]`)
 	d := NewDataSet(context.Background(), io.NopCloser(reader), DefaultFrameCapacity)
 
-	tableResult := <-d.tables
+	tableResult := <-d.results
 	assert.Error(t, tableResult.Err)
 	assert.Contains(t, tableResult.Err.Error(), "received a TableFragment frame while no streaming table was open")
 }
@@ -327,7 +307,7 @@ func TestDataSet_DecodeTables_WithInvalidTableCompletion(t *testing.T) {
 ]`)
 	d := NewDataSet(context.Background(), io.NopCloser(reader), DefaultFrameCapacity)
 
-	tableResult := <-d.tables
+	tableResult := <-d.results
 	assert.Error(t, tableResult.Err)
 	assert.Contains(t, tableResult.Err.Error(), "received a TableCompletion frame while no streaming table was open")
 }
@@ -338,7 +318,7 @@ func TestDataSet_DecodeTables_StreamingTable_WithInvalidColumnType(t *testing.T)
 ]`)
 	d := NewDataSet(context.Background(), io.NopCloser(reader), DefaultFrameCapacity)
 
-	tableResult := <-d.tables
+	tableResult := <-d.results
 	assert.Error(t, tableResult.Err)
 	assert.Contains(t, tableResult.Err.Error(), "not valid")
 }
@@ -349,7 +329,7 @@ func TestDataSet_DecodeTables_DataTable_WithInvalidColumnType(t *testing.T) {
 ]`)
 	d := NewDataSet(context.Background(), io.NopCloser(reader), DefaultFrameCapacity)
 
-	tableResult := <-d.tables
+	tableResult := <-d.results
 	assert.Error(t, tableResult.Err)
 	assert.Contains(t, tableResult.Err.Error(), "not valid")
 }

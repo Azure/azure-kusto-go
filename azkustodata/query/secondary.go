@@ -1,7 +1,11 @@
 package query
 
-/*
-TODO: figure this out
+import (
+	"github.com/Azure/azure-kusto-go/azkustodata/errors"
+	"github.com/google/uuid"
+	"time"
+)
+
 type QueryProperties struct {
 	TableId int
 	Key     string
@@ -23,64 +27,71 @@ type QueryCompletionInformation struct {
 	Payload          string
 }
 
-var errorTableUninitialized = errors.ES(errors.OpUnknown, errors.KInternal, "Table uninitialized")
-
 const QueryPropertiesKind = "QueryProperties"
 const QueryCompletionInformationKind = "QueryCompletionInformation"
 
-func (d *DataSet) QueryProperties() ([]QueryProperties, error) {
-	if d.SecondaryResults == nil {
-		return nil, errorTableUninitialized
-	}
-
-	if d.queryProperties != nil {
-		return d.queryProperties, nil
-	}
-
-	for _, t := range d.SecondaryResults {
-		if t.Kind() == QueryPropertiesKind {
-			rows := t.(FullTable).Rows()
-			d.queryProperties = make([]QueryProperties, len(rows))
-			for i, r := range rows {
-				err := r.ToStruct(&d.queryProperties[i])
-				if err != nil {
-					return nil, err
-				}
-			}
-
-			return d.queryProperties, nil
-		}
-	}
-
-	errorTableUninitialized.Op = d.op()
-	return nil, errorTableUninitialized
+func (d *DataSet) setQueryProperties(queryProperties []QueryProperties) {
+	d.lock.Lock()
+	defer d.lock.Unlock()
+	d.queryProperties = queryProperties
 }
 
-func (d *DataSet) QueryCompletionInformation() ([]QueryCompletionInformation, error) {
-	if d.SecondaryResults == nil {
-		return nil, errorTableUninitialized
-	}
-
-	if d.queryCompletionInformation != nil {
-		return d.queryCompletionInformation, nil
-	}
-
-	for _, t := range d.SecondaryResults {
-		if t.Kind() == QueryCompletionInformationKind {
-			rows := t.(FullTable).Rows()
-			d.queryCompletionInformation = make([]QueryCompletionInformation, len(rows))
-			for i, r := range rows {
-				err := r.ToStruct(&d.queryCompletionInformation[i])
-				if err != nil {
-					return nil, err
-				}
-			}
-
-			return d.queryCompletionInformation, nil
-		}
-	}
-
-	errorTableUninitialized.Op = d.op()
-	return nil, errorTableUninitialized
+func (d *DataSet) setQueryCompletionInformation(queryCompletionInformation []QueryCompletionInformation) {
+	d.lock.Lock()
+	defer d.lock.Unlock()
+	d.queryCompletionInformation = queryCompletionInformation
 }
-*/
+
+func (d *DataSet) QueryProperties() []QueryProperties {
+	d.lock.RLock()
+	defer d.lock.RUnlock()
+	return d.queryProperties
+}
+
+func (d *DataSet) QueryCompletionInformation() []QueryCompletionInformation {
+	d.lock.RLock()
+	defer d.lock.RUnlock()
+	return d.queryCompletionInformation
+}
+
+func (d *DataSet) parseSecondaryTable(t Table) error {
+	d.lock.Lock()
+	defer d.lock.Unlock()
+
+	switch t.Name() {
+	case QueryPropertiesKind:
+		if d.queryProperties != nil {
+			return errors.ES(errors.OpUnknown, errors.KInternal, "query properties already initialized")
+		}
+		rows, err := t.Consume()
+		if err != nil {
+			return errors.GetCombinedError(err...)
+		}
+
+		st, errs := ToStructs[QueryProperties](rows)
+		if errs != nil {
+			return errs
+		}
+
+		d.setQueryProperties(st)
+
+	case QueryCompletionInformationKind:
+		if d.queryProperties != nil {
+			return errors.ES(errors.OpUnknown, errors.KInternal, "query properties already initialized")
+		}
+		rows, err := t.Consume()
+		if err != nil {
+			return errors.GetCombinedError(err...)
+		}
+
+		st, errs := ToStructs[QueryCompletionInformation](rows)
+		if errs != nil {
+			return errs
+		}
+
+		d.setQueryCompletionInformation(st)
+	default:
+		return errors.ES(errors.OpUnknown, errors.KInternal, "unknown secondary table %s", t.Name())
+	}
+	return nil
+}

@@ -30,35 +30,43 @@ func SetDefaultDatabase(db string) {
 	database = db
 }
 
-const defaultSchema = "datatable(header_time: datetime, header_id: guid, header_api_version: string, payload_data: string, payload_user: string) []"
-const allDataTypes = "datatable(vnum:int, vdec:decimal, vdate:datetime, vspan:timespan, vobj:dynamic, vb:bool, vreal:real, vstr:string, vlong:long, vguid:guid)\n[\n    1, decimal(2.00000000000001), datetime(2020-03-04T14:05:01.3109965Z), time(01:23:45.6789000), dynamic({\n  \"moshe\": \"value\"\n}), true, 0.01, \"asdf\", 9223372036854775807, guid(74be27de-1e4e-49d9-b579-fe0b331d3642), \n]"
+const defaultSchema = "(header_time: datetime, header_id: guid, header_api_version: string, payload_data: string, payload_user: string)"
+const allDataTypes = "(vnum:int, vdec:decimal, vdate:datetime, vspan:timespan, vobj:dynamic, vb:bool, vreal:real, vstr:string, vlong:long, vguid:guid)\n[\n    1, decimal(2.00000000000001), datetime(2020-03-04T14:05:01.3109965Z), time(01:23:45.6789000), dynamic({\n  \"moshe\": \"value\"\n}), true, 0.01, \"asdf\", 9223372036854775807, guid(74be27de-1e4e-49d9-b579-fe0b331d3642), \n]"
 
-const allDataTypesNull = "datatable(vnum:int, vdec:decimal, vdate:datetime, vspan:timespan, vobj:dynamic, vb:bool, vreal:real, vstr:string, vlong:long, vguid:guid) [int(null), decimal(null), datetime(null), time(null), dynamic(null), bool(null), real(null), \"\", long(null), guid(null)]"
+const allDataTypesIngest = `1, "2.00000000000001", "2020-03-04T14:05:01.3109965Z", "01:23:45.6789000", "{""moshe"": ""value""}", true, 0.01, "asdf", 9223372036854775807, "74be27de-1e4e-49d9-b579-fe0b331d3642"`
+
+const allDataTypesNull = "(vnum:int, vdec:decimal, vdate:datetime, vspan:timespan, vobj:dynamic, vb:bool, vreal:real, vstr:string, vlong:long, vguid:guid)"
+
+const allDataTypesNullIngest = `null, null, null, null, null, null, null, "", null, null`
 
 func CreateTestTable(t *testing.T, client *azkustodata.Client, tableName string) error {
-	return CreateTestTableWithDB(t, client, database, tableName, defaultSchema)
+	return CreateTestTableWithDB(t, client, database, tableName, defaultSchema, "")
 }
 
 func CreateAllDataTypesTable(t *testing.T, client *azkustodata.Client, tableName string) error {
-	return CreateTestTableWithDB(t, client, database, tableName, allDataTypes)
+	return CreateTestTableWithDB(t, client, database, tableName, allDataTypes, allDataTypesIngest)
 }
 
 func CreateAllDataTypesNullTable(t *testing.T, client *azkustodata.Client, tableName string) error {
-	return CreateTestTableWithDB(t, client, database, tableName, allDataTypesNull)
+	return CreateTestTableWithDB(t, client, database, tableName, allDataTypesNull, allDataTypesNullIngest)
 }
 
 func CreateDefaultTestTableWithDB(t *testing.T, client *azkustodata.Client, database string, tableName string) error {
-	return CreateTestTableWithDB(t, client, database, tableName, defaultSchema)
+	return CreateTestTableWithDB(t, client, database, tableName, defaultSchema, "")
 }
 
-func CreateTestTableWithDB(t *testing.T, client *azkustodata.Client, database string, tableName string, schema string) error {
-	return CreateTestTableWithDBAndScheme(t, client, database, tableName, schema)
+func CreateTestTableWithDB(t *testing.T, client *azkustodata.Client, database string, tableName string, schema string, ingestion string) error {
+	return CreateTestTableWithDBAndScheme(t, client, database, tableName, schema, ingestion)
 }
 
-func CreateTestTableWithDBAndScheme(t *testing.T, client *azkustodata.Client, database string, tableName string, schema string) error {
+func CreateTestTableWithDBAndScheme(t *testing.T, client *azkustodata.Client, database string, tableName string, schema string, ingestion string) error {
 	t.Logf("Creating ingestion table %s", tableName)
 	dropUnsafe := kql.New(".drop table ").AddTable(tableName).AddLiteral(" ifexists")
-	var createUnsafe = kql.New(".set ").AddTable(tableName).AddLiteral(" <| ").AddUnsafe(schema)
+	var createUnsafe = kql.New(".create table ").AddTable(tableName).AddUnsafe(schema)
+
+	if ingestion != "" {
+		createUnsafe.AddLiteral(";\n.ingest inline into table ").AddTable(tableName).AddLiteral(" <| \n").AddUnsafe(ingestion).AddLiteral("\n")
+	}
 
 	addMappingUnsafe := kql.New(".create table ").AddTable(tableName).AddLiteral(" ingestion json mapping 'Logs_mapping' '[{\"column\":\"header_time\",\"path\":\"$.header.time\",\"datatype\":\"datetime\"},{\"column\":\"header_id\",\"path\":\"$.header.id\",\"datatype\":\"guid\"},{\"column\":\"header_api_version\",\"path\":\"$.header.api_version\",\"datatype\":\"string\"},{\"column\":\"payload_data\",\"path\":\"$.payload.data\",\"datatype\":\"string\"},{\"column\":\"payload_user\",\"path\":\"$.payload.user\",\"datatype\":\"string\"}]'")
 

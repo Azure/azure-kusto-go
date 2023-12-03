@@ -497,7 +497,7 @@ func TestQueryV2(t *testing.T) {
 
 	res := getExpectedResult()
 
-	for tableResult := range v2.Tables() {
+	for tableResult := range v2.Results() {
 		assert.NoError(t, tableResult.Err)
 
 		tb := tableResult.Table

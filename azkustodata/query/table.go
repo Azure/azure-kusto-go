@@ -40,7 +40,6 @@ type Table interface {
 	Columns() []Column
 	Kind() string
 	ColumnByName(name string) *Column
-	IsPrimaryResult() bool
 	Consume() ([]Row, []error)
 
 	op() errors.Op
@@ -77,10 +76,4 @@ func (t *baseTable) op() errors.Op {
 		return errors.OpUnknown
 	}
 	return set.op()
-}
-
-const PrimaryResultTableKind = "PrimaryResult"
-
-func (t *baseTable) IsPrimaryResult() bool {
-	return t.kind == PrimaryResultTableKind
 }

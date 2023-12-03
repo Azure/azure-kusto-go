@@ -49,7 +49,7 @@ func TestIngestionStatus(t *testing.T) {
 		t.Log("Closed ingestor")
 	})
 
-	err = testshared.CreateTestTableWithDBAndScheme(t, client, testConfig.Database, tableName, schema)
+	err = testshared.CreateTestTableWithDBAndScheme(t, client, testConfig.Database, tableName, schema, "")
 	require.NoError(t, err)
 
 	// Change the ingestion batching time
@@ -242,7 +242,12 @@ func TestIngestionStatus(t *testing.T) {
 		defer cancel()
 
 		f, err := os.Open(csvFile)
-		defer f.Close()
+		defer func(f *os.File) {
+			err := f.Close()
+			if err != nil {
+				require.NoError(t, err)
+			}
+		}(f)
 		require.NoError(t, err)
 
 		reader, writer := io.Pipe()

@@ -4,7 +4,6 @@ import (
 	"context"
 	"github.com/Azure/azure-kusto-go/azkustodata"
 	"github.com/Azure/azure-kusto-go/azkustodata/kql"
-	"github.com/Azure/azure-kusto-go/azkustodata/query"
 	"github.com/Azure/azure-kusto-go/azkustodata/value"
 )
 
@@ -17,7 +16,12 @@ func Example() {
 		panic(err)
 	}
 
-	defer client.Close()
+	defer func(client *azkustodata.Client) {
+		err := client.Close()
+		if err != nil {
+			panic(err)
+		}
+	}(client)
 
 	ctx := context.Background()
 
@@ -29,7 +33,7 @@ func Example() {
 		panic(err)
 	}
 
-	for tableResult := range dataset.Tables() {
+	for tableResult := range dataset.Results() {
 		// Make sure to always check for errors
 		if tableResult.Err != nil {
 			panic(tableResult.Err)
@@ -49,11 +53,33 @@ func Example() {
 		stateCol := table.ColumnByName("State")
 		println(stateCol.Name)
 
-		if !table.IsPrimaryResult() {
-			// Non-primary tables can be safely ignored
+		// WARNING: streaming tables must be consumed, or the dataset will be blocked
+
+		// There are a few ways to consume a streaming table:
+		// Note: Only one of these methods should be used per table
+		// 1. SkipToEnd() - skips all rows and closes the table
+		table.SkipToEnd()
+
+		// 2. Consume() - reads all rows and closes the table
+		rows, errors := table.Consume()
+		for _, row := range rows {
+			println(row.Index)
+		}
+		for _, err := range errors {
+			println(err.Error())
 		}
 
-		workWithRow := func(row query.Row) {
+		// 3. Rows() - reads rows as they are received
+		for rowResult := range table.Rows() {
+			if rowResult.Err != nil {
+				println(rowResult.Err.Error())
+			} else {
+				println(rowResult.Row.Index)
+			}
+		}
+
+		// Working with rows
+		for _, row := range rows {
 			// Each row has an index and a pointer to the table it belongs to
 			println(row.Index)
 			println(row.Table().Name())
@@ -99,42 +125,11 @@ func Example() {
 			println(pd.Pop)
 		}
 
-		if tb, ok := table.(query.StreamingTable); ok {
-			// WARNING: streaming tables must be consumed, or the dataset will be blocked
-
-			// There are a few ways to consume a streaming table:
-			// Note: Only one of these methods should be used per table
-			// 1. SkipToEnd() - skips all rows and closes the table
-			tb.SkipToEnd()
-
-			// 2. Consume() - reads all rows and closes the table
-			rows, errors := tb.Consume()
-			for _, row := range rows {
-				workWithRow(row)
-			}
-			for _, err := range errors {
-				println(err.Error())
-			}
-
-			// 3. Rows() - reads rows as they are received
-			for rowResult := range tb.Rows() {
-				if rowResult.Err != nil {
-					println(rowResult.Err.Error())
-				} else {
-					println(rowResult.Row.Index)
-				}
-			}
-		}
-
-		// tables that aren't streaming are fully loaded into memory
-		if tb, ok := table.(query.FullTable); ok {
-			tb.Consume() // Can be called multiple times
-
-			// rows are available immediately
-			for _, row := range tb.Rows() {
-				workWithRow(row)
-			}
-		}
-
 	}
+
+	// Get metadata about the query (if it was consumed - otherwise it will be nil)
+	println(dataset.Header())
+	println(dataset.QueryProperties())
+	println(dataset.QueryCompletionInformation())
+	println(dataset.Completion())
 }
