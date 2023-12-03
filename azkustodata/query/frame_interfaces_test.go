@@ -6,6 +6,7 @@ import (
 )
 
 func TestDataSetHeader_String(t *testing.T) {
+	t.Parallel()
 	header := &DataSetHeader{
 		IsProgressive:           true,
 		Version:                 "V2",
@@ -17,6 +18,7 @@ func TestDataSetHeader_String(t *testing.T) {
 }
 
 func TestDataTable_String(t *testing.T) {
+	t.Parallel()
 	table := &DataTable{
 		TableId:   1,
 		TableKind: "TestKind",
@@ -29,6 +31,7 @@ func TestDataTable_String(t *testing.T) {
 }
 
 func TestFrameColumn_String(t *testing.T) {
+	t.Parallel()
 	column := &FrameColumn{
 		ColumnName: "TestColumn",
 		ColumnType: "TestType",
@@ -38,6 +41,7 @@ func TestFrameColumn_String(t *testing.T) {
 }
 
 func TestTableHeader_String(t *testing.T) {
+	t.Parallel()
 	header := &TableHeader{
 		TableId:   1,
 		TableKind: "TestKind",
@@ -49,6 +53,7 @@ func TestTableHeader_String(t *testing.T) {
 }
 
 func TestTableFragment_String(t *testing.T) {
+	t.Parallel()
 	fragment := &TableFragment{
 		TableFragmentType: "TestType",
 		TableId:           1,
@@ -59,6 +64,7 @@ func TestTableFragment_String(t *testing.T) {
 }
 
 func TestTableCompletion_String(t *testing.T) {
+	t.Parallel()
 	completion := &TableCompletion{
 		TableId:  1,
 		RowCount: 1,
@@ -92,6 +98,7 @@ func TestTableCompletion_String(t *testing.T) {
 }
 
 func TestDataSetCompletion_String(t *testing.T) {
+	t.Parallel()
 	completion := &DataSetCompletion{
 		HasErrors: true,
 		Cancelled: false,
@@ -125,31 +132,37 @@ func TestDataSetCompletion_String(t *testing.T) {
 }
 
 func TestDataSetHeader_GetFrameType(t *testing.T) {
+	t.Parallel()
 	header := &DataSetHeader{}
 	assert.Equal(t, DataSetHeaderFrameType, header.GetFrameType())
 }
 
 func TestDataTable_GetFrameType(t *testing.T) {
+	t.Parallel()
 	table := &DataTable{}
 	assert.Equal(t, DataTableFrameType, table.GetFrameType())
 }
 
 func TestTableHeader_GetFrameType(t *testing.T) {
+	t.Parallel()
 	header := &TableHeader{}
 	assert.Equal(t, TableHeaderFrameType, header.GetFrameType())
 }
 
 func TestTableFragment_GetFrameType(t *testing.T) {
+	t.Parallel()
 	fragment := &TableFragment{}
 	assert.Equal(t, TableFragmentFrameType, fragment.GetFrameType())
 }
 
 func TestTableCompletion_GetFrameType(t *testing.T) {
+	t.Parallel()
 	completion := &TableCompletion{}
 	assert.Equal(t, TableCompletionFrameType, completion.GetFrameType())
 }
 
 func TestDataSetCompletion_GetFrameType(t *testing.T) {
+	t.Parallel()
 	completion := &DataSetCompletion{}
 	assert.Equal(t, DataSetCompletionFrameType, completion.GetFrameType())
 }

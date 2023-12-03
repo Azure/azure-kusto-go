@@ -4,7 +4,6 @@ import (
 	"github.com/Azure/azure-kusto-go/azkustodata/errors"
 	"github.com/Azure/azure-kusto-go/azkustodata/types"
 	"github.com/Azure/azure-kusto-go/azkustodata/value"
-	"sync"
 )
 
 type Column struct {
@@ -33,7 +32,6 @@ type baseTable struct {
 	name    string
 	kind    string
 	columns []Column
-	lock    sync.RWMutex
 }
 
 type Table interface {

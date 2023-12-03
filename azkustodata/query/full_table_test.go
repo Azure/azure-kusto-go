@@ -9,6 +9,7 @@ import (
 )
 
 func TestNewFullTable_WithValidDataTable(t *testing.T) {
+	t.Parallel()
 	dt := &DataTable{
 		TableId:   1,
 		TableName: "AllDataTypes",
@@ -52,6 +53,7 @@ func TestNewFullTable_WithValidDataTable(t *testing.T) {
 }
 
 func TestNewFullTable_WithInvalidColumnType(t *testing.T) {
+	t.Parallel()
 	dt := &DataTable{
 		TableId:   1,
 		TableName: "TestTable",
@@ -66,6 +68,7 @@ func TestNewFullTable_WithInvalidColumnType(t *testing.T) {
 }
 
 func TestNewFullTable_WithInvalidRowValue(t *testing.T) {
+	t.Parallel()
 	dt := &DataTable{
 		TableId:   1,
 		TableName: "TestTable",

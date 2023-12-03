@@ -4,6 +4,7 @@ import (
 	"github.com/Azure/azure-kusto-go/azkustodata/errors"
 	"github.com/Azure/azure-kusto-go/azkustodata/types"
 	"github.com/Azure/azure-kusto-go/azkustodata/value"
+	"sync"
 )
 
 type RowResult struct {
@@ -13,6 +14,7 @@ type RowResult struct {
 
 type streamingTable struct {
 	baseTable
+	lock     sync.RWMutex
 	dataset  *DataSet
 	rawRows  chan RawRows
 	rows     chan RowResult
@@ -80,22 +82,18 @@ func NewStreamingTable(dataset *DataSet, th *TableHeader) (StreamingTable, *erro
 }
 
 func (t *streamingTable) close(errors []OneApiError) {
-	closed := func() bool {
-		t.lock.RLock()
-		defer t.lock.RUnlock()
-		return t.closed
-	}()
+	t.lock.Lock()
 
-	if closed {
+	if t.closed {
+		t.lock.Unlock()
 		return
 	}
-
-	t.lock.Lock()
-	defer t.lock.Unlock()
 
 	t.closed = true
 
 	close(t.rawRows)
+
+	t.lock.Unlock()
 
 	b := <-t.end
 
@@ -104,6 +102,9 @@ func (t *streamingTable) close(errors []OneApiError) {
 			t.rows <- RowResult{Row: Row{}, Err: &e}
 		}
 	}
+
+	t.lock.Lock()
+	defer t.lock.Unlock()
 
 	close(t.rows)
 }

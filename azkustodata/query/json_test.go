@@ -20,6 +20,7 @@ var errorFrames string
 var twoTables string
 
 func TestReadFramesWithValidInput(t *testing.T) {
+	t.Parallel()
 	ch := make(chan Frame)
 
 	var err error
@@ -98,6 +99,7 @@ func TestReadFramesWithValidInput(t *testing.T) {
 }
 
 func TestReadFramesWithErrors(t *testing.T) {
+	t.Parallel()
 	ch := make(chan Frame)
 
 	var err error
@@ -208,6 +210,7 @@ func TestReadFramesWithErrors(t *testing.T) {
 }
 
 func TestReadFramesWithEmptyInput(t *testing.T) {
+	t.Parallel()
 	src := ``
 
 	ch := make(chan Frame)
@@ -225,6 +228,7 @@ func TestReadFramesWithEmptyInput(t *testing.T) {
 }
 
 func TestReadFramesWithInvalidInput(t *testing.T) {
+	t.Parallel()
 	src := `[{]`
 
 	ch := make(chan Frame)
@@ -242,6 +246,7 @@ func TestReadFramesWithInvalidInput(t *testing.T) {
 }
 
 func TestReadFramesWithInvalidFrameType(t *testing.T) {
+	t.Parallel()
 	src := `[{"FrameType": "InvalidFrameType"}
 ]`
 
@@ -259,6 +264,7 @@ func TestReadFramesWithInvalidFrameType(t *testing.T) {
 }
 
 func TestReadFramesWithInvalidFrame(t *testing.T) {
+	t.Parallel()
 	src := `[{"FrameType": "DataSetHeader", "IsProgressive": "invalid"}
 ]`
 
