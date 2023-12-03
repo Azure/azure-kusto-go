@@ -1082,7 +1082,7 @@ func createMockLogRows() []LogRow {
 		// One full line
 		{
 			HeaderTime:       value.DateTime{Value: fakeTime, Valid: true},
-			HeaderId:         value.GUID{Value: uuid.NullUUID{UUID: fakeUid, Valid: true}},
+			HeaderId:         value.GUID{Value: fakeUid, Valid: true},
 			HeaderApiVersion: value.String{Value: "v0.0.1", Valid: true},
 			PayloadData:      value.String{Value: "Hello world!", Valid: true},
 			PayloadUser:      value.String{Value: "Daniel Dubovski", Valid: true},
