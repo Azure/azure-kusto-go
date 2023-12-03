@@ -43,7 +43,7 @@ var (
 		),
 	)
 
-	// This is needed because of a bug in the backend that sometimes causes the tables not to drop and get stuck.
+	// This is needed because streaming ingestion metadata is cached in the engine and needs to refresh
 	clearStreamingCacheStatement = kql.New(".clear database cache streamingingestion schema")
 
 	countStatement = kql.New("table(tableName) | count")
@@ -1599,7 +1599,8 @@ func TestReaderIngestion(t *testing.T) { // ok
 			_, isQueued := test.ingestor.(*ingest.Ingestion)
 			_, isManaged := test.ingestor.(*ingest.Managed)
 			if isQueued || isManaged {
-				test.options = append(test.options, ingest.FlushImmediately(), ingest.ReportResultToTable())
+				test.options = append(test.options, ingest.FlushImmediately(),
+					ingest.ReportResultToTable())
 			}
 
 			f, err := os.Open(test.src)
