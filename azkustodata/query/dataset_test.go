@@ -29,7 +29,8 @@ func TestDataSet_ReadFrames_WithError(t *testing.T) {
 
 func TestDataSet_DecodeTables_WithInvalidFrame(t *testing.T) {
 	t.Parallel()
-	reader := strings.NewReader(`[{"FrameType": "InvalidFrameType"}]`)
+	reader := strings.NewReader(`[{"FrameType": "InvalidFrameType"}
+]`)
 	d := NewDataSet(context.Background(), io.NopCloser(reader), DefaultFrameCapacity)
 
 	tableResult := <-d.tables
@@ -300,7 +301,8 @@ func TestDataSet_MultiplePrimaryTables(t *testing.T) {
 
 func TestDataSet_DecodeTables_WithInvalidDataSetHeader(t *testing.T) {
 	t.Parallel()
-	reader := strings.NewReader(`[{"FrameType": "DataSetHeader", "Version": "V1"}]`)
+	reader := strings.NewReader(`[{"FrameType": "DataSetHeader", "Version": "V1"}
+]`)
 	d := NewDataSet(context.Background(), io.NopCloser(reader), DefaultFrameCapacity)
 
 	tableResult := <-d.tables
@@ -310,7 +312,8 @@ func TestDataSet_DecodeTables_WithInvalidDataSetHeader(t *testing.T) {
 
 func TestDataSet_DecodeTables_WithInvalidTableFragment(t *testing.T) {
 	t.Parallel()
-	reader := strings.NewReader(`[{"FrameType": "TableFragment", "TableId": 1}]`)
+	reader := strings.NewReader(`[{"FrameType": "TableFragment", "TableId": 1}
+]`)
 	d := NewDataSet(context.Background(), io.NopCloser(reader), DefaultFrameCapacity)
 
 	tableResult := <-d.tables
@@ -320,7 +323,8 @@ func TestDataSet_DecodeTables_WithInvalidTableFragment(t *testing.T) {
 
 func TestDataSet_DecodeTables_WithInvalidTableCompletion(t *testing.T) {
 	t.Parallel()
-	reader := strings.NewReader(`[{"FrameType": "TableCompletion", "TableId": 1}]`)
+	reader := strings.NewReader(`[{"FrameType": "TableCompletion", "TableId": 1}
+]`)
 	d := NewDataSet(context.Background(), io.NopCloser(reader), DefaultFrameCapacity)
 
 	tableResult := <-d.tables
@@ -341,7 +345,8 @@ func TestDataSet_DecodeTables_StreamingTable_WithInvalidColumnType(t *testing.T)
 
 func TestDataSet_DecodeTables_DataTable_WithInvalidColumnType(t *testing.T) {
 	t.Parallel()
-	reader := strings.NewReader(`[{"FrameType": "DataTable", "TableId": 1, "TableName": "TestTable", "Columns": [{"ColumnName": "TestColumn", "ColumnType": "invalid"}], "Rows": [["TestValue"]]}]`)
+	reader := strings.NewReader(`[{"FrameType": "DataTable", "TableId": 1, "TableName": "TestTable", "Columns": [{"ColumnName": "TestColumn", "ColumnType": "invalid"}], "Rows": [["TestValue"]]}
+]`)
 	d := NewDataSet(context.Background(), io.NopCloser(reader), DefaultFrameCapacity)
 
 	tableResult := <-d.tables
