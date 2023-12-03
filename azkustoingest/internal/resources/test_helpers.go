@@ -95,24 +95,12 @@ func SuccessfulFakeResources() *FakeMgmt {
 	return FakeResources(
 		[]value.Values{
 			{
-				value.String{
-					Valid: true,
-					Value: "TempStorage",
-				},
-				value.String{
-					Valid: true,
-					Value: "https://account.blob.core.windows.net/storageroot0",
-				},
+				value.NewString("TempStorage"),
+				value.NewString("https://account.blob.core.windows.net/storageroot0"),
 			},
 			{
-				value.String{
-					Valid: true,
-					Value: "SecuredReadyForAggregationQueue",
-				},
-				value.String{
-					Valid: true,
-					Value: "https://account.blob.core.windows.net/storageroot1",
-				},
+				value.NewString("SecuredReadyForAggregationQueue"),
+				value.NewString("https://account.blob.core.windows.net/storageroot1"),
 			},
 		},
 		false,

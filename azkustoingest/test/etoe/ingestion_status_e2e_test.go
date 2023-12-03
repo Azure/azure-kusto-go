@@ -18,7 +18,7 @@ import (
 )
 
 const (
-	scheme  string = "(rownumber:int, rowguid:string, xdouble:real, xfloat:real, xbool:bool, xint16:int, xint32:int, xint64:long, xuint8:long, xuint16:long, xuint32:long, xuint64:long, xdate:datetime, xsmalltext:string, xtext:string, xnumberAsText:string, xtime:timespan, xtextWithNulls:string, xdynamicWithNulls:dynamic)"
+	schema  string = "datatable(rownumber:int, rowguid:string, xdouble:real, xfloat:real, xbool:bool, xint16:int, xint32:int, xint64:long, xuint8:long, xuint16:long, xuint32:long, xuint64:long, xdate:datetime, xsmalltext:string, xtext:string, xnumberAsText:string, xtime:timespan, xtextWithNulls:string, xdynamicWithNulls:dynamic)[]"
 	csvFile string = "testdata/dataset.csv"
 )
 
@@ -49,7 +49,7 @@ func TestIngestionStatus(t *testing.T) {
 		t.Log("Closed ingestor")
 	})
 
-	err = testshared.CreateTestTableWithDBAndScheme(t, client, testConfig.Database, tableName, false, scheme)
+	err = testshared.CreateTestTableWithDBAndScheme(t, client, testConfig.Database, tableName, schema)
 	require.NoError(t, err)
 
 	// Change the ingestion batching time

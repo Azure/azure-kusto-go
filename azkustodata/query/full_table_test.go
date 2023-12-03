@@ -28,7 +28,7 @@ func TestNewFullTable_WithValidDataTable(t *testing.T) {
 		Rows: [][]interface{}{{1, "1.1", "2019-03-02T05:40:02Z", "13:14:20", "{\"a\": 3}", true, 1.1, "test", 1, "00000000-0000-0000-0000-000000000000"}},
 	}
 
-	table, err := NewFullTable(dt)
+	table, err := NewFullTable(nil, dt)
 
 	assert.NoError(t, err)
 	assert.Equal(t, dt.TableId, 1)
@@ -59,7 +59,7 @@ func TestNewFullTable_WithInvalidColumnType(t *testing.T) {
 		Rows:      [][]interface{}{{"TestValue"}},
 	}
 
-	_, err := NewFullTable(dt)
+	_, err := NewFullTable(nil, dt)
 
 	assert.Error(t, err)
 	assert.Contains(t, err.Error(), "not valid")
@@ -73,7 +73,7 @@ func TestNewFullTable_WithInvalidRowValue(t *testing.T) {
 		Rows:      [][]interface{}{{"TestValue"}},
 	}
 
-	_, err := NewFullTable(dt)
+	_, err := NewFullTable(nil, dt)
 
 	assert.Error(t, err)
 	assert.Contains(t, err.Error(), "unable to unmarshal")

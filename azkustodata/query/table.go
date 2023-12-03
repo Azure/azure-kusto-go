@@ -72,7 +72,11 @@ func (t *baseTable) ColumnByName(name string) *Column {
 }
 
 func (t *baseTable) op() errors.Op {
-	return t.dataSet.op()
+	set := t.dataSet
+	if set == nil {
+		return errors.OpUnknown
+	}
+	return set.op()
 }
 
 const PrimaryResultTableKind = "PrimaryResult"

@@ -117,10 +117,7 @@ func TestAuthContext(t *testing.T) {
 			fakeMgmt: FakeAuthContext(
 				[]value.Values{
 					{
-						value.String{
-							Valid: true,
-							Value: "authtoken",
-						},
+						value.NewString("authtoken"),
 					},
 				},
 				false,
@@ -132,16 +129,10 @@ func TestAuthContext(t *testing.T) {
 			fakeMgmt: FakeAuthContext(
 				[]value.Values{
 					{
-						value.String{
-							Valid: true,
-							Value: "authtoken",
-						},
+						value.NewString("authtoken"),
 					},
 					{
-						value.String{
-							Valid: true,
-							Value: "authtoken2",
-						},
+						value.NewString("authtoken2"),
 					},
 				},
 				false,
@@ -153,10 +144,7 @@ func TestAuthContext(t *testing.T) {
 			fakeMgmt: FakeAuthContext(
 				[]value.Values{
 					{
-						value.String{
-							Valid: true,
-							Value: "authtoken",
-						},
+						value.NewString("authtoken"),
 					},
 				},
 				false,
@@ -215,14 +203,8 @@ func TestResources(t *testing.T) {
 			fakeMgmt: FakeResources(
 				[]value.Values{
 					{
-						value.String{
-							Valid: true,
-							Value: "TempStorage",
-						},
-						value.String{
-							Valid: true,
-							Value: "https://.blob.core.windows.net/storageroot",
-						},
+						value.NewString("TempStorage"),
+						value.NewString("https://.blob.core.windows.net/storageroot"),
 					},
 				},
 				false,
