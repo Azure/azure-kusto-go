@@ -52,6 +52,10 @@ type DataSet struct {
 	currentStreamingTable *streamingTable
 }
 
+func (d *DataSet) Tables() chan TableResult {
+	return d.tables
+}
+
 // op returns the operation of the data set.
 func (d *DataSet) op() errors.Op {
 	op := d.ctx.Value("op")
@@ -82,10 +86,11 @@ func (d *DataSet) decodeTables() {
 			d.currentStreamingTable.close([]OneApiError{})
 		}
 	}()
+	op := d.op()
+
 	for {
 		var f Frame = nil
 
-		op := d.op()
 		select {
 		case err := <-d.errorChannel:
 			d.tables <- TableResult{Table: nil, Err: err}
@@ -123,8 +128,8 @@ func (d *DataSet) decodeTables() {
 			if !t.IsPrimaryResult() {
 				d.SecondaryResults = append(d.SecondaryResults, t)
 			}
-		} else if !d.parseStreamingTable(f, op) {
-			break
+		} else if d.parseStreamingTable(f, op) {
+			continue
 		} else {
 			err := errors.ES(op, errors.KInternal, "unknown frame type")
 			d.tables <- TableResult{Table: nil, Err: err}

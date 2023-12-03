@@ -429,7 +429,7 @@ func TestFileIngestion(t *testing.T) { //ok
 			fTable := ""
 			if test.table != "" {
 				fTable = fmt.Sprintf("%s_%d_%d", test.table, time.Now().UnixNano(), rand.Int())
-				require.NoError(t, testshared.CreateTestTable(t, client, fTable, false))
+				require.NoError(t, testshared.CreateTestTable(t, client, fTable))
 				test.options = append(test.options, azkustoingest.Table(fTable))
 			}
 
@@ -746,7 +746,7 @@ func TestReaderIngestion(t *testing.T) { // ok
 			var fTable string
 			if test.table != "" {
 				fTable = fmt.Sprintf("%s_%d_%d", test.table, time.Now().UnixNano(), rand.Int())
-				require.NoError(t, testshared.CreateTestTable(t, client, fTable, false))
+				require.NoError(t, testshared.CreateTestTable(t, client, fTable))
 				test.options = append(test.options, azkustoingest.Table(fTable))
 			}
 
@@ -975,7 +975,7 @@ func TestMultipleClusters(t *testing.T) { //ok
 			go func() {
 				defer wg.Done()
 
-				require.NoError(t, testshared.CreateTestTableWithDB(t, client, testConfig.Database, fTable, false))
+				require.NoError(t, testshared.CreateDefaultTestTableWithDB(t, client, testConfig.Database, fTable))
 
 				var options []azkustoingest.FileOption
 				if _, ok := test.ingestor.(*azkustoingest.Ingestion); ok {
@@ -1002,7 +1002,7 @@ func TestMultipleClusters(t *testing.T) { //ok
 			go func() {
 				defer wg.Done()
 
-				require.NoError(t, testshared.CreateTestTableWithDB(t, secondaryClient, testConfig.SecondaryDatabase, fSecondaryTable, false))
+				require.NoError(t, testshared.CreateDefaultTestTableWithDB(t, secondaryClient, testConfig.SecondaryDatabase, fSecondaryTable))
 
 				var options []azkustoingest.FileOption
 				if _, ok := test.secondaryIngestor.(*azkustoingest.Ingestion); ok {
