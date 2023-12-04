@@ -11,7 +11,7 @@ type CountResult struct {
 	Count int64
 }
 
-// This is needed because of a bug in the backend that sometimes causes the tables not to drop and get stuck.
+// This is needed because streaming ingestion metadata is cached in the engine and needs to refresh
 var clearStreamingCacheStatement = kql.New(".clear database cache streamingingestion schema")
 
 func executeCommands(client *azkustodata.Client, database string, commandsToRun ...azkustodata.Statement) error {
