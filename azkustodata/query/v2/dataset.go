@@ -113,9 +113,6 @@ func (d *dataSet) decodeTables() {
 
 		select {
 		case err := <-d.errorChannel:
-			if err == io.EOF {
-				return
-			}
 			d.results <- query.TableResultError(err)
 			break
 		case <-d.Context().Done():
@@ -126,7 +123,7 @@ func (d *dataSet) decodeTables() {
 		}
 
 		if f == nil {
-			continue
+			break
 		}
 
 		if d.Completion() != nil {
