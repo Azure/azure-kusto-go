@@ -1073,27 +1073,27 @@ func createMockLogRows() []LogRow {
 	return []LogRow{
 		// One empty line
 		{
-			HeaderTime:       value.DateTime{},
-			HeaderId:         value.GUID{},
-			HeaderApiVersion: value.String{Value: "", Valid: true},
-			PayloadData:      value.String{Value: "", Valid: true},
-			PayloadUser:      value.String{Value: "", Valid: true},
+			HeaderTime:       *value.NewNullDateTime(),
+			HeaderId:         *value.NewNullGUID(),
+			HeaderApiVersion: *value.NewString(""),
+			PayloadData:      *value.NewString(""),
+			PayloadUser:      *value.NewString(""),
 		},
 		// One full line
 		{
-			HeaderTime:       value.DateTime{Value: fakeTime, Valid: true},
-			HeaderId:         value.GUID{Value: fakeUid, Valid: true},
-			HeaderApiVersion: value.String{Value: "v0.0.1", Valid: true},
-			PayloadData:      value.String{Value: "Hello world!", Valid: true},
-			PayloadUser:      value.String{Value: "Daniel Dubovski", Valid: true},
+			HeaderTime:       *value.NewDateTime(fakeTime),
+			HeaderId:         *value.NewGUID(fakeUid),
+			HeaderApiVersion: *value.NewString("v0.0.1"),
+			PayloadData:      *value.NewString("Hello world!"),
+			PayloadUser:      *value.NewString("Daniel Dubovski"),
 		},
 		// Partial Data
 		{
-			HeaderTime:       value.DateTime{Value: fakeTime, Valid: true},
-			HeaderId:         value.GUID{},
-			HeaderApiVersion: value.String{Value: "v0.0.2", Valid: true},
-			PayloadData:      value.String{Value: "", Valid: true},
-			PayloadUser:      value.String{Value: "", Valid: true},
+			HeaderTime:       *value.NewDateTime(fakeTime),
+			HeaderId:         *value.NewNullGUID(),
+			HeaderApiVersion: *value.NewString("v0.0.2"),
+			PayloadData:      *value.NewString(""),
+			PayloadUser:      *value.NewString(""),
 		},
 	}
 }
