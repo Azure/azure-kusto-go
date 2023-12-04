@@ -1,7 +1,6 @@
 package azkustoingest
 
 import (
-	// "bytes"
 	"bytes"
 	"context"
 	"encoding/json"
@@ -11,6 +10,7 @@ import (
 
 	"github.com/Azure/azure-kusto-go/azkustodata"
 	"github.com/Azure/azure-kusto-go/azkustodata/errors"
+	"github.com/Azure/azure-kusto-go/kusto/ingest/ingestoptions"
 	"github.com/Azure/azure-kusto-go/azkustoingest/internal/gzip"
 	"github.com/Azure/azure-kusto-go/azkustoingest/internal/properties"
 	"github.com/Azure/azure-kusto-go/azkustoingest/internal/queued"
@@ -104,16 +104,13 @@ func prepFileAndProps(fPath string, props *properties.All, options []FileOption,
 		return nil, err, local
 	}
 
-	props.Source.OriginalSource = fPath
-
 	if !local {
 		return nil, nil, false
 	}
 
+	props.Source.OriginalSource = fPath
 	compression := utils.CompressionDiscovery(fPath)
-	if compression != properties.CTNone {
-		props.Source.DontCompress = true
-	}
+	props.Source.DontCompress = !queued.ShouldCompress(props, compression)
 
 	err = queued.CompleteFormatFromFileName(props, fPath)
 	if err != nil {
@@ -144,7 +141,7 @@ func (i *Streaming) FromReader(ctx context.Context, reader io.Reader, options ..
 }
 
 func streamImpl(c streamIngestor, ctx context.Context, payload io.Reader, props properties.All, isBlobUri bool) (*Result, error) {
-	compress := !props.Source.DontCompress
+	compress := queued.ShouldCompress(&props, ingestoptions.CTUnknown)
 	if compress && !isBlobUri {
 		payload = gzip.Compress(payload)
 	}
