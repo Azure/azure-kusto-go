@@ -5,6 +5,7 @@ package queued
 import (
 	"context"
 	"fmt"
+	"github.com/Azure/azure-kusto-go/azkustoingest/ingestoptions"
 	"github.com/Azure/azure-kusto-go/azkustoingest/internal/utils"
 	"io"
 	"math/rand"
@@ -15,7 +16,6 @@ import (
 	"time"
 
 	"github.com/Azure/azure-kusto-go/azkustodata/errors"
-	"github.com/Azure/azure-kusto-go/kusto/ingest/ingestoptions"
 	"github.com/Azure/azure-kusto-go/azkustoingest/internal/gzip"
 	"github.com/Azure/azure-kusto-go/azkustoingest/internal/properties"
 	"github.com/Azure/azure-kusto-go/azkustoingest/internal/resources"

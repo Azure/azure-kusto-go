@@ -5,13 +5,13 @@ import (
 	"compress/gzip"
 	"context"
 	"fmt"
+	"github.com/Azure/azure-kusto-go/azkustoingest/ingestoptions"
 	"github.com/Azure/azure-kusto-go/azkustoingest/internal/utils"
 	"io"
 	"os"
 	"testing"
 
 	"github.com/Azure/azure-kusto-go/azkustodata/errors"
-	"github.com/Azure/azure-kusto-go/kusto/ingest/ingestoptions"
 	"github.com/Azure/azure-kusto-go/azkustoingest/internal/properties"
 	"github.com/stretchr/testify/assert"
 
@@ -354,7 +354,8 @@ func TestShouldCompress(t *testing.T) {
 		test := test // capture
 		t.Run(test.name, func(t *testing.T) {
 			t.Parallel()
-			CompleteFormatFromFileName(test.props, test.props.Source.OriginalSource)
+			err := CompleteFormatFromFileName(test.props, test.props.Source.OriginalSource)
+			assert.NoError(t, err)
 
 			got := ShouldCompress(test.props,
 				utils.CompressionDiscovery(test.props.Source.OriginalSource))

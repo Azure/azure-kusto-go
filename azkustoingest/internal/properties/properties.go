@@ -7,6 +7,7 @@ import (
 	"encoding/json"
 	"fmt"
 	"github.com/Azure/azure-kusto-go/azkustodata"
+	"github.com/Azure/azure-kusto-go/azkustoingest/ingestoptions"
 	"github.com/cenkalti/backoff/v4"
 	"net/url"
 	"os"
