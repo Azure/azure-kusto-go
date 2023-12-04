@@ -143,10 +143,12 @@ func (d *dataSet) decodeTables() {
 			t, err := NewFullTable(d, dt)
 			if err != nil {
 				d.results <- query.TableResultError(err)
+				break
 			}
 			err = d.parseSecondaryTable(t)
 			if err != nil {
 				d.results <- query.TableResultError(err)
+				break
 			}
 		} else if d.parseStreamingTable(f, op) {
 			continue
