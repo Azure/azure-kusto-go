@@ -62,7 +62,7 @@ func TestDataSet_DecodeTables_GetRows(t *testing.T) {
 
 	tables := []struct {
 		rows    []query.Row
-		id      int
+		id      int64
 		name    string
 		kind    string
 		columns []query.Column
@@ -173,7 +173,7 @@ func TestDataSet_DecodeTables_GetRows(t *testing.T) {
 		if tableResult.Table() != nil {
 			tb := tableResult.Table()
 			expectedTable := tables[tb.Ordinal()]
-			assert.Equal(t, expectedTable.id, tb.Id())
+			assert.Equal(t, expectedTable.id, tb.Ordinal())
 			assert.Equal(t, expectedTable.name, tb.Name())
 			assert.Equal(t, expectedTable.kind, tb.Kind())
 			assert.Equal(t, expectedTable.columns, tb.Columns())
@@ -223,8 +223,7 @@ func TestDataSet_DecodeTables_GetRows(t *testing.T) {
 	}
 
 	information := d.QueryCompletionInformation()
-	assert.NotNil(t, err)
-
+	assert.NotNil(t, information)
 	assert.Equal(t, expectedQueryCompletionInformation, information)
 
 	expectedQueryProperties := []QueryProperties{
@@ -236,7 +235,7 @@ func TestDataSet_DecodeTables_GetRows(t *testing.T) {
 	}
 
 	properties := d.QueryProperties()
-	assert.NotNil(t, err)
+	assert.NotNil(t, properties)
 	assert.Equal(t, expectedQueryProperties, properties)
 }
 
