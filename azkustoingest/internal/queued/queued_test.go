@@ -5,6 +5,7 @@ import (
 	"compress/gzip"
 	"context"
 	"fmt"
+	"github.com/Azure/azure-kusto-go/azkustoingest/ingestoptions"
 	"github.com/Azure/azure-kusto-go/azkustoingest/internal/utils"
 	"io"
 	"os"
@@ -56,13 +57,13 @@ func TestCompressionDiscovery(t *testing.T) {
 
 	tests := []struct {
 		input string
-		want  properties.CompressionType
+		want  ingestoptions.CompressionType
 	}{
-		{"https://somehost.somedomain.com:8080/v1/somestuff/file.gz", properties.GZIP},
-		{"https://somehost.somedomain.com:8080/v1/somestuff/file.zip", properties.ZIP},
-		{"/path/to/a/file.gz", properties.GZIP},
-		{"/path/to/a/file.zip", properties.ZIP},
-		{"/path/to/a/file", properties.CTNone},
+		{"https://somehost.somedomain.com:8080/v1/somestuff/file.gz", ingestoptions.GZIP},
+		{"https://somehost.somedomain.com:8080/v1/somestuff/file.zip", ingestoptions.ZIP},
+		{"/path/to/a/file.gz", ingestoptions.GZIP},
+		{"/path/to/a/file.zip", ingestoptions.ZIP},
+		{"/path/to/a/file", ingestoptions.CTNone},
 	}
 
 	for _, test := range tests {
@@ -297,6 +298,67 @@ func TestIsLocalPath(t *testing.T) {
 
 			assert.NoError(t, err)
 
+			assert.Equal(t, test.want, got)
+		})
+	}
+}
+
+func TestShouldCompress(t *testing.T) {
+	t.Parallel()
+
+	tests := []struct {
+		name  string
+		props *properties.All
+		want  bool
+	}{
+		{
+			name: "Some file",
+			props: &properties.All{Source: properties.SourceOptions{CompressionType: ingestoptions.CTUnknown,
+				OriginalSource: "https://somehost.somedomain.com:8080/v1/somestuff/file"}},
+			want: true,
+		},
+		{
+			name: "Some file2",
+			props: &properties.All{Source: properties.SourceOptions{CompressionType: ingestoptions.CTNone,
+				OriginalSource: "https://somehost.somedomain.com:8080/v1/somestuff/file"}},
+			want: true,
+		},
+		{
+			name: "Provided compression type is GZIP",
+			props: &properties.All{Source: properties.SourceOptions{CompressionType: ingestoptions.GZIP,
+				OriginalSource: "https://somehost.somedomain.com:8080/v1/somestuff/file"}},
+			want: false,
+		},
+		{
+			name: "Guess by name is GZIP",
+			props: &properties.All{Source: properties.SourceOptions{CompressionType: ingestoptions.CTUnknown,
+				OriginalSource: "https://somehost.somedomain.com:8080/v1/somestuff/file.gz"}},
+			want: false,
+		},
+		{
+			name: "DontCompress is true",
+			props: &properties.All{Source: properties.SourceOptions{CompressionType: ingestoptions.CTNone,
+				DontCompress:   true,
+				OriginalSource: "https://somehost.somedomain.com:8080/v1/somestuff/file"}},
+			want: false,
+		},
+		{
+			name: "Binary format",
+			props: &properties.All{Source: properties.SourceOptions{CompressionType: ingestoptions.CTNone,
+				OriginalSource: "https://somehost.somedomain.com:8080/v1/somestuff/file.avro"}},
+			want: false,
+		},
+	}
+
+	for _, test := range tests {
+		test := test // capture
+		t.Run(test.name, func(t *testing.T) {
+			t.Parallel()
+			err := CompleteFormatFromFileName(test.props, test.props.Source.OriginalSource)
+			assert.NoError(t, err)
+
+			got := ShouldCompress(test.props,
+				utils.CompressionDiscovery(test.props.Source.OriginalSource))
 			assert.Equal(t, test.want, got)
 		})
 	}

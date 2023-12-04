@@ -242,13 +242,13 @@ func TestIngestionStatus(t *testing.T) {
 		defer cancel()
 
 		f, err := os.Open(csvFile)
+		require.NoError(t, err)
 		defer func(f *os.File) {
 			err := f.Close()
 			if err != nil {
 				require.NoError(t, err)
 			}
 		}(f)
-		require.NoError(t, err)
 
 		reader, writer := io.Pipe()
 		go func() {
