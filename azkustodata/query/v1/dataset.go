@@ -8,7 +8,7 @@ import (
 	"github.com/google/uuid"
 )
 
-type TableIndex struct {
+type TableIndexRow struct {
 	Ordinal    int64
 	Kind       string
 	Name       string
@@ -36,8 +36,9 @@ type QueryInformation struct {
 type dataset struct {
 	query.Dataset
 	results []query.Table
-	status  QueryStatus
-	info    QueryInformation
+	index   []TableIndexRow
+	status  []QueryStatus
+	info    []QueryInformation
 }
 
 func NewDataset(ctx context.Context, op errors.Op, v1 V1) (query.Dataset, error) {
@@ -53,5 +54,79 @@ func NewDataset(ctx context.Context, op errors.Op, v1 V1) (query.Dataset, error)
 		return nil, errors.ES(d.Op(), errors.KInternal, "kusto query failed: no tables returned")
 	}
 
+	// index is always the last table
+	lastTable := &v1.Tables[len(v1.Tables)-1]
+
+	index, err := parseTable[TableIndexRow](lastTable, d, nil)
+	if err != nil {
+		return nil, err
+	}
+
+	for _, r := range index {
+		if r.Kind == "QueryStatus" {
+			queryStatus, err := parseTable[QueryStatus](lastTable, d, &r)
+			if err != nil {
+				return nil, err
+			}
+			d.status = queryStatus
+		}
+		if r.Kind == "QueryInformation" {
+			queryInfo, err := parseTable[QueryInformation](lastTable, d, &r)
+			if err != nil {
+				return nil, err
+			}
+			d.info = queryInfo
+		}
+		if r.Kind == "QueryResult" {
+			table, err := parseTable[query.Table](lastTable, d, &r)
+			if err != nil {
+				return nil, err
+			}
+			d.results = append(d.results, table...)
+		}
+	}
+
 	return d, nil
+}
+
+func parseTable[T any](table *RawTable, d *dataset, index *TableIndexRow) ([]T, error) {
+	fullTable, err := common.NewFullTableV1(d, table, index)
+	if err != nil {
+		return nil, err
+	}
+
+	indexRows, errs := fullTable.Consume()
+	if errs != nil {
+		return nil, errors.GetCombinedError(errs...)
+	}
+
+	rows, err := query.ToStructs[T](indexRows)
+	if err != nil {
+		return nil, err
+	}
+
+	return rows, nil
+}
+
+func (d *dataset) Results() []query.Table {
+	return d.results
+}
+
+func (d *dataset) Index() []TableIndexRow {
+	return d.index
+}
+
+func (d *dataset) Status() []QueryStatus {
+	return d.status
+}
+
+func (d *dataset) Info() []QueryInformation {
+	return d.info
+}
+
+type Dataset interface {
+	query.Dataset
+	Results() []query.Table
+	Index() []TableIndexRow
+	Status() []QueryStatus
 }

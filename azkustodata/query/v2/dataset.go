@@ -141,7 +141,7 @@ func (d *dataSet) decodeTables() {
 		} else if completion, ok := f.(*DataSetCompletion); ok {
 			d.setCompletion(completion)
 		} else if dt, ok := f.(*DataTable); ok {
-			t, err := common.NewFullTable(d, dt)
+			t, err := common.NewFullTableV2(d, dt)
 			if err != nil {
 				d.results <- common.TableResultError(err)
 			}
@@ -188,8 +188,8 @@ func (d *dataSet) parseStreamingTable(f Frame, op errors.Op) bool {
 			d.results <- common.TableResultError(err)
 			return false
 		}
-		if table.Id() != tf.TableId {
-			err := errors.ES(op, errors.KInternal, "received a TableFragment frame for table %d while table %d was open", tf.TableId, table.Id())
+		if int(table.Ordinal()) != tf.TableId {
+			err := errors.ES(op, errors.KInternal, "received a TableFragment frame for table %d while table %d was open", tf.TableId, int(table.Ordinal()))
 			d.results <- common.TableResultError(err)
 		}
 
@@ -200,8 +200,8 @@ func (d *dataSet) parseStreamingTable(f Frame, op errors.Op) bool {
 			d.results <- common.TableResultError(err)
 			return false
 		}
-		if table.Id() != tc.TableId {
-			err := errors.ES(op, errors.KInternal, "received a TableCompletion frame for table %d while table %d was open", tc.TableId, table.Id())
+		if int(table.Ordinal()) != tc.TableId {
+			err := errors.ES(op, errors.KInternal, "received a TableCompletion frame for table %d while table %d was open", tc.TableId, int(table.Ordinal()))
 			d.results <- common.TableResultError(err)
 		}
 

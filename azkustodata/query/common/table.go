@@ -7,13 +7,14 @@ import (
 
 type baseTable struct {
 	dataSet query.Dataset
-	id      int
+	ordinal int64
+	id      string
 	name    string
 	kind    string
 	columns []query.Column
 }
 
-func NewTable(ds query.Dataset, id int, name, kind string, columns []query.Column) BaseTable {
+func NewTable(ds query.Dataset, id string, name, kind string, columns []query.Column) BaseTable {
 	return &baseTable{
 		dataSet: ds,
 		id:      id,
@@ -23,8 +24,12 @@ func NewTable(ds query.Dataset, id int, name, kind string, columns []query.Colum
 	}
 }
 
-func (t *baseTable) Id() int {
+func (t *baseTable) Id() string {
 	return t.id
+}
+
+func (t *baseTable) Ordinal() int64 {
+	return t.ordinal
 }
 
 func (t *baseTable) Name() string {
@@ -57,7 +62,8 @@ func (t *baseTable) Op() errors.Op {
 }
 
 type BaseTable interface {
-	Id() int
+	Id() string
+	Ordinal() int64
 	Name() string
 	Columns() []query.Column
 	Kind() string
