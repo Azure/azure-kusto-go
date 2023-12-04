@@ -7,6 +7,7 @@ import (
 	"github.com/Azure/azure-kusto-go/azkustodata/value"
 	"github.com/google/uuid"
 	"github.com/stretchr/testify/assert"
+	"github.com/stretchr/testify/require"
 	"io"
 	"strings"
 	"testing"
@@ -45,7 +46,7 @@ func TestDataSet_DecodeTables_Skip(t *testing.T) {
 	d := NewDataSet(context.Background(), io.NopCloser(reader), DefaultFrameCapacity)
 
 	for tableResult := range d.Results() {
-		assert.NoError(t, tableResult.Err())
+		require.NoError(t, tableResult.Err())
 		tableResult.Table().SkipToEnd()
 	}
 }
@@ -320,7 +321,7 @@ func TestDataSet_DecodeTables_WithInvalidTableCompletion(t *testing.T) {
 
 func TestDataSet_DecodeTables_StreamingTable_WithInvalidColumnType(t *testing.T) {
 	t.Parallel()
-	reader := strings.NewReader(`[{"FrameType": "TableHeader", "TableId": 1, "TableName": "TestTable", "Columns": [{"ColumnName": "TestColumn", "ColumnType": "invalid"}]}
+	reader := strings.NewReader(`[{"FrameType": "TableHeader", "TableId": 1, "TableName": "TestTable", "TableKind": "PrimaryResult", "Columns": [{"ColumnName": "TestColumn", "ColumnType": "invalid"}]}
 ]`)
 	d := NewDataSet(context.Background(), io.NopCloser(reader), DefaultFrameCapacity)
 
@@ -331,7 +332,7 @@ func TestDataSet_DecodeTables_StreamingTable_WithInvalidColumnType(t *testing.T)
 
 func TestDataSet_DecodeTables_DataTable_WithInvalidColumnType(t *testing.T) {
 	t.Parallel()
-	reader := strings.NewReader(`[{"FrameType": "DataTable", "TableId": 1, "TableName": "TestTable", "Columns": [{"ColumnName": "TestColumn", "ColumnType": "invalid"}], "Rows": [["TestValue"]]}
+	reader := strings.NewReader(`[{"FrameType": "DataTable", "TableId": 1, "TableName": "TestTable", "TableKind": "PrimaryResult", "Columns": [{"ColumnName": "TestColumn", "ColumnType": "invalid"}], "Rows": [["TestValue"]]}
 ]`)
 	d := NewDataSet(context.Background(), io.NopCloser(reader), DefaultFrameCapacity)
 

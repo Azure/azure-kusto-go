@@ -56,6 +56,9 @@ func (d *dataSet) QueryCompletionInformation() []QueryCompletionInformation {
 }
 
 func (d *dataSet) parseSecondaryTable(t query.Table) error {
+	d.lock.Lock()
+	defer d.lock.Unlock()
+
 	switch t.Kind() {
 	case QueryPropertiesKind:
 		if d.queryProperties != nil {
@@ -71,10 +74,10 @@ func (d *dataSet) parseSecondaryTable(t query.Table) error {
 			return errs
 		}
 
-		d.setQueryProperties(st)
+		d.queryProperties = st
 
 	case QueryCompletionInformationKind:
-		if d.queryProperties != nil {
+		if d.queryCompletionInformation != nil {
 			return errors.ES(errors.OpUnknown, errors.KInternal, "query properties already initialized")
 		}
 		rows, err := t.Consume()
@@ -87,7 +90,7 @@ func (d *dataSet) parseSecondaryTable(t query.Table) error {
 			return errs
 		}
 
-		d.setQueryCompletionInformation(st)
+		d.queryCompletionInformation = st
 	default:
 		return errors.ES(errors.OpUnknown, errors.KInternal, "unknown secondary table %s", t.Name())
 	}
