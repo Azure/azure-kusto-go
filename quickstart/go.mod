@@ -2,7 +2,7 @@ module github.com/Azure/azure-kusto-go/quickstart
 
 go 1.19
 
-require github.com/Azure/azure-kusto-go/azkustodata v0.0.0-20230719090435-cf35a15d5673
+require github.com/Azure/azure-kusto-go/azkustodata v0.0.0-20231203110358-172ce64bc6cc
 
 require github.com/Azure/azure-kusto-go/azkustoingest v0.0.0-20230605084522-81916992dde3
 
