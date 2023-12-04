@@ -6,7 +6,7 @@ type fullTable struct {
 	errors []error
 }
 
-func NewFullTable(ds Dataset, ordinal int64, id string, name string, kind string, columns []Column, rows []Row, errors []error) (Table, error) {
+func NewFullTable(ds Dataset, ordinal int64, id string, name string, kind string, columns []Column, rows []Row, errors []error) Table {
 	t := &fullTable{
 		baseTable: baseTable{
 			dataSet: ds,
@@ -26,7 +26,7 @@ func NewFullTable(ds Dataset, ordinal int64, id string, name string, kind string
 		}
 	}
 
-	return t, nil
+	return t
 }
 
 func (t *fullTable) Consume() ([]Row, []error) {

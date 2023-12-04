@@ -40,5 +40,5 @@ func NewFullTable(d query.Dataset, dt *DataTable) (query.Table, error) {
 		rows[i] = query.NewRow(nil, i, values)
 	}
 
-	return query.NewFullTable(d, int64(dt.TableId), strconv.Itoa(dt.TableId), dt.TableName, dt.TableKind, columns, rows, nil)
+	return query.NewFullTable(d, int64(dt.TableId), strconv.Itoa(dt.TableId), dt.TableName, dt.TableKind, columns, rows, nil), nil
 }

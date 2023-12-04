@@ -65,5 +65,5 @@ func NewFullTable(d query.Dataset, dt *RawTable, index *TableIndexRow) (query.Ta
 		rows = append(rows, query.NewRow(nil, i, values))
 	}
 
-	return query.NewFullTable(d, ordinal, id, name, kind, columns, rows, errs)
+	return query.NewFullTable(d, ordinal, id, name, kind, columns, rows, errs), nil
 }
