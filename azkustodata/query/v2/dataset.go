@@ -126,11 +126,7 @@ func (d *dataSet) decodeTables() {
 		}
 
 		if f == nil {
-			err := <-d.errorChannel
-			if err == io.EOF {
-				return
-			}
-			d.results <- query.TableResultError(err)
+			continue
 		}
 
 		if d.Completion() != nil {
