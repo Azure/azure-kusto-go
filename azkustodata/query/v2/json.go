@@ -63,9 +63,6 @@ func ReadFrames(r io.Reader, ch chan<- Frame) error {
 		frame := EveryFrame{}
 		err := dec.Decode(&frame)
 		if err != nil {
-			if err == io.EOF {
-				return nil
-			}
 			return err
 		}
 

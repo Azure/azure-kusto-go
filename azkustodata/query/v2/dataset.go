@@ -113,19 +113,24 @@ func (d *dataSet) decodeTables() {
 
 		select {
 		case err := <-d.errorChannel:
+			if err == io.EOF {
+				return
+			}
 			d.results <- query.TableResultError(err)
 			break
 		case <-d.Context().Done():
 			d.results <- query.TableResultError(errors.ES(op, errors.KInternal, "context cancelled"))
 			break
-		case fc, ok := <-d.frames:
-			if ok {
-				f = fc
-			}
+		case fc := <-d.frames:
+			f = fc
 		}
 
 		if f == nil {
-			break
+			err := <-d.errorChannel
+			if err == io.EOF {
+				return
+			}
+			d.results <- query.TableResultError(err)
 		}
 
 		if d.Completion() != nil {
