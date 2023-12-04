@@ -33,7 +33,7 @@ func SetDefaultDatabase(db string) {
 const defaultSchema = "(header_time: datetime, header_id: guid, header_api_version: string, payload_data: string, payload_user: string)"
 const allDataTypes = "(vnum:int, vdec:decimal, vdate:datetime, vspan:timespan, vobj:dynamic, vb:bool, vreal:real, vstr:string, vlong:long, vguid:guid)"
 
-const allDataTypesIngest = `1,"2.00000000000001","2020-03-04T14:05:01.3109965Z","01:23:45.6789000","{\"moshe\":\"value\"}",true,0.01,"asdf",9223372036854775807,"74be27de-1e4e-49d9-b579-fe0b331d3642"`
+const allDataTypesIngest = `1,"2.00000000000001","2020-03-04T14:05:01.3109965Z","01:23:45.6789000","{""moshe"":""value""}",true,0.01,"asdf",9223372036854775807,"74be27de-1e4e-49d9-b579-fe0b331d3642"`
 
 const allDataTypesNull = "(vnum:int, vdec:decimal, vdate:datetime, vspan:timespan, vobj:dynamic, vb:bool, vreal:real, vstr:string, vlong:long, vguid:guid)"
 

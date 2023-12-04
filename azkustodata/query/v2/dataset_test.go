@@ -36,7 +36,7 @@ func TestDataSet_DecodeTables_WithInvalidFrame(t *testing.T) {
 	d := NewDataSet(context.Background(), io.NopCloser(reader), DefaultFrameCapacity)
 
 	tableResult := <-d.Results()
-	assert.Nil(t, tableResult.Table())
+	assert.Nil(t, tableResult)
 }
 
 func TestDataSet_DecodeTables_Skip(t *testing.T) {

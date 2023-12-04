@@ -59,7 +59,7 @@ func (d *dataSet) parseSecondaryTable(t query.Table) error {
 	d.lock.Lock()
 	defer d.lock.Unlock()
 
-	switch t.Name() {
+	switch t.Kind() {
 	case QueryPropertiesKind:
 		if d.queryProperties != nil {
 			return errors.ES(errors.OpUnknown, errors.KInternal, "query properties already initialized")

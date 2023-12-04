@@ -168,7 +168,7 @@ func (d *dataSet) parseStreamingTable(f Frame, op errors.Op) bool {
 			d.results <- query.TableResultError(err)
 			return false
 		}
-		if table.Kind() != PrimaryResultTableKind {
+		if th.TableKind != PrimaryResultTableKind {
 			err := errors.ES(op, errors.KInternal, "Received a TableHeader frame for a table that is not a primary result table")
 			d.results <- query.TableResultError(err)
 			return false

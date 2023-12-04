@@ -9,7 +9,10 @@ import (
 )
 
 func NewFullTable(d query.Dataset, dt *DataTable) (query.Table, error) {
-	op := d.Op()
+	op := errors.OpUnknown
+	if d != nil {
+		op = d.Op()
+	}
 
 	columns := make([]query.Column, len(dt.Columns))
 
