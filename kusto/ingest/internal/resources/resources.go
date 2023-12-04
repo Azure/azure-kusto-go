@@ -297,7 +297,7 @@ func (i *Ingestion) importRec(rec ingestResc, rankedStorageAccounts *RankedStora
 }
 
 // Returns a list of ranked storage account resources distributed by round robin.
-func groupResourcesByStorageAccount(resources []*URI, rankedStorageAccount []*RankedStorageAccount) []*URI {
+func groupResourcesByStorageAccount(resources []*URI, rankedStorageAccount []RankedStorageAccount) []*URI {
 	// Group the resources by storage account.
 	storageAccounts := make(map[string][]*URI)
 	for _, resource := range resources {
@@ -321,11 +321,11 @@ func groupResourcesByStorageAccount(resources []*URI, rankedStorageAccount []*Ra
 	return distributedResources
 }
 
-func (i *Ingestion) getRankedStorageContainers(rankedStorageAccounts []*RankedStorageAccount) []*URI {
+func (i *Ingestion) getRankedStorageContainers(rankedStorageAccounts []RankedStorageAccount) []*URI {
 	return groupResourcesByStorageAccount(i.Containers, rankedStorageAccounts)
 }
 
-func (i *Ingestion) getRankedStorageQueues(rankedStorageAccounts []*RankedStorageAccount) []*URI {
+func (i *Ingestion) getRankedStorageQueues(rankedStorageAccounts []RankedStorageAccount) []*URI {
 	return groupResourcesByStorageAccount(i.Queues, rankedStorageAccounts)
 }
 

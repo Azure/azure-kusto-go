@@ -2,6 +2,7 @@ package resources
 
 import (
 	"math/rand"
+	"sync"
 	"time"
 )
 
@@ -19,6 +20,7 @@ type RankedStorageAccountSet struct {
 	bucket_duration   int64
 	tiers             []int
 	time_provider     func() int64
+	lock              sync.Mutex
 }
 
 func newRankedStorageAccountSet(
@@ -33,6 +35,7 @@ func newRankedStorageAccountSet(
 		bucket_duration:   bucket_duration,
 		tiers:             tiers,
 		time_provider:     time_provider,
+		lock:              sync.Mutex{},
 	}
 }
 
@@ -41,6 +44,9 @@ func newDefaultRankedStorageAccountSet() *RankedStorageAccountSet {
 }
 
 func (r *RankedStorageAccountSet) addAccountResult(accountName string, success bool) {
+	r.lock.Lock()
+	defer r.lock.Unlock()
+
 	account, ok := r.accounts[accountName]
 	if ok {
 		account.logResult(success)
@@ -48,27 +54,36 @@ func (r *RankedStorageAccountSet) addAccountResult(accountName string, success b
 }
 
 func (r *RankedStorageAccountSet) registerStorageAccount(accountName string) {
+	r.lock.Lock()
+	defer r.lock.Unlock()
+
 	if _, ok := r.accounts[accountName]; !ok {
 		r.accounts[accountName] = newRankedStorageAccount(accountName, r.number_of_buckets, r.bucket_duration, r.time_provider)
 	}
 }
 
 func (r *RankedStorageAccountSet) getStorageAccount(accountName string) (*RankedStorageAccount, bool) {
+	r.lock.Lock()
+	defer r.lock.Unlock()
+
 	account, ok := r.accounts[accountName]
 	return account, ok
 }
 
-func (r *RankedStorageAccountSet) getRankedShuffledAccounts() []*RankedStorageAccount {
-	accountsByTier := make([][]*RankedStorageAccount, len(r.tiers))
+func (r *RankedStorageAccountSet) getRankedShuffledAccounts() []RankedStorageAccount {
+	r.lock.Lock()
+	defer r.lock.Unlock()
+
+	accountsByTier := make([][]RankedStorageAccount, len(r.tiers))
 	for i := range accountsByTier {
-		accountsByTier[i] = []*RankedStorageAccount{}
+		accountsByTier[i] = []RankedStorageAccount{}
 	}
 
 	for _, account := range r.accounts {
 		rankPercentage := int(account.getRank() * 100.0)
 		for i := range r.tiers {
 			if rankPercentage >= r.tiers[i] {
-				accountsByTier[i] = append(accountsByTier[i], account)
+				accountsByTier[i] = append(accountsByTier[i], *account)
 				break
 			}
 		}
@@ -80,7 +95,7 @@ func (r *RankedStorageAccountSet) getRankedShuffledAccounts() []*RankedStorageAc
 		})
 	}
 
-	var result []*RankedStorageAccount
+	var result []RankedStorageAccount
 	for _, sublist := range accountsByTier {
 		result = append(result, sublist...)
 	}
