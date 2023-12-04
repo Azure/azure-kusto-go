@@ -1,0 +1,27 @@
+{
+  "Tables": [
+    {
+      "TableName": "Table_0",
+      "Columns": [
+        {
+          "ColumnName": "a",
+          "DataType": "Int32",
+          "ColumnType": "int"
+        }
+      ],
+      "Rows": [
+        [
+          1
+        ],
+        {
+          "Exceptions": [
+            "Query execution has exceeded the allowed limits (80DA0003): The results of this query exceed the set limit of 1 records, so not all records were returned (E_QUERY_RESULT_SET_TOO_LARGE, 0x80DA0003). See https://aka.ms/kustoquerylimits for more information and possible solutions..\r\n[0]Kusto.Data.Exceptions.KustoServicePartialQueryFailureLimitsExceededException: Query execution has exceeded the allowed limits (80DA0003): The results of this query exceed the set limit of 1 records, so not all records were returned (E_QUERY_RESULT_SET_TOO_LARGE, 0x80DA0003). See https://aka.ms/kustoquerylimits for more information and possible solutions..\r\nTimestamp=2023-12-03T13:12:01.8751538Z\r\nClientRequestId=blab6\r\nActivityId=decf948f-df53-4230-ad6e-cd66004d52ac\r\nActivityType=GW.Http.CallContext\r\nServiceAlias=ASAF\r\nMachineName=KSEngine000001\r\nProcessName=Kusto.WinSvc.Svc\r\nProcessId=1604\r\nThreadId=9752\r\nActivityStack=(Activity stack: CRID=blab6 ARID=decf948f-df53-4230-ad6e-cd66004d52ac > GW.Http.CallContext/decf948f-df53-4230-ad6e-cd66004d52ac)\r\nMonitoredActivityContext=(ActivityType=GW.Http.CallContext, Timestamp=2023-12-03T13:12:01.8751538Z, ParentActivityId=decf948f-df53-4230-ad6e-cd66004d52ac, TimeSinceStarted=0 [ms])ErrorCode=\r\nErrorReason=\r\nErrorMessage=\r\nDataSource=\r\nDatabaseName=\r\nClientRequestId=\r\nActivityId=00000000-0000-0000-0000-000000000000\r\nUnderlyingErrorCode=80DA0003\r\nUnderlyingErrorMessage=The results of this query exceed the set limit of 1 records, so not all records were returned (E_QUERY_RESULT_SET_TOO_LARGE, 0x80DA0003). See https://aka.ms/kustoquerylimits for more information and possible solutions.\r\n\r\n"
+          ]
+        }
+      ]
+    }
+  ],
+  "Exceptions": [
+    "Query execution has exceeded the allowed limits (80DA0003): The results of this query exceed the set limit of 1 records, so not all records were returned (E_QUERY_RESULT_SET_TOO_LARGE, 0x80DA0003). See https://aka.ms/kustoquerylimits for more information and possible solutions..\r\n[0]Kusto.Data.Exceptions.KustoServicePartialQueryFailureLimitsExceededException: Query execution has exceeded the allowed limits (80DA0003): The results of this query exceed the set limit of 1 records, so not all records were returned (E_QUERY_RESULT_SET_TOO_LARGE, 0x80DA0003). See https://aka.ms/kustoquerylimits for more information and possible solutions..\r\nTimestamp=2023-12-03T13:12:01.8751538Z\r\nClientRequestId=blab6\r\nActivityId=decf948f-df53-4230-ad6e-cd66004d52ac\r\nActivityType=GW.Http.CallContext\r\nServiceAlias=ASAF\r\nMachineName=KSEngine000001\r\nProcessName=Kusto.WinSvc.Svc\r\nProcessId=1604\r\nThreadId=9752\r\nActivityStack=(Activity stack: CRID=blab6 ARID=decf948f-df53-4230-ad6e-cd66004d52ac > GW.Http.CallContext/decf948f-df53-4230-ad6e-cd66004d52ac)\r\nMonitoredActivityContext=(ActivityType=GW.Http.CallContext, Timestamp=2023-12-03T13:12:01.8751538Z, ParentActivityId=decf948f-df53-4230-ad6e-cd66004d52ac, TimeSinceStarted=0 [ms])ErrorCode=\r\nErrorReason=\r\nErrorMessage=\r\nDataSource=\r\nDatabaseName=\r\nClientRequestId=\r\nActivityId=00000000-0000-0000-0000-000000000000\r\nUnderlyingErrorCode=80DA0003\r\nUnderlyingErrorMessage=The results of this query exceed the set limit of 1 records, so not all records were returned (E_QUERY_RESULT_SET_TOO_LARGE, 0x80DA0003). See https://aka.ms/kustoquerylimits for more information and possible solutions.\r\n\r\n"
+  ]
+}

@@ -1,7 +1,10 @@
-package query
+package v2
 
 import (
 	"context"
+	"github.com/Azure/azure-kusto-go/azkustodata/errors"
+	"github.com/Azure/azure-kusto-go/azkustodata/query"
+	"github.com/Azure/azure-kusto-go/azkustodata/query/common"
 	"github.com/Azure/azure-kusto-go/azkustodata/value"
 	"github.com/google/uuid"
 	"github.com/stretchr/testify/assert"
@@ -14,12 +17,12 @@ import (
 func TestDataSet_ReadFrames_WithError(t *testing.T) {
 	t.Parallel()
 	reader := strings.NewReader("invalid")
-	d := &DataSet{
+	d := &dataSet{
+		Dataset:      common.NewDataset(context.Background(), errors.OpQuery),
 		reader:       io.NopCloser(reader),
 		frames:       make(chan Frame, DefaultFrameCapacity),
 		errorChannel: make(chan error, 1),
-		results:      make(chan TableResult, 1),
-		ctx:          context.Background(),
+		results:      make(chan query.TableResult, 1),
 	}
 	go d.readFrames()
 
@@ -33,8 +36,8 @@ func TestDataSet_DecodeTables_WithInvalidFrame(t *testing.T) {
 ]`)
 	d := NewDataSet(context.Background(), io.NopCloser(reader), DefaultFrameCapacity)
 
-	tableResult := <-d.results
-	assert.Nil(t, tableResult.Table)
+	tableResult := <-d.Results()
+	assert.Nil(t, tableResult.Table())
 }
 
 func TestDataSet_DecodeTables_Skip(t *testing.T) {
@@ -42,9 +45,9 @@ func TestDataSet_DecodeTables_Skip(t *testing.T) {
 	reader := strings.NewReader(validFrames)
 	d := NewDataSet(context.Background(), io.NopCloser(reader), DefaultFrameCapacity)
 
-	for tableResult := range d.results {
-		assert.NoError(t, tableResult.Err)
-		tableResult.Table.SkipToEnd()
+	for tableResult := range d.Results() {
+		assert.NoError(t, tableResult.Err())
+		tableResult.Table().SkipToEnd()
 	}
 }
 
@@ -57,46 +60,50 @@ func TestDataSet_DecodeTables_GetRows(t *testing.T) {
 	u, err := uuid.Parse("123e27de-1e4e-49d9-b579-fe0b331d3642")
 	assert.NoError(t, err)
 
-	tables := []fullTable{
+	tables := []struct {
+		rows    []query.Row
+		id      int
+		name    string
+		kind    string
+		columns []query.Column
+	}{
 		{
-			baseTable: baseTable{
-				id:   0,
-				name: "@ExtendedProperties",
-				kind: "QueryProperties",
-				columns: []Column{
-					{Ordinal: 0, Name: "TableId", Type: "int"},
-					{Ordinal: 1, Name: "Key", Type: "string"},
-					{Ordinal: 2, Name: "Value", Type: "dynamic"},
-				},
+
+			id:   0,
+			name: "@ExtendedProperties",
+			kind: "QueryProperties",
+			columns: []query.Column{
+				common.NewColumn(0, "TableId", "int"),
+				common.NewColumn(1, "Key", "string"),
+				common.NewColumn(2, "Value", "dynamic"),
 			},
-			rows: []Row{
-				{table: nil, values: value.Values{
+			rows: []query.Row{
+				common.NewRow(nil, 0, value.Values{
 					value.NewInt(1),
 					value.NewString("Visualization"),
 					value.NewDynamic([]byte("{\"Visualization\":null,\"Title\":null,\"XColumn\":null,\"Series\":null,\"YColumns\":null,\"AnomalyColumns\":null,\"XTitle\":null,\"YTitle\":null,\"XAxis\":null,\"YAxis\":null,\"Legend\":null,\"YSplit\":null,\"Accumulate\":false,\"IsQuerySorted\":false,\"Kind\":null,\"Ymin\":\"NaN\",\"Ymax\":\"NaN\",\"Xmin\":null,\"Xmax\":null}")),
-				}},
+				}),
 			},
 		},
 		{
-			baseTable: baseTable{
-				id:   1,
-				name: "AllDataTypes",
-				kind: "PrimaryResult",
-				columns: []Column{
-					{Ordinal: 0, Name: "vnum", Type: "int"},
-					{Ordinal: 1, Name: "vdec", Type: "decimal"},
-					{Ordinal: 2, Name: "vdate", Type: "datetime"},
-					{Ordinal: 3, Name: "vspan", Type: "timespan"},
-					{Ordinal: 4, Name: "vobj", Type: "dynamic"},
-					{Ordinal: 5, Name: "vb", Type: "bool"},
-					{Ordinal: 6, Name: "vreal", Type: "real"},
-					{Ordinal: 7, Name: "vstr", Type: "string"},
-					{Ordinal: 8, Name: "vlong", Type: "long"},
-					{Ordinal: 9, Name: "vguid", Type: "guid"},
-				},
+
+			id:   1,
+			name: "AllDataTypes",
+			kind: "PrimaryResult",
+			columns: []query.Column{
+				common.NewColumn(0, "vnum", "int"),
+				common.NewColumn(1, "vdec", "decimal"),
+				common.NewColumn(2, "vdate", "datetime"),
+				common.NewColumn(3, "vspan", "timespan"),
+				common.NewColumn(4, "vobj", "dynamic"),
+				common.NewColumn(5, "vb", "bool"),
+				common.NewColumn(6, "vreal", "real"),
+				common.NewColumn(7, "vstr", "string"),
+				common.NewColumn(8, "vlong", "long"),
+				common.NewColumn(9, "vguid", "guid"),
 			},
-			rows: []Row{
-				{table: nil, values: value.Values{
+			rows: []query.Row{
+				common.NewRow(nil, 0, value.Values{
 					value.NewInt(1),
 					value.DecimalFromString("2.00000000000001"),
 					value.NewDateTime(time.Date(2020, 3, 4, 14, 5, 1, 310996500, time.UTC)),
@@ -107,30 +114,29 @@ func TestDataSet_DecodeTables_GetRows(t *testing.T) {
 					value.NewString("asdf"),
 					value.NewLong(9223372036854775807),
 					value.NewGUID(u),
-				}}},
+				})},
 		},
 		{
-			baseTable: baseTable{
-				id:   2,
-				name: "QueryCompletionInformation",
-				kind: "QueryCompletionInformation",
-				columns: []Column{
-					{Ordinal: 0, Name: "Timestamp", Type: "datetime"},
-					{Ordinal: 1, Name: "ClientRequestId", Type: "string"},
-					{Ordinal: 2, Name: "ActivityId", Type: "guid"},
-					{Ordinal: 3, Name: "SubActivityId", Type: "guid"},
-					{Ordinal: 4, Name: "ParentActivityId", Type: "guid"},
-					{Ordinal: 5, Name: "Level", Type: "int"},
-					{Ordinal: 6, Name: "LevelName", Type: "string"},
-					{Ordinal: 7, Name: "StatusCode", Type: "int"},
-					{Ordinal: 8, Name: "StatusCodeName", Type: "string"},
-					{Ordinal: 9, Name: "EventType", Type: "int"},
-					{Ordinal: 10, Name: "EventTypeName", Type: "string"},
-					{Ordinal: 11, Name: "Payload", Type: "string"},
-				},
+
+			id:   2,
+			name: "QueryCompletionInformation",
+			kind: "QueryCompletionInformation",
+			columns: []query.Column{
+				common.NewColumn(0, "Timestamp", "datetime"),
+				common.NewColumn(1, "ClientRequestId", "string"),
+				common.NewColumn(2, "ActivityId", "guid"),
+				common.NewColumn(3, "SubActivityId", "guid"),
+				common.NewColumn(4, "ParentActivityId", "guid"),
+				common.NewColumn(5, "Level", "int"),
+				common.NewColumn(6, "LevelName", "string"),
+				common.NewColumn(7, "StatusCode", "int"),
+				common.NewColumn(8, "StatusCodeName", "string"),
+				common.NewColumn(9, "EventType", "int"),
+				common.NewColumn(10, "EventTypeName", "string"),
+				common.NewColumn(11, "Payload", "string"),
 			},
-			rows: []Row{
-				{table: nil, values: value.Values{
+			rows: []query.Row{
+				common.NewRow(nil, 0, value.Values{
 					value.NewDateTime(time.Date(2023, 11, 26, 13, 34, 17, 73147800, time.UTC)),
 					value.NewString("blab6"),
 					value.NewGUID(u),
@@ -143,8 +149,8 @@ func TestDataSet_DecodeTables_GetRows(t *testing.T) {
 					value.NewInt(4),
 					value.NewString("QueryInfo"),
 					value.NewString("{\"Count\":1,\"Text\":\"Query completed successfully\"}"),
-				}},
-				{table: nil, values: value.Values{
+				}),
+				common.NewRow(nil, 1, value.Values{
 					value.NewDateTime(time.Date(2023, 11, 26, 13, 34, 17, 73147800, time.UTC)),
 					value.NewString("blab6"),
 					value.NewGUID(u),
@@ -157,26 +163,27 @@ func TestDataSet_DecodeTables_GetRows(t *testing.T) {
 					value.NewInt(5),
 					value.NewString("WorkloadGroup"),
 					value.NewString("{\"Count\":1,\"Text\":\"default\"}"),
-				}},
+				}),
 			},
 		},
 	}
 
-	for tableResult := range d.results {
-		assert.NoError(t, tableResult.Err)
-		if tableResult.Table != nil {
-			tb := tableResult.Table
+	for tableResult := range d.Results() {
+		assert.NoError(t, tableResult.Err())
+		if tableResult.Table() != nil {
+			tb := tableResult.Table()
 			expectedTable := tables[tb.Id()]
-			assert.Equal(t, expectedTable.Id(), tb.Id())
-			assert.Equal(t, expectedTable.Name(), tb.Name())
-			assert.Equal(t, expectedTable.Kind(), tb.Kind())
-			assert.Equal(t, expectedTable.Columns(), tb.Columns())
+			assert.Equal(t, expectedTable.id, tb.Id())
+			assert.Equal(t, expectedTable.name, tb.Name())
+			assert.Equal(t, expectedTable.kind, tb.Kind())
+			assert.Equal(t, expectedTable.columns, tb.Columns())
 
 			i := 0
 			for rowResult := range tb.Rows() {
-				assert.NoError(t, rowResult.Err)
-				expectedRow := expectedTable.Rows()[i]
-				for j, val := range rowResult.Row.Values() {
+				assert.NoError(t, rowResult.Err())
+				rows := expectedTable.rows
+				expectedRow := rows[i]
+				for j, val := range rowResult.Row().Values() {
 					assert.Equal(t, expectedRow.Values()[j].GetValue(), val.GetValue())
 				}
 				i++
@@ -258,22 +265,22 @@ func TestDataSet_MultiplePrimaryTables(t *testing.T) {
 	}
 
 	for tableResult := range d.Results() {
-		assert.NoError(t, tableResult.Err)
-		tb := tableResult.Table
+		assert.NoError(t, tableResult.Err())
+		tb := tableResult.Table()
 		id := tb.Id()
 		for rowResult := range tb.Rows() {
-			assert.NoError(t, rowResult.Err)
+			assert.NoError(t, rowResult.Err())
 			if id == 1 {
 				var row Table1
-				err := rowResult.Row.ToStruct(&row)
+				err := rowResult.Row().ToStruct(&row)
 				assert.NoError(t, err)
-				assert.Equal(t, table1Expected[rowResult.Row.Index], row)
+				assert.Equal(t, table1Expected[rowResult.Row().Ordinal()], row)
 			}
 			if id == 2 {
 				var row Table2
-				err := rowResult.Row.ToStruct(&row)
+				err := rowResult.Row().ToStruct(&row)
 				assert.NoError(t, err)
-				assert.Equal(t, table2Expected[rowResult.Row.Index], row)
+				assert.Equal(t, table2Expected[rowResult.Row().Ordinal()], row)
 			}
 		}
 	}
@@ -285,9 +292,9 @@ func TestDataSet_DecodeTables_WithInvalidDataSetHeader(t *testing.T) {
 ]`)
 	d := NewDataSet(context.Background(), io.NopCloser(reader), DefaultFrameCapacity)
 
-	tableResult := <-d.results
-	assert.Error(t, tableResult.Err)
-	assert.Contains(t, tableResult.Err.Error(), "received a DataSetHeader frame that is not version 2")
+	tableResult := <-d.Results()
+	assert.Error(t, tableResult.Err())
+	assert.Contains(t, tableResult.Err().Error(), "received a DataSetHeader frame that is not version 2")
 }
 
 func TestDataSet_DecodeTables_WithInvalidTableFragment(t *testing.T) {
@@ -296,9 +303,9 @@ func TestDataSet_DecodeTables_WithInvalidTableFragment(t *testing.T) {
 ]`)
 	d := NewDataSet(context.Background(), io.NopCloser(reader), DefaultFrameCapacity)
 
-	tableResult := <-d.results
-	assert.Error(t, tableResult.Err)
-	assert.Contains(t, tableResult.Err.Error(), "received a TableFragment frame while no streaming table was open")
+	tableResult := <-d.Results()
+	assert.Error(t, tableResult.Err())
+	assert.Contains(t, tableResult.Err().Error(), "received a TableFragment frame while no streaming table was open")
 }
 
 func TestDataSet_DecodeTables_WithInvalidTableCompletion(t *testing.T) {
@@ -307,9 +314,9 @@ func TestDataSet_DecodeTables_WithInvalidTableCompletion(t *testing.T) {
 ]`)
 	d := NewDataSet(context.Background(), io.NopCloser(reader), DefaultFrameCapacity)
 
-	tableResult := <-d.results
-	assert.Error(t, tableResult.Err)
-	assert.Contains(t, tableResult.Err.Error(), "received a TableCompletion frame while no streaming table was open")
+	tableResult := <-d.Results()
+	assert.Error(t, tableResult.Err())
+	assert.Contains(t, tableResult.Err().Error(), "received a TableCompletion frame while no streaming table was open")
 }
 
 func TestDataSet_DecodeTables_StreamingTable_WithInvalidColumnType(t *testing.T) {
@@ -318,9 +325,9 @@ func TestDataSet_DecodeTables_StreamingTable_WithInvalidColumnType(t *testing.T)
 ]`)
 	d := NewDataSet(context.Background(), io.NopCloser(reader), DefaultFrameCapacity)
 
-	tableResult := <-d.results
-	assert.Error(t, tableResult.Err)
-	assert.Contains(t, tableResult.Err.Error(), "not valid")
+	tableResult := <-d.Results()
+	assert.Error(t, tableResult.Err())
+	assert.Contains(t, tableResult.Err().Error(), "not valid")
 }
 
 func TestDataSet_DecodeTables_DataTable_WithInvalidColumnType(t *testing.T) {
@@ -329,7 +336,7 @@ func TestDataSet_DecodeTables_DataTable_WithInvalidColumnType(t *testing.T) {
 ]`)
 	d := NewDataSet(context.Background(), io.NopCloser(reader), DefaultFrameCapacity)
 
-	tableResult := <-d.results
-	assert.Error(t, tableResult.Err)
-	assert.Contains(t, tableResult.Err.Error(), "not valid")
+	tableResult := <-d.Results()
+	assert.Error(t, tableResult.Err())
+	assert.Contains(t, tableResult.Err().Error(), "not valid")
 }

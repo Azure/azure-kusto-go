@@ -1,4 +1,4 @@
-package query
+package v2
 
 import (
 	"github.com/stretchr/testify/assert"

@@ -1,7 +1,8 @@
-package query
+package v2
 
 import (
 	"github.com/Azure/azure-kusto-go/azkustodata/errors"
+	"github.com/Azure/azure-kusto-go/azkustodata/query"
 	"github.com/google/uuid"
 	"time"
 )
@@ -30,31 +31,31 @@ type QueryCompletionInformation struct {
 const QueryPropertiesKind = "QueryProperties"
 const QueryCompletionInformationKind = "QueryCompletionInformation"
 
-func (d *DataSet) setQueryProperties(queryProperties []QueryProperties) {
+func (d *dataSet) setQueryProperties(queryProperties []QueryProperties) {
 	d.lock.Lock()
 	defer d.lock.Unlock()
 	d.queryProperties = queryProperties
 }
 
-func (d *DataSet) setQueryCompletionInformation(queryCompletionInformation []QueryCompletionInformation) {
+func (d *dataSet) setQueryCompletionInformation(queryCompletionInformation []QueryCompletionInformation) {
 	d.lock.Lock()
 	defer d.lock.Unlock()
 	d.queryCompletionInformation = queryCompletionInformation
 }
 
-func (d *DataSet) QueryProperties() []QueryProperties {
+func (d *dataSet) QueryProperties() []QueryProperties {
 	d.lock.RLock()
 	defer d.lock.RUnlock()
 	return d.queryProperties
 }
 
-func (d *DataSet) QueryCompletionInformation() []QueryCompletionInformation {
+func (d *dataSet) QueryCompletionInformation() []QueryCompletionInformation {
 	d.lock.RLock()
 	defer d.lock.RUnlock()
 	return d.queryCompletionInformation
 }
 
-func (d *DataSet) parseSecondaryTable(t Table) error {
+func (d *dataSet) parseSecondaryTable(t query.Table) error {
 	d.lock.Lock()
 	defer d.lock.Unlock()
 
@@ -68,7 +69,7 @@ func (d *DataSet) parseSecondaryTable(t Table) error {
 			return errors.GetCombinedError(err...)
 		}
 
-		st, errs := ToStructs[QueryProperties](rows)
+		st, errs := query.ToStructs[QueryProperties](rows)
 		if errs != nil {
 			return errs
 		}
@@ -84,7 +85,7 @@ func (d *DataSet) parseSecondaryTable(t Table) error {
 			return errors.GetCombinedError(err...)
 		}
 
-		st, errs := ToStructs[QueryCompletionInformation](rows)
+		st, errs := query.ToStructs[QueryCompletionInformation](rows)
 		if errs != nil {
 			return errs
 		}

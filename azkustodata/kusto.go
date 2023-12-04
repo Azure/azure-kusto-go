@@ -4,6 +4,7 @@ import (
 	"context"
 	"github.com/Azure/azure-kusto-go/azkustodata/kql"
 	"github.com/Azure/azure-kusto-go/azkustodata/query"
+	v22 "github.com/Azure/azure-kusto-go/azkustodata/query/v2"
 	"io"
 	"net/http"
 	"sync"
@@ -176,14 +177,15 @@ func (c *Client) Query(ctx context.Context, db string, query Statement, options 
 	return iter, nil
 }
 
-func (c *Client) QueryV2(ctx context.Context, db string, kqlQuery Statement, options ...QueryOption) (*query.DataSet, error) {
+func (c *Client) QueryV2(ctx context.Context, db string, kqlQuery Statement, options ...QueryOption) (query.Dataset, error) {
 	ctx, cancel := contextSetup(ctx)
 
 	options = append(options, V2NewlinesBetweenFrames())
 	options = append(options, V2FragmentPrimaryTables())
 	options = append(options, ResultsErrorReportingPlacement(ResultsErrorReportingPlacementEndOfTable))
 
-	opts, err := setQueryOptions(ctx, errors.OpQuery, kqlQuery, queryCall, options...)
+	opQuery := errors.OpQuery
+	opts, err := setQueryOptions(ctx, opQuery, kqlQuery, queryCall, options...)
 	if err != nil {
 		return nil, err
 	}
@@ -200,12 +202,12 @@ func (c *Client) QueryV2(ctx context.Context, db string, kqlQuery Statement, opt
 		return nil, err
 	}
 
-	capacity := query.DefaultFrameCapacity
+	capacity := v22.DefaultFrameCapacity
 	if opts.v2FrameCapacity != -1 {
 		capacity = opts.v2FrameCapacity
 	}
 
-	return query.NewDataSet(ctx, res, capacity), nil
+	return v22.NewDataSet(ctx, res, capacity), nil
 }
 
 func (c *Client) QueryToJson(ctx context.Context, db string, query Statement, options ...QueryOption) (string, error) {

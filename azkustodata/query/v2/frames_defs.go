@@ -1,4 +1,4 @@
-package query
+package v2
 
 import (
 	"fmt"

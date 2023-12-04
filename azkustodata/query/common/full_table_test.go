@@ -1,6 +1,7 @@
-package query
+package common
 
 import (
+	"github.com/Azure/azure-kusto-go/azkustodata/query/v2"
 	"github.com/google/uuid"
 	"github.com/shopspring/decimal"
 	"github.com/stretchr/testify/assert"
@@ -10,11 +11,11 @@ import (
 
 func TestNewFullTable_WithValidDataTable(t *testing.T) {
 	t.Parallel()
-	dt := &DataTable{
+	dt := &v2.DataTable{
 		TableId:   1,
 		TableName: "AllDataTypes",
 		TableKind: "PrimaryResult",
-		Columns: []FrameColumn{
+		Columns: []v2.FrameColumn{
 			{ColumnName: "vnum", ColumnType: "int"},
 			{ColumnName: "vdec", ColumnType: "decimal"},
 			{ColumnName: "vdate", ColumnType: "datetime"},
@@ -36,8 +37,11 @@ func TestNewFullTable_WithValidDataTable(t *testing.T) {
 	assert.Equal(t, dt.TableName, "AllDataTypes")
 	assert.Equal(t, dt.TableKind, "PrimaryResult")
 
-	assert.Lenf(t, table.Rows(), 1, "expected 1 row, got %d", len(table.Rows()))
-	row := table.Rows()[0]
+	rows, errs := table.Consume()
+	assert.Nil(t, errs)
+
+	assert.Lenf(t, rows, 1, "expected 1 row, got %d", len(rows))
+	row := rows[0]
 	assert.Equal(t, int32(1), row.ValueByColumn(table.ColumnByName("vnum")).GetValue().(int32))
 	assert.Equal(t, decimal.RequireFromString("1.1"), row.ValueByColumn(table.ColumnByName("vdec")).GetValue().(decimal.Decimal))
 	assert.Equal(t, time.Date(2019, 3, 2, 5, 40, 2, 0, time.UTC), row.ValueByColumn(table.ColumnByName("vdate")).GetValue().(time.Time))
@@ -54,10 +58,10 @@ func TestNewFullTable_WithValidDataTable(t *testing.T) {
 
 func TestNewFullTable_WithInvalidColumnType(t *testing.T) {
 	t.Parallel()
-	dt := &DataTable{
+	dt := &v2.DataTable{
 		TableId:   1,
 		TableName: "TestTable",
-		Columns:   []FrameColumn{{ColumnName: "TestColumn", ColumnType: "invalid"}},
+		Columns:   []v2.FrameColumn{{ColumnName: "TestColumn", ColumnType: "invalid"}},
 		Rows:      [][]interface{}{{"TestValue"}},
 	}
 
@@ -69,10 +73,10 @@ func TestNewFullTable_WithInvalidColumnType(t *testing.T) {
 
 func TestNewFullTable_WithInvalidRowValue(t *testing.T) {
 	t.Parallel()
-	dt := &DataTable{
+	dt := &v2.DataTable{
 		TableId:   1,
 		TableName: "TestTable",
-		Columns:   []FrameColumn{{ColumnName: "TestColumn", ColumnType: "int"}},
+		Columns:   []v2.FrameColumn{{ColumnName: "TestColumn", ColumnType: "int"}},
 		Rows:      [][]interface{}{{"TestValue"}},
 	}
 

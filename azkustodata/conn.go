@@ -154,8 +154,6 @@ func (c *Conn) doRequest(ctx context.Context, execType int, db string, query Sta
 		op = errors.OpMgmt
 	}
 
-	ctx = context.WithValue(ctx, "op", op)
-
 	var endpoint *url.URL
 
 	buff := bufferPool.Get().(*bytes.Buffer)

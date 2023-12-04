@@ -1,39 +1,41 @@
-package query
+package common
 
 import (
 	"github.com/Azure/azure-kusto-go/azkustodata/errors"
+	"github.com/Azure/azure-kusto-go/azkustodata/query"
+	"github.com/Azure/azure-kusto-go/azkustodata/query/v2"
 	"github.com/Azure/azure-kusto-go/azkustodata/types"
 	"github.com/Azure/azure-kusto-go/azkustodata/value"
 )
 
 type fullTable struct {
 	baseTable
-	rows []Row
+	rows []query.Row
 }
 
-func NewFullTable(dataSet *DataSet, dt *DataTable) (FullTable, error) {
+func NewFullTable(dataSet query.Dataset, dt *v2.DataTable) (query.Table, error) {
 	t := &fullTable{
 		baseTable: baseTable{
 			dataSet: dataSet,
 			id:      dt.TableId,
 			name:    dt.TableName,
 			kind:    dt.TableKind,
-			columns: make([]Column, len(dt.Columns)),
+			columns: make([]query.Column, len(dt.Columns)),
 		},
-		rows: make([]Row, len(dt.Rows)),
+		rows: make([]query.Row, len(dt.Rows)),
 	}
 
-	op := t.op()
+	op := t.Op()
 
 	for i, c := range dt.Columns {
 
-		t.columns[i] = Column{
-			Ordinal: i,
-			Name:    c.ColumnName,
-			Type:    types.Column(c.ColumnType),
+		t.columns[i] = column{
+			ordinal:   i,
+			name:      c.ColumnName,
+			kustoType: types.Column(c.ColumnType),
 		}
 
-		if !t.columns[i].Type.Valid() {
+		if !t.columns[i].Type().Valid() {
 			return nil, errors.ES(op, errors.KClientArgs, "column[%d] if of type %q, which is not valid", i, c.ColumnType)
 		}
 	}
@@ -41,7 +43,7 @@ func NewFullTable(dataSet *DataSet, dt *DataTable) (FullTable, error) {
 	for i, r := range dt.Rows {
 		values := make(value.Values, len(r))
 		for j, v := range r {
-			parsed := value.Default(t.columns[j].Type)
+			parsed := value.Default(t.columns[j].Type())
 			if v != nil {
 				err := parsed.Unmarshal(v)
 				if err != nil {
@@ -50,21 +52,12 @@ func NewFullTable(dataSet *DataSet, dt *DataTable) (FullTable, error) {
 			}
 			values[j] = parsed
 		}
-		t.rows[i] = *NewRow(t, i, values)
+		t.rows[i] = NewRow(t, i, values)
 	}
 
 	return t, nil
 }
 
-func (t *fullTable) Rows() []Row {
-	return t.rows
-}
-
-func (t *fullTable) Consume() ([]Row, []error) {
+func (t *fullTable) Consume() ([]query.Row, []error) {
 	return t.rows, nil
-}
-
-type FullTable interface {
-	Table
-	Rows() []Row
 }
