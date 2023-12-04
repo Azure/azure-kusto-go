@@ -56,9 +56,6 @@ func (d *dataSet) QueryCompletionInformation() []QueryCompletionInformation {
 }
 
 func (d *dataSet) parseSecondaryTable(t query.Table) error {
-	d.lock.Lock()
-	defer d.lock.Unlock()
-
 	switch t.Kind() {
 	case QueryPropertiesKind:
 		if d.queryProperties != nil {
