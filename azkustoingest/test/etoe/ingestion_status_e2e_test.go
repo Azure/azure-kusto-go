@@ -49,7 +49,7 @@ func TestIngestionStatus(t *testing.T) {
 		t.Log("Closed ingestor")
 	})
 
-	err = testshared.CreateTestTableWithDBAndScheme(t, client, testConfig.Database, tableName, schema, "")
+	err = testshared.CreateTestTableWithDBAndScheme(t, client, testConfig.Database, tableName, schema, "", "")
 	require.NoError(t, err)
 
 	// Change the ingestion batching time

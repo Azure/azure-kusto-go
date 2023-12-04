@@ -3,7 +3,6 @@ package v1
 import (
 	"github.com/Azure/azure-kusto-go/azkustodata/errors"
 	"github.com/Azure/azure-kusto-go/azkustodata/query"
-	"github.com/Azure/azure-kusto-go/azkustodata/query/common"
 	"github.com/Azure/azure-kusto-go/azkustodata/types"
 	"github.com/Azure/azure-kusto-go/azkustodata/value"
 )
@@ -32,7 +31,7 @@ func NewFullTable(d query.Dataset, dt *RawTable, index *TableIndexRow) (query.Ta
 	columns := make([]query.Column, len(dt.Columns))
 
 	for i, c := range dt.Columns {
-		columns[i] = common.NewColumn(i, c.ColumnName, types.Column(c.ColumnType))
+		columns[i] = query.NewColumn(i, c.ColumnName, types.Column(c.ColumnType))
 		if !columns[i].Type().Valid() {
 			return nil, errors.ES(op, errors.KClientArgs, "column[%d] if of type %q, which is not valid", i, c.ColumnType)
 		}
@@ -63,8 +62,8 @@ func NewFullTable(d query.Dataset, dt *RawTable, index *TableIndexRow) (query.Ta
 			}
 			values[j] = parsed
 		}
-		rows = append(rows, common.NewRow(nil, i, values))
+		rows = append(rows, query.NewRow(nil, i, values))
 	}
 
-	return common.NewFullTable(d, ordinal, id, name, kind, columns, rows, errs)
+	return query.NewFullTable(d, ordinal, id, name, kind, columns, rows, errs)
 }

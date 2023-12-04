@@ -1,9 +1,8 @@
-package common
+package query
 
 import (
 	"context"
 	"github.com/Azure/azure-kusto-go/azkustodata/errors"
-	"github.com/Azure/azure-kusto-go/azkustodata/query"
 )
 
 type dataset struct {
@@ -19,7 +18,7 @@ func (d *dataset) Op() errors.Op {
 	return d.op
 }
 
-func NewDataset(ctx context.Context, op errors.Op) query.Dataset {
+func NewDataset(ctx context.Context, op errors.Op) Dataset {
 	return &dataset{
 		ctx: ctx,
 		op:  op,

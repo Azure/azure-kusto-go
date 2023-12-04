@@ -4,7 +4,6 @@ import (
 	"context"
 	"github.com/Azure/azure-kusto-go/azkustodata/errors"
 	"github.com/Azure/azure-kusto-go/azkustodata/query"
-	"github.com/Azure/azure-kusto-go/azkustodata/query/common"
 	"io"
 	"sync"
 )
@@ -114,10 +113,10 @@ func (d *dataSet) decodeTables() {
 
 		select {
 		case err := <-d.errorChannel:
-			d.results <- common.TableResultError(err)
+			d.results <- query.TableResultError(err)
 			break
 		case <-d.Context().Done():
-			d.results <- common.TableResultError(errors.ES(op, errors.KInternal, "context cancelled"))
+			d.results <- query.TableResultError(errors.ES(op, errors.KInternal, "context cancelled"))
 			break
 		case fc, ok := <-d.frames:
 			if ok {
@@ -130,7 +129,7 @@ func (d *dataSet) decodeTables() {
 		}
 
 		if d.Completion() != nil {
-			d.results <- common.TableResultError(errors.ES(op, errors.KInternal, "received a frame after DataSetCompletion"))
+			d.results <- query.TableResultError(errors.ES(op, errors.KInternal, "received a frame after DataSetCompletion"))
 			break
 		}
 
@@ -143,17 +142,17 @@ func (d *dataSet) decodeTables() {
 		} else if dt, ok := f.(*DataTable); ok {
 			t, err := NewFullTable(d, dt)
 			if err != nil {
-				d.results <- common.TableResultError(err)
+				d.results <- query.TableResultError(err)
 			}
 			err = d.parseSecondaryTable(t)
 			if err != nil {
-				d.results <- common.TableResultError(err)
+				d.results <- query.TableResultError(err)
 			}
 		} else if d.parseStreamingTable(f, op) {
 			continue
 		} else {
 			err := errors.ES(op, errors.KInternal, "unknown frame type")
-			d.results <- common.TableResultError(err)
+			d.results <- query.TableResultError(err)
 			break
 		}
 	}
@@ -166,50 +165,50 @@ func (d *dataSet) parseStreamingTable(f Frame, op errors.Op) bool {
 	if th, ok := f.(*TableHeader); ok {
 		if table != nil {
 			err := errors.ES(op, errors.KInternal, "received a TableHeader frame while a streaming table was still open")
-			d.results <- common.TableResultError(err)
+			d.results <- query.TableResultError(err)
 			return false
 		}
 		if table.Kind() != PrimaryResultTableKind {
 			err := errors.ES(op, errors.KInternal, "Received a TableHeader frame for a table that is not a primary result table")
-			d.results <- common.TableResultError(err)
+			d.results <- query.TableResultError(err)
 			return false
 		}
 
 		t, err := NewStreamingTable(d, th)
 		if err != nil {
-			d.results <- common.TableResultError(err)
+			d.results <- query.TableResultError(err)
 			return false
 		}
 		d.setCurrentStreamingTable(t.(*streamingTable))
-		d.results <- common.TableResultSuccess(t)
+		d.results <- query.TableResultSuccess(t)
 	} else if tf, ok := f.(*TableFragment); ok {
 		if table == nil {
 			err := errors.ES(op, errors.KInternal, "received a TableFragment frame while no streaming table was open")
-			d.results <- common.TableResultError(err)
+			d.results <- query.TableResultError(err)
 			return false
 		}
 		if int(table.Ordinal()) != tf.TableId {
 			err := errors.ES(op, errors.KInternal, "received a TableFragment frame for table %d while table %d was open", tf.TableId, int(table.Ordinal()))
-			d.results <- common.TableResultError(err)
+			d.results <- query.TableResultError(err)
 		}
 
 		table.rawRows <- tf.Rows
 	} else if tc, ok := f.(*TableCompletion); ok {
 		if table == nil {
 			err := errors.ES(op, errors.KInternal, "received a TableCompletion frame while no streaming table was open")
-			d.results <- common.TableResultError(err)
+			d.results <- query.TableResultError(err)
 			return false
 		}
 		if int(table.Ordinal()) != tc.TableId {
 			err := errors.ES(op, errors.KInternal, "received a TableCompletion frame for table %d while table %d was open", tc.TableId, int(table.Ordinal()))
-			d.results <- common.TableResultError(err)
+			d.results <- query.TableResultError(err)
 		}
 
 		table.close(tc.OneApiErrors)
 
 		if table.rowCount != tc.RowCount {
 			err := errors.ES(op, errors.KInternal, "received a TableCompletion frame for table %d with row count %d while %d rows were received", tc.TableId, tc.RowCount, table.rowCount)
-			d.results <- common.TableResultError(err)
+			d.results <- query.TableResultError(err)
 		}
 
 		d.setCurrentStreamingTable(nil)
@@ -220,20 +219,20 @@ func (d *dataSet) parseStreamingTable(f Frame, op errors.Op) bool {
 
 func (d *dataSet) parseDatasetHeader(header *DataSetHeader, op errors.Op) bool {
 	if header.Version != version {
-		d.results <- common.TableResultError(errors.ES(op, errors.KInternal, "received a DataSetHeader frame that is not version 2"))
+		d.results <- query.TableResultError(errors.ES(op, errors.KInternal, "received a DataSetHeader frame that is not version 2"))
 		return false
 	}
 	if !header.IsFragmented {
-		d.results <- common.TableResultError(errors.ES(op, errors.KInternal, "received a DataSetHeader frame that is not fragmented"))
+		d.results <- query.TableResultError(errors.ES(op, errors.KInternal, "received a DataSetHeader frame that is not fragmented"))
 		return false
 	}
 	if header.IsProgressive {
-		d.results <- common.TableResultError(errors.ES(op, errors.KInternal, "received a DataSetHeader frame that is progressive"))
+		d.results <- query.TableResultError(errors.ES(op, errors.KInternal, "received a DataSetHeader frame that is progressive"))
 		return false
 	}
 	const EndOfTableErrorPlacement = errorReportingPlacement
 	if header.ErrorReportingPlacement != EndOfTableErrorPlacement {
-		d.results <- common.TableResultError(errors.ES(op, errors.KInternal, "received a DataSetHeader frame that does not report errors at the end of the table"))
+		d.results <- query.TableResultError(errors.ES(op, errors.KInternal, "received a DataSetHeader frame that does not report errors at the end of the table"))
 		return false
 	}
 	d.setHeader(header)
@@ -245,7 +244,7 @@ func (d *dataSet) parseDatasetHeader(header *DataSetHeader, op errors.Op) bool {
 // The capacity parameter is the capacity of the channel that receives the frames from the Kusto service.
 func NewDataSet(ctx context.Context, r io.ReadCloser, capacity int) Dataset {
 	d := &dataSet{
-		Dataset:      common.NewDataset(ctx, errors.OpQuery),
+		Dataset:      query.NewDataset(ctx, errors.OpQuery),
 		reader:       r,
 		frames:       make(chan Frame, capacity),
 		errorChannel: make(chan error, 1),

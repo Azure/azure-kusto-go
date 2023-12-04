@@ -4,7 +4,6 @@ import (
 	"context"
 	"github.com/Azure/azure-kusto-go/azkustodata/errors"
 	"github.com/Azure/azure-kusto-go/azkustodata/query"
-	"github.com/Azure/azure-kusto-go/azkustodata/query/common"
 	"github.com/google/uuid"
 	"io"
 )
@@ -54,7 +53,7 @@ func NewDatasetFromReader(ctx context.Context, op errors.Op, reader io.ReadClose
 
 func NewDataset(ctx context.Context, op errors.Op, v1 V1) (Dataset, error) {
 	d := &dataset{
-		Dataset: common.NewDataset(ctx, op),
+		Dataset: query.NewDataset(ctx, op),
 	}
 
 	if v1.Exceptions != nil {

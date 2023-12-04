@@ -7,7 +7,7 @@ import (
 	"github.com/Azure/azure-kusto-go/azkustodata/value"
 )
 
-func QueryV2Example() {
+func ExampleQueryV2() {
 	// Create a client using the default Azure credential
 	kcsb := azkustodata.NewConnectionStringBuilder("https://help.kusto.windows.net/").WithDefaultAzureCredential()
 	client, err := azkustodata.New(kcsb)
@@ -71,7 +71,7 @@ func QueryV2Example() {
 
 		// 3. Rows() - reads rows as they are received
 		for rowResult := range table.Rows() {
-			if rowResult.Err != nil {
+			if rowResult.Err() != nil {
 				println(rowResult.Err().Error())
 			} else {
 				println(rowResult.Row().Ordinal())

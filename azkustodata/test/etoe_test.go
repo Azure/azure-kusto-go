@@ -498,9 +498,9 @@ func TestQueryV2(t *testing.T) {
 	res := getExpectedResult()
 
 	for tableResult := range v2.Results() {
-		assert.NoError(t, tableResult.Err)
+		assert.NoError(t, tableResult.Err())
 
-		tb := tableResult.Table
+		tb := tableResult.Table()
 		if tb.Name() == allDataTypesTable {
 			rows, errs := tb.Consume()
 			require.Nilf(t, errs, "TestQueryV2: had table.Consume() error: %s", errs)

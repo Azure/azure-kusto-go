@@ -1,20 +1,19 @@
-package common
+package query
 
 import (
 	"github.com/Azure/azure-kusto-go/azkustodata/errors"
-	"github.com/Azure/azure-kusto-go/azkustodata/query"
 )
 
 type baseTable struct {
-	dataSet query.Dataset
+	dataSet Dataset
 	ordinal int64
 	id      string
 	name    string
 	kind    string
-	columns []query.Column
+	columns []Column
 }
 
-func NewTable(ds query.Dataset, ordinal int64, id string, name string, kind string, columns []query.Column) BaseTable {
+func NewTable(ds Dataset, ordinal int64, id string, name string, kind string, columns []Column) BaseTable {
 	return &baseTable{
 		dataSet: ds,
 		ordinal: ordinal,
@@ -37,7 +36,7 @@ func (t *baseTable) Name() string {
 	return t.name
 }
 
-func (t *baseTable) Columns() []query.Column {
+func (t *baseTable) Columns() []Column {
 	return t.columns
 }
 
@@ -45,7 +44,7 @@ func (t *baseTable) Kind() string {
 	return t.kind
 }
 
-func (t *baseTable) ColumnByName(name string) query.Column {
+func (t *baseTable) ColumnByName(name string) Column {
 	for _, c := range t.columns {
 		if c.Name() == name {
 			return c
@@ -66,8 +65,8 @@ type BaseTable interface {
 	Id() string
 	Ordinal() int64
 	Name() string
-	Columns() []query.Column
+	Columns() []Column
 	Kind() string
-	ColumnByName(name string) query.Column
+	ColumnByName(name string) Column
 	Op() errors.Op
 }

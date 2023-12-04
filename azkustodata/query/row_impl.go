@@ -1,21 +1,20 @@
-package common
+package query
 
 import (
 	"encoding/csv"
 	"github.com/Azure/azure-kusto-go/azkustodata/errors"
-	"github.com/Azure/azure-kusto-go/azkustodata/query"
 	"github.com/Azure/azure-kusto-go/azkustodata/value"
 	"reflect"
 	"strings"
 )
 
 type row struct {
-	table   query.Table
+	table   Table
 	values  value.Values
 	ordinal int
 }
 
-func NewRow(t query.Table, ordinal int, values value.Values) query.Row {
+func NewRow(t Table, ordinal int, values value.Values) Row {
 	return &row{
 		table:   t,
 		ordinal: ordinal,
@@ -27,7 +26,7 @@ func (r *row) Ordinal() int {
 	return r.ordinal
 }
 
-func (r *row) Table() query.Table {
+func (r *row) Table() Table {
 	return r.table
 }
 
@@ -39,7 +38,7 @@ func (r *row) Value(i int) value.Kusto {
 	return r.values[i]
 }
 
-func (r *row) ValueByColumn(c query.Column) value.Kusto {
+func (r *row) ValueByColumn(c Column) value.Kusto {
 	return r.values[c.Ordinal()]
 }
 

@@ -1,11 +1,10 @@
-package common
+package query
 
 // value.go provides methods for converting a row to a *struct and for converting KustoValue into Go types
 // or in the reverse.
 
 import (
 	"fmt"
-	"github.com/Azure/azure-kusto-go/azkustodata/query"
 	"reflect"
 	"strings"
 
@@ -14,7 +13,7 @@ import (
 
 // decodeToStruct takes a list of columns and a row to decode into "p" which will be a pointer
 // to a struct (enforce in the decoder).
-func decodeToStruct(cols []query.Column, row value.Values, p interface{}) error {
+func decodeToStruct(cols []Column, row value.Values, p interface{}) error {
 	t := reflect.TypeOf(p)
 	v := reflect.ValueOf(p)
 	fields := newFields(t)
@@ -48,7 +47,7 @@ func newFields(ptr reflect.Type) fields {
 }
 
 // convert converts a KustoValue that is for Column col into "v" reflect.Value with reflect.Type "t".
-func (f fields) convert(col query.Column, k value.Kusto, v reflect.Value) error {
+func (f fields) convert(col Column, k value.Kusto, v reflect.Value) error {
 	fieldName, ok := f.colNameToFieldName[col.Name()]
 	if !ok {
 		return nil

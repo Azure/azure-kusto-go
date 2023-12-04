@@ -4,7 +4,6 @@ import (
 	"context"
 	"github.com/Azure/azure-kusto-go/azkustodata/errors"
 	"github.com/Azure/azure-kusto-go/azkustodata/query"
-	"github.com/Azure/azure-kusto-go/azkustodata/query/common"
 	"github.com/Azure/azure-kusto-go/azkustodata/value"
 	"github.com/google/uuid"
 	"github.com/stretchr/testify/assert"
@@ -18,7 +17,7 @@ func TestDataSet_ReadFrames_WithError(t *testing.T) {
 	t.Parallel()
 	reader := strings.NewReader("invalid")
 	d := &dataSet{
-		Dataset:      common.NewDataset(context.Background(), errors.OpQuery),
+		Dataset:      query.NewDataset(context.Background(), errors.OpQuery),
 		reader:       io.NopCloser(reader),
 		frames:       make(chan Frame, DefaultFrameCapacity),
 		errorChannel: make(chan error, 1),
@@ -73,12 +72,12 @@ func TestDataSet_DecodeTables_GetRows(t *testing.T) {
 			name: "@ExtendedProperties",
 			kind: "QueryProperties",
 			columns: []query.Column{
-				common.NewColumn(0, "TableId", "int"),
-				common.NewColumn(1, "Key", "string"),
-				common.NewColumn(2, "Value", "dynamic"),
+				query.NewColumn(0, "TableId", "int"),
+				query.NewColumn(1, "Key", "string"),
+				query.NewColumn(2, "Value", "dynamic"),
 			},
 			rows: []query.Row{
-				common.NewRow(nil, 0, value.Values{
+				query.NewRow(nil, 0, value.Values{
 					value.NewInt(1),
 					value.NewString("Visualization"),
 					value.NewDynamic([]byte("{\"Visualization\":null,\"Title\":null,\"XColumn\":null,\"Series\":null,\"YColumns\":null,\"AnomalyColumns\":null,\"XTitle\":null,\"YTitle\":null,\"XAxis\":null,\"YAxis\":null,\"Legend\":null,\"YSplit\":null,\"Accumulate\":false,\"IsQuerySorted\":false,\"Kind\":null,\"Ymin\":\"NaN\",\"Ymax\":\"NaN\",\"Xmin\":null,\"Xmax\":null}")),
@@ -91,19 +90,19 @@ func TestDataSet_DecodeTables_GetRows(t *testing.T) {
 			name: "AllDataTypes",
 			kind: "PrimaryResult",
 			columns: []query.Column{
-				common.NewColumn(0, "vnum", "int"),
-				common.NewColumn(1, "vdec", "decimal"),
-				common.NewColumn(2, "vdate", "datetime"),
-				common.NewColumn(3, "vspan", "timespan"),
-				common.NewColumn(4, "vobj", "dynamic"),
-				common.NewColumn(5, "vb", "bool"),
-				common.NewColumn(6, "vreal", "real"),
-				common.NewColumn(7, "vstr", "string"),
-				common.NewColumn(8, "vlong", "long"),
-				common.NewColumn(9, "vguid", "guid"),
+				query.NewColumn(0, "vnum", "int"),
+				query.NewColumn(1, "vdec", "decimal"),
+				query.NewColumn(2, "vdate", "datetime"),
+				query.NewColumn(3, "vspan", "timespan"),
+				query.NewColumn(4, "vobj", "dynamic"),
+				query.NewColumn(5, "vb", "bool"),
+				query.NewColumn(6, "vreal", "real"),
+				query.NewColumn(7, "vstr", "string"),
+				query.NewColumn(8, "vlong", "long"),
+				query.NewColumn(9, "vguid", "guid"),
 			},
 			rows: []query.Row{
-				common.NewRow(nil, 0, value.Values{
+				query.NewRow(nil, 0, value.Values{
 					value.NewInt(1),
 					value.DecimalFromString("2.00000000000001"),
 					value.NewDateTime(time.Date(2020, 3, 4, 14, 5, 1, 310996500, time.UTC)),
@@ -122,21 +121,21 @@ func TestDataSet_DecodeTables_GetRows(t *testing.T) {
 			name: "QueryCompletionInformation",
 			kind: "QueryCompletionInformation",
 			columns: []query.Column{
-				common.NewColumn(0, "Timestamp", "datetime"),
-				common.NewColumn(1, "ClientRequestId", "string"),
-				common.NewColumn(2, "ActivityId", "guid"),
-				common.NewColumn(3, "SubActivityId", "guid"),
-				common.NewColumn(4, "ParentActivityId", "guid"),
-				common.NewColumn(5, "Level", "int"),
-				common.NewColumn(6, "LevelName", "string"),
-				common.NewColumn(7, "StatusCode", "int"),
-				common.NewColumn(8, "StatusCodeName", "string"),
-				common.NewColumn(9, "EventType", "int"),
-				common.NewColumn(10, "EventTypeName", "string"),
-				common.NewColumn(11, "Payload", "string"),
+				query.NewColumn(0, "Timestamp", "datetime"),
+				query.NewColumn(1, "ClientRequestId", "string"),
+				query.NewColumn(2, "ActivityId", "guid"),
+				query.NewColumn(3, "SubActivityId", "guid"),
+				query.NewColumn(4, "ParentActivityId", "guid"),
+				query.NewColumn(5, "Level", "int"),
+				query.NewColumn(6, "LevelName", "string"),
+				query.NewColumn(7, "StatusCode", "int"),
+				query.NewColumn(8, "StatusCodeName", "string"),
+				query.NewColumn(9, "EventType", "int"),
+				query.NewColumn(10, "EventTypeName", "string"),
+				query.NewColumn(11, "Payload", "string"),
 			},
 			rows: []query.Row{
-				common.NewRow(nil, 0, value.Values{
+				query.NewRow(nil, 0, value.Values{
 					value.NewDateTime(time.Date(2023, 11, 26, 13, 34, 17, 73147800, time.UTC)),
 					value.NewString("blab6"),
 					value.NewGUID(u),
@@ -150,7 +149,7 @@ func TestDataSet_DecodeTables_GetRows(t *testing.T) {
 					value.NewString("QueryInfo"),
 					value.NewString("{\"Count\":1,\"Text\":\"Query completed successfully\"}"),
 				}),
-				common.NewRow(nil, 1, value.Values{
+				query.NewRow(nil, 1, value.Values{
 					value.NewDateTime(time.Date(2023, 11, 26, 13, 34, 17, 73147800, time.UTC)),
 					value.NewString("blab6"),
 					value.NewGUID(u),

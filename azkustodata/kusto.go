@@ -182,8 +182,8 @@ func (c *Client) newV1(
 	ctx context.Context, db string, kqlQuery Statement, options ...QueryOption) (v1.Dataset, error) {
 	ctx, cancel := contextSetup(ctx)
 
-	opQuery := errors.OpQuery
-	opts, err := setQueryOptions(ctx, opQuery, kqlQuery, queryCall, options...)
+	opQuery := op
+	opts, err := setQueryOptions(ctx, opQuery, kqlQuery, call, options...)
 	if err != nil {
 		return nil, err
 	}

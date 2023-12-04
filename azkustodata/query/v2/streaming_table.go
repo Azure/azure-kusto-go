@@ -3,7 +3,6 @@ package v2
 import (
 	"github.com/Azure/azure-kusto-go/azkustodata/errors"
 	"github.com/Azure/azure-kusto-go/azkustodata/query"
-	"github.com/Azure/azure-kusto-go/azkustodata/query/common"
 	"github.com/Azure/azure-kusto-go/azkustodata/types"
 	"github.com/Azure/azure-kusto-go/azkustodata/value"
 	"strconv"
@@ -11,7 +10,7 @@ import (
 )
 
 type streamingTable struct {
-	common.BaseTable
+	query.BaseTable
 	lock     sync.RWMutex
 	rawRows  chan RawRows
 	rows     chan query.RowResult
@@ -47,7 +46,7 @@ func (t *streamingTable) setSkip(skip bool) {
 
 func NewStreamingTable(dataset query.Dataset, th *TableHeader) (query.StreamingTable, *errors.Error) {
 	t := &streamingTable{
-		BaseTable: common.NewTable(dataset, int64(th.TableId), strconv.Itoa(th.TableId), th.TableName, th.TableKind, make([]query.Column, len(th.Columns))),
+		BaseTable: query.NewTable(dataset, int64(th.TableId), strconv.Itoa(th.TableId), th.TableName, th.TableKind, make([]query.Column, len(th.Columns))),
 		rawRows:   make(chan RawRows),
 		rows:      make(chan query.RowResult),
 		end:       make(chan bool),
@@ -55,7 +54,7 @@ func NewStreamingTable(dataset query.Dataset, th *TableHeader) (query.StreamingT
 
 	columns := t.Columns()
 	for i, c := range th.Columns {
-		columns[i] = common.NewColumn(i, c.ColumnName, types.Column(c.ColumnType))
+		columns[i] = query.NewColumn(i, c.ColumnName, types.Column(c.ColumnType))
 		if !columns[i].Type().Valid() {
 			return nil, errors.ES(t.Op(), errors.KClientArgs, "column[%d] if of type %q, which is not valid", i, c.ColumnType)
 		}
@@ -108,12 +107,12 @@ func (t *streamingTable) readRows() {
 					parsed := value.Default(columns[j].Type())
 					err := parsed.Unmarshal(v)
 					if err != nil {
-						t.rows <- query.RowResultError(errors.ES(t.Op(), errors.KInternal, "unable to unmarshal column %s into A %s value: %s", columns[j].Name, columns[j].Type, err))
+						t.rows <- query.RowResultError(errors.ES(t.Op(), errors.KInternal, "unable to unmarshal column %s into A %s value: %s", columns[j].Name(), columns[j].Type(), err))
 						continue
 					}
 					values[j] = parsed
 				}
-				t.rows <- query.RowResultSuccess(common.NewRow(t, t.RowCount(), values))
+				t.rows <- query.RowResultSuccess(query.NewRow(t, t.RowCount(), values))
 			}
 			t.rowCount++
 		}
@@ -142,7 +141,7 @@ func (t *streamingTable) Consume() ([]query.Row, []error) {
 	var rows []query.Row
 	var errs []error
 	for r := range t.rows {
-		if r.Err != nil {
+		if r.Err() != nil {
 			errs = append(errs, r.Err())
 		} else {
 			rows = append(rows, r.Row())

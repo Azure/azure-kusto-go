@@ -1,16 +1,12 @@
-package common
-
-import (
-	"github.com/Azure/azure-kusto-go/azkustodata/query"
-)
+package query
 
 type fullTable struct {
 	baseTable
-	rows   []query.Row
+	rows   []Row
 	errors []error
 }
 
-func NewFullTable(ds query.Dataset, ordinal int64, id string, name string, kind string, columns []query.Column, rows []query.Row, errors []error) (query.Table, error) {
+func NewFullTable(ds Dataset, ordinal int64, id string, name string, kind string, columns []Column, rows []Row, errors []error) (Table, error) {
 	t := &fullTable{
 		baseTable: baseTable{
 			dataSet: ds,
@@ -33,6 +29,6 @@ func NewFullTable(ds query.Dataset, ordinal int64, id string, name string, kind 
 	return t, nil
 }
 
-func (t *fullTable) Consume() ([]query.Row, []error) {
+func (t *fullTable) Consume() ([]Row, []error) {
 	return t.rows, nil
 }
