@@ -3,8 +3,8 @@ package azkustodata
 import (
 	"context"
 	"github.com/Azure/azure-kusto-go/azkustodata/kql"
-	"github.com/Azure/azure-kusto-go/azkustodata/query"
-	v22 "github.com/Azure/azure-kusto-go/azkustodata/query/v2"
+	v1 "github.com/Azure/azure-kusto-go/azkustodata/query/v1"
+	queryv2 "github.com/Azure/azure-kusto-go/azkustodata/query/v2"
 	"io"
 	"net/http"
 	"sync"
@@ -177,7 +177,41 @@ func (c *Client) Query(ctx context.Context, db string, query Statement, options 
 	return iter, nil
 }
 
-func (c *Client) QueryV2(ctx context.Context, db string, kqlQuery Statement, options ...QueryOption) (query.Dataset, error) {
+func (c *Client) newV1(
+	op errors.Op, call int,
+	ctx context.Context, db string, kqlQuery Statement, options ...QueryOption) (v1.Dataset, error) {
+	ctx, cancel := contextSetup(ctx)
+
+	opQuery := errors.OpQuery
+	opts, err := setQueryOptions(ctx, opQuery, kqlQuery, queryCall, options...)
+	if err != nil {
+		return nil, err
+	}
+
+	conn, err := c.getConn(mgmtCall, connOptions{queryOptions: opts})
+	if err != nil {
+		return nil, err
+	}
+
+	res, err := conn.rawQuery(ctx, db, kqlQuery, opts)
+
+	if err != nil {
+		cancel()
+		return nil, err
+	}
+
+	return v1.NewDatasetFromReader(ctx, opQuery, res)
+}
+
+func (c *Client) QueryNew(ctx context.Context, db string, kqlQuery Statement, options ...QueryOption) (v1.Dataset, error) {
+	return c.newV1(errors.OpQuery, queryCall, ctx, db, kqlQuery, options...)
+}
+
+func (c *Client) MgmtNew(ctx context.Context, db string, kqlQuery Statement, options ...QueryOption) (v1.Dataset, error) {
+	return c.newV1(errors.OpMgmt, mgmtCall, ctx, db, kqlQuery, options...)
+}
+
+func (c *Client) StreamingQuery(ctx context.Context, db string, kqlQuery Statement, options ...QueryOption) (queryv2.Dataset, error) {
 	ctx, cancel := contextSetup(ctx)
 
 	options = append(options, V2NewlinesBetweenFrames())
@@ -202,12 +236,12 @@ func (c *Client) QueryV2(ctx context.Context, db string, kqlQuery Statement, opt
 		return nil, err
 	}
 
-	capacity := v22.DefaultFrameCapacity
+	capacity := queryv2.DefaultFrameCapacity
 	if opts.v2FrameCapacity != -1 {
 		capacity = opts.v2FrameCapacity
 	}
 
-	return v22.NewDataSet(ctx, res, capacity), nil
+	return queryv2.NewDataSet(ctx, res, capacity), nil
 }
 
 func (c *Client) QueryToJson(ctx context.Context, db string, query Statement, options ...QueryOption) (string, error) {

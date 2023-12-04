@@ -491,7 +491,7 @@ func TestQueryV2(t *testing.T) {
 	err = testshared.CreateAllDataTypesNullTable(t, client, allDataTypesTable+"_null")
 	require.NoError(t, err)
 
-	v2, err := client.QueryV2(context.Background(), testConfig.Database, kql.New("").AddTable(allDataTypesTable).AddLiteral(";").AddTable(allDataTypesTable+"_null"))
+	v2, err := client.StreamingQuery(context.Background(), testConfig.Database, kql.New("").AddTable(allDataTypesTable).AddLiteral(";").AddTable(allDataTypesTable+"_null"))
 
 	require.NoError(t, err)
 

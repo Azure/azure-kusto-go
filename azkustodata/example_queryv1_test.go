@@ -7,7 +7,7 @@ import (
 	"github.com/Azure/azure-kusto-go/azkustodata/value"
 )
 
-func QueryV2Example() {
+func QueryV1Example() {
 	// Create a client using the default Azure credential
 	kcsb := azkustodata.NewConnectionStringBuilder("https://help.kusto.windows.net/").WithDefaultAzureCredential()
 	client, err := azkustodata.New(kcsb)
@@ -27,58 +27,42 @@ func QueryV2Example() {
 
 	// Simple query - single table
 
-	dataset, err := client.StreamingQuery(ctx, "Samples", kql.New("PopulationData"))
+	dataset, err := client.QueryNew(ctx, "Samples", kql.New("PopulationData"))
 
 	if err != nil {
 		panic(err)
 	}
 
-	for tableResult := range dataset.Results() {
-		// Make sure to always check for errors
-		if tableResult.Err() != nil {
-			panic(tableResult.Err())
-		}
-
-		// You can access table metadata, such as the table name
-		table := tableResult.Table()
-
-		println(table.Name())
-		println(table.Id())
+	results := dataset.Results()
+	// You can use random access to get a specific table
+	t := results[0]
+	println(t.Name())
+	// Or iterate over all primary results
+	for _, tb := range results {
+		println(tb.Name())
+		println(tb.Id())
 
 		// Columns are available as well
-		for _, column := range table.Columns() {
+		for _, column := range tb.Columns() {
 			println(column.Name)
 		}
 		// or by name
-		stateCol := table.ColumnByName("State")
+		stateCol := tb.ColumnByName("State")
 		println(stateCol.Name)
 
-		// WARNING: streaming tables must be consumed, or the dataset will be blocked
+		// Use Consume() to get all rows as a slice
+		rows, errs := tb.Consume()
 
-		// There are a few ways to consume a streaming table:
-		// Note: Only one of these methods should be used per table
-		// 1. SkipToEnd() - skips all rows and closes the table
-		table.SkipToEnd()
-
-		// 2. Consume() - reads all rows and closes the table
-		rows, errors := table.Consume()
-		for _, row := range rows {
-			println(row.Ordinal())
-		}
-		for _, err := range errors {
-			println(err.Error())
+		// Make sure to always check for errors
+		if errs != nil {
+			panic(errs)
 		}
 
-		// 3. Rows() - reads rows as they are received
-		for rowResult := range table.Rows() {
-			if rowResult.Err != nil {
-				println(rowResult.Err().Error())
-			} else {
-				println(rowResult.Row().Ordinal())
-			}
-		}
+		// You can randomly access rows
+		row := rows[0]
+		println(row.Ordinal())
 
-		// Working with rows
+		// Or iterate over all rows
 		for _, row := range rows {
 			// Each row has an index and a pointer to the table it belongs to
 			println(row.Ordinal())
@@ -127,9 +111,7 @@ func QueryV2Example() {
 
 	}
 
-	// Get metadata about the query (if it was consumed - otherwise it will be nil)
-	println(dataset.Header())
-	println(dataset.QueryProperties())
-	println(dataset.QueryCompletionInformation())
-	println(dataset.Completion())
+	// Get metadata about the query
+	println(dataset.Info())
+	println(dataset.Status())
 }

@@ -141,7 +141,7 @@ func (d *dataSet) decodeTables() {
 		} else if completion, ok := f.(*DataSetCompletion); ok {
 			d.setCompletion(completion)
 		} else if dt, ok := f.(*DataTable); ok {
-			t, err := common.NewFullTableV2(d, dt)
+			t, err := NewFullTable(d, dt)
 			if err != nil {
 				d.results <- common.TableResultError(err)
 			}
@@ -262,5 +262,7 @@ type Dataset interface {
 	query.Dataset
 	Header() *DataSetHeader
 	Completion() *DataSetCompletion
+	QueryProperties() []QueryProperties
+	QueryCompletionInformation() []QueryCompletionInformation
 	Results() chan query.TableResult
 }

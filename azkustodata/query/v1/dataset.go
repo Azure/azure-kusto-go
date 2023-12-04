@@ -6,6 +6,7 @@ import (
 	"github.com/Azure/azure-kusto-go/azkustodata/query"
 	"github.com/Azure/azure-kusto-go/azkustodata/query/common"
 	"github.com/google/uuid"
+	"io"
 )
 
 type TableIndexRow struct {
@@ -41,7 +42,17 @@ type dataset struct {
 	info    []QueryInformation
 }
 
-func NewDataset(ctx context.Context, op errors.Op, v1 V1) (query.Dataset, error) {
+func NewDatasetFromReader(ctx context.Context, op errors.Op, reader io.ReadCloser) (Dataset, error) {
+	defer reader.Close()
+	v1, err := decodeV1(reader)
+	if err != nil {
+		return nil, err
+	}
+
+	return NewDataset(ctx, op, v1)
+}
+
+func NewDataset(ctx context.Context, op errors.Op, v1 V1) (Dataset, error) {
 	d := &dataset{
 		Dataset: common.NewDataset(ctx, op),
 	}
@@ -90,7 +101,7 @@ func NewDataset(ctx context.Context, op errors.Op, v1 V1) (query.Dataset, error)
 }
 
 func parseTable[T any](table *RawTable, d *dataset, index *TableIndexRow) ([]T, error) {
-	fullTable, err := common.NewFullTableV1(d, table, index)
+	fullTable, err := NewFullTable(d, table, index)
 	if err != nil {
 		return nil, err
 	}
@@ -129,4 +140,5 @@ type Dataset interface {
 	Results() []query.Table
 	Index() []TableIndexRow
 	Status() []QueryStatus
+	Info() []QueryInformation
 }

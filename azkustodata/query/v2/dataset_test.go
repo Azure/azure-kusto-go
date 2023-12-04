@@ -172,7 +172,7 @@ func TestDataSet_DecodeTables_GetRows(t *testing.T) {
 		assert.NoError(t, tableResult.Err())
 		if tableResult.Table() != nil {
 			tb := tableResult.Table()
-			expectedTable := tables[tb.Id()]
+			expectedTable := tables[tb.Ordinal()]
 			assert.Equal(t, expectedTable.id, tb.Id())
 			assert.Equal(t, expectedTable.name, tb.Name())
 			assert.Equal(t, expectedTable.kind, tb.Kind())
@@ -191,53 +191,53 @@ func TestDataSet_DecodeTables_GetRows(t *testing.T) {
 		}
 	}
 
-	/*	expectedQueryCompletionInformation := []QueryCompletionInformation{
-			{
-				Timestamp:        time.Date(2023, 11, 26, 13, 34, 17, 73147800, time.UTC),
-				ClientRequestId:  "blab6",
-				ActivityId:       u,
-				SubActivityId:    u,
-				ParentActivityId: u,
-				Level:            4,
-				LevelName:        "Info",
-				StatusCode:       0,
-				StatusCodeName:   "S_OK (0)",
-				EventType:        4,
-				EventTypeName:    "QueryInfo",
-				Payload:          "{\"Count\":1,\"Text\":\"Query completed successfully\"}",
-			},
-			{
-				Timestamp:        time.Date(2023, 11, 26, 13, 34, 17, 73147800, time.UTC),
-				ClientRequestId:  "blab6",
-				ActivityId:       u,
-				SubActivityId:    u,
-				ParentActivityId: u,
-				Level:            4,
-				LevelName:        "Info",
-				StatusCode:       0,
-				StatusCodeName:   "S_OK (0)",
-				EventType:        5,
-				EventTypeName:    "WorkloadGroup",
-				Payload:          "{\"Count\":1,\"Text\":\"default\"}",
-			},
-		}
+	expectedQueryCompletionInformation := []QueryCompletionInformation{
+		{
+			Timestamp:        time.Date(2023, 11, 26, 13, 34, 17, 73147800, time.UTC),
+			ClientRequestId:  "blab6",
+			ActivityId:       u,
+			SubActivityId:    u,
+			ParentActivityId: u,
+			Level:            4,
+			LevelName:        "Info",
+			StatusCode:       0,
+			StatusCodeName:   "S_OK (0)",
+			EventType:        4,
+			EventTypeName:    "QueryInfo",
+			Payload:          "{\"Count\":1,\"Text\":\"Query completed successfully\"}",
+		},
+		{
+			Timestamp:        time.Date(2023, 11, 26, 13, 34, 17, 73147800, time.UTC),
+			ClientRequestId:  "blab6",
+			ActivityId:       u,
+			SubActivityId:    u,
+			ParentActivityId: u,
+			Level:            4,
+			LevelName:        "Info",
+			StatusCode:       0,
+			StatusCodeName:   "S_OK (0)",
+			EventType:        5,
+			EventTypeName:    "WorkloadGroup",
+			Payload:          "{\"Count\":1,\"Text\":\"default\"}",
+		},
+	}
 
-		information, err := d.QueryCompletionInformation()
-		assert.NoError(t, err)
+	information := d.QueryCompletionInformation()
+	assert.NotNil(t, err)
 
-		assert.Equal(t, expectedQueryCompletionInformation, information)
+	assert.Equal(t, expectedQueryCompletionInformation, information)
 
-		expectedQueryProperties := []QueryProperties{
-			{
-				TableId: 1,
-				Key:     "Visualization",
-				Value:   map[string]interface{}{"Visualization": nil, "Title": nil, "XColumn": nil, "Series": nil, "YColumns": nil, "AnomalyColumns": nil, "XTitle": nil, "YTitle": nil, "XAxis": nil, "YAxis": nil, "Legend": nil, "YSplit": nil, "Accumulate": false, "IsQuerySorted": false, "Kind": nil, "Ymin": "NaN", "Ymax": "NaN", "Xmin": nil, "Xmax": nil},
-			},
-		}
+	expectedQueryProperties := []QueryProperties{
+		{
+			TableId: 1,
+			Key:     "Visualization",
+			Value:   map[string]interface{}{"Visualization": nil, "Title": nil, "XColumn": nil, "Series": nil, "YColumns": nil, "AnomalyColumns": nil, "XTitle": nil, "YTitle": nil, "XAxis": nil, "YAxis": nil, "Legend": nil, "YSplit": nil, "Accumulate": false, "IsQuerySorted": false, "Kind": nil, "Ymin": "NaN", "Ymax": "NaN", "Xmin": nil, "Xmax": nil},
+		},
+	}
 
-		properties, err := d.QueryProperties()
-		assert.NoError(t, err)
-		assert.Equal(t, expectedQueryProperties, properties)*/
+	properties := d.QueryProperties()
+	assert.NotNil(t, err)
+	assert.Equal(t, expectedQueryProperties, properties)
 }
 
 func TestDataSet_MultiplePrimaryTables(t *testing.T) {
@@ -267,7 +267,7 @@ func TestDataSet_MultiplePrimaryTables(t *testing.T) {
 	for tableResult := range d.Results() {
 		assert.NoError(t, tableResult.Err())
 		tb := tableResult.Table()
-		id := tb.Id()
+		id := tb.Ordinal()
 		for rowResult := range tb.Rows() {
 			assert.NoError(t, rowResult.Err())
 			if id == 1 {

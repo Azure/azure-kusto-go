@@ -14,9 +14,10 @@ type baseTable struct {
 	columns []query.Column
 }
 
-func NewTable(ds query.Dataset, id string, name, kind string, columns []query.Column) BaseTable {
+func NewTable(ds query.Dataset, ordinal int64, id string, name string, kind string, columns []query.Column) BaseTable {
 	return &baseTable{
 		dataSet: ds,
+		ordinal: ordinal,
 		id:      id,
 		name:    name,
 		kind:    kind,

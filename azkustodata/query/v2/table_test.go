@@ -1,7 +1,6 @@
-package common
+package v2
 
 import (
-	"github.com/Azure/azure-kusto-go/azkustodata/query/v2"
 	"github.com/google/uuid"
 	"github.com/shopspring/decimal"
 	"github.com/stretchr/testify/assert"
@@ -11,11 +10,11 @@ import (
 
 func TestNewFullTable_WithValidDataTable(t *testing.T) {
 	t.Parallel()
-	dt := &v2.DataTable{
+	dt := &DataTable{
 		TableId:   1,
 		TableName: "AllDataTypes",
 		TableKind: "PrimaryResult",
-		Columns: []v2.FrameColumn{
+		Columns: []FrameColumn{
 			{ColumnName: "vnum", ColumnType: "int"},
 			{ColumnName: "vdec", ColumnType: "decimal"},
 			{ColumnName: "vdate", ColumnType: "datetime"},
@@ -30,7 +29,7 @@ func TestNewFullTable_WithValidDataTable(t *testing.T) {
 		Rows: [][]interface{}{{1, "1.1", "2019-03-02T05:40:02Z", "13:14:20", "{\"a\": 3}", true, 1.1, "test", 1, "00000000-0000-0000-0000-000000000000"}},
 	}
 
-	table, err := NewFullTableV2(nil, dt)
+	table, err := NewFullTable(nil, dt)
 
 	assert.NoError(t, err)
 	assert.Equal(t, dt.TableId, 1)
@@ -58,14 +57,14 @@ func TestNewFullTable_WithValidDataTable(t *testing.T) {
 
 func TestNewFullTable_WithInvalidColumnType(t *testing.T) {
 	t.Parallel()
-	dt := &v2.DataTable{
+	dt := &DataTable{
 		TableId:   1,
 		TableName: "TestTable",
-		Columns:   []v2.FrameColumn{{ColumnName: "TestColumn", ColumnType: "invalid"}},
+		Columns:   []FrameColumn{{ColumnName: "TestColumn", ColumnType: "invalid"}},
 		Rows:      [][]interface{}{{"TestValue"}},
 	}
 
-	_, err := NewFullTableV2(nil, dt)
+	_, err := NewFullTable(nil, dt)
 
 	assert.Error(t, err)
 	assert.Contains(t, err.Error(), "not valid")
@@ -73,14 +72,14 @@ func TestNewFullTable_WithInvalidColumnType(t *testing.T) {
 
 func TestNewFullTable_WithInvalidRowValue(t *testing.T) {
 	t.Parallel()
-	dt := &v2.DataTable{
+	dt := &DataTable{
 		TableId:   1,
 		TableName: "TestTable",
-		Columns:   []v2.FrameColumn{{ColumnName: "TestColumn", ColumnType: "int"}},
+		Columns:   []FrameColumn{{ColumnName: "TestColumn", ColumnType: "int"}},
 		Rows:      [][]interface{}{{"TestValue"}},
 	}
 
-	_, err := NewFullTableV2(nil, dt)
+	_, err := NewFullTable(nil, dt)
 
 	assert.Error(t, err)
 	assert.Contains(t, err.Error(), "unable to unmarshal")

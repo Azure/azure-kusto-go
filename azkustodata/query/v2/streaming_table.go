@@ -6,6 +6,7 @@ import (
 	"github.com/Azure/azure-kusto-go/azkustodata/query/common"
 	"github.com/Azure/azure-kusto-go/azkustodata/types"
 	"github.com/Azure/azure-kusto-go/azkustodata/value"
+	"strconv"
 	"sync"
 )
 
@@ -46,7 +47,7 @@ func (t *streamingTable) setSkip(skip bool) {
 
 func NewStreamingTable(dataset query.Dataset, th *TableHeader) (query.StreamingTable, *errors.Error) {
 	t := &streamingTable{
-		BaseTable: common.NewTable(dataset, th.TableId, th.TableName, th.TableKind, make([]query.Column, len(th.Columns))),
+		BaseTable: common.NewTable(dataset, int64(th.TableId), strconv.Itoa(th.TableId), th.TableName, th.TableKind, make([]query.Column, len(th.Columns))),
 		rawRows:   make(chan RawRows),
 		rows:      make(chan query.RowResult),
 		end:       make(chan bool),
