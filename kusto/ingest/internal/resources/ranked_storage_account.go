@@ -5,13 +5,6 @@ type StorageAccountStats struct {
 	totalCount   int
 }
 
-func NewStorageAccountStats() *StorageAccountStats {
-	return &StorageAccountStats{
-		successCount: 0,
-		totalCount:   0,
-	}
-}
-
 func (s *StorageAccountStats) logResult(success bool) {
 	s.totalCount++
 	if success {
@@ -36,9 +29,6 @@ type RankedStorageAccount struct {
 
 func newRankedStorageAccount(accountName string, numberOfBuckets int, bucketDuration int64, timeProvider func() int64) *RankedStorageAccount {
 	buckets := make([]StorageAccountStats, numberOfBuckets)
-	for i := range buckets {
-		buckets[i] = StorageAccountStats{}
-	}
 	return &RankedStorageAccount{
 		buckets:            buckets,
 		lastUpdateTime:     timeProvider(),

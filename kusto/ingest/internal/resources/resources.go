@@ -44,7 +44,7 @@ type URI struct {
 	sas                             url.Values
 }
 
-// Pparses a string representing a Kutso resource URI.
+// Parse parses a string representing a Kutso resource URI.
 func Parse(uri string) (*URI, error) {
 	// Example for a valid url:
 	// https://fkjsalfdks.blob.core.windows.com/sdsadsadsa?sas=asdasdasd

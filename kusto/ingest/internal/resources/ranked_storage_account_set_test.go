@@ -17,21 +17,17 @@ func TestRankedStorageAccountSet_TestDefaultRank(t *testing.T) {
 
 	accounts := r.getRankedShuffledAccounts()
 
-	if len(accounts) != 3 {
-		t.Errorf("Expected number of accounts to be %d, but got %d", 3, len(accounts))
-	}
+	assert.Len(t, accounts, 3)
 
 	for i := 0; i < len(accounts); i++ {
-		if accounts[i].getRank() != 1 {
-			t.Errorf("Expected account %s to have rank 1, but got %f", accounts[i].accountName, accounts[i].getRank())
-		}
+		assert.EqualValues(t, 1, accounts[i].getRank(), "Expected account %s to have rank 1, but got %f", accounts[i].accountName, accounts[i].getRank())
 	}
 }
 
 func TestRankedStorageAccountSet_TestRanking(t *testing.T) {
 	currentTime := int64(0)
-	time_provider := func() int64 { return currentTime }
-	r := newRankedStorageAccountSet(6, 10, []int{90, 70, 30, 0}, time_provider)
+	timeProvider := func() int64 { return currentTime }
+	r := newRankedStorageAccountSet(6, 10, []int{90, 70, 30, 0}, timeProvider)
 
 	// Add 3 accounts
 	r.registerStorageAccount("test-account-1")
@@ -81,8 +77,8 @@ func TestRankedStorageAccountSet_TestRanking(t *testing.T) {
 
 func TestRankedStorageAccountSet_TestResultsWeightOverTime(t *testing.T) {
 	currentTime := int64(0)
-	time_provider := func() int64 { return currentTime }
-	r := newRankedStorageAccountSet(6, 10, []int{90, 70, 30, 0}, time_provider)
+	timeProvider := func() int64 { return currentTime }
+	r := newRankedStorageAccountSet(6, 10, []int{90, 70, 30, 0}, timeProvider)
 
 	// Add 1 accounts
 	r.registerStorageAccount("test-account-1")
@@ -110,8 +106,8 @@ func TestRankedStorageAccountSet_TestResultsWeightOverTime(t *testing.T) {
 
 func TestRankedStorageAccountSet_TestRankWhenResultsComeInLargeGap(t *testing.T) {
 	currentTime := int64(0)
-	time_provider := func() int64 { return currentTime }
-	r := newRankedStorageAccountSet(6, 10, []int{90, 70, 30, 0}, time_provider)
+	timeProvider := func() int64 { return currentTime }
+	r := newRankedStorageAccountSet(6, 10, []int{90, 70, 30, 0}, timeProvider)
 
 	// Add 1 accounts
 	r.registerStorageAccount("test-account-1")
@@ -141,55 +137,33 @@ func TestRankedStorageAccountSet_TestRankWhenResultsComeInLargeGap(t *testing.T)
 }
 
 func TestNewRankedStorageAccountSet(t *testing.T) {
-	number_of_buckets := 6
-	bucket_duration := int64(10)
+	numberOfBuckets := 6
+	bucketDuration := int64(10)
 	tiers := []int{90, 70, 30, 0}
-	time_provider := func() int64 { return 11 }
+	timeProvider := func() int64 { return 11 }
 
-	r := newRankedStorageAccountSet(number_of_buckets, bucket_duration, tiers, time_provider)
+	r := newRankedStorageAccountSet(numberOfBuckets, bucketDuration, tiers, timeProvider)
 
-	if r.number_of_buckets != number_of_buckets {
-		t.Errorf("Expected number_of_buckets to be %d, but got %d", number_of_buckets, r.number_of_buckets)
-	}
-
-	if r.bucket_duration != bucket_duration {
-		t.Errorf("Expected bucket_duration to be %d, but got %d", bucket_duration, r.bucket_duration)
-	}
-
-	if len(r.tiers) != len(tiers) {
-		t.Errorf("Expected tiers to have length %d, but got %d", len(tiers), len(r.tiers))
-	}
+	assert.Equal(t, numberOfBuckets, r.numberOfBuckets, "Expected number_of_buckets to be %d, but got %d", numberOfBuckets, r.numberOfBuckets)
+	assert.Equal(t, bucketDuration, r.bucketDuration, "Expected bucket_duration to be %d, but got %d", bucketDuration, r.bucketDuration)
+	assert.Len(t, r.tiers, len(tiers), "Expected tiers to have length %d, but got %d", len(tiers), len(r.tiers))
 
 	for i := 0; i < len(tiers); i++ {
-		if r.tiers[i] != tiers[i] {
-			t.Errorf("Expected tiers[%d] to be %d, but got %d", i, tiers[i], r.tiers[i])
-		}
+		assert.Equal(t, tiers[i], r.tiers[i], "Expected tiers[%d] to be %d, but got %d", i, tiers[i], r.tiers[i])
 	}
 
-	if r.time_provider() != time_provider() {
-		t.Errorf("Expected time_provider to return the same value as the provided function, but got a different value")
-	}
+	assert.Equal(t, timeProvider(), r.timeProvider(), "Expected time_provider to return the same value as the provided function, but got a different value")
 }
 
 func TestNewDefaultRankedStorageAccountSet(t *testing.T) {
 	r := newDefaultRankedStorageAccountSet()
 
-	if r.number_of_buckets != defaultNumberOfBuckets {
-		t.Errorf("Expected number_of_buckets to be %d, but got %d", defaultNumberOfBuckets, r.number_of_buckets)
-	}
-
-	if r.bucket_duration != defaultBucketDurationInSeconds {
-		t.Errorf("Expected bucket_duration to be %d, but got %d", defaultBucketDurationInSeconds, r.bucket_duration)
-	}
-
-	if len(r.tiers) != len(defaultTiersValue) {
-		t.Errorf("Expected tiers to have length %d, but got %d", len(defaultTiersValue), len(r.tiers))
-	}
+	assert.EqualValues(t, defaultNumberOfBuckets, r.numberOfBuckets, "Expected number_of_buckets to be %d, but got %d", defaultNumberOfBuckets, r.numberOfBuckets)
+	assert.EqualValues(t, defaultBucketDurationInSeconds, r.bucketDuration, "Expected bucket_duration to be %d, but got %d", defaultBucketDurationInSeconds, r.bucketDuration)
+	assert.Len(t, r.tiers, len(defaultTiersValue), "Expected tiers to have length %d, but got %d", len(defaultTiersValue), len(r.tiers))
 
 	for i := 0; i < len(defaultTiersValue); i++ {
-		if r.tiers[i] != defaultTiersValue[i] {
-			t.Errorf("Expected tiers[%d] to be %d, but got %d", i, defaultTiersValue[i], r.tiers[i])
-		}
+		assert.EqualValues(t, defaultTiersValue[i], r.tiers[i], "Expected tiers[%d] to be %d, but got %d", i, defaultTiersValue[i], r.tiers[i])
 	}
 }
 
@@ -202,15 +176,14 @@ func TestRankedStorageAccountSet_AddAccountResult(t *testing.T) {
 
 	account, ok := r.getStorageAccount(accountName)
 	if !ok {
-		t.Errorf("Expected account %s to be registered, but it was not found", accountName)
+		assert.Fail(t, "Expected account %s to be registered, but it was not found", accountName)
 	}
 
 	successCount := account.buckets[account.currentBucketIndex].successCount
 	totalCount := account.buckets[account.currentBucketIndex].totalCount
 
-	if successCount != 1 || totalCount != 1 {
-		t.Errorf("Expected account %s to have 1 successful request and 1 total requests, but got %d and %d", accountName, successCount, totalCount)
-	}
+	assert.EqualValues(t, 1, successCount, "Expected account %s to have 1 successful request, but got %d", accountName, successCount)
+	assert.EqualValues(t, 1, totalCount, "Expected account %s to have 1 total requests, but got %d", accountName, totalCount)
 }
 
 func TestRankedStorageAccountSet_GetStorageAccount(t *testing.T) {
@@ -219,10 +192,10 @@ func TestRankedStorageAccountSet_GetStorageAccount(t *testing.T) {
 
 	account, ok := r.getStorageAccount(accountName)
 	if ok {
-		t.Errorf("Expected account %s to not be registered, but it was found", accountName)
+		assert.Fail(t, "Expected account %s to not be registered, but it was found", accountName)
 	}
 
 	if account != nil {
-		t.Errorf("Expected account to be nil, but got %+v", account)
+		assert.Fail(t, "Expected account to be nil, but got %+v", account)
 	}
 }

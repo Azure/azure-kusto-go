@@ -15,27 +15,27 @@ var defaultTiersValue = [4]int{90, 70, 30, 0}
 var defaultTimeProvider = func() int64 { return time.Now().Unix() }
 
 type RankedStorageAccountSet struct {
-	accounts          map[string]*RankedStorageAccount
-	number_of_buckets int
-	bucket_duration   int64
-	tiers             []int
-	time_provider     func() int64
-	lock              sync.Mutex
+	accounts        map[string]*RankedStorageAccount
+	numberOfBuckets int
+	bucketDuration  int64
+	tiers           []int
+	timeProvider    func() int64
+	lock            sync.Mutex
 }
 
 func newRankedStorageAccountSet(
-	number_of_buckets int,
-	bucket_duration int64,
+	numberOfBuckets int,
+	bucketDuration int64,
 	tiers []int,
-	time_provider func() int64,
+	timeProvider func() int64,
 ) *RankedStorageAccountSet {
 	return &RankedStorageAccountSet{
-		accounts:          make(map[string]*RankedStorageAccount),
-		number_of_buckets: number_of_buckets,
-		bucket_duration:   bucket_duration,
-		tiers:             tiers,
-		time_provider:     time_provider,
-		lock:              sync.Mutex{},
+		accounts:        make(map[string]*RankedStorageAccount),
+		numberOfBuckets: numberOfBuckets,
+		bucketDuration:  bucketDuration,
+		tiers:           tiers,
+		timeProvider:    timeProvider,
+		lock:            sync.Mutex{},
 	}
 }
 
@@ -58,7 +58,7 @@ func (r *RankedStorageAccountSet) registerStorageAccount(accountName string) {
 	defer r.lock.Unlock()
 
 	if _, ok := r.accounts[accountName]; !ok {
-		r.accounts[accountName] = newRankedStorageAccount(accountName, r.number_of_buckets, r.bucket_duration, r.time_provider)
+		r.accounts[accountName] = newRankedStorageAccount(accountName, r.numberOfBuckets, r.bucketDuration, r.timeProvider)
 	}
 }
 
@@ -89,15 +89,15 @@ func (r *RankedStorageAccountSet) getRankedShuffledAccounts() []RankedStorageAcc
 		}
 	}
 
+	var result []RankedStorageAccount
+
 	for _, tier := range accountsByTier {
 		rand.Shuffle(len(tier), func(i, j int) {
 			tier[i], tier[j] = tier[j], tier[i]
 		})
-	}
 
-	var result []RankedStorageAccount
-	for _, sublist := range accountsByTier {
-		result = append(result, sublist...)
+		//Apend to results
+		result = append(result, tier...)
 	}
 
 	return result
