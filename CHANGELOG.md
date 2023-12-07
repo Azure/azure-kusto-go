@@ -4,6 +4,23 @@ All notable changes to this project will be documented in this file.
 
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
+## [Unreleased]
+
+## [0.15.0] - 2023-12-04
+
+### Changed (BREAKING)
+
+- Queries are no longer progressive by default. 
+- `ResultsProgressiveDisable()` has been removed.
+- Use `ResultsProgressiveEnabled()` to enable progressive queries.
+
+### Added
+- Add file options: RawDataSize, CompressionType
+- New package ingest/ingestoptions now contains Compression properties (in the future will hold DataFormat)
+
+### Fixed
+
+- String quoting in default value of query parameters
 
 ## [0.14.2] - 2023-11-08
 
@@ -14,6 +31,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ## [0.14.1] - 2023-09-27
 
 ### Added
+
 - Support new playfab domain
 
 ### Fixed
