@@ -244,7 +244,7 @@ func TestResources(t *testing.T) {
 		t.Run(test.desc, func(t *testing.T) {
 			t.Parallel()
 
-			manager := &Manager{client: test.fakeMgmt}
+			manager := &Manager{client: test.fakeMgmt, rankedStorageAccount: newDefaultRankedStorageAccountSet()}
 
 			err := manager.fetch(context.Background())
 
@@ -255,10 +255,18 @@ func TestResources(t *testing.T) {
 
 			assert.NoError(t, err)
 
-			got, err := manager.Resources()
+			got, err := manager.getResources()
 			assert.NoError(t, err)
 
 			assert.Equal(t, test.want, got)
+
+			containers, err := manager.GetRankedStorageContainers()
+			assert.NoError(t, err)
+			assert.Equal(t, test.want.Containers, containers)
+
+			queues, err := manager.GetRankedStorageQueues()
+			assert.NoError(t, err)
+			assert.Equal(t, test.want.Queues, queues)
 		})
 	}
 }
