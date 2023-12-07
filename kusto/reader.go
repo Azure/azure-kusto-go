@@ -6,6 +6,8 @@ import (
 	"context"
 	"flag"
 	"fmt"
+	"github.com/google/uuid"
+	"github.com/rs/zerolog"
 	"io"
 	"net/http"
 	"sync"
@@ -121,28 +123,40 @@ func (r *RowIterator) start() chan struct{} {
 		once.Do(func() { close(done) })
 	}
 
+	logger := zerolog.Ctx(r.ctx).With().Str("id", uuid.New().String()).Logger()
+
+	logger.Info().Msg("starting row iterator")
+
 	go func() {
 		defer closeDone() // Catchall
+		logger.Info().Msg("starting row iterator goroutine")
 
 		for {
 			select {
 			case <-r.ctx.Done():
 			case sent := <-r.inColumns:
+				logger.Info().Msg("got columns")
 				r.columns = sent.inColumns
 				sent.done()
 				closeDone()
 			case sent, ok := <-r.inRows:
+				logger.Info().Msg("got rows")
 				if !ok {
 					close(r.rows)
 					return
 				}
+				logger.Info().Msg("got rows ok")
 				if sent.inRows != nil {
+					logger.Info().Msg("sending rows")
 					for k, values := range sent.inRows {
 						select {
 						case <-r.ctx.Done():
+							logger.Info().Msg("context done")
+							break
 						case r.rows <- Row{Values: values, Replace: k == 0 && sent.inTableFragmentType == "DataReplace"}:
 						}
 					}
+					logger.Info().Msg("sent rows")
 				}
 
 				if sent.inRowErrors != nil {
