@@ -6,6 +6,7 @@ import (
 	"github.com/Azure/azure-kusto-go/azkustodata/query"
 	"github.com/google/uuid"
 	"io"
+	"time"
 )
 
 type TableIndexRow struct {
@@ -17,20 +18,20 @@ type TableIndexRow struct {
 }
 
 type QueryStatus struct {
-	TimeStamp         string
-	Severity          int64
+	Timestamp         time.Time
+	Severity          int32
 	SeverityName      string
-	StatusCode        int64
+	StatusCode        int32
 	StatusDescription string
-	Count             int64
-	RequestId         string
-	ActivityId        string
+	Count             int32
+	RequestId         uuid.UUID
+	ActivityId        uuid.UUID
 	SubActivityId     uuid.UUID
-	ClientActivityId  uuid.UUID
+	ClientActivityId  string
 }
 
-type QueryInformation struct {
-	Value map[string]interface{}
+type QueryProperties struct {
+	Value string
 }
 
 type dataset struct {
@@ -38,7 +39,7 @@ type dataset struct {
 	results []query.Table
 	index   []TableIndexRow
 	status  []QueryStatus
-	info    []QueryInformation
+	info    []QueryProperties
 }
 
 func NewDatasetFromReader(ctx context.Context, op errors.Op, reader io.ReadCloser) (Dataset, error) {
@@ -72,27 +73,28 @@ func NewDataset(ctx context.Context, op errors.Op, v1 V1) (Dataset, error) {
 		return nil, err
 	}
 
-	for _, r := range index {
+	d.index = index
+
+	for i, r := range index {
 		if r.Kind == "QueryStatus" {
-			queryStatus, err := parseTable[QueryStatus](lastTable, d, &r)
+			queryStatus, err := parseTable[QueryStatus](&v1.Tables[i], d, &r)
 			if err != nil {
 				return nil, err
 			}
 			d.status = queryStatus
-		}
-		if r.Kind == "QueryInformation" {
-			queryInfo, err := parseTable[QueryInformation](lastTable, d, &r)
+		} else if r.Kind == "QueryProperties" {
+			queryInfo, err := parseTable[QueryProperties](&v1.Tables[i], d, &r)
 			if err != nil {
 				return nil, err
 			}
 			d.info = queryInfo
-		}
-		if r.Kind == "QueryResult" {
-			table, err := parseTable[query.Table](lastTable, d, &r)
+		} else if r.Kind == "QueryResult" {
+			table, err := NewFullTable(d, &v1.Tables[i], &r)
 			if err != nil {
 				return nil, err
 			}
-			d.results = append(d.results, table...)
+
+			d.results = append(d.results, table)
 		}
 	}
 
@@ -130,7 +132,7 @@ func (d *dataset) Status() []QueryStatus {
 	return d.status
 }
 
-func (d *dataset) Info() []QueryInformation {
+func (d *dataset) Info() []QueryProperties {
 	return d.info
 }
 
@@ -139,5 +141,5 @@ type Dataset interface {
 	Results() []query.Table
 	Index() []TableIndexRow
 	Status() []QueryStatus
-	Info() []QueryInformation
+	Info() []QueryProperties
 }

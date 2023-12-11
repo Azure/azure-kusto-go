@@ -240,6 +240,29 @@ func (d *dataSet) parseDatasetHeader(header *DataSetHeader, op errors.Op) bool {
 	return true
 }
 
+func (d *dataSet) Consume() ([]query.Table, []error) {
+	tables := make([]query.Table, 0, len(d.results))
+	errs := make([]error, 0, len(d.results))
+
+	for tb := range d.Results() {
+		if tb.Err() != nil {
+			errs = append(errs, tb.Err())
+			continue
+		}
+
+		table := tb.Table()
+		if table == nil {
+			errs = append(errs, errors.ES(d.Op(), errors.KInternal, "received a nil table"))
+			continue
+		}
+
+		rows, errs2 := table.Consume()
+		tables = append(tables, query.NewFullTable(d, table.Ordinal(), table.Id(), table.Name(), table.Kind(), table.Columns(), rows, errs2))
+	}
+
+	return tables, errs
+}
+
 // NewDataSet creates a new dataSet from a reader.
 // The capacity parameter is the capacity of the channel that receives the frames from the Kusto service.
 func NewDataSet(ctx context.Context, r io.ReadCloser, capacity int) Dataset {
