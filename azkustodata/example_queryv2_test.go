@@ -33,6 +33,8 @@ func ExampleQueryV2() {
 		panic(err)
 	}
 
+	// The tables are streamed, so you need to iterate through the `Results()` channel to get them
+
 	for tableResult := range dataset.Results() {
 		// Make sure to always check for errors
 		if tableResult.Err() != nil {
@@ -126,6 +128,15 @@ func ExampleQueryV2() {
 		}
 
 	}
+
+	// Alternatively, you can consume the stream and get tables
+	tables, errors := dataset.Consume()
+	if len(errors) > 0 {
+		panic(errors[0])
+	}
+	// Now you can access tables and row with random access
+	rows, errors := tables[1].Consume()
+	println(rows, errors)
 
 	// Get metadata about the query (if it was consumed - otherwise it will be nil)
 	println(dataset.Header())

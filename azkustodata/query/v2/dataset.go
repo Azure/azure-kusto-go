@@ -287,4 +287,5 @@ type Dataset interface {
 	QueryProperties() []QueryProperties
 	QueryCompletionInformation() []QueryCompletionInformation
 	Results() chan query.TableResult
+	Consume() ([]query.Table, []error)
 }

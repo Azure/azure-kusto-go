@@ -33,6 +33,11 @@ func ExampleQueryV1() {
 		panic(err)
 	}
 
+	// TODO:
+	// API for singular primary result
+	// API for result by index
+	// API for result by name
+	// API for table to structs
 	results := dataset.Results()
 	// You can use random access to get a specific table
 	t := results[0]
@@ -44,11 +49,11 @@ func ExampleQueryV1() {
 
 		// Columns are available as well
 		for _, column := range tb.Columns() {
-			println(column.Name)
+			println(column.Name())
 		}
 		// or by name
 		stateCol := tb.ColumnByName("State")
-		println(stateCol.Name)
+		println(stateCol.Name())
 
 		// Use Consume() to get all rows as a slice
 		rows, errs := tb.Consume()
@@ -111,7 +116,7 @@ func ExampleQueryV1() {
 
 	}
 
-	// Get metadata about the query
+	// Get metadata about the
 	println(dataset.Info())
 	println(dataset.Status())
 }
