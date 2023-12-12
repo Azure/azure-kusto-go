@@ -464,6 +464,60 @@ func TestQueries(t *testing.T) {
 	}
 }
 
+func TestIterativeQuery(t *testing.T) {
+	t.Parallel()
+
+	if skipETOE || testing.Short() {
+		t.Skipf("end to end tests disabled: missing config.json file in etoe directory")
+	}
+
+	_, cancel := context.WithCancel(context.Background())
+	defer cancel()
+	client, err := azkustodata.New(testConfig.kcsb)
+	if err != nil {
+		panic(err)
+	}
+
+	t.Cleanup(func() {
+		t.Log("Closing client")
+		require.NoError(t, client.Close())
+		t.Log("Closed client")
+	})
+
+	allDataTypesTable := fmt.Sprintf("goe2e_v2_all_data_types_%d_%d", time.Now().UnixNano(), rand.Int())
+	err = testshared.CreateAllDataTypesTable(t, client, allDataTypesTable)
+	require.NoError(t, err)
+
+	err = testshared.CreateAllDataTypesNullTable(t, client, allDataTypesTable+"_null")
+	require.NoError(t, err)
+
+	v2, err := client.IterativeQuery(context.Background(), testConfig.Database, kql.New("").AddTable(allDataTypesTable).AddLiteral(";").AddTable(allDataTypesTable+"_null"))
+
+	require.NoError(t, err)
+
+	res := getExpectedResult()
+
+	for tableResult := range v2.Results() {
+		require.NoError(t, tableResult.Err())
+
+		tb := tableResult.Table()
+		if tb.Name() == allDataTypesTable {
+			rows, errs := tb.GetAllRows()
+			require.Nilf(t, errs, "TestIterativeQuery: had table.GetAllTables() error: %s", errs)
+			structs, err := query.ToStructs[AllDataType](rows)
+			require.NoError(t, err)
+			require.Equal(t, []AllDataType{res}, structs)
+		}
+		if tb.Name() == allDataTypesTable+"_null" {
+			rows, errs := tb.GetAllRows()
+			require.Nilf(t, errs, "TestIterativeQuery: had table.GetAllTables() error: %s", errs)
+			structs, err := query.ToStructs[AllDataType](rows)
+			require.NoError(t, err)
+			require.Equal(t, []AllDataType{{}}, structs)
+		}
+	}
+}
+
 func TestQueryV2(t *testing.T) {
 	t.Parallel()
 
@@ -491,29 +545,31 @@ func TestQueryV2(t *testing.T) {
 	err = testshared.CreateAllDataTypesNullTable(t, client, allDataTypesTable+"_null")
 	require.NoError(t, err)
 
-	v2, err := client.StreamingQuery(context.Background(), testConfig.Database, kql.New("").AddTable(allDataTypesTable).AddLiteral(";").AddTable(allDataTypesTable+"_null"))
+	v2, err := client.QueryNew(context.Background(), testConfig.Database, kql.New("").AddTable(allDataTypesTable).AddLiteral(";").AddTable(allDataTypesTable+"_null"))
 
 	require.NoError(t, err)
 
 	res := getExpectedResult()
 
-	for tableResult := range v2.Results() {
-		require.NoError(t, tableResult.Err())
-
-		tb := tableResult.Table()
-		if tb.Name() == allDataTypesTable {
-			rows, errs := tb.GetAllRows()
-			require.Nilf(t, errs, "TestQueryV2: had table.GetAllTables() error: %s", errs)
-			structs, err := query.ToStructs[AllDataType](rows)
-			require.NoError(t, err)
-			require.Equal(t, []AllDataType{res}, structs)
-		}
-		if tb.Name() == allDataTypesTable+"_null" {
-			rows, errs := tb.GetAllRows()
-			require.Nilf(t, errs, "TestQueryV2: had table.GetAllTables() error: %s", errs)
-			structs, err := query.ToStructs[AllDataType](rows)
-			require.NoError(t, err)
-			require.Equal(t, []AllDataType{{}}, structs)
+	// Iterate 3 times to assure the data is not consumed
+	for i := 0; i < 3; i++ {
+		tables, errs := v2.GetAllTables()
+		require.Nil(t, errs)
+		for _, tb := range tables {
+			if tb.Name() == allDataTypesTable {
+				rows, errs := tb.GetAllRows()
+				require.Nilf(t, errs, "TestIterativeQuery: had table.GetAllTables() error: %s", errs)
+				structs, err := query.ToStructs[AllDataType](rows)
+				require.NoError(t, err)
+				require.Equal(t, []AllDataType{res}, structs)
+			}
+			if tb.Name() == allDataTypesTable+"_null" {
+				rows, errs := tb.GetAllRows()
+				require.Nilf(t, errs, "TestIterativeQuery: had table.GetAllTables() error: %s", errs)
+				structs, err := query.ToStructs[AllDataType](rows)
+				require.NoError(t, err)
+				require.Equal(t, []AllDataType{{}}, structs)
+			}
 		}
 	}
 }

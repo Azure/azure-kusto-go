@@ -203,36 +203,22 @@ func (c *Client) newV1(
 	return v1.NewDatasetFromReader(ctx, opQuery, res)
 }
 
-func (c *Client) QueryNew(ctx context.Context, db string, kqlQuery Statement, options ...QueryOption) (v1.Dataset, error) {
-	return c.newV1(errors.OpQuery, queryCall, ctx, db, kqlQuery, options...)
-}
-
 func (c *Client) MgmtNew(ctx context.Context, db string, kqlQuery Statement, options ...QueryOption) (v1.Dataset, error) {
 	return c.newV1(errors.OpMgmt, mgmtCall, ctx, db, kqlQuery, options...)
 }
 
-func (c *Client) StreamingQuery(ctx context.Context, db string, kqlQuery Statement, options ...QueryOption) (queryv2.StreamingDataset, error) {
-	ctx, cancel := contextSetup(ctx)
-
-	options = append(options, V2NewlinesBetweenFrames())
-	options = append(options, V2FragmentPrimaryTables())
-	options = append(options, ResultsErrorReportingPlacement(ResultsErrorReportingPlacementEndOfTable))
-
-	opQuery := errors.OpQuery
-	opts, err := setQueryOptions(ctx, opQuery, kqlQuery, queryCall, options...)
+func (c *Client) QueryNew(ctx context.Context, db string, kqlQuery Statement, options ...QueryOption) (queryv2.Dataset, error) {
+	_, res, err := c.newV2(ctx, db, kqlQuery, options)
 	if err != nil {
 		return nil, err
 	}
 
-	conn, err := c.getConn(queryCall, connOptions{queryOptions: opts})
-	if err != nil {
-		return nil, err
-	}
+	return queryv2.NewFullDataSet(ctx, res)
+}
 
-	res, err := conn.rawQuery(ctx, db, kqlQuery, opts)
-
+func (c *Client) IterativeQuery(ctx context.Context, db string, kqlQuery Statement, options ...QueryOption) (queryv2.StreamingDataset, error) {
+	opts, res, err := c.newV2(ctx, db, kqlQuery, options)
 	if err != nil {
-		cancel()
 		return nil, err
 	}
 
@@ -242,6 +228,33 @@ func (c *Client) StreamingQuery(ctx context.Context, db string, kqlQuery Stateme
 	}
 
 	return queryv2.NewStreamingDataSet(ctx, res, capacity), nil
+}
+
+func (c *Client) newV2(ctx context.Context, db string, kqlQuery Statement, options []QueryOption) (*queryOptions, io.ReadCloser, error) {
+	ctx, cancel := contextSetup(ctx)
+
+	options = append(options, V2NewlinesBetweenFrames())
+	options = append(options, V2FragmentPrimaryTables())
+	options = append(options, ResultsErrorReportingPlacement(ResultsErrorReportingPlacementEndOfTable))
+
+	opQuery := errors.OpQuery
+	opts, err := setQueryOptions(ctx, opQuery, kqlQuery, queryCall, options...)
+	if err != nil {
+		return nil, nil, err
+	}
+
+	conn, err := c.getConn(queryCall, connOptions{queryOptions: opts})
+	if err != nil {
+		return nil, nil, err
+	}
+
+	res, err := conn.rawQuery(ctx, db, kqlQuery, opts)
+
+	if err != nil {
+		cancel()
+		return nil, nil, err
+	}
+	return opts, res, nil
 }
 
 func (c *Client) QueryToJson(ctx context.Context, db string, query Statement, options ...QueryOption) (string, error) {

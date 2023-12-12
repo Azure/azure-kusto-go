@@ -27,7 +27,7 @@ func ExampleQueryV1() {
 
 	// Simple query - single table
 
-	dataset, err := client.QueryNew(ctx, "Samples", kql.New("PopulationData"))
+	dataset, err := client.MgmtNew(ctx, "Samples", kql.New(".show tables"))
 
 	if err != nil {
 		panic(err)
@@ -100,18 +100,19 @@ func ExampleQueryV1() {
 
 			// Or convert the row to a struct
 
-			type PopulationData struct {
-				State string
-				Pop   int `kusto:"Population"` // use the kusto tag to map to a different column name
+			type ShowTables struct {
+				TableName string
+				Database  string `kusto:"DatabaseName"` // You can use tags to map to different column names
+				Folder    string
+				DocString string
 			}
 
-			var pd PopulationData
-			err := row.ToStruct(&pd)
+			var tableData ShowTables
+			err := row.ToStruct(&tableData)
 			if err != nil {
 				panic(err)
 			}
-			println(pd.State)
-			println(pd.Pop)
+			println(tableData.TableName)
 		}
 
 	}

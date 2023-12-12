@@ -27,7 +27,7 @@ func ExampleQueryV2() {
 
 	// Simple query - single table
 
-	dataset, err := client.StreamingQuery(ctx, "Samples", kql.New("PopulationData"))
+	dataset, err := client.IterativeQuery(ctx, "Samples", kql.New("PopulationData"))
 
 	if err != nil {
 		panic(err)
