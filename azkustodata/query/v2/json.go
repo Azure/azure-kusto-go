@@ -53,7 +53,7 @@ func (f *EveryFrame) Decode() (Frame, error) {
 	}
 }
 
-func ReadFrames(r io.Reader, ch chan<- Frame) error {
+func ReadFramesIterative(r io.Reader, ch chan<- Frame) error {
 	defer close(ch)
 
 	dec := json.NewDecoder(&skipReader{r: r})
@@ -77,6 +77,27 @@ func ReadFrames(r io.Reader, ch chan<- Frame) error {
 
 		ch <- f
 	}
+}
+
+func ReadFramesFull(r io.Reader) ([]Frame, error) {
+	dec := json.NewDecoder(r)
+	dec.UseNumber()
+
+	var rawFrames []EveryFrame
+	err := dec.Decode(&rawFrames)
+	if err != nil {
+		return nil, err
+	}
+
+	frames := make([]Frame, len(rawFrames))
+	for i, f := range rawFrames {
+		frames[i], err = f.Decode()
+		if err != nil {
+			return nil, err
+		}
+	}
+
+	return frames, nil
 }
 
 type skipReader struct {

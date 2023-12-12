@@ -42,3 +42,34 @@ func NewFullTable(d query.Dataset, dt *DataTable) (query.Table, error) {
 
 	return query.NewFullTable(d, int64(dt.TableId), strconv.Itoa(dt.TableId), dt.TableName, dt.TableKind, columns, rows, nil), nil
 }
+
+func parseColumns(th *TableHeader, columns []query.Column, op errors.Op) *errors.Error {
+	for i, c := range th.Columns {
+		columns[i] = query.NewColumn(i, c.ColumnName, types.Column(c.ColumnType))
+		if !columns[i].Type().Valid() {
+			return errors.ES(op, errors.KClientArgs, "column[%d] if of type %q, which is not valid", i, c.ColumnType)
+		}
+	}
+	return nil
+}
+func parseRow(r []interface{}, t table) (query.Row, *errors.Error) {
+	values := make(value.Values, len(r))
+	columns := t.Columns()
+	for j, v := range r {
+		parsed := value.Default(columns[j].Type())
+		err := parsed.Unmarshal(v)
+		if err != nil {
+			return nil, errors.ES(t.Op(), errors.KInternal, "unable to unmarshal column %s into A %s value: %s", columns[j].Name(), columns[j].Type(), err)
+		}
+		values[j] = parsed
+	}
+	row := query.NewRow(t, t.RowCount(), values)
+	return row, nil
+}
+
+type table interface {
+	query.Table
+	RowCount() int
+	addRawRows(rows RawRows)
+	close([]OneApiError)
+}

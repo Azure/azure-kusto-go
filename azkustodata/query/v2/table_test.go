@@ -36,7 +36,7 @@ func TestNewFullTable_WithValidDataTable(t *testing.T) {
 	assert.Equal(t, dt.TableName, "AllDataTypes")
 	assert.Equal(t, dt.TableKind, "PrimaryResult")
 
-	rows, errs := table.Consume()
+	rows, errs := table.GetAllRows()
 	assert.Nil(t, errs)
 
 	assert.Lenf(t, rows, 1, "expected 1 row, got %d", len(rows))

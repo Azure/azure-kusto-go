@@ -502,15 +502,15 @@ func TestQueryV2(t *testing.T) {
 
 		tb := tableResult.Table()
 		if tb.Name() == allDataTypesTable {
-			rows, errs := tb.Consume()
-			require.Nilf(t, errs, "TestQueryV2: had table.Consume() error: %s", errs)
+			rows, errs := tb.GetAllRows()
+			require.Nilf(t, errs, "TestQueryV2: had table.GetAllTables() error: %s", errs)
 			structs, err := query.ToStructs[AllDataType](rows)
 			require.NoError(t, err)
 			require.Equal(t, []AllDataType{res}, structs)
 		}
 		if tb.Name() == allDataTypesTable+"_null" {
-			rows, errs := tb.Consume()
-			require.Nilf(t, errs, "TestQueryV2: had table.Consume() error: %s", errs)
+			rows, errs := tb.GetAllRows()
+			require.Nilf(t, errs, "TestQueryV2: had table.GetAllTables() error: %s", errs)
 			structs, err := query.ToStructs[AllDataType](rows)
 			require.NoError(t, err)
 			require.Equal(t, []AllDataType{{}}, structs)

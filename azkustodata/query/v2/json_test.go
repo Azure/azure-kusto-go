@@ -27,7 +27,7 @@ func TestReadFramesWithValidInput(t *testing.T) {
 	errChan := make(chan error)
 
 	go func() {
-		err := ReadFrames(strings.NewReader(validFrames), ch)
+		err := ReadFramesIterative(strings.NewReader(validFrames), ch)
 		errChan <- err
 	}()
 
@@ -108,7 +108,7 @@ func TestReadFramesWithErrors(t *testing.T) {
 	errChan := make(chan error)
 
 	go func() {
-		err := ReadFrames(strings.NewReader(errorFrames), ch)
+		err := ReadFramesIterative(strings.NewReader(errorFrames), ch)
 		errChan <- err
 		require.NoError(t, err)
 	}()
@@ -223,7 +223,7 @@ func TestReadFramesWithEmptyInput(t *testing.T) {
 	errChan := make(chan error)
 
 	go func() {
-		err := ReadFrames(strings.NewReader(src), ch)
+		err := ReadFramesIterative(strings.NewReader(src), ch)
 		errChan <- err
 	}()
 
@@ -244,7 +244,7 @@ func TestReadFramesWithInvalidInput(t *testing.T) {
 	errChan := make(chan error)
 
 	go func() {
-		err := ReadFrames(strings.NewReader(src), ch)
+		err := ReadFramesIterative(strings.NewReader(src), ch)
 		errChan <- err
 	}()
 
@@ -266,7 +266,7 @@ func TestReadFramesWithInvalidFrameType(t *testing.T) {
 	errChan := make(chan error)
 
 	go func() {
-		err := ReadFrames(strings.NewReader(src), ch)
+		err := ReadFramesIterative(strings.NewReader(src), ch)
 		errChan <- err
 	}()
 
@@ -287,7 +287,7 @@ func TestReadFramesWithInvalidFrame(t *testing.T) {
 	errChan := make(chan error)
 
 	go func() {
-		err := ReadFrames(strings.NewReader(src), ch)
+		err := ReadFramesIterative(strings.NewReader(src), ch)
 		errChan <- err
 	}()
 

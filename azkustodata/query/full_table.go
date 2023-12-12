@@ -29,6 +29,6 @@ func NewFullTable(ds Dataset, ordinal int64, id string, name string, kind string
 	return t
 }
 
-func (t *fullTable) Consume() ([]Row, []error) {
+func (t *fullTable) GetAllRows() ([]Row, []error) {
 	return t.rows, nil
 }

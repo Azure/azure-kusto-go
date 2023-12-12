@@ -17,6 +17,14 @@ type TableIndexRow struct {
 	PrettyName string
 }
 
+var primaryResultIndexRow = &TableIndexRow{
+	Ordinal:    0,
+	Kind:       "QueryResult",
+	Name:       "PrimaryResult",
+	Id:         "00000000-0000-0000-0000-000000000000",
+	PrettyName: "",
+}
+
 type QueryStatus struct {
 	Timestamp         time.Time
 	Severity          int32
@@ -65,6 +73,17 @@ func NewDataset(ctx context.Context, op errors.Op, v1 V1) (Dataset, error) {
 		return nil, errors.ES(d.Op(), errors.KInternal, "kusto query failed: no tables returned")
 	}
 
+	// Special case - if there is only one table, it is the primary result
+	if len(v1.Tables) == 1 {
+		table, err := NewFullTable(d, &v1.Tables[0], primaryResultIndexRow)
+		if err != nil {
+			return nil, err
+		}
+
+		d.results = append(d.results, table)
+		return d, nil
+	}
+
 	// index is always the last table
 	lastTable := &v1.Tables[len(v1.Tables)-1]
 
@@ -107,7 +126,7 @@ func parseTable[T any](table *RawTable, d *dataset, index *TableIndexRow) ([]T, 
 		return nil, err
 	}
 
-	indexRows, errs := fullTable.Consume()
+	indexRows, errs := fullTable.GetAllRows()
 	if errs != nil {
 		return nil, errors.GetCombinedError(errs...)
 	}

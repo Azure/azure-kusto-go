@@ -211,7 +211,7 @@ func (c *Client) MgmtNew(ctx context.Context, db string, kqlQuery Statement, opt
 	return c.newV1(errors.OpMgmt, mgmtCall, ctx, db, kqlQuery, options...)
 }
 
-func (c *Client) StreamingQuery(ctx context.Context, db string, kqlQuery Statement, options ...QueryOption) (queryv2.Dataset, error) {
+func (c *Client) StreamingQuery(ctx context.Context, db string, kqlQuery Statement, options ...QueryOption) (queryv2.StreamingDataset, error) {
 	ctx, cancel := contextSetup(ctx)
 
 	options = append(options, V2NewlinesBetweenFrames())
@@ -241,7 +241,7 @@ func (c *Client) StreamingQuery(ctx context.Context, db string, kqlQuery Stateme
 		capacity = opts.v2FrameCapacity
 	}
 
-	return queryv2.NewDataSet(ctx, res, capacity), nil
+	return queryv2.NewStreamingDataSet(ctx, res, capacity), nil
 }
 
 func (c *Client) QueryToJson(ctx context.Context, db string, query Statement, options ...QueryOption) (string, error) {

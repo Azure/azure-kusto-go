@@ -31,31 +31,19 @@ type QueryCompletionInformation struct {
 const QueryPropertiesKind = "QueryProperties"
 const QueryCompletionInformationKind = "QueryCompletionInformation"
 
-func (d *dataSet) setQueryProperties(queryProperties []QueryProperties) {
+func (d *streamingDataset) setQueryProperties(queryProperties []QueryProperties) {
 	d.lock.Lock()
 	defer d.lock.Unlock()
 	d.queryProperties = queryProperties
 }
 
-func (d *dataSet) setQueryCompletionInformation(queryCompletionInformation []QueryCompletionInformation) {
+func (d *streamingDataset) setQueryCompletionInformation(queryCompletionInformation []QueryCompletionInformation) {
 	d.lock.Lock()
 	defer d.lock.Unlock()
 	d.queryCompletionInformation = queryCompletionInformation
 }
 
-func (d *dataSet) QueryProperties() []QueryProperties {
-	d.lock.RLock()
-	defer d.lock.RUnlock()
-	return d.queryProperties
-}
-
-func (d *dataSet) QueryCompletionInformation() []QueryCompletionInformation {
-	d.lock.RLock()
-	defer d.lock.RUnlock()
-	return d.queryCompletionInformation
-}
-
-func (d *dataSet) parseSecondaryTable(t query.Table) error {
+func (d *baseDataset) parseSecondaryTable(t query.Table) error {
 	d.lock.Lock()
 	defer d.lock.Unlock()
 
@@ -64,7 +52,7 @@ func (d *dataSet) parseSecondaryTable(t query.Table) error {
 		if d.queryProperties != nil {
 			return errors.ES(errors.OpUnknown, errors.KInternal, "query properties already initialized")
 		}
-		rows, err := t.Consume()
+		rows, err := t.GetAllRows()
 		if err != nil {
 			return errors.GetCombinedError(err...)
 		}
@@ -80,7 +68,7 @@ func (d *dataSet) parseSecondaryTable(t query.Table) error {
 		if d.queryCompletionInformation != nil {
 			return errors.ES(errors.OpUnknown, errors.KInternal, "query properties already initialized")
 		}
-		rows, err := t.Consume()
+		rows, err := t.GetAllRows()
 		if err != nil {
 			return errors.GetCombinedError(err...)
 		}

@@ -73,7 +73,7 @@ func TestDatasetSuccess(t *testing.T) {
 		A int32 `kusto:"a"`
 	}
 
-	table1Rows, errs := ds.Results()[0].Consume()
+	table1Rows, errs := ds.Results()[0].GetAllRows()
 	assert.Nil(t, errs)
 	expectedTable1 := []firstTable{
 		{A: 1},
@@ -90,7 +90,7 @@ func TestDatasetSuccess(t *testing.T) {
 		B int32  `kusto:"b"`
 	}
 
-	table2Rows, errs := ds.Results()[1].Consume()
+	table2Rows, errs := ds.Results()[1].GetAllRows()
 	assert.Nil(t, errs)
 	expectedTable2Rows := []secondTable{
 		{A: "a", B: 1},

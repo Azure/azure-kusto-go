@@ -62,8 +62,8 @@ func ExampleQueryV2() {
 		// 1. SkipToEnd() - skips all rows and closes the table
 		table.SkipToEnd()
 
-		// 2. Consume() - reads all rows and closes the table
-		rows, errors := table.Consume()
+		// 2. GetAllTables() - reads all rows and closes the table
+		rows, errors := table.GetAllRows()
 		for _, row := range rows {
 			println(row.Ordinal())
 		}
@@ -130,12 +130,12 @@ func ExampleQueryV2() {
 	}
 
 	// Alternatively, you can consume the stream and get tables
-	tables, errors := dataset.Consume()
+	tables, errors := dataset.GetAllTables()
 	if len(errors) > 0 {
 		panic(errors[0])
 	}
 	// Now you can access tables and row with random access
-	rows, errors := tables[1].Consume()
+	rows, errors := tables[1].GetAllRows()
 	println(rows, errors)
 
 	// Get metadata about the query (if it was consumed - otherwise it will be nil)

@@ -3,8 +3,6 @@ package v2
 import (
 	"github.com/Azure/azure-kusto-go/azkustodata/errors"
 	"github.com/Azure/azure-kusto-go/azkustodata/query"
-	"github.com/Azure/azure-kusto-go/azkustodata/types"
-	"github.com/Azure/azure-kusto-go/azkustodata/value"
 	"strconv"
 	"sync"
 )
@@ -18,6 +16,10 @@ type streamingTable struct {
 	skip     bool
 	end      chan bool
 	closed   bool
+}
+
+func (t *streamingTable) addRawRows(rows RawRows) {
+	t.rawRows <- rows
 }
 
 func (t *streamingTable) RowCount() int {
@@ -53,11 +55,9 @@ func NewStreamingTable(dataset query.Dataset, th *TableHeader) (query.StreamingT
 	}
 
 	columns := t.Columns()
-	for i, c := range th.Columns {
-		columns[i] = query.NewColumn(i, c.ColumnName, types.Column(c.ColumnType))
-		if !columns[i].Type().Valid() {
-			return nil, errors.ES(t.Op(), errors.KClientArgs, "column[%d] if of type %q, which is not valid", i, c.ColumnType)
-		}
+	err := parseColumns(th, columns, t.Op())
+	if err != nil {
+		return nil, err
 	}
 
 	go t.readRows()
@@ -101,25 +101,18 @@ func (t *streamingTable) readRows() {
 			if t.Skip() {
 				t.rows <- query.RowResultError(errors.ES(t.Op(), errors.KInternal, skipError))
 			} else {
-				values := make(value.Values, len(r))
-				columns := t.Columns()
-				for j, v := range r {
-					parsed := value.Default(columns[j].Type())
-					err := parsed.Unmarshal(v)
-					if err != nil {
-						t.rows <- query.RowResultError(errors.ES(t.Op(), errors.KInternal, "unable to unmarshal column %s into A %s value: %s", columns[j].Name(), columns[j].Type(), err))
-						continue
-					}
-					values[j] = parsed
+				row, err := parseRow(r, t)
+				if err != nil {
+					t.rows <- query.RowResultError(err)
+					continue
 				}
-				t.rows <- query.RowResultSuccess(query.NewRow(t, t.RowCount(), values))
+				t.rows <- query.RowResultSuccess(row)
 			}
 			t.rowCount++
 		}
 	}
 	t.end <- true
 }
-
 func (t *streamingTable) Rows() <-chan query.RowResult {
 	return t.rows
 }
@@ -137,7 +130,7 @@ func (t *streamingTable) SkipToEnd() []error {
 	return errs
 }
 
-func (t *streamingTable) Consume() ([]query.Row, []error) {
+func (t *streamingTable) GetAllRows() ([]query.Row, []error) {
 	var rows []query.Row
 	var errs []error
 	for r := range t.rows {

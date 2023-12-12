@@ -1,6 +1,7 @@
 package query
 
 import (
+	"github.com/Azure/azure-kusto-go/azkustodata/errors"
 	"github.com/Azure/azure-kusto-go/azkustodata/value"
 )
 
@@ -37,8 +38,23 @@ type Row interface {
 	String() string
 }
 
-// ToStructs converts the rows into a slice of structs.
-func ToStructs[T any](rows []Row) ([]T, error) {
+// ToStructs converts a table or a slice of rows into a slice of structs.
+func ToStructs[T any](data interface{}) ([]T, error) {
+	var rows []Row
+	if t, ok := data.(Table); ok {
+		var errs []error
+		rows, errs = t.GetAllRows()
+		if errs != nil {
+			return nil, errors.GetCombinedError(errs...)
+		}
+	} else if r, ok := data.([]Row); ok {
+		rows = r
+	} else if r, ok := data.(Row); ok {
+		rows = []Row{r}
+	} else {
+		return nil, errors.ES(errors.OpUnknown, errors.KInternal, "invalid data type - expected Table or []Row")
+	}
+
 	if len(rows) == 0 {
 		return nil, nil
 	}

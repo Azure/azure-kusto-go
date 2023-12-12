@@ -55,8 +55,8 @@ func ExampleQueryV1() {
 		stateCol := tb.ColumnByName("State")
 		println(stateCol.Name())
 
-		// Use Consume() to get all rows as a slice
-		rows, errs := tb.Consume()
+		// Use GetAllTables() to get all rows as a slice
+		rows, errs := tb.GetAllRows()
 
 		// Make sure to always check for errors
 		if errs != nil {
