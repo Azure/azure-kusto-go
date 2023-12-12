@@ -10,9 +10,8 @@ import (
 
 type fullDataset struct {
 	baseDataset
-	frames                []Frame
-	currentFrame          int
-	currentStreamingTable *streamingTable
+	frames       []Frame
+	currentFrame int
 
 	tables []query.Table
 	errors []error
@@ -51,12 +50,12 @@ func (d *fullDataset) newTableFromHeader(th *TableHeader) (table, error) {
 		return nil, err
 	}
 
-	return fragmentedTable{Table: query.NewFullTable(d, int64(th.TableId), strconv.Itoa(th.TableId), th.TableName, th.TableKind, columns, nil, nil)}, nil
+	return &fragmentedTable{Table: query.NewFullTable(d, int64(th.TableId), strconv.Itoa(th.TableId), th.TableName, th.TableKind, columns, nil, nil)}, nil
 }
 
-func (d *fullDataset) finishTable(t table) {
-	f := t.(*fragmentedTable)
-	d.tables = append(d.tables, query.NewFullTable(d, t.Ordinal(), t.Id(), t.Name(), t.Kind(), t.Columns(), f.rows, f.errors))
+func (d *fullDataset) onFinishTable() {
+	f := d.currentTable.(*fragmentedTable)
+	d.tables = append(d.tables, query.NewFullTable(d, f.Ordinal(), f.Id(), f.Name(), f.Kind(), f.Columns(), f.rows, f.errors))
 }
 
 func (d *fullDataset) getNextFrame() Frame {
@@ -91,7 +90,8 @@ func NewFullDataSet(ctx context.Context, r io.ReadCloser) (Dataset, error) {
 	}
 
 	d := &fullDataset{
-		baseDataset: *newBaseDataset(query.NewDataset(ctx, errors.OpQuery)),
+		// We don't need a real mutex here - everything happens synchronously
+		baseDataset: *newBaseDataset(query.NewDataset(ctx, errors.OpQuery), true),
 		frames:      full,
 	}
 

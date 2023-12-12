@@ -57,13 +57,16 @@ func (d *streamingDataset) reportError(err error) {
 	d.results <- query.TableResultError(err)
 }
 
-func (d *streamingDataset) finishTable(t table) {
-	d.results <- query.TableResultSuccess(t.(*streamingTable))
+func (d *streamingDataset) onFinishHeader() {
+	d.results <- query.TableResultSuccess(d.currentTable.(*streamingTable))
 }
 
 func (d *streamingDataset) newTableFromHeader(th *TableHeader) (table, error) {
 	newStreamingTable, e := NewStreamingTable(d, th)
-	return newStreamingTable.(*streamingTable), e
+	if e != nil {
+		return nil, e
+	}
+	return newStreamingTable.(*streamingTable), nil
 }
 
 func (d *streamingDataset) close() {
@@ -97,7 +100,7 @@ func (d *streamingDataset) GetAllTables() ([]query.Table, []error) {
 // The capacity parameter is the capacity of the channel that receives the frames from the Kusto service.
 func NewStreamingDataSet(ctx context.Context, r io.ReadCloser, capacity int) StreamingDataset {
 	d := &streamingDataset{
-		baseDataset:  *newBaseDataset(query.NewDataset(ctx, errors.OpQuery)),
+		baseDataset:  *newBaseDataset(query.NewDataset(ctx, errors.OpQuery), false),
 		reader:       r,
 		frames:       make(chan Frame, capacity),
 		errorChannel: make(chan error, 1),

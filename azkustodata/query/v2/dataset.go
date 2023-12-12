@@ -3,6 +3,7 @@ package v2
 import (
 	"github.com/Azure/azure-kusto-go/azkustodata/errors"
 	"github.com/Azure/azure-kusto-go/azkustodata/query"
+	"github.com/Azure/azure-kusto-go/azkustodata/utils"
 	"sync"
 )
 
@@ -25,12 +26,17 @@ type baseDataset struct {
 	queryCompletionInformation []QueryCompletionInformation
 	// currentTable is a reference to the current table, which is still receiving rows.
 	currentTable table
-	lock         sync.RWMutex
+	lock         utils.RWMutex
 }
 
-func newBaseDataset(dataset query.Dataset) *baseDataset {
+func newBaseDataset(dataset query.Dataset, fakeLock bool) *baseDataset {
+	var lock utils.RWMutex = &utils.FakeMutex{}
+	if !fakeLock {
+		lock = &sync.RWMutex{}
+	}
 	return &baseDataset{
 		Dataset: dataset,
+		lock:    lock,
 	}
 }
 
@@ -75,7 +81,7 @@ func decodeTables(d dataset) {
 				d.reportError(err)
 				break
 			}
-		} else if parseStreamingTable(d, f) {
+		} else if parsePrimaryTable(d, f) {
 			continue
 		} else {
 			err := errors.ES(op, errors.KInternal, "unknown frame type")
@@ -85,8 +91,7 @@ func decodeTables(d dataset) {
 	}
 }
 
-func parseStreamingTable(d dataset, f Frame) bool {
-
+func parsePrimaryTable(d dataset, f Frame) bool {
 	table := d.getCurrentTable()
 
 	if th, ok := f.(*TableHeader); ok {
@@ -107,7 +112,7 @@ func parseStreamingTable(d dataset, f Frame) bool {
 			return false
 		}
 		d.setCurrentTable(t)
-		d.finishTable(t)
+		d.onFinishHeader()
 	} else if tf, ok := f.(*TableFragment); ok {
 		if table == nil {
 			err := errors.ES(d.Op(), errors.KInternal, "received a TableFragment frame while no streaming table was open")
@@ -138,6 +143,7 @@ func parseStreamingTable(d dataset, f Frame) bool {
 			d.reportError(err)
 		}
 
+		d.onFinishTable()
 		d.setCurrentTable(nil)
 	}
 
@@ -214,6 +220,11 @@ func (d *baseDataset) setCurrentTable(currentStreamingTable table) {
 	defer d.lock.Unlock()
 	d.currentTable = currentStreamingTable
 }
+func (d *baseDataset) onFinishHeader() {
+}
+
+func (d *baseDataset) onFinishTable() {
+}
 
 func (d *baseDataset) close() {
 }
@@ -241,7 +252,8 @@ type dataset interface {
 	newTableFromHeader(th *TableHeader) (table, error)
 	getNextFrame() Frame
 	reportError(err error)
-	finishTable(t table)
+	onFinishHeader()
+	onFinishTable()
 	parseSecondaryTable(t query.Table) error
 	close()
 }
