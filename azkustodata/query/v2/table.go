@@ -8,7 +8,7 @@ import (
 	"strconv"
 )
 
-func NewFullTable(d query.Dataset, dt *DataTable) (query.Table, error) {
+func NewDataTable(d query.Dataset, dt *DataTable) (query.Table, error) {
 	op := errors.OpUnknown
 	if d != nil {
 		op = d.Op()
@@ -40,7 +40,7 @@ func NewFullTable(d query.Dataset, dt *DataTable) (query.Table, error) {
 		rows[i] = query.NewRow(nil, i, values)
 	}
 
-	return query.NewFullTable(d, int64(dt.TableId), strconv.Itoa(dt.TableId), dt.TableName, dt.TableKind, columns, rows, nil), nil
+	return query.NewDataTable(d, int64(dt.TableId), strconv.Itoa(dt.TableId), dt.TableName, dt.TableKind, columns, rows, nil), nil
 }
 
 func parseColumns(th *TableHeader, columns []query.Column, op errors.Op) *errors.Error {

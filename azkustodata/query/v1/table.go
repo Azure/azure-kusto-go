@@ -7,7 +7,7 @@ import (
 	"github.com/Azure/azure-kusto-go/azkustodata/value"
 )
 
-func NewFullTable(d query.Dataset, dt *RawTable, index *TableIndexRow) (query.Table, error) {
+func NewDataTable(d query.Dataset, dt *RawTable, index *TableIndexRow) (query.Table, error) {
 	var id string
 	var kind string
 	var name string
@@ -65,5 +65,5 @@ func NewFullTable(d query.Dataset, dt *RawTable, index *TableIndexRow) (query.Ta
 		rows = append(rows, query.NewRow(nil, i, values))
 	}
 
-	return query.NewFullTable(d, ordinal, id, name, kind, columns, rows, errs), nil
+	return query.NewDataTable(d, ordinal, id, name, kind, columns, rows, errs), nil
 }

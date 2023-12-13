@@ -90,7 +90,7 @@ func (d *streamingDataset) GetAllTables() ([]query.Table, []error) {
 		}
 
 		rows, errs2 := table.GetAllRows()
-		tables = append(tables, query.NewFullTable(d, table.Ordinal(), table.Id(), table.Name(), table.Kind(), table.Columns(), rows, errs2))
+		tables = append(tables, query.NewDataTable(d, table.Ordinal(), table.Id(), table.Name(), table.Kind(), table.Columns(), rows, errs2))
 	}
 
 	return tables, errs

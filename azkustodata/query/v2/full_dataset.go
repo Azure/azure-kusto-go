@@ -50,12 +50,12 @@ func (d *fullDataset) newTableFromHeader(th *TableHeader) (table, error) {
 		return nil, err
 	}
 
-	return &fragmentedTable{Table: query.NewFullTable(d, int64(th.TableId), strconv.Itoa(th.TableId), th.TableName, th.TableKind, columns, make([]query.Row, 0), make([]error, 0))}, nil
+	return &fragmentedTable{Table: query.NewDataTable(d, int64(th.TableId), strconv.Itoa(th.TableId), th.TableName, th.TableKind, columns, make([]query.Row, 0), make([]error, 0))}, nil
 }
 
 func (d *fullDataset) onFinishTable() {
 	f := d.currentTable.(*fragmentedTable)
-	d.tables = append(d.tables, query.NewFullTable(d, f.Ordinal(), f.Id(), f.Name(), f.Kind(), f.Columns(), f.rows, f.errors))
+	d.tables = append(d.tables, query.NewDataTable(d, f.Ordinal(), f.Id(), f.Name(), f.Kind(), f.Columns(), f.rows, f.errors))
 }
 
 func (d *fullDataset) getNextFrame() Frame {

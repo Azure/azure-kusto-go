@@ -75,7 +75,7 @@ func NewDataset(ctx context.Context, op errors.Op, v1 V1) (Dataset, error) {
 
 	// Special case - if there is only one table, it is the primary result
 	if len(v1.Tables) == 1 {
-		table, err := NewFullTable(d, &v1.Tables[0], primaryResultIndexRow)
+		table, err := NewDataTable(d, &v1.Tables[0], primaryResultIndexRow)
 		if err != nil {
 			return nil, err
 		}
@@ -108,7 +108,7 @@ func NewDataset(ctx context.Context, op errors.Op, v1 V1) (Dataset, error) {
 			}
 			d.info = queryInfo
 		} else if r.Kind == "QueryResult" {
-			table, err := NewFullTable(d, &v1.Tables[i], &r)
+			table, err := NewDataTable(d, &v1.Tables[i], &r)
 			if err != nil {
 				return nil, err
 			}
@@ -117,11 +117,15 @@ func NewDataset(ctx context.Context, op errors.Op, v1 V1) (Dataset, error) {
 		}
 	}
 
+	if len(d.results) == 0 {
+		return nil, errors.ES(d.Op(), errors.KInternal, "kusto query failed: no results returned")
+	}
+
 	return d, nil
 }
 
 func parseTable[T any](table *RawTable, d *dataset, index *TableIndexRow) ([]T, error) {
-	fullTable, err := NewFullTable(d, table, index)
+	fullTable, err := NewDataTable(d, table, index)
 	if err != nil {
 		return nil, err
 	}
@@ -143,6 +147,10 @@ func (d *dataset) Results() []query.Table {
 	return d.results
 }
 
+func (d *dataset) PrimaryResults() query.Table {
+	return d.results[0]
+}
+
 func (d *dataset) Index() []TableIndexRow {
 	return d.index
 }
@@ -157,6 +165,7 @@ func (d *dataset) Info() []QueryProperties {
 
 type Dataset interface {
 	query.Dataset
+	PrimaryResults() query.Table
 	Results() []query.Table
 	Index() []TableIndexRow
 	Status() []QueryStatus

@@ -71,7 +71,7 @@ func decodeTables(d dataset) {
 		} else if completion, ok := f.(*DataSetCompletion); ok {
 			d.setCompletion(completion)
 		} else if dt, ok := f.(*DataTable); ok {
-			t, err := NewFullTable(d, dt)
+			t, err := NewDataTable(d, dt)
 			if err != nil {
 				d.reportError(err)
 				break
