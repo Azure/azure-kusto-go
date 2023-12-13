@@ -207,7 +207,7 @@ func (c *Client) MgmtNew(ctx context.Context, db string, kqlQuery Statement, opt
 	return c.newV1(errors.OpMgmt, mgmtCall, ctx, db, kqlQuery, options...)
 }
 
-func (c *Client) QueryNew(ctx context.Context, db string, kqlQuery Statement, options ...QueryOption) (queryv2.Dataset, error) {
+func (c *Client) QueryNew(ctx context.Context, db string, kqlQuery Statement, options ...QueryOption) (queryv2.FullDataset, error) {
 	_, res, err := c.newV2(ctx, db, kqlQuery, options)
 	if err != nil {
 		return nil, err

@@ -11,7 +11,7 @@ import (
 //go:embed testData/success.json
 var successFile string
 
-//go:embed testData/error.json
+//go:embed testData/partialError.json
 var errorFile string
 
 func TestDecodeSuccess(t *testing.T) {

@@ -11,10 +11,32 @@ import (
 type fullDataset struct {
 	baseDataset
 	frames       []Frame
+	errors       []error
 	currentFrame int
 
 	tables []query.Table
-	errors []error
+}
+
+func (d *fullDataset) Tables() []query.Table {
+	return d.tables
+}
+
+func (d *fullDataset) TableByName(name string) query.Table {
+	for _, t := range d.tables {
+		if t.Name() == name {
+			return t
+		}
+	}
+	return nil
+}
+
+func (d *fullDataset) TableByOrdinal(ordinal int) query.Table {
+	for _, t := range d.tables {
+		if t.Ordinal() == int64(ordinal) {
+			return t
+		}
+	}
+	return nil
 }
 
 type fragmentedTable struct {
@@ -82,7 +104,7 @@ func (d *fullDataset) GetAllTables() ([]query.Table, []error) {
 	return d.tables, d.errors
 }
 
-func NewFullDataSet(ctx context.Context, r io.ReadCloser) (Dataset, error) {
+func NewFullDataSet(ctx context.Context, r io.ReadCloser) (FullDataset, error) {
 	defer r.Close()
 	full, err := ReadFramesFull(r)
 	if err != nil {

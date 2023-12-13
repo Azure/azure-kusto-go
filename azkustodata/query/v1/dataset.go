@@ -65,10 +65,6 @@ func NewDataset(ctx context.Context, op errors.Op, v1 V1) (Dataset, error) {
 		Dataset: query.NewDataset(ctx, op),
 	}
 
-	if v1.Exceptions != nil {
-		return nil, errors.ES(d.Op(), errors.KInternal, "kusto query failed: %v", v1.Exceptions)
-	}
-
 	if len(v1.Tables) == 0 {
 		return nil, errors.ES(d.Op(), errors.KInternal, "kusto query failed: no tables returned")
 	}
@@ -81,7 +77,13 @@ func NewDataset(ctx context.Context, op errors.Op, v1 V1) (Dataset, error) {
 		}
 
 		d.results = append(d.results, table)
-		return d, nil
+
+		err = nil
+		if v1.Exceptions != nil {
+			err = errors.ES(d.Op(), errors.KInternal, "exceptions: %v", v1.Exceptions)
+		}
+
+		return d, err
 	}
 
 	// index is always the last table
@@ -117,11 +119,13 @@ func NewDataset(ctx context.Context, op errors.Op, v1 V1) (Dataset, error) {
 		}
 	}
 
-	if len(d.results) == 0 {
-		return nil, errors.ES(d.Op(), errors.KInternal, "kusto query failed: no results returned")
+	err = nil
+
+	if v1.Exceptions != nil {
+		err = errors.ES(d.Op(), errors.KInternal, "exceptions: %v", v1.Exceptions)
 	}
 
-	return d, nil
+	return d, err
 }
 
 func parseTable[T any](table *RawTable, d *dataset, index *TableIndexRow) ([]T, error) {

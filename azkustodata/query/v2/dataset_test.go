@@ -14,6 +14,14 @@ import (
 	"time"
 )
 
+type firstTable struct {
+	A int
+}
+type secondTable struct {
+	A string
+	B int
+}
+
 func TestDataSet_ReadFrames_WithError(t *testing.T) {
 	t.Parallel()
 	reader := strings.NewReader("invalid")
@@ -246,21 +254,14 @@ func TestDataSet_MultiplePrimaryTables(t *testing.T) {
 	t.Parallel()
 	reader := strings.NewReader(twoTables)
 	d := NewStreamingDataSet(context.Background(), io.NopCloser(reader), DefaultFrameCapacity)
-	type Table1 struct {
-		A int
-	}
-	type Table2 struct {
-		A string
-		B int
-	}
 
-	table1Expected := []Table1{
+	table1Expected := []firstTable{
 		{A: 1},
 		{A: 2},
 		{A: 3},
 	}
 
-	table2Expected := []Table2{
+	table2Expected := []secondTable{
 		{A: "a", B: 1},
 		{A: "b", B: 2},
 		{A: "c", B: 3},
@@ -273,13 +274,13 @@ func TestDataSet_MultiplePrimaryTables(t *testing.T) {
 		for rowResult := range tb.Rows() {
 			assert.NoError(t, rowResult.Err())
 			if id == 1 {
-				var row Table1
+				var row firstTable
 				err := rowResult.Row().ToStruct(&row)
 				assert.NoError(t, err)
 				assert.Equal(t, table1Expected[rowResult.Row().Ordinal()], row)
 			}
 			if id == 2 {
-				var row Table2
+				var row secondTable
 				err := rowResult.Row().ToStruct(&row)
 				assert.NoError(t, err)
 				assert.Equal(t, table2Expected[rowResult.Row().Ordinal()], row)
@@ -341,4 +342,27 @@ func TestDataSet_DecodeTables_DataTable_WithInvalidColumnType(t *testing.T) {
 	tableResult := <-d.Results()
 	assert.Error(t, tableResult.Err())
 	assert.Contains(t, tableResult.Err().Error(), "not valid")
+}
+
+func TestDataSet_PartialErrors_Streaming(t *testing.T) {
+	t.Parallel()
+	reader := strings.NewReader(partialErrors)
+	d := NewStreamingDataSet(context.Background(), io.NopCloser(reader), DefaultFrameCapacity)
+
+	for result := range d.Results() {
+		if result.Table() != nil {
+			tb := result.Table()
+			rows, errs := tb.GetAllRows()
+
+			assert.ErrorContains(t, errs[0], "LimitsExceeded")
+
+			assert.Equal(t, 1, len(rows))
+			ft := &firstTable{}
+			assert.NoError(t, rows[0].ToStruct(ft))
+			assert.Equal(t, int(1), ft.A)
+		}
+		if result.Err() != nil {
+			assert.ErrorContains(t, result.Err(), "LimitsExceeded")
+		}
+	}
 }

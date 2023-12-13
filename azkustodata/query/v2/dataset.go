@@ -243,6 +243,13 @@ type StreamingDataset interface {
 	Results() <-chan query.TableResult
 }
 
+type FullDataset interface {
+	Dataset
+	Tables() []query.Table
+	TableByName(name string) query.Table
+	TableByOrdinal(ordinal int) query.Table
+}
+
 type dataset interface {
 	Dataset
 	setHeader(dataSetHeader *DataSetHeader)

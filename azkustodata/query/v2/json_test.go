@@ -13,8 +13,8 @@ import (
 //go:embed testData/validFrames.json
 var validFrames string
 
-//go:embed testData/error.json
-var errorFrames string
+//go:embed testData/partialError.json
+var partialErrors string
 
 //go:embed testData/twoTables.json
 var twoTables string
@@ -108,7 +108,7 @@ func TestReadFramesWithErrors(t *testing.T) {
 	errChan := make(chan error)
 
 	go func() {
-		err := ReadFramesIterative(strings.NewReader(errorFrames), ch)
+		err := ReadFramesIterative(strings.NewReader(partialErrors), ch)
 		errChan <- err
 		require.NoError(t, err)
 	}()
