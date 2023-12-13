@@ -215,10 +215,10 @@ func (d *baseDataset) getCurrentTable() table {
 	return d.currentTable
 }
 
-func (d *baseDataset) setCurrentTable(currentStreamingTable table) {
+func (d *baseDataset) setCurrentTable(currentTable table) {
 	d.lock.Lock()
 	defer d.lock.Unlock()
-	d.currentTable = currentStreamingTable
+	d.currentTable = currentTable
 }
 func (d *baseDataset) onFinishHeader() {
 }

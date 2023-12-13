@@ -23,11 +23,11 @@ type fragmentedTable struct {
 	errors []error
 }
 
-func (f fragmentedTable) RowCount() int {
+func (f *fragmentedTable) RowCount() int {
 	return len(f.rows)
 }
 
-func (f fragmentedTable) addRawRows(rows RawRows) {
+func (f *fragmentedTable) addRawRows(rows RawRows) {
 	for _, r := range rows {
 		row, err := parseRow(r, f)
 		if err != nil {
@@ -37,7 +37,7 @@ func (f fragmentedTable) addRawRows(rows RawRows) {
 	}
 }
 
-func (f fragmentedTable) close(errors []OneApiError) {
+func (f *fragmentedTable) close(errors []OneApiError) {
 	for _, e := range errors {
 		f.errors = append(f.errors, &e)
 	}
