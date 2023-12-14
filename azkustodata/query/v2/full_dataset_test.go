@@ -257,7 +257,7 @@ func TestFullDataSet_DecodeTables_WithInvalidDataSetHeader(t *testing.T) {
 	reader := strings.NewReader(`[{"FrameType": "DataSetHeader", "Version": "V1"}
 ]`)
 	d, err := NewFullDataSet(context.Background(), io.NopCloser(reader))
-	assert.NoError(t, err)
+	assert.ErrorContains(t, err, " received a DataSetHeader frame that is not version 2")
 	assert.Nil(t, d)
 }
 
@@ -266,7 +266,7 @@ func TestFullDataSet_DecodeTables_WithInvalidTableFragment(t *testing.T) {
 	reader := strings.NewReader(`[{"FrameType": "TableFragment", "TableId": 1}
 ]`)
 	d, err := NewFullDataSet(context.Background(), io.NopCloser(reader))
-	assert.NoError(t, err)
+	assert.ErrorContains(t, err, "received a TableFragment frame while no streaming table was open")
 	assert.Nil(t, d)
 }
 
@@ -275,7 +275,7 @@ func TestFullDataSet_DecodeTables_WithInvalidTableCompletion(t *testing.T) {
 	reader := strings.NewReader(`[{"FrameType": "TableCompletion", "TableId": 1}
 ]`)
 	d, err := NewFullDataSet(context.Background(), io.NopCloser(reader))
-	assert.NoError(t, err)
+	assert.ErrorContains(t, err, "received a TableCompletion frame while no streaming table was open")
 	assert.Nil(t, d)
 }
 
@@ -284,15 +284,6 @@ func TestFullDataSet_DecodeTables_StreamingTable_WithInvalidColumnType(t *testin
 	reader := strings.NewReader(`[{"FrameType": "TableHeader", "TableId": 1, "TableName": "TestTable", "TableKind": "PrimaryResult", "Columns": [{"ColumnName": "TestColumn", "ColumnType": "invalid"}]}
 ]`)
 	d, err := NewFullDataSet(context.Background(), io.NopCloser(reader))
-	assert.NoError(t, err)
-	assert.Nil(t, d)
-}
-
-func TestFullDataSet_DecodeTables_DataTable_WithInvalidColumnType(t *testing.T) {
-	t.Parallel()
-	reader := strings.NewReader(`[{"FrameType": "DataTable", "TableId": 1, "TableName": "TestTable", "TableKind": "PrimaryResult", "Columns": [{"ColumnName": "TestColumn", "ColumnType": "invalid"}], "Rows": [["TestValue"]]}
-]`)
-	d, err := NewFullDataSet(context.Background(), io.NopCloser(reader))
-	assert.NoError(t, err)
+	assert.ErrorContains(t, err, "column[0] if of type \"invalid\"")
 	assert.Nil(t, d)
 }

@@ -34,12 +34,8 @@ func TestStreamingDataSet_ReadFrames_WithError(t *testing.T) {
 	}
 
 	br, err := prepareReadBuffer(d.reader)
-	assert.NoError(t, err)
-
-	go d.readFrames(br)
-
-	err = <-d.errorChannel
-	assert.Error(t, err)
+	require.ErrorContains(t, err, "invalid")
+	require.Nil(t, br)
 }
 
 func TestStreamingDataSet_DecodeTables_WithInvalidFrame(t *testing.T) {
@@ -357,7 +353,7 @@ func TestStreamingDataSet_DecodeTables_DataTable_WithInvalidColumnType(t *testin
 	assert.Contains(t, tableResult.Err().Error(), "not valid")
 }
 
-func TestDataSet_PartialErrors_Streaming(t *testing.T) {
+func TestStreamingDataSet_PartialErrors_Streaming(t *testing.T) {
 	t.Parallel()
 	reader := strings.NewReader(partialErrors)
 	d, err := NewStreamingDataSet(context.Background(), io.NopCloser(reader), DefaultFrameCapacity)
@@ -371,7 +367,7 @@ func TestDataSet_PartialErrors_Streaming(t *testing.T) {
 			assert.ErrorContains(t, errs[0], "LimitsExceeded")
 
 			assert.Equal(t, 1, len(rows))
-			ft := &firstTable{}
+			ft := &table1{}
 			assert.NoError(t, rows[0].ToStruct(ft))
 			assert.Equal(t, int(1), ft.A)
 		}
@@ -381,7 +377,7 @@ func TestDataSet_PartialErrors_Streaming(t *testing.T) {
 	}
 }
 
-func TestDataSet_PartialErrors_GetAll(t *testing.T) {
+func TestStreamingDataSet_PartialErrors_GetAll(t *testing.T) {
 	t.Parallel()
 	reader := strings.NewReader(partialErrors)
 	d, err := NewStreamingDataSet(context.Background(), io.NopCloser(reader), DefaultFrameCapacity)
@@ -396,21 +392,17 @@ func TestDataSet_PartialErrors_GetAll(t *testing.T) {
 		assert.ErrorContains(t, errs[0], "LimitsExceeded")
 
 		assert.Equal(t, 1, len(rows))
-		ft := &firstTable{}
+		ft := &table1{}
 		assert.NoError(t, rows[0].ToStruct(ft))
 		assert.Equal(t, int(1), ft.A)
 
 	}
 }
 
-func TestDataSet_FullError(t *testing.T) {
+func TestStreamingDataSet_FullError(t *testing.T) {
 	t.Parallel()
 	reader := strings.NewReader(errorText)
 	d, err := NewStreamingDataSet(context.Background(), io.NopCloser(reader), DefaultFrameCapacity)
-	tables, errs := d.GetAllTables()
-	assert.NoError(t, err)
-	assert.Len(t, errs, 1)
-	assert.ErrorContains(t, errs[0], "Bad request")
-	assert.Nil(t, tables)
-
+	assert.ErrorContains(t, err, "Bad request")
+	assert.Nil(t, d)
 }

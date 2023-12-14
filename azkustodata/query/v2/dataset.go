@@ -69,6 +69,11 @@ func decodeTables(d dataset) {
 				break
 			}
 		} else if completion, ok := f.(*DataSetCompletion); ok {
+			if completion.HasErrors && completion.OneApiErrors != nil {
+				for _, e := range completion.OneApiErrors {
+					d.reportError(errors.E(op, errors.KInternal, &e))
+				}
+			}
 			d.setCompletion(completion)
 		} else if dt, ok := f.(*DataTable); ok {
 			t, err := NewDataTable(d, dt)

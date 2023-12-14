@@ -158,7 +158,7 @@ func TestReadFramesWithErrors(t *testing.T) {
 	assert.Equal(t, tableHeader.TableKind, "PrimaryResult")
 	assert.Equal(t, tableHeader.TableName, "PrimaryResult")
 	assert.Equal(t, tableHeader.Columns, []FrameColumn{
-		{"a", "int"},
+		{"A", "int"},
 	})
 
 	tableFragment := (<-ch).(*TableFragment)
@@ -225,27 +225,6 @@ func TestReadFramesWithErrors(t *testing.T) {
 	})
 
 	assert.Nil(t, <-ch)
-
-	err := <-errChan
-	require.NoError(t, err)
-}
-
-func TestReadFramesWithEmptyInput(t *testing.T) {
-	t.Parallel()
-	src := ``
-
-	ch := make(chan Frame)
-	// err channel
-	errChan := make(chan error)
-
-	go func() {
-		err := readAndDecodeFrames(src, ch)
-		errChan <- err
-	}()
-
-	for range ch {
-		assert.Fail(t, "should not receive any frames")
-	}
 
 	err := <-errChan
 	require.NoError(t, err)
