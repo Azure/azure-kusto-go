@@ -130,7 +130,7 @@ func (s *skipReader) Read(p []byte) (n int, err error) {
 	amt, err := s.r.Read(cp[:len(p)])
 	pIndex := 0
 
-	if err != nil {
+	if err != nil && err != io.EOF {
 		return 0, err
 	}
 
@@ -151,7 +151,6 @@ func (s *skipReader) Read(p []byte) (n int, err error) {
 		}
 		p[pIndex] = cp[i]
 		pIndex++
-
 	}
 
 	return pIndex, err
