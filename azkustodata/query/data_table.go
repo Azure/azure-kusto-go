@@ -30,5 +30,9 @@ func NewDataTable(ds Dataset, ordinal int64, id string, name string, kind string
 }
 
 func (t *dataTable) GetAllRows() ([]Row, []error) {
-	return t.rows, t.errors
+	errs := t.errors
+	if t.errors != nil && len(t.errors) == 0 {
+		errs = nil
+	}
+	return t.rows, errs
 }

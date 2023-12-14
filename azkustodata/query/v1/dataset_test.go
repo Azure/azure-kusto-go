@@ -106,7 +106,7 @@ func TestDatasetSuccess(t *testing.T) {
 func TestDatasetPartialErrors(t *testing.T) {
 	t.Parallel()
 
-	reader := io.NopCloser(strings.NewReader(errorFile))
+	reader := io.NopCloser(strings.NewReader(partialErrorFile))
 	ctx := context.Background()
 	op := errors.OpQuery
 	ds, err := NewDatasetFromReader(ctx, op, reader)

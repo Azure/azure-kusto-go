@@ -106,7 +106,7 @@ func (d *fullDataset) GetAllTables() ([]query.Table, []error) {
 
 func NewFullDataSet(ctx context.Context, r io.ReadCloser) (FullDataset, error) {
 	defer r.Close()
-	full, err := ReadFramesFull(r)
+	full, err := readFramesFull(r)
 	if err != nil {
 		return nil, err
 	}

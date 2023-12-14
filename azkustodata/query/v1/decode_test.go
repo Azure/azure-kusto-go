@@ -12,6 +12,9 @@ import (
 var successFile string
 
 //go:embed testData/partialError.json
+var partialErrorFile string
+
+//go:embed testData/error.txt
 var errorFile string
 
 func TestDecodeSuccess(t *testing.T) {
@@ -234,7 +237,7 @@ func TestDecodeSuccess(t *testing.T) {
 func TestDecodeError(t *testing.T) {
 	t.Parallel()
 
-	reader := io.NopCloser(strings.NewReader(errorFile))
+	reader := io.NopCloser(strings.NewReader(partialErrorFile))
 	v1, err := decodeV1(reader)
 	assert.NoError(t, err)
 	assert.NotNil(t, v1)
@@ -259,4 +262,13 @@ func TestDecodeError(t *testing.T) {
 	assert.Equal(t, 1, len(v1.Exceptions))
 	exception := v1.Exceptions[0]
 	assert.Equal(t, "Query execution has exceeded the allowed limits (80DA0003): The results of this query exceed the set limit of 1 records, so not all records were returned (E_QUERY_RESULT_SET_TOO_LARGE, 0x80DA0003). See https://aka.ms/kustoquerylimits for more information and possible solutions..\r\n[0]Kusto.Data.Exceptions.KustoServicePartialQueryFailureLimitsExceededException: Query execution has exceeded the allowed limits (80DA0003): The results of this query exceed the set limit of 1 records, so not all records were returned (E_QUERY_RESULT_SET_TOO_LARGE, 0x80DA0003). See https://aka.ms/kustoquerylimits for more information and possible solutions..\r\nTimestamp=2023-12-03T13:12:01.8751538Z\r\nClientRequestId=blab6\r\nActivityId=123e27de-1e4e-49d9-b579-fe0b331d3642\r\nActivityType=GW.Http.CallContext\r\nServiceAlias=REDACTED\r\nMachineName=KSEngine000001\r\nProcessName=Kusto.WinSvc.Svc\r\nProcessId=1604\r\nThreadId=9752\r\nActivityStack=(Activity stack: CRID=blab6 ARID=123e27de-1e4e-49d9-b579-fe0b331d3642 > GW.Http.CallContext/123e27de-1e4e-49d9-b579-fe0b331d3642)\r\nMonitoredActivityContext=(ActivityType=GW.Http.CallContext, Timestamp=2023-12-03T13:12:01.8751538Z, ParentActivityId=123e27de-1e4e-49d9-b579-fe0b331d3642, TimeSinceStarted=0 [ms])ErrorCode=\r\nErrorReason=\r\nErrorMessage=\r\nDataSource=\r\nDatabaseName=\r\nClientRequestId=\r\nActivityId=123e27de-1e4e-49d9-b579-fe0b331d3642\r\nUnderlyingErrorCode=80DA0003\r\nUnderlyingErrorMessage=The results of this query exceed the set limit of 1 records, so not all records were returned (E_QUERY_RESULT_SET_TOO_LARGE, 0x80DA0003). See https://aka.ms/kustoquerylimits for more information and possible solutions.\r\n\r\n", exception)
+}
+
+func TestDecodeErrorText(t *testing.T) {
+	t.Parallel()
+
+	reader := io.NopCloser(strings.NewReader(errorFile))
+	v1, err := decodeV1(reader)
+	assert.ErrorContains(t, err, "General_BadRequest")
+	assert.Nil(t, v1)
 }

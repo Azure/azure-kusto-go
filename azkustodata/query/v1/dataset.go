@@ -57,7 +57,7 @@ func NewDatasetFromReader(ctx context.Context, op errors.Op, reader io.ReadClose
 		return nil, err
 	}
 
-	return NewDataset(ctx, op, v1)
+	return NewDataset(ctx, op, *v1)
 }
 
 func NewDataset(ctx context.Context, op errors.Op, v1 V1) (Dataset, error) {

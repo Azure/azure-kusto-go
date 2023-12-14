@@ -1,8 +1,10 @@
 package v2
 
 import (
+	"bufio"
 	"encoding/json"
 	"fmt"
+	"github.com/Azure/azure-kusto-go/azkustodata/errors"
 	"io"
 )
 
@@ -53,15 +55,32 @@ func (f *EveryFrame) Decode() (Frame, error) {
 	}
 }
 
-func ReadFramesIterative(r io.Reader, ch chan<- Frame) error {
+// prepareReadBuffer checks for errors and returns a decoder
+func prepareReadBuffer(r io.Reader) (io.Reader, error) {
+	br := bufio.NewReader(r)
+	peek, err := br.Peek(1)
+	if err != nil {
+		return nil, err
+	}
+	if peek[0] != '[' {
+		all, err := io.ReadAll(br)
+		if err != nil {
+			return nil, err
+		}
+		return nil, errors.ES(errors.OpUnknown, errors.KInternal, "Got error: %v", string(all))
+	}
+	return br, nil
+
+}
+
+func readFramesIterative(br io.Reader, ch chan<- Frame) error {
 	defer close(ch)
 
-	dec := json.NewDecoder(&skipReader{r: r})
+	dec := json.NewDecoder(&skipReader{r: br})
 	dec.UseNumber()
 
 	for {
-		frame := EveryFrame{}
-		err := dec.Decode(&frame)
+		f, err := decodeFrame(dec)
 		if err != nil {
 			if err == io.EOF {
 				return nil
@@ -69,22 +88,36 @@ func ReadFramesIterative(r io.Reader, ch chan<- Frame) error {
 			return err
 		}
 
-		f, err := frame.Decode()
-
-		if err != nil {
-			return err
-		}
-
 		ch <- f
 	}
 }
 
-func ReadFramesFull(r io.Reader) ([]Frame, error) {
-	dec := json.NewDecoder(r)
+func decodeFrame(dec *json.Decoder) (Frame, error) {
+	frame := EveryFrame{}
+	err := dec.Decode(&frame)
+	if err != nil {
+		return nil, err
+	}
+
+	f, err := frame.Decode()
+
+	if err != nil {
+		return nil, err
+	}
+	return f, nil
+}
+
+func readFramesFull(r io.Reader) ([]Frame, error) {
+	br, err := prepareReadBuffer(r)
+	if err != nil {
+		return nil, err
+	}
+
+	dec := json.NewDecoder(br)
 	dec.UseNumber()
 
 	var rawFrames []EveryFrame
-	err := dec.Decode(&rawFrames)
+	err = dec.Decode(&rawFrames)
 	if err != nil {
 		return nil, err
 	}

@@ -227,7 +227,7 @@ func (c *Client) IterativeQuery(ctx context.Context, db string, kqlQuery Stateme
 		capacity = opts.v2FrameCapacity
 	}
 
-	return queryv2.NewStreamingDataSet(ctx, res, capacity), nil
+	return queryv2.NewStreamingDataSet(ctx, res, capacity)
 }
 
 func (c *Client) newV2(ctx context.Context, db string, kqlQuery Statement, options []QueryOption) (*queryOptions, io.ReadCloser, error) {

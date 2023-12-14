@@ -19,6 +19,22 @@ var partialErrors string
 //go:embed testData/twoTables.json
 var twoTables string
 
+//go:embed testData/error.txt
+var errorText string
+
+func readAndDecodeFrames(src string, ch chan Frame) error {
+	br, err := prepareReadBuffer(strings.NewReader(src))
+	if err != nil {
+		return err
+	}
+	err = readFramesIterative(br, ch)
+	if err != nil {
+		return err
+	}
+
+	return nil
+}
+
 func TestReadFramesWithValidInput(t *testing.T) {
 	t.Parallel()
 	ch := make(chan Frame)
@@ -27,7 +43,7 @@ func TestReadFramesWithValidInput(t *testing.T) {
 	errChan := make(chan error)
 
 	go func() {
-		err := ReadFramesIterative(strings.NewReader(validFrames), ch)
+		err := readAndDecodeFrames(validFrames, ch)
 		errChan <- err
 	}()
 
@@ -108,7 +124,7 @@ func TestReadFramesWithErrors(t *testing.T) {
 	errChan := make(chan error)
 
 	go func() {
-		err := ReadFramesIterative(strings.NewReader(partialErrors), ch)
+		err := readAndDecodeFrames(partialErrors, ch)
 		errChan <- err
 		require.NoError(t, err)
 	}()
@@ -223,7 +239,7 @@ func TestReadFramesWithEmptyInput(t *testing.T) {
 	errChan := make(chan error)
 
 	go func() {
-		err := ReadFramesIterative(strings.NewReader(src), ch)
+		err := readAndDecodeFrames(src, ch)
 		errChan <- err
 	}()
 
@@ -244,7 +260,7 @@ func TestReadFramesWithInvalidInput(t *testing.T) {
 	errChan := make(chan error)
 
 	go func() {
-		err := ReadFramesIterative(strings.NewReader(src), ch)
+		err := readAndDecodeFrames(src, ch)
 		errChan <- err
 	}()
 
@@ -266,7 +282,7 @@ func TestReadFramesWithInvalidFrameType(t *testing.T) {
 	errChan := make(chan error)
 
 	go func() {
-		err := ReadFramesIterative(strings.NewReader(src), ch)
+		err := readAndDecodeFrames(src, ch)
 		errChan <- err
 	}()
 
@@ -287,7 +303,7 @@ func TestReadFramesWithInvalidFrame(t *testing.T) {
 	errChan := make(chan error)
 
 	go func() {
-		err := ReadFramesIterative(strings.NewReader(src), ch)
+		err := readAndDecodeFrames(src, ch)
 		errChan <- err
 	}()
 
