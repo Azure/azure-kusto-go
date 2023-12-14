@@ -1,13 +1,13 @@
 package query
 
-type fullTable struct {
+type dataTable struct {
 	baseTable
 	rows   []Row
 	errors []error
 }
 
-func NewFullTable(ds Dataset, ordinal int64, id string, name string, kind string, columns []Column, rows []Row, errors []error) Table {
-	t := &fullTable{
+func NewDataTable(ds Dataset, ordinal int64, id string, name string, kind string, columns []Column, rows []Row, errors []error) Table {
+	t := &dataTable{
 		baseTable: baseTable{
 			dataSet: ds,
 			ordinal: ordinal,
@@ -29,6 +29,10 @@ func NewFullTable(ds Dataset, ordinal int64, id string, name string, kind string
 	return t
 }
 
-func (t *fullTable) GetAllRows() ([]Row, []error) {
-	return t.rows, nil
+func (t *dataTable) GetAllRows() ([]Row, []error) {
+	errs := t.errors
+	if t.errors != nil && len(t.errors) == 0 {
+		errs = nil
+	}
+	return t.rows, errs
 }

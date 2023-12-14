@@ -207,7 +207,7 @@ func (c *Client) MgmtNew(ctx context.Context, db string, kqlQuery Statement, opt
 	return c.newV1(errors.OpMgmt, mgmtCall, ctx, db, kqlQuery, options...)
 }
 
-func (c *Client) QueryNew(ctx context.Context, db string, kqlQuery Statement, options ...QueryOption) (queryv2.Dataset, error) {
+func (c *Client) QueryNew(ctx context.Context, db string, kqlQuery Statement, options ...QueryOption) (queryv2.FullDataset, error) {
 	_, res, err := c.newV2(ctx, db, kqlQuery, options)
 	if err != nil {
 		return nil, err
@@ -227,7 +227,7 @@ func (c *Client) IterativeQuery(ctx context.Context, db string, kqlQuery Stateme
 		capacity = opts.v2FrameCapacity
 	}
 
-	return queryv2.NewStreamingDataSet(ctx, res, capacity), nil
+	return queryv2.NewStreamingDataSet(ctx, res, capacity)
 }
 
 func (c *Client) newV2(ctx context.Context, db string, kqlQuery Statement, options []QueryOption) (*queryOptions, io.ReadCloser, error) {

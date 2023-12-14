@@ -25,13 +25,8 @@ func (d *streamingDataset) Results() <-chan query.TableResult {
 }
 
 // readFrames consumes the frames from the reader and sends them to the frames channel.
-func (d *streamingDataset) readFrames() {
-	err := ReadFramesIterative(d.reader, d.frames)
-	if err != nil {
-		d.errorChannel <- err
-	}
-
-	err = d.reader.Close()
+func (d *streamingDataset) readFrames(reader io.Reader) {
+	err := readFramesIterative(reader, d.frames)
 	if err != nil {
 		d.errorChannel <- err
 	}
@@ -90,7 +85,7 @@ func (d *streamingDataset) GetAllTables() ([]query.Table, []error) {
 		}
 
 		rows, errs2 := table.GetAllRows()
-		tables = append(tables, query.NewFullTable(d, table.Ordinal(), table.Id(), table.Name(), table.Kind(), table.Columns(), rows, errs2))
+		tables = append(tables, query.NewDataTable(d, table.Ordinal(), table.Id(), table.Name(), table.Kind(), table.Columns(), rows, errs2))
 	}
 
 	return tables, errs
@@ -98,7 +93,7 @@ func (d *streamingDataset) GetAllTables() ([]query.Table, []error) {
 
 // NewStreamingDataSet creates a new streamingDataset from a reader.
 // The capacity parameter is the capacity of the channel that receives the frames from the Kusto service.
-func NewStreamingDataSet(ctx context.Context, r io.ReadCloser, capacity int) StreamingDataset {
+func NewStreamingDataSet(ctx context.Context, r io.ReadCloser, capacity int) (StreamingDataset, error) {
 	d := &streamingDataset{
 		baseDataset:  *newBaseDataset(query.NewDataset(ctx, errors.OpQuery), false),
 		reader:       r,
@@ -106,9 +101,15 @@ func NewStreamingDataSet(ctx context.Context, r io.ReadCloser, capacity int) Str
 		errorChannel: make(chan error, 1),
 		results:      make(chan query.TableResult, 1),
 	}
-	go d.readFrames()
+
+	br, err := prepareReadBuffer(d.reader)
+	if err != nil {
+		return nil, err
+	}
+
+	go d.readFrames(br)
 
 	go decodeTables(d)
 
-	return d
+	return d, nil
 }

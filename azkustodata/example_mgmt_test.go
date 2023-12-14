@@ -7,7 +7,7 @@ import (
 	"github.com/Azure/azure-kusto-go/azkustodata/value"
 )
 
-func ExampleQueryV1() {
+func ExampleMgmt() {
 	// Create a client using the default Azure credential
 	kcsb := azkustodata.NewConnectionStringBuilder("https://help.kusto.windows.net/").WithDefaultAzureCredential()
 	client, err := azkustodata.New(kcsb)
@@ -33,88 +33,78 @@ func ExampleQueryV1() {
 		panic(err)
 	}
 
-	// TODO:
-	// API for singular primary result
-	// API for result by index
-	// API for result by name
-	// API for table to structs
-	results := dataset.Results()
-	// You can use random access to get a specific table
-	t := results[0]
-	println(t.Name())
+	tb := dataset.PrimaryResults()
 	// Or iterate over all primary results
-	for _, tb := range results {
-		println(tb.Name())
-		println(tb.Id())
 
-		// Columns are available as well
-		for _, column := range tb.Columns() {
-			println(column.Name())
-		}
-		// or by name
-		stateCol := tb.ColumnByName("State")
-		println(stateCol.Name())
+	println(tb.Name())
+	println(tb.Id())
 
-		// Use GetAllTables() to get all rows as a slice
-		rows, errs := tb.GetAllRows()
+	// Columns are available as well
+	for _, column := range tb.Columns() {
+		println(column.Name())
+	}
+	// or by name
+	stateCol := tb.ColumnByName("State")
+	println(stateCol.Name())
 
-		// Make sure to always check for errors
-		if errs != nil {
-			panic(errs)
-		}
+	// Use GetAllTables() to get all rows as a slice
+	rows, errs := tb.GetAllRows()
 
-		// You can randomly access rows
-		row := rows[0]
+	// Make sure to always check for errors
+	if errs != nil {
+		panic(errs)
+	}
+
+	// You can randomly access rows
+	row := rows[0]
+	println(row.Ordinal())
+
+	// Or iterate over all rows
+	for _, row := range rows {
+		// Each row has an index and a pointer to the table it belongs to
 		println(row.Ordinal())
+		println(row.Table().Name())
 
-		// Or iterate over all rows
-		for _, row := range rows {
-			// Each row has an index and a pointer to the table it belongs to
-			println(row.Ordinal())
-			println(row.Table().Name())
+		// There are a few ways to access the values of a row:
+		val := row.Value(0)
+		println(val)
+		println(row.Values()[0])
+		println(row.ValueByColumn(stateCol))
 
-			// There are a few ways to access the values of a row:
-			val := row.Value(0)
-			println(val)
-			println(row.Values()[0])
-			println(row.ValueByColumn(stateCol))
+		// Working with values:
+		// Get the type of the value
+		println(val.GetType()) // prints "string"
 
-			// Working with values:
-			// Get the type of the value
-			println(val.GetType()) // prints "string"
-
-			// Get the value as a string
-			// Note that values are pointers - since they can be null
-			if s, ok := val.GetValue().(*string); ok {
-				if s != nil {
-					println(*s)
-				}
+		// Get the value as a string
+		// Note that values are pointers - since they can be null
+		if s, ok := val.GetValue().(*string); ok {
+			if s != nil {
+				println(*s)
 			}
-
-			// Or cast directly to the kusto type
-			if s, ok := val.GetValue().(value.String); ok {
-				if s.Valid {
-					println(s.Value)
-				}
-			}
-
-			// Or convert the row to a struct
-
-			type ShowTables struct {
-				TableName string
-				Database  string `kusto:"DatabaseName"` // You can use tags to map to different column names
-				Folder    string
-				DocString string
-			}
-
-			var tableData ShowTables
-			err := row.ToStruct(&tableData)
-			if err != nil {
-				panic(err)
-			}
-			println(tableData.TableName)
 		}
 
+		// Or cast directly to the kusto type
+		if s, ok := val.GetValue().(value.String); ok {
+			if s.Valid {
+				println(s.Value)
+			}
+		}
+
+		// Or convert the row to a struct
+
+		type ShowTables struct {
+			TableName string
+			Database  string `kusto:"DatabaseName"` // You can use tags to map to different column names
+			Folder    string
+			DocString string
+		}
+
+		var tableData ShowTables
+		err := row.ToStruct(&tableData)
+		if err != nil {
+			panic(err)
+		}
+		println(tableData.TableName)
 	}
 
 	// Get metadata about the

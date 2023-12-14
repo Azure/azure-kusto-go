@@ -57,16 +57,12 @@ func NewDatasetFromReader(ctx context.Context, op errors.Op, reader io.ReadClose
 		return nil, err
 	}
 
-	return NewDataset(ctx, op, v1)
+	return NewDataset(ctx, op, *v1)
 }
 
 func NewDataset(ctx context.Context, op errors.Op, v1 V1) (Dataset, error) {
 	d := &dataset{
 		Dataset: query.NewDataset(ctx, op),
-	}
-
-	if v1.Exceptions != nil {
-		return nil, errors.ES(d.Op(), errors.KInternal, "kusto query failed: %v", v1.Exceptions)
 	}
 
 	if len(v1.Tables) == 0 {
@@ -75,13 +71,19 @@ func NewDataset(ctx context.Context, op errors.Op, v1 V1) (Dataset, error) {
 
 	// Special case - if there is only one table, it is the primary result
 	if len(v1.Tables) == 1 {
-		table, err := NewFullTable(d, &v1.Tables[0], primaryResultIndexRow)
+		table, err := NewDataTable(d, &v1.Tables[0], primaryResultIndexRow)
 		if err != nil {
 			return nil, err
 		}
 
 		d.results = append(d.results, table)
-		return d, nil
+
+		err = nil
+		if v1.Exceptions != nil {
+			err = errors.ES(d.Op(), errors.KInternal, "exceptions: %v", v1.Exceptions)
+		}
+
+		return d, err
 	}
 
 	// index is always the last table
@@ -108,7 +110,7 @@ func NewDataset(ctx context.Context, op errors.Op, v1 V1) (Dataset, error) {
 			}
 			d.info = queryInfo
 		} else if r.Kind == "QueryResult" {
-			table, err := NewFullTable(d, &v1.Tables[i], &r)
+			table, err := NewDataTable(d, &v1.Tables[i], &r)
 			if err != nil {
 				return nil, err
 			}
@@ -117,11 +119,17 @@ func NewDataset(ctx context.Context, op errors.Op, v1 V1) (Dataset, error) {
 		}
 	}
 
-	return d, nil
+	err = nil
+
+	if v1.Exceptions != nil {
+		err = errors.ES(d.Op(), errors.KInternal, "exceptions: %v", v1.Exceptions)
+	}
+
+	return d, err
 }
 
 func parseTable[T any](table *RawTable, d *dataset, index *TableIndexRow) ([]T, error) {
-	fullTable, err := NewFullTable(d, table, index)
+	fullTable, err := NewDataTable(d, table, index)
 	if err != nil {
 		return nil, err
 	}
@@ -143,6 +151,10 @@ func (d *dataset) Results() []query.Table {
 	return d.results
 }
 
+func (d *dataset) PrimaryResults() query.Table {
+	return d.results[0]
+}
+
 func (d *dataset) Index() []TableIndexRow {
 	return d.index
 }
@@ -157,6 +169,7 @@ func (d *dataset) Info() []QueryProperties {
 
 type Dataset interface {
 	query.Dataset
+	PrimaryResults() query.Table
 	Results() []query.Table
 	Index() []TableIndexRow
 	Status() []QueryStatus

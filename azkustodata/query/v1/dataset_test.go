@@ -13,6 +13,10 @@ import (
 	"time"
 )
 
+type firstTable struct {
+	A int32 `kusto:"a"`
+}
+
 func TestDatasetSuccess(t *testing.T) {
 	t.Parallel()
 
@@ -69,10 +73,6 @@ func TestDatasetSuccess(t *testing.T) {
 	}
 	assert.EqualValues(t, expectedInfo, ds.Info())
 
-	type firstTable struct {
-		A int32 `kusto:"a"`
-	}
-
 	table1Rows, errs := ds.Results()[0].GetAllRows()
 	assert.Nil(t, errs)
 	expectedTable1 := []firstTable{
@@ -103,13 +103,24 @@ func TestDatasetSuccess(t *testing.T) {
 	assert.EqualValues(t, expectedTable2Rows, table2)
 }
 
-func TestDatasetErrors(t *testing.T) {
+func TestDatasetPartialErrors(t *testing.T) {
 	t.Parallel()
 
-	reader := io.NopCloser(strings.NewReader(errorFile))
+	reader := io.NopCloser(strings.NewReader(partialErrorFile))
 	ctx := context.Background()
 	op := errors.OpQuery
 	ds, err := NewDatasetFromReader(ctx, op, reader)
-	assert.Nil(t, ds)
+	assert.NotNil(t, ds)
 	assert.ErrorContains(t, err, "Query execution has exceeded the allowed limits")
+
+	tb := ds.PrimaryResults()
+
+	rows, errs := tb.GetAllRows()
+
+	assert.ErrorContains(t, errs[0], "Query execution has exceeded the allowed limits")
+
+	assert.Equal(t, 1, len(rows))
+	ft := &firstTable{}
+	assert.NoError(t, rows[0].ToStruct(ft))
+	assert.Equal(t, int32(1), ft.A)
 }

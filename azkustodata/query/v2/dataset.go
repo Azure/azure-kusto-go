@@ -71,7 +71,7 @@ func decodeTables(d dataset) {
 		} else if completion, ok := f.(*DataSetCompletion); ok {
 			d.setCompletion(completion)
 		} else if dt, ok := f.(*DataTable); ok {
-			t, err := NewFullTable(d, dt)
+			t, err := NewDataTable(d, dt)
 			if err != nil {
 				d.reportError(err)
 				break
@@ -241,6 +241,13 @@ type Dataset interface {
 type StreamingDataset interface {
 	Dataset
 	Results() <-chan query.TableResult
+}
+
+type FullDataset interface {
+	Dataset
+	Tables() []query.Table
+	TableByName(name string) query.Table
+	TableByOrdinal(ordinal int) query.Table
 }
 
 type dataset interface {

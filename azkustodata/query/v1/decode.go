@@ -1,7 +1,9 @@
 package v1
 
 import (
+	"bufio"
 	"encoding/json"
+	"github.com/Azure/azure-kusto-go/azkustodata/errors"
 	"io"
 )
 
@@ -46,10 +48,27 @@ type V1 struct {
 	Exceptions []string   `json:"Exceptions"`
 }
 
-func decodeV1(data io.ReadCloser) (V1, error) {
+func decodeV1(data io.ReadCloser) (*V1, error) {
 	var v1 V1
-	dec := json.NewDecoder(data)
+	br := bufio.NewReader(data)
+	peek, err := br.Peek(1)
+	if err != nil {
+		return nil, err
+	}
+	if peek[0] != '{' {
+		all, err := io.ReadAll(br)
+		if err != nil {
+			return nil, err
+		}
+		return nil, errors.ES(errors.OpUnknown, errors.KInternal, "Got error: %v", string(all))
+	}
+
+	dec := json.NewDecoder(br)
 	dec.UseNumber()
-	err := dec.Decode(&v1)
-	return v1, err
+	err = dec.Decode(&v1)
+	if err != nil {
+		return nil, err
+	}
+
+	return &v1, nil
 }
