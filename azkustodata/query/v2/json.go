@@ -100,58 +100,85 @@ func ReadFramesFull(r io.Reader) ([]Frame, error) {
 	return frames, nil
 }
 
+// skipReader is an io.Reader that filters out specific characters from a wrapped
+// io.Reader, specifically intended to convert from a JSON array to the jsonlines
+// format by removing the opening '[', the closing ']', and the commas between objects.
 type skipReader struct {
-	r          io.Reader
-	afterStart bool
-	skipNext   bool
-	finished   bool
+	r          io.Reader // Source reader from which the JSON array is read.
+	afterStart bool      // afterStart indicates if the reader has passed the initial '['.
+	shouldSkip bool      // shouldSkip indicates if the next character should be skipped.
+	finished   bool      // finished indicates if the reader has reached the end of the stream.
 }
 
-func (s *skipReader) Read(p []byte) (n int, err error) {
+// Read reads bytes from the wrapped io.Reader, filters out unwanted characters,
+// and writes the resulting bytes into the provided byte slice.
+func (s *skipReader) Read(buffer []byte) (int, error) {
 	if s.finished {
+		// If the stream has already been finished, return EOF.
 		return 0, io.EOF
 	}
 
-	// skip '[' at the beginning
-	if !s.afterStart {
-		s.afterStart = true
-
-		buf := make([]byte, 1)
-		amt, err := s.r.Read(buf)
-		if err != nil {
-			return 0, err
-		}
-		if amt != 1 || buf[0] != '[' {
-			return 0, fmt.Errorf("expected '[' at the beginning of the stream, got '%c'", buf[0])
-		}
-	}
-
-	cp := make([]byte, len(p))
-	amt, err := s.r.Read(cp[:len(p)])
-	pIndex := 0
-
-	if err != nil && err != io.EOF {
+	err := s.skipInitialBracket()
+	if err != nil {
 		return 0, err
 	}
 
-	for i := 0; i < amt; i++ {
-		if s.skipNext {
-			s.skipNext = false
-			next := cp[i]
-			if next == ']' {
-				s.finished = true
-				return pIndex, nil
-			} else if next != ',' {
-				return 0, fmt.Errorf("expected ',' between frames, got '%c'", next)
-			}
-			continue
-		}
-		if cp[i] == '\n' {
-			s.skipNext = true
-		}
-		p[pIndex] = cp[i]
-		pIndex++
+	// Create a temporary buffer to store bytes read from the source reader.
+	tempBuffer := make([]byte, len(buffer))
+	amt, err := s.r.Read(tempBuffer)
+	if err != nil && err != io.EOF {
+		// Return any read errors other than EOF.
+		return 0, err
 	}
 
-	return pIndex, err
+	// Process the temporary buffer and filter out the characters.
+	writeIndex := 0 // Index where the next byte will be written in 'buffer'.
+	for i := 0; i < amt; i++ {
+		if s.shouldSkip {
+			// If we need to skip the next character,
+			// check if it is either ']' or ',', and act accordingly.
+			s.shouldSkip = false
+			nextChar := tempBuffer[i]
+			if nextChar == ']' {
+				// If it is the closing bracket, the reader has finished.
+				s.finished = true
+				return writeIndex, nil
+			} else if nextChar != ',' {
+				return 0, fmt.Errorf("expected ',' between objects, got '%c'", nextChar)
+			}
+			// Continue to the next character if we successfully skipped ',' or ']'.
+			continue
+		}
+
+		if tempBuffer[i] == '\n' {
+			// If the character is a newline, it needs to be followed by a skip,
+			// likely the next character is a ',' in the JSON array.
+			s.shouldSkip = true
+			continue
+		}
+
+		// Copy the character to the provided buffer 'buffer'.
+		buffer[writeIndex] = tempBuffer[i]
+		writeIndex++
+	}
+
+	// Return the number of bytes written to 'buffer' and any error encountered.
+	return writeIndex, err
+}
+
+// skipInitialBracket skips the initial '[' at the beginning of the JSON array.
+func (s *skipReader) skipInitialBracket() error {
+	if !s.afterStart {
+		s.afterStart = true
+
+		initialByte := make([]byte, 1)
+		amt, err := s.r.Read(initialByte)
+		if err != nil {
+			return err
+		}
+		if amt != 1 || initialByte[0] != '[' {
+			return fmt.Errorf("expected '[' at the beginning of the stream, got '%c'", initialByte[0])
+		}
+	}
+	return nil
 }
