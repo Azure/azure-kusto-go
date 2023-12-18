@@ -2,32 +2,44 @@ package v1
 
 import (
 	"bufio"
+	"bytes"
 	"encoding/json"
 	"github.com/Azure/azure-kusto-go/azkustodata/errors"
 	"io"
 )
 
-type RowOrErrors struct {
+type RawRow struct {
 	Row    []interface{}
 	Errors []string
 }
 
-func (r *RowOrErrors) UnmarshalJSON(data []byte) error {
+func (r *RawRow) UnmarshalJSON(data []byte) error {
 	var row []interface{}
-	var errors struct {
-		Exceptions []string `json:"Exceptions"`
+	var errs struct {
+		Errors []string `json:"Exceptions"`
 	}
 
 	var err error
 
-	if err = json.Unmarshal(data, &row); err != nil {
-		if err = json.Unmarshal(data, &errors); err != nil {
+	reader := bytes.NewReader(data)
+	dec := json.NewDecoder(reader)
+	dec.UseNumber()
+
+	if err = dec.Decode(&row); err != nil {
+		_, err := reader.Seek(0, io.SeekStart)
+		if err != nil {
 			return err
 		}
-		r.Errors = errors.Exceptions
+
+		if err = dec.Decode(&errs); err != nil {
+			return err
+		}
+		r.Errors = errs.Errors
+		r.Row = nil
 		return nil
 	}
 	r.Row = row
+	r.Errors = nil
 	return nil
 }
 
@@ -38,9 +50,9 @@ type RawColumn struct {
 }
 
 type RawTable struct {
-	TableName string        `json:"TableName"`
-	Columns   []RawColumn   `json:"Columns"`
-	Rows      []RowOrErrors `json:"Rows"`
+	TableName string      `json:"TableName"`
+	Columns   []RawColumn `json:"Columns"`
+	Rows      []RawRow    `json:"Rows"`
 }
 
 type V1 struct {

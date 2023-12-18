@@ -24,9 +24,9 @@ func TestDataTable_String(t *testing.T) {
 		TableKind: "TestKind",
 		TableName: "TestName",
 		Columns:   []FrameColumn{{ColumnName: "TestColumn", ColumnType: "TestType"}},
-		Rows:      [][]interface{}{{"TestValue"}},
+		Rows:      RawRows{NewRawRow("TestValue")},
 	}
-	expected := "DataTable(TableId=1, TableKind=TestKind, TableName=TestName, Columns=[{TestColumn TestType}], Rows=[[TestValue]])"
+	expected := "DataTable(TableId=1, TableKind=TestKind, TableName=TestName, Columns=[{TestColumn TestType}], Rows=[{[TestValue] []}])"
 	assert.Equal(t, expected, table.String())
 }
 
@@ -57,9 +57,9 @@ func TestTableFragment_String(t *testing.T) {
 	fragment := &TableFragment{
 		TableFragmentType: "TestType",
 		TableId:           1,
-		Rows:              [][]interface{}{{"TestValue"}},
+		Rows:              RawRows{NewRawRow("TestValue")},
 	}
-	expected := "TableFragment(TableFragmentType=TestType, TableId=1, Rows=[[TestValue]])"
+	expected := "TableFragment(TableFragmentType=TestType, TableId=1, Rows=[{[TestValue] []}])"
 	assert.Equal(t, expected, fragment.String())
 }
 

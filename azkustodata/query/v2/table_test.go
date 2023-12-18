@@ -26,7 +26,7 @@ func TestNewFullTable_WithValidDataTable(t *testing.T) {
 			{ColumnName: "vlong", ColumnType: "long"},
 			{ColumnName: "vguid", ColumnType: "guid"},
 		},
-		Rows: [][]interface{}{{1, "1.1", "2019-03-02T05:40:02Z", "13:14:20", "{\"a\": 3}", true, 1.1, "test", 1, "00000000-0000-0000-0000-000000000000"}},
+		Rows: RawRows{NewRawRow(1, "1.1", "2019-03-02T05:40:02Z", "13:14:20", "{\"a\": 3}", true, 1.1, "test", 1, "00000000-0000-0000-0000-000000000000")},
 	}
 
 	table, err := NewDataTable(nil, dt)
@@ -61,7 +61,7 @@ func TestNewFullTable_WithInvalidColumnType(t *testing.T) {
 		TableId:   1,
 		TableName: "TestTable",
 		Columns:   []FrameColumn{{ColumnName: "TestColumn", ColumnType: "invalid"}},
-		Rows:      [][]interface{}{{"TestValue"}},
+		Rows:      RawRows{NewRawRow("TestValue")},
 	}
 
 	_, err := NewDataTable(nil, dt)
@@ -76,7 +76,7 @@ func TestNewFullTable_WithInvalidRowValue(t *testing.T) {
 		TableId:   1,
 		TableName: "TestTable",
 		Columns:   []FrameColumn{{ColumnName: "TestColumn", ColumnType: "int"}},
-		Rows:      [][]interface{}{{"TestValue"}},
+		Rows:      []RawRow{NewRawRow("TestValue")},
 	}
 
 	_, err := NewDataTable(nil, dt)

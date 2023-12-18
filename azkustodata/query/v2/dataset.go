@@ -11,7 +11,6 @@ import (
 const DefaultFrameCapacity = 5
 
 const version = "v2.0"
-const errorReportingPlacement = "EndOfTable"
 const PrimaryResultTableKind = "PrimaryResult"
 
 type baseDataset struct {
@@ -81,10 +80,30 @@ func decodeTables(d dataset) {
 				d.reportError(err)
 				break
 			}
+			if t.Kind() == "PrimaryResult" {
+				newTable, err := d.newTableFromHeader(&TableHeader{
+					TableId:   dt.TableId,
+					TableKind: dt.TableKind,
+					TableName: dt.TableName,
+					Columns:   dt.Columns,
+				})
+				if err != nil {
+					d.reportError(err)
+					break
+				}
+
+				d.setCurrentTable(newTable)
+				d.onFinishHeader()
+				newTable.addRawRows(dt.Rows)
+				d.onFinishTable()
+				d.setCurrentTable(nil)
+			}
+
 			err = d.parseSecondaryTable(t)
 			if err != nil {
 				d.reportError(err)
-				break
+				// Continuing here as it's not a fatal error - secondary tables can have errors, but we still want the partial results.
+				continue
 			}
 		} else if parsePrimaryTable(d, f) {
 			continue
@@ -160,17 +179,8 @@ func parseDatasetHeader(d dataset, header *DataSetHeader) bool {
 		d.reportError(errors.ES(d.Op(), errors.KInternal, "received a DataSetHeader frame that is not version 2"))
 		return false
 	}
-	if !header.IsFragmented {
-		d.reportError(errors.ES(d.Op(), errors.KInternal, "received a DataSetHeader frame that is not fragmented"))
-		return false
-	}
 	if header.IsProgressive {
 		d.reportError(errors.ES(d.Op(), errors.KInternal, "received a DataSetHeader frame that is progressive"))
-		return false
-	}
-	const EndOfTableErrorPlacement = errorReportingPlacement
-	if header.ErrorReportingPlacement != EndOfTableErrorPlacement {
-		d.reportError(errors.ES(d.Op(), errors.KInternal, "received a DataSetHeader frame that does not report errors at the end of the table"))
 		return false
 	}
 	d.setHeader(header)

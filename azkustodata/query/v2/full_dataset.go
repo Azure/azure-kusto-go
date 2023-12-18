@@ -51,7 +51,14 @@ func (f *fragmentedTable) RowCount() int {
 
 func (f *fragmentedTable) addRawRows(rows RawRows) {
 	for _, r := range rows {
-		row, err := parseRow(r, f)
+		if r.Errors != nil {
+			for _, e := range r.Errors {
+				f.errors = append(f.errors, &e)
+			}
+			continue
+		}
+
+		row, err := parseRow(r.Row, f)
 		if err != nil {
 			f.errors = append(f.errors, err)
 		}
@@ -120,7 +127,11 @@ func NewFullDataSet(ctx context.Context, r io.ReadCloser) (FullDataset, error) {
 	decodeTables(d)
 
 	if len(d.errors) > 0 {
-		return nil, errors.GetCombinedError(d.errors...)
+		ret := d
+		if d.header == nil {
+			ret = nil
+		}
+		return ret, errors.GetCombinedError(d.errors...)
 	}
 
 	return d, nil

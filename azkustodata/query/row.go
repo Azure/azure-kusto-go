@@ -39,30 +39,28 @@ type Row interface {
 }
 
 // ToStructs converts a table or a slice of rows into a slice of structs.
-func ToStructs[T any](data interface{}) ([]T, error) {
+func ToStructs[T any](data interface{}) ([]T, []error) {
 	var rows []Row
+	var errs []error
+
 	if t, ok := data.(Table); ok {
-		var errs []error
 		rows, errs = t.GetAllRows()
-		if errs != nil {
-			return nil, errors.GetCombinedError(errs...)
-		}
 	} else if r, ok := data.([]Row); ok {
 		rows = r
 	} else if r, ok := data.(Row); ok {
 		rows = []Row{r}
 	} else {
-		return nil, errors.ES(errors.OpUnknown, errors.KInternal, "invalid data type - expected Table or []Row")
+		return nil, []error{errors.ES(errors.OpUnknown, errors.KInternal, "invalid data type - expected Table or []Row")}
 	}
 
-	if len(rows) == 0 {
-		return nil, nil
+	if rows == nil || len(rows) == 0 {
+		return nil, errs
 	}
 	out := make([]T, len(rows))
 	for i, r := range rows {
 		if err := r.ToStruct(&out[i]); err != nil {
-			return nil, err
+			errs = append(errs, err)
 		}
 	}
-	return out, nil
+	return out, errs
 }

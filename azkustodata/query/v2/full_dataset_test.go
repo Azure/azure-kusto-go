@@ -252,6 +252,17 @@ func TestFullDataSet_MultiplePrimaryTables(t *testing.T) {
 	}
 }
 
+func TestFullDataSet_PartialError(t *testing.T) {
+	t.Parallel()
+	reader := strings.NewReader(partialErrorFullDataset)
+	d, err := NewFullDataSet(context.Background(), io.NopCloser(reader))
+	assert.ErrorContains(t, err, "LimitsExceeded")
+
+	props := d.QueryProperties()
+	assert.NotNil(t, props)
+	assert.Len(t, props, 1)
+}
+
 func TestFullDataSet_DecodeTables_WithInvalidDataSetHeader(t *testing.T) {
 	t.Parallel()
 	reader := strings.NewReader(`[{"FrameType": "DataSetHeader", "Version": "V1"}

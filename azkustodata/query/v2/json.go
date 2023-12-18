@@ -2,6 +2,7 @@ package v2
 
 import (
 	"bufio"
+	"bytes"
 	"encoding/json"
 	"fmt"
 	"github.com/Azure/azure-kusto-go/azkustodata/errors"
@@ -213,5 +214,35 @@ func (s *skipReader) skipInitialBracket() error {
 			return fmt.Errorf("expected '[' at the beginning of the stream, got '%c'", initialByte[0])
 		}
 	}
+	return nil
+}
+
+func (r *RawRow) UnmarshalJSON(data []byte) error {
+	var row []interface{}
+	var errs struct {
+		OneApiErrors []OneApiError `json:"OneApiErrors"`
+	}
+
+	var err error
+
+	reader := bytes.NewReader(data)
+	dec := json.NewDecoder(reader)
+	dec.UseNumber()
+
+	if err = dec.Decode(&row); err != nil {
+		_, err := reader.Seek(0, io.SeekStart)
+		if err != nil {
+			return err
+		}
+
+		if err = dec.Decode(&errs); err != nil {
+			return err
+		}
+		r.Errors = errs.OneApiErrors
+		r.Row = nil
+		return nil
+	}
+	r.Row = row
+	r.Errors = nil
 	return nil
 }

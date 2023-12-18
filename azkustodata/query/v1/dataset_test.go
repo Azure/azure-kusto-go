@@ -81,7 +81,9 @@ func TestDatasetSuccess(t *testing.T) {
 		{A: 3},
 	}
 
-	table1, err := query.ToStructs[firstTable](table1Rows)
+	table1, errs := query.ToStructs[firstTable](table1Rows)
+
+	assert.Nil(t, errs)
 
 	assert.EqualValues(t, expectedTable1, table1)
 
@@ -98,7 +100,8 @@ func TestDatasetSuccess(t *testing.T) {
 		{A: "c", B: 3},
 	}
 
-	table2, err := query.ToStructs[secondTable](table2Rows)
+	table2, errs := query.ToStructs[secondTable](table2Rows)
+	assert.Nil(t, errs)
 
 	assert.EqualValues(t, expectedTable2Rows, table2)
 }

@@ -504,15 +504,15 @@ func TestIterativeQuery(t *testing.T) {
 		if tb.Name() == allDataTypesTable {
 			rows, errs := tb.GetAllRows()
 			require.Nilf(t, errs, "TestIterativeQuery: had table.GetAllTables() error: %s", errs)
-			structs, err := query.ToStructs[AllDataType](rows)
-			require.NoError(t, err)
+			structs, errs := query.ToStructs[AllDataType](rows)
+			require.Nil(t, errs)
 			require.Equal(t, []AllDataType{res}, structs)
 		}
 		if tb.Name() == allDataTypesTable+"_null" {
 			rows, errs := tb.GetAllRows()
 			require.Nilf(t, errs, "TestIterativeQuery: had table.GetAllTables() error: %s", errs)
-			structs, err := query.ToStructs[AllDataType](rows)
-			require.NoError(t, err)
+			structs, errs := query.ToStructs[AllDataType](rows)
+			require.Nil(t, errs)
 			require.Equal(t, []AllDataType{{}}, structs)
 		}
 	}
@@ -560,14 +560,14 @@ func TestQueryV2(t *testing.T) {
 				rows, errs := tb.GetAllRows()
 				require.Nilf(t, errs, "TestIterativeQuery: had table.GetAllTables() error: %s", errs)
 				structs, err := query.ToStructs[AllDataType](rows)
-				require.NoError(t, err)
+				require.Nil(t, err)
 				require.Equal(t, []AllDataType{res}, structs)
 			}
 			if tb.Name() == allDataTypesTable+"_null" {
 				rows, errs := tb.GetAllRows()
 				require.Nilf(t, errs, "TestIterativeQuery: had table.GetAllTables() error: %s", errs)
 				structs, err := query.ToStructs[AllDataType](rows)
-				require.NoError(t, err)
+				require.Nil(t, err)
 				require.Equal(t, []AllDataType{{}}, structs)
 			}
 		}

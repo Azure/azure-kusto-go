@@ -23,9 +23,17 @@ func NewDataTable(d query.Dataset, dt *DataTable) (query.Table, error) {
 		}
 	}
 
-	rows := make([]query.Row, len(dt.Rows))
+	rows := make([]query.Row, 0, len(dt.Rows))
+	errs := make([]error, 0, len(dt.Rows))
 
-	for i, r := range dt.Rows {
+	for i, raw := range dt.Rows {
+		if raw.Errors != nil {
+			for _, e := range raw.Errors {
+				errs = append(errs, &e)
+			}
+			continue
+		}
+		r := raw.Row
 		values := make(value.Values, len(r))
 		for j, v := range r {
 			parsed := value.Default(columns[j].Type())
@@ -37,10 +45,10 @@ func NewDataTable(d query.Dataset, dt *DataTable) (query.Table, error) {
 			}
 			values[j] = parsed
 		}
-		rows[i] = query.NewRow(nil, i, values)
+		rows = append(rows, query.NewRow(nil, i, values))
 	}
 
-	return query.NewDataTable(d, int64(dt.TableId), strconv.Itoa(dt.TableId), dt.TableName, dt.TableKind, columns, rows, nil), nil
+	return query.NewDataTable(d, int64(dt.TableId), strconv.Itoa(dt.TableId), dt.TableName, dt.TableKind, columns, rows, errs), nil
 }
 
 func parseColumns(th *TableHeader, columns []query.Column, op errors.Op) *errors.Error {

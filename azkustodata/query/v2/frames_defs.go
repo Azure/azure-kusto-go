@@ -4,6 +4,15 @@ import (
 	"fmt"
 )
 
+type RawRow struct {
+	Row    []interface{}
+	Errors []OneApiError
+}
+
+func NewRawRow(items ...interface{}) RawRow {
+	return RawRow{Row: items}
+}
+
 type Frame interface {
 	fmt.Stringer
 	GetFrameType() string
@@ -25,7 +34,7 @@ type DataSetHeader struct {
 
 const DataTableFrameType = "DataTable"
 
-type RawRows [][]interface{}
+type RawRows []RawRow
 
 type DataTable struct {
 	TableId   int           `json:"TableId"`

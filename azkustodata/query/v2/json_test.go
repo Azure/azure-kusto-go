@@ -22,6 +22,9 @@ var twoTables string
 //go:embed testData/error.txt
 var errorText string
 
+//go:embed testData/partialErrorFullDataset.json
+var partialErrorFullDataset string
+
 func readAndDecodeFrames(src string, ch chan Frame) error {
 	br, err := prepareReadBuffer(strings.NewReader(src))
 	if err != nil {
@@ -65,11 +68,10 @@ func TestReadFramesWithValidInput(t *testing.T) {
 		{"Value", "dynamic"},
 	})
 	assert.Equal(t, dataTable.Rows, RawRows{
-		{
-			json.Number("1"),
+		NewRawRow(json.Number("1"),
 			"Visualization",
-			`{"Visualization":null,"Title":null,"XColumn":null,"Series":null,"YColumns":null,"AnomalyColumns":null,"XTitle":null,"YTitle":null,"XAxis":null,"YAxis":null,"Legend":null,"YSplit":null,"Accumulate":false,"IsQuerySorted":false,"Kind":null,"Ymin":"NaN","Ymax":"NaN","Xmin":null,"Xmax":null}`,
-		}})
+			`{"Visualization":null,"Title":null,"XColumn":null,"Series":null,"YColumns":null,"AnomalyColumns":null,"XTitle":null,"YTitle":null,"XAxis":null,"YAxis":null,"Legend":null,"YSplit":null,"Accumulate":false,"IsQuerySorted":false,"Kind":null,"Ymin":"NaN","Ymax":"NaN","Xmin":null,"Xmax":null}`),
+	})
 
 	tableHeader := (<-ch).(*TableHeader)
 	assert.Equal(t, tableHeader.TableId, 1)
@@ -92,7 +94,16 @@ func TestReadFramesWithValidInput(t *testing.T) {
 	assert.Equal(t, tableFragment.TableFragmentType, "DataAppend")
 	assert.Equal(t, tableFragment.TableId, 1)
 	assert.Equal(t, tableFragment.Rows, RawRows{
-		{json.Number("1"), "2.00000000000001", "2020-03-04T14:05:01.3109965Z", "01:23:45.6789000", map[string]interface{}{"moshe": "value"}, true, json.Number("0.01"), "asdf", json.Number("9223372036854775807"), "123e27de-1e4e-49d9-b579-fe0b331d3642"},
+		NewRawRow(json.Number("1"),
+			"2.00000000000001",
+			"2020-03-04T14:05:01.3109965Z",
+			"01:23:45.6789000",
+			map[string]interface{}{"moshe": "value"},
+			true,
+			json.Number("0.01"),
+			"asdf",
+			json.Number("9223372036854775807"),
+			"123e27de-1e4e-49d9-b579-fe0b331d3642"),
 	})
 
 	tableCompletion := (<-ch).(*TableCompletion)
@@ -147,11 +158,10 @@ func TestReadFramesWithErrors(t *testing.T) {
 		{"Value", "dynamic"},
 	})
 	assert.Equal(t, dataTable.Rows, RawRows{
-		{
-			json.Number("1"),
+		NewRawRow(json.Number("1"),
 			"Visualization",
-			`{"Visualization":null,"Title":null,"XColumn":null,"Series":null,"YColumns":null,"AnomalyColumns":null,"XTitle":null,"YTitle":null,"XAxis":null,"YAxis":null,"Legend":null,"YSplit":null,"Accumulate":false,"IsQuerySorted":false,"Kind":null,"Ymin":"NaN","Ymax":"NaN","Xmin":null,"Xmax":null}`,
-		}})
+			`{"Visualization":null,"Title":null,"XColumn":null,"Series":null,"YColumns":null,"AnomalyColumns":null,"XTitle":null,"YTitle":null,"XAxis":null,"YAxis":null,"Legend":null,"YSplit":null,"Accumulate":false,"IsQuerySorted":false,"Kind":null,"Ymin":"NaN","Ymax":"NaN","Xmin":null,"Xmax":null}`),
+	})
 
 	tableHeader := (<-ch).(*TableHeader)
 	assert.Equal(t, tableHeader.TableId, 1)
@@ -165,7 +175,7 @@ func TestReadFramesWithErrors(t *testing.T) {
 	assert.Equal(t, tableFragment.TableFragmentType, "DataAppend")
 	assert.Equal(t, tableFragment.TableId, 1)
 	assert.Equal(t, tableFragment.Rows, RawRows{
-		{json.Number("1")},
+		NewRawRow(json.Number("1")),
 	})
 
 	tableCompletion := (<-ch).(*TableCompletion)

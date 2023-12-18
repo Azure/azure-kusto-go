@@ -2,6 +2,7 @@ package v1
 
 import (
 	_ "embed"
+	"encoding/json"
 	"github.com/stretchr/testify/assert"
 	"io"
 	"strings"
@@ -49,9 +50,9 @@ func TestDecodeSuccess(t *testing.T) {
 				},
 			},
 			rows: [][]interface{}{
-				{float64(1)},
-				{float64(2)},
-				{float64(3)},
+				{json.Number("1")},
+				{json.Number("2")},
+				{json.Number("3")},
 			},
 		},
 		{
@@ -73,9 +74,9 @@ func TestDecodeSuccess(t *testing.T) {
 				},
 			},
 			rows: [][]interface{}{
-				{"a", float64(1)},
-				{"b", float64(2)},
-				{"c", float64(3)},
+				{"a", json.Number("1")},
+				{"b", json.Number("2")},
+				{"c", json.Number("3")},
 			},
 		},
 		{
@@ -155,8 +156,8 @@ func TestDecodeSuccess(t *testing.T) {
 				},
 			},
 			rows: [][]interface{}{
-				{"2023-12-03T13:17:49.4832956Z", float64(4), "Info", float64(0), "Query completed successfully", float64(1), "6b4c0ab2-180e-46d8-b97e-593e6aea1e7a", "6b4c0ab2-180e-46d8-b97e-593e6aea1e7a", "2a41ff99-6429-418e-8bae-5cf703c5138a", "blab6"},
-				{"2023-12-03T13:17:49.4832956Z", float64(6), "Stats", float64(0), `{"ExecutionTime":0.0,"resource_usage":{"cache":{"memory":{"hits":0,"misses":0,"total":0},"disk":{"hits":0,"misses":0,"total":0},"shards":{"hot":{"hitbytes":0,"missbytes":0,"retrievebytes":0},"cold":{"hitbytes":0,"missbytes":0,"retrievebytes":0},"bypassbytes":0}},"cpu":{"user":"00:00:00","kernel":"00:00:00","total cpu":"00:00:00"},"memory":{"peak_per_node":524384},"network":{"inter_cluster_total_bytes":962,"cross_cluster_total_bytes":0}},"input_dataset_statistics":{"extents":{"total":0,"scanned":0,"scanned_min_datetime":"0001-01-01T00:00:00.0000000Z","scanned_max_datetime":"0001-01-01T00:00:00.0000000Z"},"rows":{"total":0,"scanned":0},"rowstores":{"scanned_rows":0,"scanned_values_size":0},"shards":{"queries_generic":0,"queries_specialized":0}},"dataset_statistics":[{"table_row_count":3,"table_size":15},{"table_row_count":3,"table_size":43}],"cross_cluster_resource_usage":{}}`, float64(1),
+				{"2023-12-03T13:17:49.4832956Z", json.Number("4"), "Info", json.Number("0"), "Query completed successfully", json.Number("1"), "6b4c0ab2-180e-46d8-b97e-593e6aea1e7a", "6b4c0ab2-180e-46d8-b97e-593e6aea1e7a", "2a41ff99-6429-418e-8bae-5cf703c5138a", "blab6"},
+				{"2023-12-03T13:17:49.4832956Z", json.Number("6"), "Stats", json.Number("0"), `{"ExecutionTime":0.0,"resource_usage":{"cache":{"memory":{"hits":0,"misses":0,"total":0},"disk":{"hits":0,"misses":0,"total":0},"shards":{"hot":{"hitbytes":0,"missbytes":0,"retrievebytes":0},"cold":{"hitbytes":0,"missbytes":0,"retrievebytes":0},"bypassbytes":0}},"cpu":{"user":"00:00:00","kernel":"00:00:00","total cpu":"00:00:00"},"memory":{"peak_per_node":524384},"network":{"inter_cluster_total_bytes":962,"cross_cluster_total_bytes":0}},"input_dataset_statistics":{"extents":{"total":0,"scanned":0,"scanned_min_datetime":"0001-01-01T00:00:00.0000000Z","scanned_max_datetime":"0001-01-01T00:00:00.0000000Z"},"rows":{"total":0,"scanned":0},"rowstores":{"scanned_rows":0,"scanned_values_size":0},"shards":{"queries_generic":0,"queries_specialized":0}},"dataset_statistics":[{"table_row_count":3,"table_size":15},{"table_row_count":3,"table_size":43}],"cross_cluster_resource_usage":{}}`, json.Number("1"),
 					"6b4c0ab2-180e-46d8-b97e-593e6aea1e7a",
 					"6b4c0ab2-180e-46d8-b97e-593e6aea1e7a",
 					"2a41ff99-6429-418e-8bae-5cf703c5138a",
@@ -197,10 +198,10 @@ func TestDecodeSuccess(t *testing.T) {
 				},
 			},
 			rows: [][]interface{}{
-				{float64(0), "QueryResult", "PrimaryResult", "e43f725a-26fd-4219-8869-30c21e1b139c", ""},
-				{float64(1), "QueryResult", "PrimaryResult", "0f66e92a-8d0e-43da-8a66-ddb6bf84c49d", ""},
-				{float64(2), "QueryProperties", "@ExtendedProperties", "d52bc55b-fc74-4a63-adb9-b72ff939e4c2", ""},
-				{float64(3), "QueryStatus", "QueryStatus", "00000000-0000-0000-0000-000000000000", ""},
+				{json.Number("0"), "QueryResult", "PrimaryResult", "e43f725a-26fd-4219-8869-30c21e1b139c", ""},
+				{json.Number("1"), "QueryResult", "PrimaryResult", "0f66e92a-8d0e-43da-8a66-ddb6bf84c49d", ""},
+				{json.Number("2"), "QueryProperties", "@ExtendedProperties", "d52bc55b-fc74-4a63-adb9-b72ff939e4c2", ""},
+				{json.Number("3"), "QueryStatus", "QueryStatus", "00000000-0000-0000-0000-000000000000", ""},
 			},
 		},
 	}
@@ -254,7 +255,7 @@ func TestDecodeError(t *testing.T) {
 	row := tb.Rows[0]
 	assert.Equal(t, 1, len(row.Row))
 	value := row.Row[0]
-	assert.Equal(t, float64(1), value)
+	assert.Equal(t, json.Number("1"), value)
 	row = tb.Rows[1]
 	assert.Equal(t, 1, len(row.Errors))
 	assert.Equal(t, "Query execution has exceeded the allowed limits (80DA0003): The results of this query exceed the set limit of 1 records, so not all records were returned (E_QUERY_RESULT_SET_TOO_LARGE, 0x80DA0003). See https://aka.ms/kustoquerylimits for more information and possible solutions..\r\n[0]Kusto.Data.Exceptions.KustoServicePartialQueryFailureLimitsExceededException: Query execution has exceeded the allowed limits (80DA0003): The results of this query exceed the set limit of 1 records, so not all records were returned (E_QUERY_RESULT_SET_TOO_LARGE, 0x80DA0003). See https://aka.ms/kustoquerylimits for more information and possible solutions..\r\nTimestamp=2023-12-03T13:12:01.8751538Z\r\nClientRequestId=blab6\r\nActivityId=123e27de-1e4e-49d9-b579-fe0b331d3642\r\nActivityType=GW.Http.CallContext\r\nServiceAlias=REDACTED\r\nMachineName=KSEngine000001\r\nProcessName=Kusto.WinSvc.Svc\r\nProcessId=1604\r\nThreadId=9752\r\nActivityStack=(Activity stack: CRID=blab6 ARID=123e27de-1e4e-49d9-b579-fe0b331d3642 > GW.Http.CallContext/123e27de-1e4e-49d9-b579-fe0b331d3642)\r\nMonitoredActivityContext=(ActivityType=GW.Http.CallContext, Timestamp=2023-12-03T13:12:01.8751538Z, ParentActivityId=123e27de-1e4e-49d9-b579-fe0b331d3642, TimeSinceStarted=0 [ms])ErrorCode=\r\nErrorReason=\r\nErrorMessage=\r\nDataSource=\r\nDatabaseName=\r\nClientRequestId=\r\nActivityId=123e27de-1e4e-49d9-b579-fe0b331d3642\r\nUnderlyingErrorCode=80DA0003\r\nUnderlyingErrorMessage=The results of this query exceed the set limit of 1 records, so not all records were returned (E_QUERY_RESULT_SET_TOO_LARGE, 0x80DA0003). See https://aka.ms/kustoquerylimits for more information and possible solutions.\r\n\r\n", row.Errors[0])
