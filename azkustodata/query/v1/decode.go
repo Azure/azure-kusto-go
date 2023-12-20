@@ -13,6 +13,8 @@ type RawRow struct {
 	Errors []string
 }
 
+// UnmarshalJSON implements the json.Unmarshaler interface, to decode a RawRow from JSON.
+// It needs special handling, because the field may be a Row or a list of Errors.
 func (r *RawRow) UnmarshalJSON(data []byte) error {
 	var row []interface{}
 	var errs struct {

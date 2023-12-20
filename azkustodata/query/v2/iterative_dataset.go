@@ -7,8 +7,8 @@ import (
 	"io"
 )
 
-// streamingDataset is a structure that represents a set of data as returned by the Kusto service.
-type streamingDataset struct {
+// iterativeDataset is a structure that represents a set of data as returned by the Kusto service.
+type iterativeDataset struct {
 	baseDataset
 	// reader is an io.ReadCloser used to read the data from the Kusto service.
 	reader io.ReadCloser
@@ -20,19 +20,19 @@ type streamingDataset struct {
 	results chan query.TableResult
 }
 
-func (d *streamingDataset) Results() <-chan query.TableResult {
+func (d *iterativeDataset) Results() <-chan query.TableResult {
 	return d.results
 }
 
 // readFrames consumes the frames from the reader and sends them to the frames channel.
-func (d *streamingDataset) readFrames(reader io.Reader) {
+func (d *iterativeDataset) readFrames(reader io.Reader) {
 	err := readFramesIterative(reader, d.frames)
 	if err != nil {
 		d.errorChannel <- err
 	}
 }
 
-func (d *streamingDataset) getNextFrame() Frame {
+func (d *iterativeDataset) getNextFrame() Frame {
 	var f Frame = nil
 
 	select {
@@ -48,15 +48,15 @@ func (d *streamingDataset) getNextFrame() Frame {
 	return f
 }
 
-func (d *streamingDataset) reportError(err error) {
+func (d *iterativeDataset) reportError(err error) {
 	d.results <- query.TableResultError(err)
 }
 
-func (d *streamingDataset) onFinishHeader() {
+func (d *iterativeDataset) onFinishHeader() {
 	d.results <- query.TableResultSuccess(d.currentTable.(*streamingTable))
 }
 
-func (d *streamingDataset) newTableFromHeader(th *TableHeader) (table, error) {
+func (d *iterativeDataset) newTableFromHeader(th *TableHeader) (table, error) {
 	newStreamingTable, e := NewStreamingTable(d, th)
 	if e != nil {
 		return nil, e
@@ -64,11 +64,11 @@ func (d *streamingDataset) newTableFromHeader(th *TableHeader) (table, error) {
 	return newStreamingTable.(*streamingTable), nil
 }
 
-func (d *streamingDataset) close() {
+func (d *iterativeDataset) close() {
 	close(d.results)
 }
 
-func (d *streamingDataset) GetAllTables() ([]query.Table, []error) {
+func (d *iterativeDataset) GetAllTables() ([]query.Table, []error) {
 	tables := make([]query.Table, 0, len(d.results))
 	errs := make([]error, 0, len(d.results))
 
@@ -91,10 +91,10 @@ func (d *streamingDataset) GetAllTables() ([]query.Table, []error) {
 	return tables, errs
 }
 
-// NewStreamingDataSet creates a new streamingDataset from a reader.
+// NewStreamingDataSet creates a new iterativeDataset from a reader.
 // The capacity parameter is the capacity of the channel that receives the frames from the Kusto service.
-func NewStreamingDataSet(ctx context.Context, r io.ReadCloser, capacity int) (StreamingDataset, error) {
-	d := &streamingDataset{
+func NewStreamingDataSet(ctx context.Context, r io.ReadCloser, capacity int) (IterativeDataset, error) {
+	d := &iterativeDataset{
 		baseDataset:  *newBaseDataset(query.NewDataset(ctx, errors.OpQuery), false),
 		reader:       r,
 		frames:       make(chan Frame, capacity),

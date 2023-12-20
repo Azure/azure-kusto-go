@@ -4,6 +4,8 @@ import (
 	"fmt"
 )
 
+// This file contains the raw JSON frames that are received from the Kusto service.
+
 type RawRow struct {
 	Row    []interface{}
 	Errors []OneApiError

@@ -1,5 +1,7 @@
 package query
 
+// dataTable is a basic implementation of Table, to be used by specific implementations.
+// It contains all the rows and errors for the table.
 type dataTable struct {
 	baseTable
 	rows   []Row

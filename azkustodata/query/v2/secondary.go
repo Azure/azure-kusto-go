@@ -7,12 +7,16 @@ import (
 	"time"
 )
 
+// This file handles the parsing of the known secondary tables in v2 datasets.
+
+// QueryProperties represents the query properties table, which arrives before the first result.
 type QueryProperties struct {
 	TableId int
 	Key     string
 	Value   map[string]interface{}
 }
 
+// QueryCompletionInformation represents the query completion information table, which arrives after the last result.
 type QueryCompletionInformation struct {
 	Timestamp        time.Time
 	ClientRequestId  string
@@ -31,6 +35,7 @@ type QueryCompletionInformation struct {
 const QueryPropertiesKind = "QueryProperties"
 const QueryCompletionInformationKind = "QueryCompletionInformation"
 
+// parseSecondaryTable parses a secondary table, and stores it in the dataset.
 func (d *baseDataset) parseSecondaryTable(t query.Table) error {
 	d.lock.Lock()
 	defer d.lock.Unlock()

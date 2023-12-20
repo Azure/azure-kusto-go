@@ -5,6 +5,7 @@ import (
 	"github.com/Azure/azure-kusto-go/azkustodata/errors"
 )
 
+// dataset is a basic implementation of Dataset, to be used by specific implementations.
 type dataset struct {
 	ctx context.Context
 	op  errors.Op

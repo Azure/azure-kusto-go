@@ -216,7 +216,7 @@ func (c *Client) QueryNew(ctx context.Context, db string, kqlQuery Statement, op
 	return queryv2.NewFullDataSet(ctx, res)
 }
 
-func (c *Client) IterativeQuery(ctx context.Context, db string, kqlQuery Statement, options ...QueryOption) (queryv2.StreamingDataset, error) {
+func (c *Client) IterativeQuery(ctx context.Context, db string, kqlQuery Statement, options ...QueryOption) (queryv2.IterativeDataset, error) {
 	opts, res, err := c.newV2(ctx, db, kqlQuery, options)
 	if err != nil {
 		return nil, err

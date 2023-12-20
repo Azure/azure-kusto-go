@@ -25,13 +25,18 @@ func RowResultError(err error) RowResult {
 	}
 }
 
+// RowResult is a single streamed row from a table.
+// It can contain either a row or an error.
 type RowResult interface {
 	Row() Row
 	Err() error
 }
 
-type StreamingTable interface {
+// IterativeTable is a table that returns rows one at a time.
+type IterativeTable interface {
 	Table
+	// Rows returns a channel that will be populated with rows as they are read.
 	Rows() <-chan RowResult
+	// SkipToEnd skips all remaining rows in the table.
 	SkipToEnd() []error
 }

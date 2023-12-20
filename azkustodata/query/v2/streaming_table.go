@@ -7,6 +7,9 @@ import (
 	"sync"
 )
 
+// streamingTable represents a table that is streamed from the service.
+// It is used by the iterative dataset.
+// The rows are received from the service via the rawRows channel, and are parsed and sent to the rows channel.
 type streamingTable struct {
 	query.BaseTable
 	lock     sync.RWMutex
@@ -46,7 +49,7 @@ func (t *streamingTable) setSkip(skip bool) {
 	t.skip = skip
 }
 
-func NewStreamingTable(dataset query.Dataset, th *TableHeader) (query.StreamingTable, *errors.Error) {
+func NewStreamingTable(dataset query.Dataset, th *TableHeader) (query.IterativeTable, *errors.Error) {
 	t := &streamingTable{
 		BaseTable: query.NewTable(dataset, int64(th.TableId), strconv.Itoa(th.TableId), th.TableName, th.TableKind, make([]query.Column, len(th.Columns))),
 		rawRows:   make(chan RawRows),

@@ -4,6 +4,7 @@ import (
 	"github.com/Azure/azure-kusto-go/azkustodata/types"
 )
 
+// column is a basic implementation of Column, to be used by specific implementations.
 type column struct {
 	ordinal   int
 	name      string

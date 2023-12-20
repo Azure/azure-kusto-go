@@ -9,6 +9,40 @@ import (
 	"io"
 )
 
+// this file contains the decoding of v2 frames, including parsing the format and converting the frames.
+
+// UnmarshalJSON decodes a RawRow from JSON, it needs special handling because the row can be either a row (list of values) or an error (objecT).
+func (r *RawRow) UnmarshalJSON(data []byte) error {
+	var row []interface{}
+	var errs struct {
+		OneApiErrors []OneApiError `json:"OneApiErrors"`
+	}
+
+	var err error
+
+	reader := bytes.NewReader(data)
+	dec := json.NewDecoder(reader)
+	dec.UseNumber()
+
+	if err = dec.Decode(&row); err != nil {
+		_, err := reader.Seek(0, io.SeekStart)
+		if err != nil {
+			return err
+		}
+
+		if err = dec.Decode(&errs); err != nil {
+			return err
+		}
+		r.Errors = errs.OneApiErrors
+		r.Row = nil
+		return nil
+	}
+	r.Row = row
+	r.Errors = nil
+	return nil
+}
+
+// Decode converts an unknown frame to a known frame type
 func (f *EveryFrame) Decode() (Frame, error) {
 	switch f.FrameType {
 	case DataSetHeaderFrameType:
@@ -74,6 +108,23 @@ func prepareReadBuffer(r io.Reader) (io.Reader, error) {
 
 }
 
+// decodeFrame decode a single frame from a decoder
+func decodeFrame(dec *json.Decoder) (Frame, error) {
+	frame := EveryFrame{}
+	err := dec.Decode(&frame)
+	if err != nil {
+		return nil, err
+	}
+
+	f, err := frame.Decode()
+
+	if err != nil {
+		return nil, err
+	}
+	return f, nil
+}
+
+// readFramesIterative reads frames from a reader and sends them to a channel as they are read.
 func readFramesIterative(br io.Reader, ch chan<- Frame) error {
 	defer close(ch)
 
@@ -93,21 +144,7 @@ func readFramesIterative(br io.Reader, ch chan<- Frame) error {
 	}
 }
 
-func decodeFrame(dec *json.Decoder) (Frame, error) {
-	frame := EveryFrame{}
-	err := dec.Decode(&frame)
-	if err != nil {
-		return nil, err
-	}
-
-	f, err := frame.Decode()
-
-	if err != nil {
-		return nil, err
-	}
-	return f, nil
-}
-
+// readFramesFull reads all frames from a reader and returns them as a slice.
 func readFramesFull(r io.Reader) ([]Frame, error) {
 	br, err := prepareReadBuffer(r)
 	if err != nil {
@@ -214,35 +251,5 @@ func (s *skipReader) skipInitialBracket() error {
 			return fmt.Errorf("expected '[' at the beginning of the stream, got '%c'", initialByte[0])
 		}
 	}
-	return nil
-}
-
-func (r *RawRow) UnmarshalJSON(data []byte) error {
-	var row []interface{}
-	var errs struct {
-		OneApiErrors []OneApiError `json:"OneApiErrors"`
-	}
-
-	var err error
-
-	reader := bytes.NewReader(data)
-	dec := json.NewDecoder(reader)
-	dec.UseNumber()
-
-	if err = dec.Decode(&row); err != nil {
-		_, err := reader.Seek(0, io.SeekStart)
-		if err != nil {
-			return err
-		}
-
-		if err = dec.Decode(&errs); err != nil {
-			return err
-		}
-		r.Errors = errs.OneApiErrors
-		r.Row = nil
-		return nil
-	}
-	r.Row = row
-	r.Errors = nil
 	return nil
 }

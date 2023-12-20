@@ -4,19 +4,22 @@ package query
 // It contains a Table and an error, if any occurred during the operation.
 type tableResult struct {
 	// Table is the result of the operation.
-	table StreamingTable
+	table IterativeTable
 	// Err is the error that occurred during the operation, if any.
 	err error
 }
 
-func (t *tableResult) Table() StreamingTable {
+// Table returns the table that was the result of the operation.
+func (t *tableResult) Table() IterativeTable {
 	return t.table
 }
+
+// Err returns the error that occurred during the operation, if any.
 func (t *tableResult) Err() error {
 	return t.err
 }
 
-func TableResultSuccess(table StreamingTable) TableResult {
+func TableResultSuccess(table IterativeTable) TableResult {
 	return &tableResult{
 		table: table,
 	}

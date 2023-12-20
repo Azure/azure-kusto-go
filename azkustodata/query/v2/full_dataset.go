@@ -5,9 +5,9 @@ import (
 	"github.com/Azure/azure-kusto-go/azkustodata/errors"
 	"github.com/Azure/azure-kusto-go/azkustodata/query"
 	"io"
-	"strconv"
 )
 
+// FullDataset represents a full result from kusto - where all the tables are received before the dataset is returned.
 type fullDataset struct {
 	baseDataset
 	frames       []Frame
@@ -37,49 +37,6 @@ func (d *fullDataset) TableByOrdinal(ordinal int) query.Table {
 		}
 	}
 	return nil
-}
-
-type fragmentedTable struct {
-	query.Table
-	rows   []query.Row
-	errors []error
-}
-
-func (f *fragmentedTable) RowCount() int {
-	return len(f.rows)
-}
-
-func (f *fragmentedTable) addRawRows(rows RawRows) {
-	for _, r := range rows {
-		if r.Errors != nil {
-			for _, e := range r.Errors {
-				f.errors = append(f.errors, &e)
-			}
-			continue
-		}
-
-		row, err := parseRow(r.Row, f)
-		if err != nil {
-			f.errors = append(f.errors, err)
-		}
-		f.rows = append(f.rows, row)
-	}
-}
-
-func (f *fragmentedTable) close(errors []OneApiError) {
-	for _, e := range errors {
-		f.errors = append(f.errors, &e)
-	}
-}
-
-func (d *fullDataset) newTableFromHeader(th *TableHeader) (table, error) {
-	columns := make([]query.Column, len(th.Columns))
-	err := parseColumns(th, columns, d.Op())
-	if err != nil {
-		return nil, err
-	}
-
-	return &fragmentedTable{Table: query.NewDataTable(d, int64(th.TableId), strconv.Itoa(th.TableId), th.TableName, th.TableKind, columns, make([]query.Row, 0), make([]error, 0))}, nil
 }
 
 func (d *fullDataset) onFinishTable() {
@@ -112,7 +69,9 @@ func (d *fullDataset) GetAllTables() ([]query.Table, []error) {
 }
 
 func NewFullDataSet(ctx context.Context, r io.ReadCloser) (FullDataset, error) {
-	defer r.Close()
+	defer func(r io.ReadCloser) {
+		_ = r.Close()
+	}(r)
 	full, err := readFramesFull(r)
 	if err != nil {
 		return nil, err

@@ -25,7 +25,7 @@ type table2 struct {
 func TestStreamingDataSet_ReadFrames_WithError(t *testing.T) {
 	t.Parallel()
 	reader := strings.NewReader("invalid")
-	d := &streamingDataset{
+	d := &iterativeDataset{
 		baseDataset:  *newBaseDataset(query.NewDataset(context.Background(), errors.OpQuery), false),
 		reader:       io.NopCloser(reader),
 		frames:       make(chan Frame, DefaultFrameCapacity),

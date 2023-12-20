@@ -4,6 +4,8 @@ import (
 	"fmt"
 )
 
+// This file contains the boilerplate code for String() and GetFrameType() methods for all frames.
+
 func (f *DataSetHeader) String() string {
 	return fmt.Sprintf("DataSetHeader(IsProgressive=%t, Version=%s, IsFragmented=%t, ErrorReportingPlacement=%s)", f.IsProgressive, f.Version, f.IsFragmented, f.ErrorReportingPlacement)
 }
@@ -12,6 +14,10 @@ func (f *DataTable) String() string {
 }
 func (c *FrameColumn) String() string {
 	return fmt.Sprintf("FrameColumn(ColumnName=%s, ColumnType=%s)", c.ColumnName, c.ColumnType)
+}
+
+func (r *RawRow) String() string {
+	return fmt.Sprintf("RawRow(Row=%v, Errors=%v)", r.Row, r.Errors)
 }
 
 func (f *TableHeader) String() string {

@@ -8,6 +8,7 @@ import (
 	"strconv"
 )
 
+// NewDataTable creates a new query.Table from a DataTable frame.
 func NewDataTable(d query.Dataset, dt *DataTable) (query.Table, error) {
 	op := errors.OpUnknown
 	if d != nil {
@@ -60,12 +61,14 @@ func parseColumns(th *TableHeader, columns []query.Column, op errors.Op) *errors
 	}
 	return nil
 }
+
 func parseRow(r []interface{}, t table) (query.Row, *errors.Error) {
 	values := make(value.Values, len(r))
 	columns := t.Columns()
 	for j, v := range r {
 		parsed := value.Default(columns[j].Type())
 		err := parsed.Unmarshal(v)
+
 		if err != nil {
 			return nil, errors.ES(t.Op(), errors.KInternal, "unable to unmarshal column %s into A %s value: %s", columns[j].Name(), columns[j].Type(), err)
 		}
@@ -75,6 +78,8 @@ func parseRow(r []interface{}, t table) (query.Row, *errors.Error) {
 	return row, nil
 }
 
+// table is an interface that represents a table that can be added to a dataset.
+// It is implemented by both streamingTable and fragmentedTable.
 type table interface {
 	query.Table
 	RowCount() int

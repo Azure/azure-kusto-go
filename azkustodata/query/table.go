@@ -6,6 +6,6 @@ type Table interface {
 }
 
 type TableResult interface {
-	Table() StreamingTable
+	Table() IterativeTable
 	Err() error
 }
