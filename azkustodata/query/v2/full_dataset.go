@@ -21,24 +21,6 @@ func (d *fullDataset) Tables() []query.Table {
 	return d.tables
 }
 
-func (d *fullDataset) TableByName(name string) query.Table {
-	for _, t := range d.tables {
-		if t.Name() == name {
-			return t
-		}
-	}
-	return nil
-}
-
-func (d *fullDataset) TableByOrdinal(ordinal int) query.Table {
-	for _, t := range d.tables {
-		if t.Ordinal() == int64(ordinal) {
-			return t
-		}
-	}
-	return nil
-}
-
 func (d *fullDataset) onFinishTable() {
 	f := d.currentTable.(*fragmentedTable)
 	d.tables = append(d.tables, query.NewDataTable(d, f.Ordinal(), f.Id(), f.Name(), f.Kind(), f.Columns(), f.rows, f.errors))

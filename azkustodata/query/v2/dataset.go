@@ -25,8 +25,6 @@ type IterativeDataset interface {
 type FullDataset interface {
 	Dataset
 	Tables() []query.Table
-	TableByName(name string) query.Table
-	TableByOrdinal(ordinal int) query.Table
 }
 
 // dataset is the internal interface for the dataset implementation, it is used by both the iterative and full datasets implementations.

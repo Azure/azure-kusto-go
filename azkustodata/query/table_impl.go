@@ -5,16 +5,17 @@ import (
 )
 
 type baseTable struct {
-	dataSet Dataset
-	ordinal int64
-	id      string
-	name    string
-	kind    string
-	columns []Column
+	dataSet       Dataset
+	ordinal       int64
+	id            string
+	name          string
+	kind          string
+	columns       []Column
+	columnsByName map[string]Column
 }
 
 func NewTable(ds Dataset, ordinal int64, id string, name string, kind string, columns []Column) BaseTable {
-	return &baseTable{
+	b := &baseTable{
 		dataSet: ds,
 		ordinal: ordinal,
 		id:      id,
@@ -22,6 +23,12 @@ func NewTable(ds Dataset, ordinal int64, id string, name string, kind string, co
 		kind:    kind,
 		columns: columns,
 	}
+	b.columnsByName = make(map[string]Column)
+	for _, c := range columns {
+		b.columnsByName[c.Name()] = c
+	}
+
+	return b
 }
 
 func (t *baseTable) Id() string {
@@ -45,10 +52,8 @@ func (t *baseTable) Kind() string {
 }
 
 func (t *baseTable) ColumnByName(name string) Column {
-	for _, c := range t.columns {
-		if c.Name() == name {
-			return c
-		}
+	if c, ok := t.columnsByName[name]; ok {
+		return c
 	}
 	return nil
 }

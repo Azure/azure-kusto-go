@@ -4,8 +4,14 @@ import (
 	"context"
 	"github.com/Azure/azure-kusto-go/azkustodata"
 	"github.com/Azure/azure-kusto-go/azkustodata/kql"
+	"github.com/Azure/azure-kusto-go/azkustodata/query"
 	"github.com/Azure/azure-kusto-go/azkustodata/value"
 )
+
+type PopulationData struct {
+	State string
+	Pop   int `kusto:"Population"` // use the kusto tag to map to a different column name
+}
 
 func ExampleIterativeQuery() {
 	// Create a client using the default Azure credential
@@ -63,7 +69,7 @@ func ExampleIterativeQuery() {
 		// 1. SkipToEnd() - skips all rows and closes the table
 		table.SkipToEnd()
 
-		// 2. GetAllTables() - reads all rows and closes the table
+		// 2. GetAllRows() - reads all rows and closes the table
 		rows, errors := table.GetAllRows()
 		for _, row := range rows {
 			println(row.Ordinal())
@@ -87,13 +93,24 @@ func ExampleIterativeQuery() {
 			println(row.Ordinal())
 			println(row.Table().Name())
 
+			// For convenience, you can get the value from the row in the correct type
+			s, err := row.StringByOrdinal(0)
+			if err != nil {
+				panic(err)
+			}
+			println(s)
+			i, err := row.IntByName("Population")
+			if err != nil {
+				panic(err)
+			}
+			println(i) // int is *int32 - since it can be nil
+
 			// There are a few ways to access the values of a row:
 			val := row.Value(0)
 			println(val)
 			println(row.Values()[0])
 			println(row.ValueByColumn(stateCol))
 
-			// Working with values:
 			// Get the type of the value
 			println(val.GetType()) // prints "string"
 
@@ -106,7 +123,7 @@ func ExampleIterativeQuery() {
 			}
 
 			// Or cast directly to the kusto type
-			if s, ok := val.GetValue().(value.String); ok {
+			if s, ok := val.(*value.String); ok {
 				if s.Valid {
 					println(s.Value)
 				}
@@ -114,20 +131,31 @@ func ExampleIterativeQuery() {
 
 			// Or convert the row to a struct
 
-			type PopulationData struct {
-				State string
-				Pop   int `kusto:"Population"` // use the kusto tag to map to a different column name
-			}
-
 			var pd PopulationData
-			err := row.ToStruct(&pd)
+			err = row.ToStruct(&pd)
 			if err != nil {
 				panic(err)
 			}
 			println(pd.State)
 			println(pd.Pop)
+
 		}
 
+		// Or you can easily get the results as a slice of structs
+		strts, errs := query.ToStructs[PopulationData](table)
+		if errs != nil {
+			panic(errs)
+		}
+		println(strts)
+
+		// Or iteratively
+		for res := range query.ToStructsIterative[PopulationData](table) {
+			if res.Err != nil {
+				println(res.Err.Error())
+			} else {
+				println(res.Out)
+			}
+		}
 	}
 
 	// Alternatively, you can consume the stream and get tables

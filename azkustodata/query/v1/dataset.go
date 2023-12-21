@@ -169,7 +169,6 @@ func (d *dataset) Info() []QueryProperties {
 
 type Dataset interface {
 	query.Dataset
-	PrimaryResults() query.Table
 	Results() []query.Table
 	Index() []TableIndexRow
 	Status() []QueryStatus

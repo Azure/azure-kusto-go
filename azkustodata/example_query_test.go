@@ -39,10 +39,8 @@ func ExampleQuery() {
 	}
 
 	// access tables
-	tb1 := dataset.TableByOrdinal(0)
-	tb2 := dataset.TableByName("PrimaryResult")
+	tb1 := dataset.Tables()[0]
 	println(tb1.Name())
-	println(tb2.Name())
 
 	for _, table := range dataset.Tables() {
 		println(table.Name())
@@ -67,6 +65,18 @@ func ExampleQuery() {
 			// Each row has an index and a pointer to the table it belongs to
 			println(row.Ordinal())
 			println(row.Table().Name())
+
+			// For convenience, you can get the value from the row in the correct type
+			s, err := row.StringByOrdinal(0)
+			if err != nil {
+				panic(err)
+			}
+			println(s)
+			i, err := row.IntByName("Population")
+			if err != nil {
+				panic(err)
+			}
+			println(i) // int is *int32 - since it can be nil
 
 			// There are a few ways to access the values of a row:
 			val := row.Value(0)
