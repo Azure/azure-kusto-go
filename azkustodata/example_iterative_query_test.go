@@ -153,7 +153,7 @@ func ExampleIterativeQuery() {
 			if res.Err != nil {
 				println(res.Err.Error())
 			} else {
-				println(res.Out)
+				println(res.Out.State)
 			}
 		}
 	}

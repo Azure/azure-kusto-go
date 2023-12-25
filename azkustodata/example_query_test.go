@@ -111,7 +111,7 @@ func ExampleQuery() {
 			}
 
 			var pd PopulationData
-			err := row.ToStruct(&pd)
+			err = row.ToStruct(&pd)
 			if err != nil {
 				panic(err)
 			}

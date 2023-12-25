@@ -10,16 +10,9 @@ type dataTable struct {
 
 func NewDataTable(ds Dataset, ordinal int64, id string, name string, kind string, columns []Column, rows []Row, errors []error) Table {
 	t := &dataTable{
-		baseTable: baseTable{
-			dataSet: ds,
-			ordinal: ordinal,
-			id:      id,
-			name:    name,
-			kind:    kind,
-			columns: columns,
-		},
-		rows:   rows,
-		errors: errors,
+		baseTable: *NewTable(ds, ordinal, id, name, kind, columns).(*baseTable),
+		rows:      rows,
+		errors:    errors,
 	}
 
 	for _, r := range rows {

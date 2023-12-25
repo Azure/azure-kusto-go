@@ -50,17 +50,17 @@ func (t *streamingTable) setSkip(skip bool) {
 }
 
 func NewStreamingTable(dataset query.Dataset, th *TableHeader) (query.IterativeTable, *errors.Error) {
+	columns := make([]query.Column, len(th.Columns))
+	err := parseColumns(th, columns, dataset.Op())
+	if err != nil {
+		return nil, err
+	}
+
 	t := &streamingTable{
-		BaseTable: query.NewTable(dataset, int64(th.TableId), strconv.Itoa(th.TableId), th.TableName, th.TableKind, make([]query.Column, len(th.Columns))),
+		BaseTable: query.NewTable(dataset, int64(th.TableId), strconv.Itoa(th.TableId), th.TableName, th.TableKind, columns),
 		rawRows:   make(chan RawRows),
 		rows:      make(chan query.RowResult),
 		end:       make(chan bool),
-	}
-
-	columns := t.Columns()
-	err := parseColumns(th, columns, t.Op())
-	if err != nil {
-		return nil, err
 	}
 
 	go t.readRows()

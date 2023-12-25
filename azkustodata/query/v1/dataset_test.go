@@ -116,7 +116,7 @@ func TestDatasetPartialErrors(t *testing.T) {
 	assert.NotNil(t, ds)
 	assert.ErrorContains(t, err, "Query execution has exceeded the allowed limits")
 
-	tb := ds.PrimaryResults()
+	tb := ds.Results()[0]
 
 	rows, errs := tb.GetAllRows()
 
