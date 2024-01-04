@@ -36,6 +36,10 @@ func (f *DataSetCompletion) String() string {
 	return fmt.Sprintf("DataSetCompletion(HasErrors=%t, Cancelled=%t, OneApiErrors=%#v)", f.HasErrors, f.Cancelled, f.OneApiErrors)
 }
 
+func (f *TableProgress) String() string {
+	return fmt.Sprintf("TableProgress(TableId=%d, Progress=%d)", f.TableId, f.Progress)
+}
+
 func (f *DataSetHeader) GetFrameType() string {
 	return DataSetHeaderFrameType
 }
@@ -59,3 +63,5 @@ func (f *TableCompletion) GetFrameType() string {
 func (f *DataSetCompletion) GetFrameType() string {
 	return DataSetCompletionFrameType
 }
+
+func (f *TableProgress) GetFrameType() string { return TableProgressFrameType }

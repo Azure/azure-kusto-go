@@ -110,6 +110,8 @@ func decodeTables(d dataset) {
 			}
 		} else if parsePrimaryTable(d, f) {
 			continue
+		} else if _, ok := f.(*TableProgress); ok {
+			// ignore
 		} else {
 			err := errors.ES(op, errors.KInternal, "unknown frame type")
 			d.reportError(err)

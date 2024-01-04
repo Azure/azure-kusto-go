@@ -85,6 +85,11 @@ func (f *EveryFrame) Decode() (Frame, error) {
 			Cancelled:    f.Cancelled,
 			OneApiErrors: f.OneApiErrors,
 		}, nil
+	case TableProgressFrameType:
+		return &TableProgress{
+			TableId:  f.TableId,
+			Progress: f.TableProgress,
+		}, nil
 	default:
 		return nil, fmt.Errorf("unknown frame type: %s", f.FrameType)
 	}

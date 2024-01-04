@@ -79,6 +79,13 @@ type DataSetCompletion struct {
 	OneApiErrors []OneApiError `json:"OneApiErrors"`
 }
 
+const TableProgressFrameType = "TableProgress"
+
+type TableProgress struct {
+	TableId  int     `json:"TableId"`
+	Progress float64 `json:"TableProgress"`
+}
+
 type EveryFrame struct {
 	FrameType               string        `json:"FrameType"`
 	IsProgressive           bool          `json:"IsProgressive"`
@@ -95,4 +102,5 @@ type EveryFrame struct {
 	OneApiErrors            []OneApiError `json:"OneApiErrors"`
 	HasErrors               bool          `json:"HasErrors"`
 	Cancelled               bool          `json:"Cancelled"`
+	TableProgress           float64       `json:"TableProgress"`
 }

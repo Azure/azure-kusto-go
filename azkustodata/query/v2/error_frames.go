@@ -13,6 +13,7 @@ func (e *OneApiError) Error() string {
 type ErrorMessage struct {
 	Code        string       `json:"code"`
 	Message     string       `json:"message"`
+	Description string       `json:"@message"`
 	Type        string       `json:"@type"`
 	Context     ErrorContext `json:"@context"`
 	IsPermanent bool         `json:"@permanent"`
