@@ -37,7 +37,7 @@ func (f *DataSetCompletion) String() string {
 }
 
 func (f *TableProgress) String() string {
-	return fmt.Sprintf("TableProgress(TableId=%d, Progress=%d)", f.TableId, f.Progress)
+	return fmt.Sprintf("TableProgress(TableId=%d, Progress=%f)", f.TableId, f.Progress)
 }
 
 func (f *DataSetHeader) GetFrameType() string {
