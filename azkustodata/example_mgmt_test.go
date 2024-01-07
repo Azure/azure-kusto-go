@@ -45,7 +45,7 @@ func ExampleMgmt() {
 		stateCol := tb.ColumnByName("State")
 		println(stateCol.Name())
 
-		// Use GetAllTables() to get all rows as a slice
+		// Use GetAllRows() to get all rows as a slice
 		rows, errs := tb.GetAllRows()
 
 		// Make sure to always check for errors

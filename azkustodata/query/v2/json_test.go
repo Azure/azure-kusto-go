@@ -184,9 +184,10 @@ func TestReadFramesWithErrors(t *testing.T) {
 	assert.Equal(t, tableCompletion.OneApiErrors, []OneApiError{
 		{
 			ErrorMessage: ErrorMessage{
-				Code:    "LimitsExceeded",
-				Message: "Request is invalid and cannot be executed.",
-				Type:    "Kusto.Data.Exceptions.KustoServicePartialQueryFailureLimitsExceededException",
+				Code:        "LimitsExceeded",
+				Message:     "Request is invalid and cannot be executed.",
+				Type:        "Kusto.Data.Exceptions.KustoServicePartialQueryFailureLimitsExceededException",
+				Description: "Query execution has exceeded the allowed limits (80DA0003): The results of this query exceed the set limit of 1 records, so not all records were returned (E_QUERY_RESULT_SET_TOO_LARGE, 0x80DA0003). See https://aka.ms/kustoquerylimits for more information and possible solutions..",
 				Context: ErrorContext{
 					Timestamp:        "2023-11-28T08:30:06.4085369Z",
 					ServiceAlias:     "<censored>",
@@ -212,9 +213,10 @@ func TestReadFramesWithErrors(t *testing.T) {
 	assert.Equal(t, dataSetCompletion.OneApiErrors, []OneApiError{
 		{
 			ErrorMessage: ErrorMessage{
-				Code:    "LimitsExceeded",
-				Message: "Request is invalid and cannot be executed.",
-				Type:    "Kusto.Data.Exceptions.KustoServicePartialQueryFailureLimitsExceededException",
+				Code:        "LimitsExceeded",
+				Message:     "Request is invalid and cannot be executed.",
+				Type:        "Kusto.Data.Exceptions.KustoServicePartialQueryFailureLimitsExceededException",
+				Description: "Query execution has exceeded the allowed limits (80DA0003): The results of this query exceed the set limit of 1 records, so not all records were returned (E_QUERY_RESULT_SET_TOO_LARGE, 0x80DA0003). See https://aka.ms/kustoquerylimits for more information and possible solutions..",
 				Context: ErrorContext{
 					Timestamp:        "2023-11-28T08:30:06.4085369Z",
 					ServiceAlias:     "<censored>",

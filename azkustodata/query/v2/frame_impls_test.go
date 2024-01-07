@@ -71,9 +71,10 @@ func TestTableCompletion_String(t *testing.T) {
 		OneApiErrors: []OneApiError{
 			{
 				ErrorMessage: ErrorMessage{
-					Code:    "TestCode",
-					Message: "TestMessage",
-					Type:    "TestType",
+					Code:        "TestCode",
+					Message:     "TestMessage",
+					Type:        "TestType",
+					Description: "TestDescription",
 					Context: ErrorContext{
 						Timestamp:        "TestTimestamp",
 						ServiceAlias:     "TestServiceAlias",
@@ -93,7 +94,7 @@ func TestTableCompletion_String(t *testing.T) {
 			},
 		},
 	}
-	expected := "TableCompletion(TableId=1, RowCount=1, OneApiErrors=[]v2.OneApiError{v2.OneApiError{ErrorMessage:v2.ErrorMessage{Code:\"TestCode\", Message:\"TestMessage\", Type:\"TestType\", Context:v2.ErrorContext{Timestamp:\"TestTimestamp\", ServiceAlias:\"TestServiceAlias\", MachineName:\"TestMachineName\", ProcessName:\"TestProcessName\", ProcessId:1, ThreadId:1, ClientRequestId:\"TestClientRequestId\", ActivityId:\"TestActivityId\", SubActivityId:\"TestSubActivityId\", ActivityType:\"TestActivityType\", ParentActivityId:\"TestParentActivityId\", ActivityStack:\"TestActivityStack\"}, IsPermanent:false}}})"
+	expected := "TableCompletion(TableId=1, RowCount=1, OneApiErrors=[]v2.OneApiError{v2.OneApiError{ErrorMessage:v2.ErrorMessage{Code:\"TestCode\", Message:\"TestMessage\", Description:\"TestDescription\", Type:\"TestType\", Context:v2.ErrorContext{Timestamp:\"TestTimestamp\", ServiceAlias:\"TestServiceAlias\", MachineName:\"TestMachineName\", ProcessName:\"TestProcessName\", ProcessId:1, ThreadId:1, ClientRequestId:\"TestClientRequestId\", ActivityId:\"TestActivityId\", SubActivityId:\"TestSubActivityId\", ActivityType:\"TestActivityType\", ParentActivityId:\"TestParentActivityId\", ActivityStack:\"TestActivityStack\"}, IsPermanent:false}}})"
 	assert.Equal(t, expected, completion.String())
 }
 
@@ -105,9 +106,10 @@ func TestDataSetCompletion_String(t *testing.T) {
 		OneApiErrors: []OneApiError{
 			{
 				ErrorMessage: ErrorMessage{
-					Code:    "TestCode",
-					Message: "TestMessage",
-					Type:    "TestType",
+					Code:        "TestCode",
+					Message:     "TestMessage",
+					Type:        "TestType",
+					Description: "TestDescription",
 					Context: ErrorContext{
 						Timestamp:        "TestTimestamp",
 						ServiceAlias:     "TestServiceAlias",
@@ -127,7 +129,7 @@ func TestDataSetCompletion_String(t *testing.T) {
 			},
 		},
 	}
-	expected := "DataSetCompletion(HasErrors=true, Cancelled=false, OneApiErrors=[]v2.OneApiError{v2.OneApiError{ErrorMessage:v2.ErrorMessage{Code:\"TestCode\", Message:\"TestMessage\", Type:\"TestType\", Context:v2.ErrorContext{Timestamp:\"TestTimestamp\", ServiceAlias:\"TestServiceAlias\", MachineName:\"TestMachineName\", ProcessName:\"TestProcessName\", ProcessId:1, ThreadId:1, ClientRequestId:\"TestClientRequestId\", ActivityId:\"TestActivityId\", SubActivityId:\"TestSubActivityId\", ActivityType:\"TestActivityType\", ParentActivityId:\"TestParentActivityId\", ActivityStack:\"TestActivityStack\"}, IsPermanent:false}}})"
+	expected := "DataSetCompletion(HasErrors=true, Cancelled=false, OneApiErrors=[]v2.OneApiError{v2.OneApiError{ErrorMessage:v2.ErrorMessage{Code:\"TestCode\", Message:\"TestMessage\", Description:\"TestDescription\", Type:\"TestType\", Context:v2.ErrorContext{Timestamp:\"TestTimestamp\", ServiceAlias:\"TestServiceAlias\", MachineName:\"TestMachineName\", ProcessName:\"TestProcessName\", ProcessId:1, ThreadId:1, ClientRequestId:\"TestClientRequestId\", ActivityId:\"TestActivityId\", SubActivityId:\"TestSubActivityId\", ActivityType:\"TestActivityType\", ParentActivityId:\"TestParentActivityId\", ActivityStack:\"TestActivityStack\"}, IsPermanent:false}}})"
 	assert.Equal(t, expected, completion.String())
 }
 
