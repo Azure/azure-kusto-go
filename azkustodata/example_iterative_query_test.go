@@ -40,6 +40,7 @@ func ExampleIterativeQuery() {
 	}
 
 	// The tables are streamed, so you need to iterate through the `Results()` channel to get them
+	// It is only possible to iterate through the results once - since they are streamed
 
 	for tableResult := range dataset.Results() {
 		// Make sure to always check for errors
@@ -66,25 +67,25 @@ func ExampleIterativeQuery() {
 
 		// There are a few ways to consume a streaming table:
 		// Note: Only one of these methods should be used per table
-		// 1. SkipToEnd() - skips all rows and closes the table
-		table.SkipToEnd()
-
-		// 2. GetAllRows() - reads all rows and closes the table
-		rows, errors := table.GetAllRows()
-		for _, row := range rows {
-			println(row.Ordinal())
-		}
-		for _, err := range errors {
-			println(err.Error())
-		}
-
-		// 3. Rows() - reads rows as they are received
+		// 1. Rows() - reads rows as they are received
 		for rowResult := range table.Rows() {
 			if rowResult.Err() != nil {
 				println(rowResult.Err().Error())
 			} else {
 				println(rowResult.Row().Ordinal())
 			}
+		}
+
+		// 2. SkipToEnd() - skips all rows and closes the table
+		table.SkipToEnd()
+
+		// 3. GetAllRows() - reads all rows and closes the table
+		rows, errors := table.GetAllRows()
+		for _, row := range rows {
+			println(row.Ordinal())
+		}
+		for _, err := range errors {
+			println(err.Error())
 		}
 
 		// Working with rows
@@ -141,14 +142,7 @@ func ExampleIterativeQuery() {
 
 		}
 
-		// Or you can easily get the results as a slice of structs
-		strts, errs := query.ToStructs[PopulationData](table)
-		if errs != nil {
-			panic(errs)
-		}
-		println(strts)
-
-		// Or iteratively
+		// Or you can easily get the results as a slice of structs Iteratively
 		for res := range query.ToStructsIterative[PopulationData](table) {
 			if res.Err != nil {
 				println(res.Err.Error())
@@ -156,9 +150,18 @@ func ExampleIterativeQuery() {
 				println(res.Out.State)
 			}
 		}
+
+		// Or all at once
+		strts, errs := query.ToStructs[PopulationData](table)
+		if errs != nil {
+			panic(errs)
+		}
+		println(strts)
+
 	}
 
-	// Alternatively, you can consume the stream and get tables
+	// Alternatively, you can consume the stream and get tables.
+	// Only if you haven't consumed them in any other way
 	tables, errors := dataset.GetAllTables()
 	if len(errors) > 0 {
 		panic(errors[0])

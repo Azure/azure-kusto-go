@@ -1,8 +1,5 @@
 package query
 
-// value.go provides methods for converting a row to a *struct and for converting KustoValue into Go types
-// or in the reverse.
-
 import (
 	"fmt"
 	"reflect"

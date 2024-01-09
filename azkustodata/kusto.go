@@ -177,7 +177,7 @@ func (c *Client) Query(ctx context.Context, db string, query Statement, options 
 	return iter, nil
 }
 
-func (c *Client) newV1(
+func (c *Client) queryV1(
 	op errors.Op, call int,
 	ctx context.Context, db string, kqlQuery Statement, options ...QueryOption) (v1.Dataset, error) {
 	ctx, cancel := contextSetup(ctx)
@@ -203,8 +203,9 @@ func (c *Client) newV1(
 	return v1.NewDatasetFromReader(ctx, opQuery, res)
 }
 
+// TODO: Rename these when we remove the old ones.
 func (c *Client) MgmtNew(ctx context.Context, db string, kqlQuery Statement, options ...QueryOption) (v1.Dataset, error) {
-	return c.newV1(errors.OpMgmt, mgmtCall, ctx, db, kqlQuery, options...)
+	return c.queryV1(errors.OpMgmt, mgmtCall, ctx, db, kqlQuery, options...)
 }
 
 func (c *Client) QueryNew(ctx context.Context, db string, kqlQuery Statement, options ...QueryOption) (queryv2.FullDataset, error) {

@@ -63,6 +63,18 @@ func ExampleMgmt() {
 			println(row.Ordinal())
 			println(row.Table().Name())
 
+			// For convenience, you can get the value from the row in the correct type
+			s, err := row.StringByOrdinal(0)
+			if err != nil {
+				panic(err)
+			}
+			println(s)
+			i, err := row.IntByName("Population")
+			if err != nil {
+				panic(err)
+			}
+			println(i) // int is *int32 - since it can be nil
+
 			// There are a few ways to access the values of a row:
 			val := row.Value(0)
 			println(val)
@@ -98,7 +110,7 @@ func ExampleMgmt() {
 			}
 
 			var tableData ShowTables
-			err := row.ToStruct(&tableData)
+			err = row.ToStruct(&tableData)
 			if err != nil {
 				panic(err)
 			}
