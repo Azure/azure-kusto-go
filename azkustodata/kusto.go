@@ -17,8 +17,6 @@ type Statement = *kql.Builder
 // queryer provides for getting a stream of Kusto frames. Exists to allow fake Kusto streams in tests.
 type queryer interface {
 	io.Closer
-	query(ctx context.Context, db string, query Statement, options *queryOptions) (execResp, error)
-	mgmt(ctx context.Context, db string, query Statement, options *queryOptions) (execResp, error)
 	rawQuery(ctx context.Context, db string, query Statement, options *queryOptions) (io.ReadCloser, error)
 }
 

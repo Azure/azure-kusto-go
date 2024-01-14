@@ -7,7 +7,8 @@ import (
 	"github.com/Azure/azure-kusto-go/azkustodata/errors"
 	"github.com/Azure/azure-kusto-go/azkustodata/kql"
 	"github.com/Azure/azure-kusto-go/azkustodata/query"
-	"github.com/Azure/azure-kusto-go/azkustodata/table"
+	v1 "github.com/Azure/azure-kusto-go/azkustodata/query/v1"
+	v2 "github.com/Azure/azure-kusto-go/azkustodata/query/v2"
 	"github.com/Azure/azure-kusto-go/azkustodata/testshared"
 	"github.com/Azure/azure-kusto-go/azkustodata/utils"
 	"github.com/Azure/azure-kusto-go/azkustodata/value"
@@ -27,9 +28,11 @@ import (
 	"unicode"
 )
 
-type queryFunc func(ctx context.Context, db string, query azkustodata.Statement, options ...azkustodata.QueryOption) (*azkustodata.RowIterator, error)
+type queryFunc func(ctx context.Context, db string, query azkustodata.Statement, options ...azkustodata.QueryOption) (v2.FullDataset, error)
 
-type mgmtFunc func(ctx context.Context, db string, query azkustodata.Statement, options ...azkustodata.MgmtOption) (*azkustodata.RowIterator, error)
+type mgmtFunc func(ctx context.Context, db string, query azkustodata.Statement, options ...azkustodata.QueryOption) (v1.Dataset, error)
+
+// TODO: tests for iterative query
 
 type queryJsonFunc func(ctx context.Context, db string, query azkustodata.Statement, options ...azkustodata.QueryOption) (string, error)
 type DynamicTypeVariations struct {
@@ -113,17 +116,11 @@ func TestAuth(t *testing.T) {
 				}
 			}(client)
 
-			query, err := client.Query(context.Background(), testConfig.Database, kql.New("print 1"))
-			defer func() {
-				query.Stop()
-				_, _ = query.GetQueryCompletionInformation() // make sure it stops
-			}()
-			require.NoError(t, err)
-
-			row, inlineError, err := query.NextRowOrError()
-			require.NoError(t, err)
-			require.Nil(t, inlineError)
-			assert.Equal(t, "1\n", row.String())
+			res, err := client.Query(context.Background(), testConfig.Database, kql.New("print 1"))
+			assert.NoError(t, err)
+			rows, err := res.Results()[0].GetAllRows()
+			assert.NoError(t, err)
+			assert.Equal(t, "1\n", rows[0].String())
 		})
 	}
 
@@ -167,7 +164,7 @@ func TestQueries(t *testing.T) {
 		qjcall   queryJsonFunc
 		options  interface{} // either []azkustodata.QueryOption or []azkustodata.MgmtOption
 		// doer is called from within the function passed to RowIterator.Do(). It allows us to collect the data we receive.
-		doer func(row *table.Row, update interface{}) error
+		doer func(row query.Row, update interface{}) error
 		// gotInit creates the variable that will be used by doer's update argument.
 		gotInit func() interface{}
 		// want is the data we want to receive from the query.
@@ -177,7 +174,7 @@ func TestQueries(t *testing.T) {
 			desc:  "Query: Retrieve count of the number of rows that match",
 			stmt:  kql.New("").AddTable(allDataTypesTable).AddLiteral("| count"),
 			qcall: client.Query,
-			doer: func(row *table.Row, update interface{}) error {
+			doer: func(row query.Row, update interface{}) error {
 				rec := testshared.CountResult{}
 				if err := row.ToStruct(&rec); err != nil {
 					return err
@@ -196,7 +193,7 @@ func TestQueries(t *testing.T) {
 			desc:  "Mgmt(regression github.com/Azure/azure-kusto-go/issues/11): make sure we can retrieve .show databases, but we do not check the results at this time",
 			stmt:  kql.New(`.show databases`),
 			mcall: client.Mgmt,
-			doer: func(row *table.Row, update interface{}) error {
+			doer: func(row query.Row, update interface{}) error {
 				return nil
 			},
 			gotInit: func() interface{} {
@@ -207,7 +204,7 @@ func TestQueries(t *testing.T) {
 			desc:  "Mgmt(https://github.com/Azure/azure-kusto-go/issues/55): transformations on mgmt queries",
 			stmt:  kql.New(`.show databases | project A="1" | take 1`),
 			mcall: client.Mgmt,
-			doer: func(row *table.Row, update interface{}) error {
+			doer: func(row query.Row, update interface{}) error {
 				rec := MgmtProjectionResult{}
 				if err := row.ToStruct(&rec); err != nil {
 					return err
@@ -226,7 +223,7 @@ func TestQueries(t *testing.T) {
 			desc:  "Mgmt(https://github.com/Azure/azure-kusto-go/issues/55): transformations on mgmt queries - multiple tables",
 			stmt:  kql.New(`.show databases | project A="1" | take 1;`).AddTable(allDataTypesTable).AddLiteral(" | project A=\"2\" | take 1"),
 			mcall: client.Mgmt,
-			doer: func(row *table.Row, update interface{}) error {
+			doer: func(row query.Row, update interface{}) error {
 				rec := MgmtProjectionResult{}
 				if err := row.ToStruct(&rec); err != nil {
 					return err
@@ -246,7 +243,7 @@ func TestQueries(t *testing.T) {
 			stmt:    kql.New("").AddTable(allDataTypesTable),
 			qcall:   client.Query,
 			options: []azkustodata.QueryOption{azkustodata.ResultsProgressiveEnabled()},
-			doer: func(row *table.Row, update interface{}) error {
+			doer: func(row query.Row, update interface{}) error {
 				rec := AllDataType{}
 				if err := row.ToStruct(&rec); err != nil {
 					return err
@@ -286,7 +283,7 @@ func TestQueries(t *testing.T) {
 			desc:  "Query: Non-Progressive query: make sure we can convert all data types from a row",
 			stmt:  kql.New("").AddTable(allDataTypesTable),
 			qcall: client.Query,
-			doer: func(row *table.Row, update interface{}) error {
+			doer: func(row query.Row, update interface{}) error {
 				rec := AllDataType{}
 				if err := row.ToStruct(&rec); err != nil {
 					return err
@@ -326,7 +323,7 @@ func TestQueries(t *testing.T) {
 			desc:  "Query: make sure Dynamic data type variations can be parsed",
 			stmt:  kql.New(`print PlainValue = dynamic('1'), PlainArray = dynamic('[1,2,3]'), PlainJson= dynamic('{ "a": 1}'), JsonArray= dynamic('[{ "a": 1}, { "a": 2}]')`),
 			qcall: client.Query,
-			doer: func(row *table.Row, update interface{}) error {
+			doer: func(row query.Row, update interface{}) error {
 				rec := DynamicTypeVariations{}
 				if err := row.ToStruct(&rec); err != nil {
 					return err
@@ -370,7 +367,7 @@ func TestQueries(t *testing.T) {
 				azkustodata.RequestDescription("9bff424f-711d-48b8-9a6e-d3a618748334"), azkustodata.Application("aaa"), azkustodata.User("bbb"),
 				azkustodata.CustomQueryOption("additional", "additional")},
 			qcall: client.Query,
-			doer: func(row *table.Row, update interface{}) error {
+			doer: func(row query.Row, update interface{}) error {
 				rec := testshared.CountResult{}
 				if err := row.ToStruct(&rec); err != nil {
 					return err
@@ -404,7 +401,7 @@ func TestQueries(t *testing.T) {
 				}()
 			}
 
-			var iter *azkustodata.RowIterator
+			var dataset query.FullDataset
 			var err error
 			switch {
 			case test.qcall != nil:
@@ -412,16 +409,16 @@ func TestQueries(t *testing.T) {
 				if test.options != nil {
 					options = test.options.([]azkustodata.QueryOption)
 				}
-				iter, err = test.qcall(context.Background(), testConfig.Database, test.stmt, options...)
+				dataset, err = test.qcall(context.Background(), testConfig.Database, test.stmt, options...)
 
 				require.Nilf(t, err, "TestQueries(%s): had test.qcall error: %s", test.desc, err)
 
 			case test.mcall != nil:
-				var options []azkustodata.MgmtOption
+				var options []azkustodata.QueryOption
 				if test.options != nil {
-					options = test.options.([]azkustodata.MgmtOption)
+					options = test.options.([]azkustodata.QueryOption)
 				}
-				iter, err = test.mcall(context.Background(), testConfig.Database, test.stmt, options...)
+				dataset, err = test.mcall(context.Background(), testConfig.Database, test.stmt, options...)
 
 				require.Nilf(t, err, "TestQueries(%s): had test.mcall error: %s", test.desc, err)
 
@@ -450,14 +447,17 @@ func TestQueries(t *testing.T) {
 				require.Fail(t, "test setup failure")
 			}
 
-			defer iter.Stop()
-
 			var got = test.gotInit()
-			err = iter.DoOnRowOrError(func(row *table.Row, e *errors.Error) error {
-				return test.doer(row, got)
-			})
+			results := dataset.Results()
+			assert.Len(t, results, 1)
+			rows, err := results[0].GetAllRows()
+			require.Nilf(t, err, "TestQueries(%s): had table.GetAllTables() error: %s", test.desc, err)
 
-			require.Nilf(t, err, "TestQueries(%s): had iter.Do() error: %s", test.desc, err)
+			assert.Len(t, rows, 1)
+
+			err = test.doer(rows[0], got)
+
+			require.Nilf(t, err, "TestQueries(%s): had dataset.Do() error: %s", test.desc, err)
 
 			require.Equal(t, test.want, got)
 		})
@@ -518,62 +518,6 @@ func TestIterativeQuery(t *testing.T) {
 	}
 }
 
-func TestQueryV2(t *testing.T) {
-	t.Parallel()
-
-	if skipETOE || testing.Short() {
-		t.Skipf("end to end tests disabled: missing config.json file in etoe directory")
-	}
-
-	_, cancel := context.WithCancel(context.Background())
-	defer cancel()
-	client, err := azkustodata.New(testConfig.kcsb)
-	if err != nil {
-		panic(err)
-	}
-
-	t.Cleanup(func() {
-		t.Log("Closing client")
-		require.NoError(t, client.Close())
-		t.Log("Closed client")
-	})
-
-	allDataTypesTable := fmt.Sprintf("goe2e_v2_all_data_types_%d_%d", time.Now().UnixNano(), rand.Int())
-	err = testshared.CreateAllDataTypesTable(t, client, allDataTypesTable)
-	require.NoError(t, err)
-
-	err = testshared.CreateAllDataTypesNullTable(t, client, allDataTypesTable+"_null")
-	require.NoError(t, err)
-
-	v2, err := client.QueryNew(context.Background(), testConfig.Database, kql.New("").AddTable(allDataTypesTable).AddLiteral(";").AddTable(allDataTypesTable+"_null"))
-
-	require.NoError(t, err)
-
-	res := getExpectedResult()
-
-	// Iterate 3 times to assure the data is not consumed
-	for i := 0; i < 3; i++ {
-		tables, errs := v2.GetAllTables()
-		require.Nil(t, errs)
-		for _, tb := range tables {
-			if tb.Name() == allDataTypesTable {
-				rows, errs := tb.GetAllRows()
-				require.Nilf(t, errs, "TestIterativeQuery: had table.GetAllTables() error: %s", errs)
-				structs, err := query.ToStructs[AllDataType](rows)
-				require.Nil(t, err)
-				require.Equal(t, []AllDataType{res}, structs)
-			}
-			if tb.Name() == allDataTypesTable+"_null" {
-				rows, errs := tb.GetAllRows()
-				require.Nilf(t, errs, "TestIterativeQuery: had table.GetAllTables() error: %s", errs)
-				structs, err := query.ToStructs[AllDataType](rows)
-				require.Nil(t, err)
-				require.Equal(t, []AllDataType{{}}, structs)
-			}
-		}
-	}
-}
-
 func TestStatement(t *testing.T) {
 	t.Parallel()
 
@@ -617,7 +561,7 @@ func TestStatement(t *testing.T) {
 		qjcall   queryJsonFunc
 		options  interface{} // either []azkustodata.QueryOption or []azkustodata.MgmtOption
 		// doer is called from within the function passed to RowIterator.Do(). It allows us to collect the data we receive.
-		doer func(row *table.Row, update interface{}) error
+		doer func(row query.Row, update interface{}) error
 		// gotInit creates the variable that will be used by doer's update argument.
 		gotInit func() interface{}
 		// want is the data we want to receive from the query.
@@ -647,7 +591,7 @@ func TestStatement(t *testing.T) {
 				AddColumn("vguid").AddLiteral(" == ").AddGUID(guid),
 			options: []azkustodata.QueryOption{},
 			qcall:   client.Query,
-			doer: func(row *table.Row, update interface{}) error {
+			doer: func(row query.Row, update interface{}) error {
 				rec := AllDataType{}
 				if err := row.ToStruct(&rec); err != nil {
 					return err
@@ -713,7 +657,7 @@ func TestStatement(t *testing.T) {
 				AddLong("lg", 9223372036854775807).
 				AddGUID("guid", guid))},
 			qcall: client.Query,
-			doer: func(row *table.Row, update interface{}) error {
+			doer: func(row query.Row, update interface{}) error {
 				rec := AllDataType{}
 				if err := row.ToStruct(&rec); err != nil {
 					return err
@@ -757,7 +701,7 @@ func TestStatement(t *testing.T) {
 				AddString("tableName", "goe2e_all_data_types\"").
 				AddString("txt", "asdf"))},
 			qcall: client.Query,
-			doer: func(row *table.Row, update interface{}) error {
+			doer: func(row query.Row, update interface{}) error {
 				rec := AllDataType{}
 				if err := row.ToStruct(&rec); err != nil {
 					return err
@@ -813,7 +757,7 @@ func TestStatement(t *testing.T) {
 				}()
 			}
 
-			var iter *azkustodata.RowIterator
+			var res query.FullDataset
 			var err error
 			switch {
 			case test.qcall != nil:
@@ -821,7 +765,7 @@ func TestStatement(t *testing.T) {
 				if test.options != nil {
 					options = test.options.([]azkustodata.QueryOption)
 				}
-				iter, err = test.qcall(context.Background(), testConfig.Database, test.stmt, options...)
+				res, err = test.qcall(context.Background(), testConfig.Database, test.stmt, options...)
 				if (!test.failFlag && err != nil) || (test.failFlag && err == nil) {
 					require.Nilf(t, err, "TestQueries(%s): had iter.Do() error: %s.", test.desc, err)
 				}
@@ -831,11 +775,12 @@ func TestStatement(t *testing.T) {
 			}
 
 			var got = test.gotInit()
-			if iter != nil {
-				defer iter.Stop()
-				err = iter.DoOnRowOrError(func(row *table.Row, e *errors.Error) error {
-					return test.doer(row, got)
-				})
+			if res != nil {
+				rows, err := res.Results()[0].GetAllRows()
+				assert.NoError(t, err)
+				assert.Len(t, rows, 1)
+				err = test.doer(rows[0], got)
+
 				require.Nilf(t, err, "TestQueries(%s): had iter.Do() error: %s.", test.desc, err)
 			}
 
@@ -858,10 +803,7 @@ func TestNoRedirects(t *testing.T) {
 				t.Log("Closed client")
 			})
 
-			q, err := client.Query(context.Background(), "db", kql.New("table"))
-			if q != nil {
-				defer q.Stop()
-			}
+			_, err = client.Query(context.Background(), "db", kql.New("table"))
 			require.Error(t, err)
 			assert.Contains(t, err.Error(), fmt.Sprintf("%d", code))
 		})
@@ -876,10 +818,8 @@ func TestNoRedirects(t *testing.T) {
 				t.Log("Closed client")
 			})
 
-			q, err := client.Query(context.Background(), "db", kql.New("table"))
-			if q != nil {
-				defer q.Stop()
-			}
+			_, err = client.Query(context.Background(), "db", kql.New("table"))
+
 			require.Error(t, err)
 			convErr, ok := err.(*errors.HttpError)
 			require.True(t, ok)
@@ -934,12 +874,8 @@ func TestError(t *testing.T) {
 		t.Log("Closed client")
 	})
 
-	q, err := client.Query(context.Background(), testConfig.Database, kql.New("table(tableName) | count"),
+	_, err = client.Query(context.Background(), testConfig.Database, kql.New("table(tableName) | count"),
 		azkustodata.QueryParameters(kql.NewParameters().AddString("tableName", uuid.NewString())))
-
-	if q != nil {
-		defer q.Stop()
-	}
 
 	kustoError, ok := errors.GetKustoError(err)
 	require.True(t, ok)

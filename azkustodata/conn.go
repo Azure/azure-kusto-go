@@ -17,9 +17,6 @@ import (
 	"unicode"
 
 	"github.com/Azure/azure-kusto-go/azkustodata/errors"
-	"github.com/Azure/azure-kusto-go/azkustodata/internal/frames"
-	v1 "github.com/Azure/azure-kusto-go/azkustodata/internal/frames/v1"
-	v2 "github.com/Azure/azure-kusto-go/azkustodata/internal/frames/v2"
 	"github.com/Azure/azure-kusto-go/azkustodata/internal/response"
 	truestedEndpoints "github.com/Azure/azure-kusto-go/azkustodata/trusted_endpoints"
 	"github.com/google/uuid"
@@ -83,21 +80,6 @@ type connOptions struct {
 	queryOptions *queryOptions
 }
 
-// query makes a query for the purpose of extracting data from Kusto. Context can be used to set
-// a timeout or cancel the query. Queries cannot take longer than 5 minutes.
-func (c *Conn) query(ctx context.Context, db string, query Statement, options *queryOptions) (execResp, error) {
-	if strings.HasPrefix(strings.TrimSpace(query.String()), ".") {
-		return execResp{}, errors.ES(errors.OpQuery, errors.KClientArgs, "a Stmt to Query() cannot begin with a period(.), only Mgmt() calls can do that").SetNoRetry()
-	}
-
-	return c.execute(ctx, execQuery, db, query, *options.requestProperties)
-}
-
-// mgmt is used to do management queries to Kusto.
-func (c *Conn) mgmt(ctx context.Context, db string, query Statement, options *queryOptions) (execResp, error) {
-	return c.execute(ctx, execMgmt, db, query, *options.requestProperties)
-}
-
 func (c *Conn) rawQuery(ctx context.Context, db string, query Statement, options *queryOptions) (io.ReadCloser, error) {
 	_, _, _, body, e := c.doRequest(ctx, execQuery, db, query, *options.requestProperties)
 	if e != nil {
@@ -111,33 +93,6 @@ const (
 	execQuery = 1
 	execMgmt  = 2
 )
-
-type execResp struct {
-	reqHeader  http.Header
-	respHeader http.Header
-	frameCh    chan frames.Frame
-}
-
-func (c *Conn) execute(ctx context.Context, execType int, db string, query Statement, properties requestProperties) (execResp, error) {
-	op, reqHeader, respHeader, body, e := c.doRequest(ctx, execType, db, query, properties)
-	if e != nil {
-		return execResp{}, e
-	}
-
-	var dec frames.Decoder
-	switch execType {
-	case execMgmt:
-		dec = &v1.Decoder{}
-	case execQuery:
-		dec = &v2.Decoder{}
-	default:
-		return execResp{}, errors.ES(op, errors.KInternal, "unknown execution type was %v", execType).SetNoRetry()
-	}
-
-	frameCh := dec.Decode(ctx, body, op)
-
-	return execResp{reqHeader: reqHeader, respHeader: respHeader, frameCh: frameCh}, nil
-}
 
 func (c *Conn) doRequest(ctx context.Context, execType int, db string, query Statement, properties requestProperties) (errors.Op, http.Header, http.Header,
 	io.ReadCloser, error) {

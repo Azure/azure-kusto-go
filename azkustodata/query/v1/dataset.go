@@ -151,10 +151,6 @@ func (d *dataset) Results() []query.Table {
 	return d.results
 }
 
-func (d *dataset) PrimaryResults() query.Table {
-	return d.results[0]
-}
-
 func (d *dataset) Index() []TableIndexRow {
 	return d.index
 }
@@ -167,9 +163,13 @@ func (d *dataset) Info() []QueryProperties {
 	return d.info
 }
 
+func (d *dataset) PrimaryResults() ([]query.Row, error) {
+	return query.PrimaryResults(d)
+}
+
 type Dataset interface {
 	query.Dataset
-	Results() []query.Table
+	query.FullDataset
 	Index() []TableIndexRow
 	Status() []QueryStatus
 	Info() []QueryProperties

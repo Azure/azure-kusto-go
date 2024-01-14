@@ -17,7 +17,11 @@ type fullDataset struct {
 	tables []query.Table
 }
 
-func (d *fullDataset) Tables() []query.Table {
+func (d *fullDataset) PrimaryResults() ([]query.Row, error) {
+	return query.PrimaryResults(d)
+}
+
+func (d *fullDataset) Results() []query.Table {
 	return d.tables
 }
 

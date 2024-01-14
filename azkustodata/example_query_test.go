@@ -4,6 +4,7 @@ import (
 	"context"
 	"github.com/Azure/azure-kusto-go/azkustodata"
 	"github.com/Azure/azure-kusto-go/azkustodata/kql"
+	"github.com/Azure/azure-kusto-go/azkustodata/query"
 	"github.com/Azure/azure-kusto-go/azkustodata/value"
 )
 
@@ -39,10 +40,10 @@ func ExampleQuery() {
 	}
 
 	// access tables
-	tb1 := dataset.Tables()[0]
+	tb1 := dataset.Results()[0]
 	println(tb1.Name())
 
-	for _, table := range dataset.Tables() {
+	for _, table := range dataset.Results() {
 		println(table.Name())
 		println(table.Id())
 
@@ -120,6 +121,14 @@ func ExampleQuery() {
 		}
 
 	}
+
+	// Alternatively, get the primary results as a slice of rows, if there is only one table
+	rows, errs := dataset.PrimaryResults()
+	println(len(rows), errs)
+
+	// Or convert the dataset to a slice of structs (or a specific table if there is more than one)
+	strts, errs := query.ToStructs[PopulationData](dataset) // or dataset.Results()[i]
+	println(len(strts), errs)
 
 	// Get metadata about the query (if it was consumed - otherwise it will be nil)
 	println(dataset.Header())

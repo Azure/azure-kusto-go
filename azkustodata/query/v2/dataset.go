@@ -25,7 +25,7 @@ type IterativeDataset interface {
 // FullDataset represents a full result from kusto - where all the tables are received before the dataset is returned.
 type FullDataset interface {
 	Dataset
-	Tables() []query.Table
+	query.FullDataset
 }
 
 // dataset is the internal interface for the dataset implementation, it is used by both the iterative and full datasets implementations.

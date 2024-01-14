@@ -221,7 +221,8 @@ func (r *row) TimespanByName(name string) (*time.Duration, error) {
 	return r.TimespanByOrdinal(col.Ordinal())
 }
 
-// ToStructs converts a table or a slice of rows into a slice of structs.
+// ToStructs converts a table, a non-iterative dataset or a slice of rows into a slice of structs.
+// If a dataset is provided, it should contain exactly one table.
 func ToStructs[T any](data interface{}) ([]T, error) {
 	var rows []Row
 	var errs error
@@ -232,6 +233,11 @@ func ToStructs[T any](data interface{}) ([]T, error) {
 		rows = r
 	} else if r, ok := data.(Row); ok {
 		rows = []Row{r}
+	} else if ds, ok := data.(FullDataset); ok {
+		rows, errs = PrimaryResults(ds)
+		if errs != nil {
+			return nil, errs
+		}
 	} else {
 		return nil, errors.ES(errors.OpUnknown, errors.KInternal, "invalid data type - expected Table or []Row")
 	}
@@ -251,6 +257,15 @@ func ToStructs[T any](data interface{}) ([]T, error) {
 	}
 
 	return out, errs
+}
+
+// PrimaryResults returns the rows of the dataset, assuming there is one table. If there are no primary results, or more than one table, an error is returned.
+func PrimaryResults(dataset FullDataset) ([]Row, error) {
+	if len(dataset.Results()) != 1 {
+		return nil, errors.ES(errors.OpUnknown, errors.KInternal, "expected exactly one table in dataset")
+	}
+
+	return dataset.Results()[0].GetAllRows()
 }
 
 type StructResult[T any] struct {

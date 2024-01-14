@@ -362,9 +362,9 @@ func TestStreamingDataSet_PartialErrors_Streaming(t *testing.T) {
 	for result := range d.Results() {
 		if result.Table() != nil {
 			tb := result.Table()
-			rows, errs := tb.GetAllRows()
+			rows, err := tb.GetAllRows()
 
-			assert.ErrorContains(t, errs[0], "LimitsExceeded")
+			assert.ErrorContains(t, err, "LimitsExceeded")
 
 			assert.Equal(t, 1, len(rows))
 			ft := &table1{}
@@ -387,9 +387,9 @@ func TestStreamingDataSet_PartialErrors_GetAll(t *testing.T) {
 	assert.ErrorContains(t, errs[0], "LimitsExceeded")
 
 	for _, tb := range results {
-		rows, errs := tb.GetAllRows()
+		rows, err := tb.GetAllRows()
 
-		assert.ErrorContains(t, errs[0], "LimitsExceeded")
+		assert.ErrorContains(t, err, "LimitsExceeded")
 
 		assert.Equal(t, 1, len(rows))
 		ft := &table1{}
