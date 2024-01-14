@@ -134,14 +134,14 @@ func parseTable[T any](table *RawTable, d *dataset, index *TableIndexRow) ([]T, 
 		return nil, err
 	}
 
-	indexRows, errs := fullTable.GetAllRows()
-	if errs != nil {
-		return nil, errors.GetCombinedError(errs...)
+	indexRows, err := fullTable.GetAllRows()
+	if err != nil {
+		return nil, err
 	}
 
-	rows, errs := query.ToStructs[T](indexRows)
-	if errs != nil {
-		return nil, errors.GetCombinedError(errs...)
+	rows, err := query.ToStructs[T](indexRows)
+	if err != nil {
+		return nil, err
 	}
 
 	return rows, nil

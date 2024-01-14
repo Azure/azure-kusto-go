@@ -45,7 +45,7 @@ func newBaseDataset(dataset query.Dataset, fakeLock bool) *baseDataset {
 // decodeTables decodes the frames from the frames channel and sends the results to the results channel.
 func decodeTables(d dataset) {
 	defer func() {
-		d.close()
+		d.Close()
 		table := d.getCurrentTable()
 		if table != nil {
 			table.close([]OneApiError{})

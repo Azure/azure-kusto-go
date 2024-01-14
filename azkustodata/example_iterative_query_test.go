@@ -80,11 +80,11 @@ func ExampleIterativeQuery() {
 		table.SkipToEnd()
 
 		// 3. GetAllRows() - reads all rows and closes the table
-		rows, errors := table.GetAllRows()
+		rows, err := table.GetAllRows()
 		for _, row := range rows {
 			println(row.Ordinal())
 		}
-		for _, err := range errors {
+		if err != nil {
 			println(err.Error())
 		}
 
@@ -167,8 +167,8 @@ func ExampleIterativeQuery() {
 		panic(errors[0])
 	}
 	// Now you can access tables and row with random access
-	rows, errors := tables[1].GetAllRows()
-	println(rows, errors)
+	rows, err := tables[1].GetAllRows()
+	println(rows, err)
 
 	// Get metadata about the query (if it was consumed - otherwise it will be nil)
 	println(dataset.Header())

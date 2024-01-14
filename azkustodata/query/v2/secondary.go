@@ -40,8 +40,6 @@ func (d *baseDataset) parseSecondaryTable(t query.Table) error {
 	d.lock.Lock()
 	defer d.lock.Unlock()
 
-	var errs []error
-
 	switch t.Kind() {
 	case QueryPropertiesKind:
 		if d.queryProperties != nil {
@@ -49,18 +47,16 @@ func (d *baseDataset) parseSecondaryTable(t query.Table) error {
 		}
 		rows, err := t.GetAllRows()
 		if err != nil {
-			errs = append(errs, err...)
+			return err
 		}
 		if len(rows) > 0 {
-			st, errs := query.ToStructs[QueryProperties](rows)
+			st, err := query.ToStructs[QueryProperties](rows)
 			d.queryProperties = st
-			if errs != nil {
-				return errors.GetCombinedError(errs...)
+			if err != nil {
+				return err
 			}
 		}
-		if errs != nil {
-			return errors.GetCombinedError(errs...)
-		}
+
 		return nil
 
 	case QueryCompletionInformationKind:
@@ -69,17 +65,14 @@ func (d *baseDataset) parseSecondaryTable(t query.Table) error {
 		}
 		rows, err := t.GetAllRows()
 		if err != nil {
-			errs = append(errs, err...)
+			return err
 		}
 		if len(rows) > 0 {
-			st, errs := query.ToStructs[QueryCompletionInformation](rows)
+			st, err := query.ToStructs[QueryCompletionInformation](rows)
 			d.queryCompletionInformation = st
-			if errs != nil {
-				return errors.GetCombinedError(errs...)
+			if err != nil {
+				return err
 			}
-		}
-		if errs != nil {
-			return errors.GetCombinedError(errs...)
 		}
 		return nil
 

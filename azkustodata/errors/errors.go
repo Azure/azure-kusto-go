@@ -175,7 +175,7 @@ func (e *Error) Error() string {
 func Retry(err error) bool {
 	var e *Error
 	if errors.As(err, &e) {
-		// e.permanent can be set multiple ways. If it is true, you can never retry.
+		// e.permanent can be set multi1ple ways. If it is true, you can never retry.
 		// If it is false, it does not necessarily mean anything, you have to go a little further.
 		if e.permanent {
 			return false
@@ -412,6 +412,52 @@ func (c CombinedError) Error() string {
 	return result
 }
 
+func (c CombinedError) Flatten() error {
+	if len(c.Errors) == 0 {
+		return nil
+	}
+	errorQueue := make([]error, 0, len(c.Errors))
+	for _, err := range c.Errors {
+		errorQueue = append(errorQueue, err)
+	}
+
+	res := make([]error, 0, len(errorQueue))
+
+	for len(errorQueue) > 0 {
+		err := errorQueue[0]
+		errorQueue = errorQueue[1:]
+		var combined *CombinedError
+		if errors.As(err, &combined) {
+			for _, err := range combined.Errors {
+				errorQueue = append(errorQueue, err)
+			}
+		}
+	}
+
+	if len(res) == 0 {
+		return nil
+	}
+	if len(res) == 1 {
+		return res[0]
+	}
+	return &CombinedError{Errors: res}
+}
+
 func GetCombinedError(errs ...error) *CombinedError {
 	return &CombinedError{Errors: errs}
+}
+
+func TryCombinedError(errs ...error) error {
+	if len(errs) == 0 {
+		return nil
+	}
+	if len(errs) == 1 {
+		var combined *CombinedError
+		if errors.As(errs[0], &combined) {
+			return combined.Flatten()
+		}
+		return errs[0]
+	}
+
+	return CombinedError{Errors: errs}.Flatten()
 }

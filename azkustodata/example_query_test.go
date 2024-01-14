@@ -27,7 +27,7 @@ func ExampleQuery() {
 
 	// Simple query - single table
 
-	dataset, err := client.QueryNew(ctx, "Samples", kql.New("PopulationData"))
+	dataset, err := client.Query(ctx, "Samples", kql.New("PopulationData"))
 
 	if err != nil {
 		// It's possible to get an errors and still get a table - partial results

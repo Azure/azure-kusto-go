@@ -27,7 +27,7 @@ func ExampleMgmt() {
 
 	// Simple query - single table
 
-	dataset, err := client.MgmtNew(ctx, "Samples", kql.New(".show tables"))
+	dataset, err := client.Mgmt(ctx, "Samples", kql.New(".show tables"))
 
 	if err != nil {
 		panic(err)

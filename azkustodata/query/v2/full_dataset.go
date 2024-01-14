@@ -23,7 +23,7 @@ func (d *fullDataset) Tables() []query.Table {
 
 func (d *fullDataset) onFinishTable() {
 	f := d.currentTable.(*fragmentedTable)
-	d.tables = append(d.tables, query.NewDataTable(d, f.Ordinal(), f.Id(), f.Name(), f.Kind(), f.Columns(), f.rows, f.errors))
+	d.tables = append(d.tables, query.NewDataTable(d, f.Ordinal(), f.Id(), f.Name(), f.Kind(), f.Columns(), f.rows, f.errors...))
 }
 
 func (d *fullDataset) getNextFrame() Frame {
@@ -42,8 +42,9 @@ func (d *fullDataset) reportError(err error) {
 	d.errors = append(d.errors, err)
 }
 
-func (d *fullDataset) close() {
+func (d *fullDataset) Close() error {
 	d.frames = nil
+	return nil
 }
 
 func (d *fullDataset) GetAllTables() ([]query.Table, []error) {

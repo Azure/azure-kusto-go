@@ -47,5 +47,5 @@ func (d *fullDataset) newTableFromHeader(th *TableHeader) (table, error) {
 		return nil, err
 	}
 
-	return &fragmentedTable{Table: query.NewDataTable(d, int64(th.TableId), strconv.Itoa(th.TableId), th.TableName, th.TableKind, columns, make([]query.Row, 0), make([]error, 0))}, nil
+	return &fragmentedTable{Table: query.NewDataTable(d, int64(th.TableId), strconv.Itoa(th.TableId), th.TableName, th.TableKind, columns, make([]query.Row, 0))}, nil
 }

@@ -222,9 +222,9 @@ func (r *row) TimespanByName(name string) (*time.Duration, error) {
 }
 
 // ToStructs converts a table or a slice of rows into a slice of structs.
-func ToStructs[T any](data interface{}) ([]T, []error) {
+func ToStructs[T any](data interface{}) ([]T, error) {
 	var rows []Row
-	var errs []error
+	var errs error
 
 	if t, ok := data.(Table); ok {
 		rows, errs = t.GetAllRows()
@@ -233,7 +233,7 @@ func ToStructs[T any](data interface{}) ([]T, []error) {
 	} else if r, ok := data.(Row); ok {
 		rows = []Row{r}
 	} else {
-		return nil, []error{errors.ES(errors.OpUnknown, errors.KInternal, "invalid data type - expected Table or []Row")}
+		return nil, errors.ES(errors.OpUnknown, errors.KInternal, "invalid data type - expected Table or []Row")
 	}
 
 	if rows == nil || len(rows) == 0 {
@@ -242,9 +242,14 @@ func ToStructs[T any](data interface{}) ([]T, []error) {
 	out := make([]T, len(rows))
 	for i, r := range rows {
 		if err := r.ToStruct(&out[i]); err != nil {
-			errs = append(errs, err)
+			out = out[:i]
+			if len(out) == 0 {
+				out = nil
+			}
+			return out, err
 		}
 	}
+
 	return out, errs
 }
 

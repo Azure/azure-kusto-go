@@ -2,7 +2,7 @@ package query
 
 type Table interface {
 	BaseTable
-	GetAllRows() ([]Row, []error)
+	GetAllRows() ([]Row, error)
 }
 
 type TableResult interface {

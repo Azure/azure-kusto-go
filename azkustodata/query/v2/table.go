@@ -49,7 +49,7 @@ func NewDataTable(d query.Dataset, dt *DataTable) (query.Table, error) {
 		rows = append(rows, query.NewRow(nil, i, values))
 	}
 
-	return query.NewDataTable(d, int64(dt.TableId), strconv.Itoa(dt.TableId), dt.TableName, dt.TableKind, columns, rows, errs), nil
+	return query.NewDataTable(d, int64(dt.TableId), strconv.Itoa(dt.TableId), dt.TableName, dt.TableKind, columns, rows, errs...), nil
 }
 
 func parseColumns(th *TableHeader, columns []query.Column, op errors.Op) *errors.Error {

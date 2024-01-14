@@ -140,7 +140,7 @@ func (t *streamingTable) SkipToEnd() []error {
 	return errs
 }
 
-func (t *streamingTable) GetAllRows() ([]query.Row, []error) {
+func (t *streamingTable) GetAllRows() ([]query.Row, error) {
 	var rows []query.Row
 	var errs []error
 	for r := range t.rows {
@@ -151,5 +151,5 @@ func (t *streamingTable) GetAllRows() ([]query.Row, []error) {
 		}
 	}
 
-	return rows, errs
+	return rows, errors.TryCombinedError(errs...)
 }

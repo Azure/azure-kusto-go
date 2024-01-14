@@ -13,6 +13,7 @@ type Dataset interface {
 	QueryProperties() []QueryProperties
 	QueryCompletionInformation() []QueryCompletionInformation
 	GetAllTables() ([]query.Table, []error)
+	Close() error
 }
 
 // IterativeDataset represents an iterative result from kusto - where the tables are streamed as they are received from the service.
@@ -40,5 +41,4 @@ type dataset interface {
 	onFinishHeader()
 	onFinishTable()
 	parseSecondaryTable(t query.Table) error
-	close()
 }
