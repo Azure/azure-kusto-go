@@ -18,7 +18,11 @@ type fullDataset struct {
 }
 
 func (d *fullDataset) PrimaryResults() ([]query.Row, error) {
-	return query.PrimaryResults(d)
+	if len(d.Results()) != 1 {
+		return nil, errors.ES(errors.OpUnknown, errors.KInternal, "expected exactly one table in dataset")
+	}
+
+	return d.Results()[0].GetAllRows()
 }
 
 func (d *fullDataset) Results() []query.Table {

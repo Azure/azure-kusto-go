@@ -164,7 +164,12 @@ func (d *dataset) Info() []QueryProperties {
 }
 
 func (d *dataset) PrimaryResults() ([]query.Row, error) {
-	return query.PrimaryResults(d)
+	// todo find out how to not duplicate this code without circular dependencies
+	if len(d.Results()) != 1 {
+		return nil, errors.ES(errors.OpUnknown, errors.KInternal, "expected exactly one table in dataset")
+	}
+
+	return d.Results()[0].GetAllRows()
 }
 
 type Dataset interface {

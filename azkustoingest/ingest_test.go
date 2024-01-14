@@ -3,10 +3,11 @@ package azkustoingest
 import (
 	"context"
 	"github.com/Azure/azure-kusto-go/azkustodata"
+	v1 "github.com/Azure/azure-kusto-go/azkustodata/query/v1"
+	v2 "github.com/Azure/azure-kusto-go/azkustodata/query/v2"
 	"net/http"
 	"testing"
 
-	"github.com/Azure/azure-kusto-go/azkustodata/table"
 	"github.com/Azure/azure-kusto-go/azkustodata/types"
 	"github.com/Azure/azure-kusto-go/azkustoingest/internal/resources"
 	"github.com/stretchr/testify/assert"
@@ -15,7 +16,7 @@ import (
 type mockClient struct {
 	endpoint string
 	auth     azkustodata.Authorization
-	onMgmt   func(ctx context.Context, db string, query azkustodata.Statement, options ...azkustodata.MgmtOption) (*azkustodata.RowIterator, error)
+	onMgmt   func(ctx context.Context, db string, query azkustodata.Statement, options ...azkustodata.QueryOption) (v1.Dataset, error)
 }
 
 func (m mockClient) ClientDetails() *azkustodata.ClientDetails {
@@ -37,11 +38,11 @@ func (m mockClient) Endpoint() string {
 	return m.endpoint
 }
 
-func (m mockClient) Query(context.Context, string, azkustodata.Statement, ...azkustodata.QueryOption) (*azkustodata.RowIterator, error) {
+func (m mockClient) Query(context.Context, string, azkustodata.Statement, ...azkustodata.QueryOption) (v2.Dataset, error) {
 	panic("not implemented")
 }
 
-func (m mockClient) Mgmt(ctx context.Context, db string, query azkustodata.Statement, options ...azkustodata.MgmtOption) (*azkustodata.RowIterator, error) {
+func (m mockClient) Mgmt(ctx context.Context, db string, query azkustodata.Statement, options ...azkustodata.QueryOption) (v1.Dataset, error) {
 	if m.onMgmt != nil {
 		rows, err := m.onMgmt(ctx, db, query, options...)
 		if err != nil || rows != nil {

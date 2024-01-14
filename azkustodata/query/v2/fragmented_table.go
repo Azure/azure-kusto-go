@@ -36,6 +36,12 @@ func (f *fragmentedTable) addRawRows(rows RawRows) {
 
 func (f *fragmentedTable) close(errors []OneApiError) {
 	for _, e := range errors {
+		// check if the error is already in the list
+		for _, err := range f.errors {
+			if err.(*OneApiError).Error() == e.Error() {
+				continue
+			}
+		}
 		f.errors = append(f.errors, &e)
 	}
 }

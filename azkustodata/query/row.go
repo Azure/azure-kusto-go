@@ -234,7 +234,7 @@ func ToStructs[T any](data interface{}) ([]T, error) {
 	} else if r, ok := data.(Row); ok {
 		rows = []Row{r}
 	} else if ds, ok := data.(FullDataset); ok {
-		rows, errs = PrimaryResults(ds)
+		rows, errs = ds.PrimaryResults()
 		if errs != nil {
 			return nil, errs
 		}
@@ -257,15 +257,6 @@ func ToStructs[T any](data interface{}) ([]T, error) {
 	}
 
 	return out, errs
-}
-
-// PrimaryResults returns the rows of the dataset, assuming there is one table. If there are no primary results, or more than one table, an error is returned.
-func PrimaryResults(dataset FullDataset) ([]Row, error) {
-	if len(dataset.Results()) != 1 {
-		return nil, errors.ES(errors.OpUnknown, errors.KInternal, "expected exactly one table in dataset")
-	}
-
-	return dataset.Results()[0].GetAllRows()
 }
 
 type StructResult[T any] struct {

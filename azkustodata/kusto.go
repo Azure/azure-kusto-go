@@ -17,7 +17,7 @@ type Statement = *kql.Builder
 // queryer provides for getting a stream of Kusto frames. Exists to allow fake Kusto streams in tests.
 type queryer interface {
 	io.Closer
-	rawQuery(ctx context.Context, db string, query Statement, options *queryOptions) (io.ReadCloser, error)
+	rawQuery(ctx context.Context, callType callType, db string, query Statement, options *queryOptions) (io.ReadCloser, error)
 }
 
 // Authorization provides the TokenProvider needed to acquire the auth token.
@@ -120,7 +120,7 @@ func (c *Client) executeV1(
 		return nil, err
 	}
 
-	res, err := conn.rawQuery(ctx, db, kqlQuery, opts)
+	res, err := conn.rawQuery(ctx, mgmtCall, db, kqlQuery, opts)
 
 	if err != nil {
 		cancel()
@@ -175,7 +175,7 @@ func (c *Client) executeV2(ctx context.Context, db string, kqlQuery Statement, o
 		return nil, nil, err
 	}
 
-	res, err := conn.rawQuery(ctx, db, kqlQuery, opts)
+	res, err := conn.rawQuery(ctx, queryCall, db, kqlQuery, opts)
 
 	if err != nil {
 		cancel()
@@ -197,7 +197,7 @@ func (c *Client) QueryToJson(ctx context.Context, db string, query Statement, op
 		return "", err
 	}
 
-	r, err := conn.rawQuery(ctx, db, query, opts)
+	r, err := conn.rawQuery(ctx, queryCall, db, query, opts)
 	if err != nil {
 		cancel()
 		return "", err

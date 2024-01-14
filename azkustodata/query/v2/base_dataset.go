@@ -184,10 +184,6 @@ func parseDatasetHeader(d dataset, header *DataSetHeader) bool {
 		d.reportError(errors.ES(d.Op(), errors.KInternal, "received a DataSetHeader frame that is not version 2"))
 		return false
 	}
-	if header.IsProgressive {
-		d.reportError(errors.ES(d.Op(), errors.KInternal, "received a DataSetHeader frame that is progressive"))
-		return false
-	}
 	d.setHeader(header)
 
 	return true

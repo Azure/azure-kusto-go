@@ -5,16 +5,15 @@ import (
 	"errors"
 	"fmt"
 	"github.com/Azure/azure-kusto-go/azkustodata"
+	"github.com/Azure/azure-kusto-go/azkustodata/query"
 	"io"
 
-	"github.com/Azure/azure-kusto-go/azkustodata/table"
 	"github.com/Azure/azure-kusto-go/azkustodata/types"
 	"github.com/Azure/azure-kusto-go/azkustodata/value"
 	"github.com/Azure/azure-kusto-go/azkustoingest/internal/properties"
 )
 
 type FakeMgmt struct {
-	mock       *azkustodata.MockRows
 	DBEqual    string
 	QueryEqual string
 	mgmtErr    bool
@@ -70,7 +69,7 @@ func (f *FakeMgmt) SetMgmtErr() *FakeMgmt {
 	return f
 }
 
-func (f *FakeMgmt) Mgmt(_ context.Context, db string, query azkustodata.Statement, _ ...azkustodata.MgmtOption) (*azkustodata.RowIterator, error) {
+func (f *FakeMgmt) Mgmt(_ context.Context, db string, query azkustodata.Statement, _ ...azkustodata.QueryOption) (query.FullDataset, error) {
 	if f.DBEqual != "" {
 		if db != f.DBEqual {
 			panic(fmt.Sprintf("expected db to be %q, was %q", f.DBEqual, db))

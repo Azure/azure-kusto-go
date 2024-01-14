@@ -168,7 +168,8 @@ func TestQueries(t *testing.T) {
 		// gotInit creates the variable that will be used by doer's update argument.
 		gotInit func() interface{}
 		// want is the data we want to receive from the query.
-		want interface{}
+		want  interface{}
+		want2 interface{}
 	}{
 		{
 			desc:  "Query: Retrieve count of the number of rows that match",
@@ -236,7 +237,8 @@ func TestQueries(t *testing.T) {
 				v := []MgmtProjectionResult{}
 				return &v
 			},
-			want: &[]MgmtProjectionResult{{A: "1"}, {A: "2"}},
+			want:  &[]MgmtProjectionResult{{A: "1"}},
+			want2: &[]MgmtProjectionResult{{A: "2"}},
 		},
 		{
 			desc:    "Query: Progressive query: make sure we can convert all data types from a row",
@@ -449,7 +451,23 @@ func TestQueries(t *testing.T) {
 
 			var got = test.gotInit()
 			results := dataset.Results()
-			assert.Len(t, results, 1)
+
+			if test.want2 != nil {
+				var got = test.gotInit()
+				assert.Len(t, results, 2)
+				rows, err := results[1].GetAllRows()
+				require.Nilf(t, err, "TestQueries(%s): had table.GetAllTables() error: %s", test.desc, err)
+
+				assert.Len(t, rows, 1)
+
+				err = test.doer(rows[0], got)
+
+				require.Nilf(t, err, "TestQueries(%s): had dataset.Do() error: %s", test.desc, err)
+
+				require.Equal(t, test.want2, got)
+			} else {
+				assert.Len(t, results, 1)
+			}
 			rows, err := results[0].GetAllRows()
 			require.Nilf(t, err, "TestQueries(%s): had table.GetAllTables() error: %s", test.desc, err)
 

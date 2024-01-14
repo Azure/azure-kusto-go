@@ -28,6 +28,8 @@ var bufferPool = sync.Pool{
 	},
 }
 
+// TODO - inspect this. Do we need this? can this be simplified?
+
 // Conn provides connectivity to a Kusto instance.
 type Conn struct {
 	endpoint                           string
@@ -80,8 +82,8 @@ type connOptions struct {
 	queryOptions *queryOptions
 }
 
-func (c *Conn) rawQuery(ctx context.Context, db string, query Statement, options *queryOptions) (io.ReadCloser, error) {
-	_, _, _, body, e := c.doRequest(ctx, execQuery, db, query, *options.requestProperties)
+func (c *Conn) rawQuery(ctx context.Context, callType callType, db string, query Statement, options *queryOptions) (io.ReadCloser, error) {
+	_, _, _, body, e := c.doRequest(ctx, int(callType), db, query, *options.requestProperties)
 	if e != nil {
 		return nil, e
 	}

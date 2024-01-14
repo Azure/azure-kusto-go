@@ -325,11 +325,11 @@ func (m *Manager) fetch(ctx context.Context) error {
 	m.fetchLock.Lock()
 	defer m.fetchLock.Unlock()
 
-	var rows *azkustodata.RowIterator
+	var dataset query.FullDataset
 	retryCtx := backoff.WithContext(initBackoff(), ctx)
 	err := backoff.Retry(func() error {
 		var err error
-		rows, err = m.client.Mgmt(ctx, "NetDefaultDB", kql.New(".get ingestion resources"))
+		dataset, err = m.client.Mgmt(ctx, "NetDefaultDB", kql.New(".get ingestion resources"))
 		if err == nil {
 			return nil
 		}
@@ -347,21 +347,18 @@ func (m *Manager) fetch(ctx context.Context) error {
 	}
 
 	ingest := Ingestion{}
-	err = rows.DoOnRowOrError(
-		func(r *table.Row, e *kustoErrors.Error) error {
-			if e != nil {
-				return e
-			}
-			rec := ingestResc{}
-			if err := r.ToStruct(&rec); err != nil {
-				return err
-			}
-			if err := ingest.importRec(rec, m.rankedStorageAccount); err != nil && err != errDoNotCare {
-				return err
-			}
-			return nil
-		},
-	)
+
+	resc, err := query.ToStructs[ingestResc](dataset)
+	if err != nil {
+		return err
+	}
+
+	for _, rec := range resc {
+		if err := ingest.importRec(rec, m.rankedStorageAccount); err != nil && !errors.Is(err, errDoNotCare) {
+			return err
+		}
+	}
+
 	if err != nil {
 		return fmt.Errorf("problem reading ingestion resources from Kusto: %s", err)
 	}
