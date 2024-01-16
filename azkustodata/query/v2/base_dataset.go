@@ -73,7 +73,7 @@ func decodeTables(d dataset) {
 		} else if completion, ok := f.(*DataSetCompletion); ok {
 			if completion.HasErrors && completion.OneApiErrors != nil {
 				for _, e := range completion.OneApiErrors {
-					d.reportError(errors.E(op, errors.KInternal, &e))
+					d.reportError(&e)
 				}
 			}
 			d.setCompletion(completion)

@@ -412,52 +412,66 @@ func (c CombinedError) Error() string {
 	return result
 }
 
-func (c CombinedError) Flatten() error {
-	if len(c.Errors) == 0 {
-		return nil
-	}
-	errorQueue := make([]error, 0, len(c.Errors))
-	for _, err := range c.Errors {
-		errorQueue = append(errorQueue, err)
-	}
+// Flatten flattens and combines errors. If the error is not a *CombinedError, it is returned as is.
+func Flatten(e error) error {
+	if c, ok := e.(*CombinedError); ok {
+		if len(c.Errors) == 0 {
+			return nil
+		}
+		errorQueue := make([]error, 0, len(c.Errors))
+		errorSet := make(map[string]bool, len(c.Errors))
 
-	res := make([]error, 0, len(errorQueue))
+		for _, err := range c.Errors {
+			errorQueue = append(errorQueue, err)
+		}
 
-	for len(errorQueue) > 0 {
-		err := errorQueue[0]
-		errorQueue = errorQueue[1:]
-		var combined *CombinedError
-		if errors.As(err, &combined) {
-			for _, err := range combined.Errors {
-				errorQueue = append(errorQueue, err)
+		res := make([]error, 0, len(errorQueue))
+
+		for len(errorQueue) > 0 {
+			err := errorQueue[0]
+			errorQueue = errorQueue[1:]
+			if combined, ok := err.(*CombinedError); ok {
+				for _, err := range combined.Errors {
+					if _, ok := errorSet[err.Error()]; !ok {
+						errorSet[err.Error()] = true
+						errorQueue = append(errorQueue, err)
+					}
+				}
+			} else {
+				if _, ok := errorSet[err.Error()]; !ok {
+					errorSet[err.Error()] = true
+					res = append(res, err)
+				}
 			}
 		}
-	}
 
-	if len(res) == 0 {
-		return nil
+		if len(res) == 0 {
+			return nil
+		}
+		if len(res) == 1 {
+			return res[0]
+		}
+		return &CombinedError{Errors: res}
+	} else {
+		return e
 	}
-	if len(res) == 1 {
-		return res[0]
-	}
-	return &CombinedError{Errors: res}
-}
-
-func GetCombinedError(errs ...error) *CombinedError {
-	return &CombinedError{Errors: errs}
 }
 
 func TryCombinedError(errs ...error) error {
-	if len(errs) == 0 {
-		return nil
-	}
-	if len(errs) == 1 {
-		var combined *CombinedError
-		if errors.As(errs[0], &combined) {
-			return combined.Flatten()
+	// filter out nil errors
+	nonulls := make([]error, 0, len(errs))
+	for _, err := range errs {
+		if err != nil {
+			nonulls = append(nonulls, err)
 		}
-		return errs[0]
 	}
 
-	return CombinedError{Errors: errs}.Flatten()
+	if len(nonulls) == 0 {
+		return nil
+	}
+	if len(nonulls) == 1 {
+		return Flatten(nonulls[0])
+	}
+
+	return Flatten(&CombinedError{Errors: nonulls})
 }

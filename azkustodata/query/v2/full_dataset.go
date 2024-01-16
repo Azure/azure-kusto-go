@@ -81,7 +81,7 @@ func NewFullDataSet(ctx context.Context, r io.ReadCloser) (FullDataset, error) {
 		if d.header == nil {
 			ret = nil
 		}
-		return ret, errors.GetCombinedError(d.errors...)
+		return ret, errors.TryCombinedError(d.errors...)
 	}
 
 	return d, nil

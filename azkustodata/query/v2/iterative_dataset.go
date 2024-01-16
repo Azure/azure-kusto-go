@@ -66,7 +66,6 @@ func (d *iterativeDataset) newTableFromHeader(th *TableHeader) (table, error) {
 
 func (d *iterativeDataset) Close() error {
 	close(d.results)
-	close(d.frames)
 	close(d.errorChannel)
 	return d.reader.Close()
 }
