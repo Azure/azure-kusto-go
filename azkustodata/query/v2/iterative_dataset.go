@@ -66,7 +66,13 @@ func (d *iterativeDataset) newTableFromHeader(th *TableHeader) (table, error) {
 
 func (d *iterativeDataset) Close() error {
 	close(d.results)
+	// try to close the error channel, but don't block if it's full
+	select {
+	case <-d.errorChannel:
+	default:
+	}
 	close(d.errorChannel)
+
 	return d.reader.Close()
 }
 
