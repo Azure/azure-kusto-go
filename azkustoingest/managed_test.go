@@ -7,7 +7,7 @@ import (
 	"fmt"
 	"github.com/Azure/azure-kusto-go/azkustodata"
 	"github.com/Azure/azure-kusto-go/azkustodata/errors"
-	"github.com/Azure/azure-kusto-go/azkustodata/query"
+	v1 "github.com/Azure/azure-kusto-go/azkustodata/query/v1"
 	"github.com/Azure/azure-kusto-go/azkustoingest/internal/gzip"
 	"github.com/Azure/azure-kusto-go/azkustoingest/internal/properties"
 	"github.com/Azure/azure-kusto-go/azkustoingest/internal/resources"
@@ -22,9 +22,9 @@ import (
 	"github.com/stretchr/testify/require"
 )
 
-type testMgmtFunc func(t *testing.T, ctx context.Context, db string, query azkustodata.Statement, options ...azkustodata.QueryOption) (query.FullDataset, error)
+type testMgmtFunc func(t *testing.T, ctx context.Context, db string, query azkustodata.Statement, options ...azkustodata.QueryOption) (v1.Dataset, error)
 
-func failIfQueuedCalled(t *testing.T, _ context.Context, _ string, query azkustodata.Statement, _ ...azkustodata.QueryOption) (query.FullDataset, error) {
+func failIfQueuedCalled(t *testing.T, _ context.Context, _ string, query azkustodata.Statement, _ ...azkustodata.QueryOption) (v1.Dataset, error) {
 	// .get ingestion resources is always called in the ctor
 	if query.String() == ".get ingestion resources" {
 		return nil, nil
@@ -234,7 +234,7 @@ func TestManaged(t *testing.T) {
 				assert.NoError(t, err)
 				return errors.E(errors.OpIngestStream, errors.KHTTPError, fmt.Errorf("error"))
 			},
-			onMgmt: func(t *testing.T, ctx context.Context, db string, query azkustodata.Statement, options ...azkustodata.QueryOption) (query.FullDataset, error) {
+			onMgmt: func(t *testing.T, ctx context.Context, db string, query azkustodata.Statement, options ...azkustodata.QueryOption) (v1.Dataset, error) {
 				// .get ingestion resources is always called in the ctor
 				if query.String() == ".get ingestion resources" {
 					return resources.SuccessfulFakeResources().Mgmt(ctx, db, query, options...)
@@ -267,7 +267,7 @@ func TestManaged(t *testing.T) {
 				require.Fail(t, "Big file shouldn't try to stream")
 				return errors.E(errors.OpIngestStream, errors.KHTTPError, fmt.Errorf("error"))
 			},
-			onMgmt: func(t *testing.T, ctx context.Context, db string, query azkustodata.Statement, options ...azkustodata.QueryOption) (query.FullDataset, error) {
+			onMgmt: func(t *testing.T, ctx context.Context, db string, query azkustodata.Statement, options ...azkustodata.QueryOption) (v1.Dataset, error) {
 				// .get ingestion resources is always called in the ctor
 				if query.String() == ".get ingestion resources" {
 					return resources.SuccessfulFakeResources().Mgmt(ctx, db, query, options...)
@@ -298,7 +298,7 @@ func TestManaged(t *testing.T) {
 				clientRequestId string, isBlobUri bool) error {
 				return errors.E(errors.OpIngestStream, errors.KHTTPError, fmt.Errorf("error"))
 			},
-			onMgmt: func(t *testing.T, ctx context.Context, db string, query azkustodata.Statement, options ...azkustodata.QueryOption) (query.FullDataset, error) {
+			onMgmt: func(t *testing.T, ctx context.Context, db string, query azkustodata.Statement, options ...azkustodata.QueryOption) (v1.Dataset, error) {
 				// .get ingestion resources is always called in the ctor
 				if query.String() == ".get ingestion resources" {
 					return resources.SuccessfulFakeResources().Mgmt(ctx, db, query, options...)
@@ -334,7 +334,7 @@ func TestManaged(t *testing.T) {
 			mockClient := mockClient{
 				endpoint: "https://test.kusto.windows.net",
 				auth:     azkustodata.Authorization{},
-				onMgmt: func(ctx context.Context, db string, query azkustodata.Statement, options ...azkustodata.QueryOption) (query.FullDataset, error) {
+				onMgmt: func(ctx context.Context, db string, query azkustodata.Statement, options ...azkustodata.QueryOption) (v1.Dataset, error) {
 					if test.onMgmt == nil {
 						return nil, nil
 					}

@@ -2,6 +2,7 @@ package resources
 
 import (
 	"context"
+	v1 "github.com/Azure/azure-kusto-go/azkustodata/query/v1"
 	"testing"
 
 	"github.com/stretchr/testify/assert"
@@ -91,10 +92,10 @@ func TestParse(t *testing.T) {
 }
 
 func FakeAuthContext(rows []value.Values, setErr bool) *FakeMgmt {
-	cols := table.Columns{
+	cols := []v1.RawColumn{
 		{
-			Name: "AuthorizationContext",
-			Type: types.String,
+			ColumnName: "AuthorizationContext",
+			ColumnType: string(types.String),
 		},
 	}
 
