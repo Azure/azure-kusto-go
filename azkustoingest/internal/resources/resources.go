@@ -236,6 +236,10 @@ func (m *Manager) AuthContext(ctx context.Context) (string, error) {
 	if err != nil {
 		return "", err
 	}
+	if tokens == nil {
+		return "", fmt.Errorf("call for AuthContext returned no Rows")
+	}
+
 	if len(tokens) != 1 {
 		return "", fmt.Errorf("call for AuthContext returned more than 1 Row")
 	}
@@ -325,7 +329,7 @@ func (m *Manager) fetch(ctx context.Context) error {
 	m.fetchLock.Lock()
 	defer m.fetchLock.Unlock()
 
-	var dataset query.FullDataset
+	var dataset v1.Dataset
 	retryCtx := backoff.WithContext(initBackoff(), ctx)
 	err := backoff.Retry(func() error {
 		var err error

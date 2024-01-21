@@ -23,8 +23,8 @@ type FakeMgmt struct {
 
 func FakeResources(rows []value.Values, setErr bool) *FakeMgmt {
 	cols := []v1.RawColumn{
-		{ColumnName: "ResourceTypeName", DataType: string(types.String)},
-		{ColumnName: "StorageRoot", DataType: string(types.String)},
+		{ColumnName: "ResourceTypeName", ColumnType: string(types.String)},
+		{ColumnName: "StorageRoot", ColumnType: string(types.String)},
 	}
 
 	fm := NewFakeMgmt(cols, rows, setErr)

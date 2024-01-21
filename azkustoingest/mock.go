@@ -51,6 +51,27 @@ func (m mockClient) Mgmt(ctx context.Context, db string, query azkustodata.State
 		}
 	}
 
+	if query.String() == ".get kusto identity token" {
+		return v1.NewDataset(ctx, errors.OpMgmt, v1.V1{
+			Tables: []v1.RawTable{
+				{
+					TableName: "Table",
+					Columns: []v1.RawColumn{
+						{
+							ColumnName: "AuthorizationContext",
+							ColumnType: string(types.String),
+						},
+					},
+					Rows: []v1.RawRow{
+						{
+							Row:    []interface{}{"mock"},
+							Errors: nil,
+						},
+					},
+				},
+			}})
+	}
+
 	return v1.NewDataset(ctx, errors.OpMgmt, v1.V1{
 		Tables: []v1.RawTable{
 			{
@@ -73,7 +94,9 @@ func (m mockClient) Mgmt(ctx context.Context, db string, query azkustodata.State
 
 func newMockClient() mockClient {
 	return mockClient{
-		endpoint: "https://test.kusto.windows.net",
-		auth:     azkustodata.Authorization{},
+		endpoint: "localhost",
+		auth: azkustodata.Authorization{
+			TokenProvider: &azkustodata.TokenProvider{},
+		},
 	}
 }

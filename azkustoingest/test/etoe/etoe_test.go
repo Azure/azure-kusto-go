@@ -1227,11 +1227,14 @@ func waitForIngest(t *testing.T, ctx context.Context, client *azkustodata.Client
 
 			propertiesTable := dataset.QueryProperties()
 			assert.NotNil(t, propertiesTable)
-			assert.Len(t, propertiesTable, 1)
+			assert.Greater(t, len(propertiesTable), 0)
 
-			completionTable := dataset.Completion()
+			completionTable := dataset.QueryCompletionInformation()
 			assert.NotNil(t, completionTable)
-			assert.Len(t, completionTable, 1)
+			assert.Greater(t, len(completionTable), 0)
+
+			assert.NotNil(t, dataset.Header())
+			assert.NotNil(t, dataset.Completion())
 
 			return false, err
 		}()
