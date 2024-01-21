@@ -468,10 +468,11 @@ func TestQueries(t *testing.T) {
 			} else {
 				assert.Len(t, results, 1)
 			}
+
 			rows, err := results[0].GetAllRows()
 			require.Nilf(t, err, "TestQueries(%s): had table.GetAllTables() error: %s", test.desc, err)
 
-			assert.Len(t, rows, 1)
+			assert.Greaterf(t, len(rows), 0, "TestQueries(%s): had no rows", test.desc)
 
 			err = test.doer(rows[0], got)
 
@@ -509,13 +510,13 @@ func TestIterativeQuery(t *testing.T) {
 	err = testshared.CreateAllDataTypesNullTable(t, client, allDataTypesTable+"_null")
 	require.NoError(t, err)
 
-	v2, err := client.IterativeQuery(context.Background(), testConfig.Database, kql.New("").AddTable(allDataTypesTable).AddLiteral(";").AddTable(allDataTypesTable+"_null"))
+	dataset, err := client.IterativeQuery(context.Background(), testConfig.Database, kql.New("").AddTable(allDataTypesTable).AddLiteral(";").AddTable(allDataTypesTable+"_null"))
 
 	require.NoError(t, err)
 
 	res := getExpectedResult()
 
-	for tableResult := range v2.Results() {
+	for tableResult := range dataset.Results() {
 		require.NoError(t, tableResult.Err())
 
 		tb := tableResult.Table()

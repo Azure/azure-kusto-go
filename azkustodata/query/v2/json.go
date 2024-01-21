@@ -142,23 +142,24 @@ func readFramesIterative(reader io.Reader, ch chan<- Frame) error {
 
 		line, err := handleKustoJson(line)
 		if err != nil {
+			if err == io.EOF {
+				return nil
+			}
 			return err
 		}
 
 		dec := json.NewDecoder(bytes.NewReader(line))
 		dec.UseNumber()
 
-		for {
-			f, err := decodeFrame(dec)
-			if err != nil {
-				if err == io.EOF {
-					return nil
-				}
-				return err
+		f, err := decodeFrame(dec)
+		if err != nil {
+			if err == io.EOF {
+				return nil
 			}
-
-			ch <- f
+			return err
 		}
+
+		ch <- f
 	}
 
 	return nil
