@@ -175,7 +175,7 @@ func (e *Error) Error() string {
 func Retry(err error) bool {
 	var e *Error
 	if errors.As(err, &e) {
-		// e.permanent can be set multi1ple ways. If it is true, you can never retry.
+		// e.permanent can be set multiple ways. If it is true, you can never retry.
 		// If it is false, it does not necessarily mean anything, you have to go a little further.
 		if e.permanent {
 			return false
