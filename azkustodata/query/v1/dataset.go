@@ -164,7 +164,6 @@ func (d *dataset) Info() []QueryProperties {
 }
 
 func (d *dataset) PrimaryResults() ([]query.Row, error) {
-	// todo find out how to not duplicate this code without circular dependencies
 	if len(d.Results()) != 1 {
 		return nil, errors.ES(errors.OpUnknown, errors.KInternal, "expected exactly one table in dataset")
 	}
