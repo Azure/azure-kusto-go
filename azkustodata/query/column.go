@@ -11,3 +11,5 @@ type Column interface {
 	// Type returns the column's kusto data type.
 	Type() types.Column
 }
+
+type Columns []Column

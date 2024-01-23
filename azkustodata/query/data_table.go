@@ -1,18 +1,20 @@
 package query
 
+import "github.com/Azure/azure-kusto-go/azkustodata/errors"
+
 // dataTable is a basic implementation of Table, to be used by specific implementations.
 // It contains all the rows and errors for the table.
 type dataTable struct {
 	baseTable
-	rows   []Row
-	errors []error
+	rows  []Row
+	error error
 }
 
-func NewDataTable(ds Dataset, ordinal int64, id string, name string, kind string, columns []Column, rows []Row, errors []error) Table {
+func NewDataTable(ds Dataset, ordinal int64, id string, name string, kind string, columns []Column, rows []Row, errs ...error) Table {
 	t := &dataTable{
 		baseTable: *NewTable(ds, ordinal, id, name, kind, columns).(*baseTable),
 		rows:      rows,
-		errors:    errors,
+		error:     errors.TryCombinedError(errs...),
 	}
 
 	for _, r := range rows {
@@ -24,10 +26,6 @@ func NewDataTable(ds Dataset, ordinal int64, id string, name string, kind string
 	return t
 }
 
-func (t *dataTable) GetAllRows() ([]Row, []error) {
-	errs := t.errors
-	if t.errors != nil && len(t.errors) == 0 {
-		errs = nil
-	}
-	return t.rows, errs
+func (t *dataTable) GetAllRows() ([]Row, error) {
+	return t.rows, t.error
 }

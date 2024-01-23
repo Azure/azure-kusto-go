@@ -17,13 +17,21 @@ type fullDataset struct {
 	tables []query.Table
 }
 
-func (d *fullDataset) Tables() []query.Table {
+func (d *fullDataset) PrimaryResults() ([]query.Row, error) {
+	if len(d.Results()) != 1 {
+		return nil, errors.ES(errors.OpUnknown, errors.KInternal, "expected exactly one table in dataset")
+	}
+
+	return d.Results()[0].GetAllRows()
+}
+
+func (d *fullDataset) Results() []query.Table {
 	return d.tables
 }
 
 func (d *fullDataset) onFinishTable() {
 	f := d.currentTable.(*fragmentedTable)
-	d.tables = append(d.tables, query.NewDataTable(d, f.Ordinal(), f.Id(), f.Name(), f.Kind(), f.Columns(), f.rows, f.errors))
+	d.tables = append(d.tables, query.NewDataTable(d, f.Ordinal(), f.Id(), f.Name(), f.Kind(), f.Columns(), f.rows, f.errors...))
 }
 
 func (d *fullDataset) getNextFrame() Frame {
@@ -42,8 +50,9 @@ func (d *fullDataset) reportError(err error) {
 	d.errors = append(d.errors, err)
 }
 
-func (d *fullDataset) close() {
+func (d *fullDataset) Close() error {
 	d.frames = nil
+	return nil
 }
 
 func (d *fullDataset) GetAllTables() ([]query.Table, []error) {
@@ -72,7 +81,7 @@ func NewFullDataSet(ctx context.Context, r io.ReadCloser) (FullDataset, error) {
 		if d.header == nil {
 			ret = nil
 		}
-		return ret, errors.GetCombinedError(d.errors...)
+		return ret, errors.TryCombinedError(d.errors...)
 	}
 
 	return d, nil

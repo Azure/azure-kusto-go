@@ -118,9 +118,9 @@ func TestDatasetPartialErrors(t *testing.T) {
 
 	tb := ds.Results()[0]
 
-	rows, errs := tb.GetAllRows()
+	rows, err := tb.GetAllRows()
 
-	assert.ErrorContains(t, errs[0], "Query execution has exceeded the allowed limits")
+	assert.ErrorContains(t, err, "Query execution has exceeded the allowed limits")
 
 	assert.Equal(t, 1, len(rows))
 	ft := &firstTable{}

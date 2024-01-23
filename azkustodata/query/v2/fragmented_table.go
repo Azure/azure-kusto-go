@@ -36,6 +36,12 @@ func (f *fragmentedTable) addRawRows(rows RawRows) {
 
 func (f *fragmentedTable) close(errors []OneApiError) {
 	for _, e := range errors {
+		// check if the error is already in the list
+		for _, err := range f.errors {
+			if err.(*OneApiError).Error() == e.Error() {
+				continue
+			}
+		}
 		f.errors = append(f.errors, &e)
 	}
 }
@@ -47,5 +53,5 @@ func (d *fullDataset) newTableFromHeader(th *TableHeader) (table, error) {
 		return nil, err
 	}
 
-	return &fragmentedTable{Table: query.NewDataTable(d, int64(th.TableId), strconv.Itoa(th.TableId), th.TableName, th.TableKind, columns, make([]query.Row, 0), make([]error, 0))}, nil
+	return &fragmentedTable{Table: query.NewDataTable(d, int64(th.TableId), strconv.Itoa(th.TableId), th.TableName, th.TableKind, columns, make([]query.Row, 0))}, nil
 }

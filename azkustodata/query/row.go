@@ -221,10 +221,11 @@ func (r *row) TimespanByName(name string) (*time.Duration, error) {
 	return r.TimespanByOrdinal(col.Ordinal())
 }
 
-// ToStructs converts a table or a slice of rows into a slice of structs.
-func ToStructs[T any](data interface{}) ([]T, []error) {
+// ToStructs converts a table, a non-iterative dataset or a slice of rows into a slice of structs.
+// If a dataset is provided, it should contain exactly one table.
+func ToStructs[T any](data interface{}) ([]T, error) {
 	var rows []Row
-	var errs []error
+	var errs error
 
 	if t, ok := data.(Table); ok {
 		rows, errs = t.GetAllRows()
@@ -232,8 +233,13 @@ func ToStructs[T any](data interface{}) ([]T, []error) {
 		rows = r
 	} else if r, ok := data.(Row); ok {
 		rows = []Row{r}
+	} else if ds, ok := data.(FullDataset); ok {
+		rows, errs = ds.PrimaryResults()
+		if errs != nil {
+			return nil, errs
+		}
 	} else {
-		return nil, []error{errors.ES(errors.OpUnknown, errors.KInternal, "invalid data type - expected Table or []Row")}
+		return nil, errors.ES(errors.OpUnknown, errors.KInternal, "invalid data type - expected Table or []Row")
 	}
 
 	if rows == nil || len(rows) == 0 {
@@ -242,9 +248,14 @@ func ToStructs[T any](data interface{}) ([]T, []error) {
 	out := make([]T, len(rows))
 	for i, r := range rows {
 		if err := r.ToStruct(&out[i]); err != nil {
-			errs = append(errs, err)
+			out = out[:i]
+			if len(out) == 0 {
+				out = nil
+			}
+			return out, err
 		}
 	}
+
 	return out, errs
 }
 

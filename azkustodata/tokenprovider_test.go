@@ -2,6 +2,7 @@ package azkustodata
 
 import (
 	"context"
+	"github.com/stretchr/testify/require"
 	"os"
 	"testing"
 
@@ -12,6 +13,11 @@ func TestAcquireTokenErr(t *testing.T) {
 	s := newTestServ()
 	os.Unsetenv("AZURE_TENANT_ID")
 	payload := `{"AzureAD": {"LoginEndpoint": "https://login.microsofdummy.com","LoginMfaRequired": false,"KustoClientAppId": "db662dc1-0cfe-4e1c-a843-19a68e65xxxx","KustoClientRedirectUri": "https://microsoft/dummykustoclient","KustoServiceResourceId": "https://kusto.windows.net","FirstPartyAuthorityUrl": "https://login.microsofdummy.com/f8cdef31-a31e-4b4a-93e4-5f571e9xxxxx"  },  "dSTS": {"CloudEndpointSuffix": "windows.net","DstsRealm": "realm://xxx.windows.net","DstsInstance": "xxx.core.windows.net","KustoDnsHostName": "kusto.windows.net","ServiceName": "kusto"}}`
+	provider, err := NewConnectionStringBuilder("https://help.kusto.windows.net").newTokenProvider()
+	if err != nil {
+		require.NoError(t, err)
+	}
+
 	tests := []struct {
 		name    string
 		wantErr string
@@ -20,14 +26,14 @@ func TestAcquireTokenErr(t *testing.T) {
 		{
 			name: "test_acquiretoken_cred",
 			tkp: TokenProvider{
-				tokenCred: NewMockClient().auth.TokenProvider.tokenCred,
+				tokenCred: provider.tokenCred,
 			},
 			wantErr: "",
 		},
 		{
 			name: "test_acquiretoken_invalid_datasource",
 			tkp: TokenProvider{
-				tokenCred: NewMockClient().auth.TokenProvider.tokenCred,
+				tokenCred: provider.tokenCred,
 			},
 		},
 	}

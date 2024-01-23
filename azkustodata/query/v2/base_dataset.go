@@ -45,7 +45,7 @@ func newBaseDataset(dataset query.Dataset, fakeLock bool) *baseDataset {
 // decodeTables decodes the frames from the frames channel and sends the results to the results channel.
 func decodeTables(d dataset) {
 	defer func() {
-		d.close()
+		d.Close()
 		table := d.getCurrentTable()
 		if table != nil {
 			table.close([]OneApiError{})
@@ -73,7 +73,7 @@ func decodeTables(d dataset) {
 		} else if completion, ok := f.(*DataSetCompletion); ok {
 			if completion.HasErrors && completion.OneApiErrors != nil {
 				for _, e := range completion.OneApiErrors {
-					d.reportError(errors.E(op, errors.KInternal, &e))
+					d.reportError(&e)
 				}
 			}
 			d.setCompletion(completion)
@@ -182,10 +182,6 @@ func parsePrimaryTable(d dataset, f Frame) bool {
 func parseDatasetHeader(d dataset, header *DataSetHeader) bool {
 	if header.Version != version {
 		d.reportError(errors.ES(d.Op(), errors.KInternal, "received a DataSetHeader frame that is not version 2"))
-		return false
-	}
-	if header.IsProgressive {
-		d.reportError(errors.ES(d.Op(), errors.KInternal, "received a DataSetHeader frame that is progressive"))
 		return false
 	}
 	d.setHeader(header)

@@ -7,12 +7,9 @@ import (
 	queryv2 "github.com/Azure/azure-kusto-go/azkustodata/query/v2"
 	"io"
 	"net/http"
-	"sync"
 	"time"
 
 	"github.com/Azure/azure-kusto-go/azkustodata/errors"
-	"github.com/Azure/azure-kusto-go/azkustodata/internal/frames"
-	v2 "github.com/Azure/azure-kusto-go/azkustodata/internal/frames/v2"
 )
 
 type Statement = *kql.Builder
@@ -20,9 +17,7 @@ type Statement = *kql.Builder
 // queryer provides for getting a stream of Kusto frames. Exists to allow fake Kusto streams in tests.
 type queryer interface {
 	io.Closer
-	query(ctx context.Context, db string, query Statement, options *queryOptions) (execResp, error)
-	mgmt(ctx context.Context, db string, query Statement, options *queryOptions) (execResp, error)
-	rawQuery(ctx context.Context, db string, query Statement, options *queryOptions) (io.ReadCloser, error)
+	rawQuery(ctx context.Context, callType callType, db string, query Statement, options *queryOptions) (io.ReadCloser, error)
 }
 
 // Authorization provides the TokenProvider needed to acquire the auth token.
@@ -91,13 +86,6 @@ func WithHttpClient(client *http.Client) Option {
 // QueryOption is an option type for a call to Query().
 type QueryOption func(q *queryOptions) error
 
-// Note: QueryOption are defined in queryopts.go file
-
-// Deprecated: MgmtOption will be removed in a future release. Use QueryOption instead.
-type MgmtOption = QueryOption
-
-// Note: MgmtOption are defined in queryopts.go file
-
 // Auth returns the Authorization passed to New().
 func (c *Client) Auth() Authorization {
 	return c.auth
@@ -116,68 +104,7 @@ const (
 	mgmtCall        = 2
 )
 
-// Query queries Kusto for data. context can set a timeout or cancel the query.
-// query is a injection safe Stmt object. Queries cannot take longer than 5 minutes by default and have row/size limitations.
-// Note that the server has a timeout of 4 minutes for a query by default unless the context deadline is set. Queries can
-// take a maximum of 1 hour.
-func (c *Client) Query(ctx context.Context, db string, query Statement, options ...QueryOption) (*RowIterator, error) {
-	ctx, cancel := contextSetup(ctx) // Note: cancel is called when *RowIterator has Stop() called.
-
-	opts, err := setQueryOptions(ctx, errors.OpQuery, query, queryCall, options...)
-	if err != nil {
-		return nil, err
-	}
-
-	conn, err := c.getConn(queryCall, connOptions{queryOptions: opts})
-	if err != nil {
-		return nil, err
-	}
-
-	execResp, err := conn.query(ctx, db, query, opts)
-	if err != nil {
-		cancel()
-		return nil, err
-	}
-
-	var header v2.DataSetHeader
-
-	ff := <-execResp.frameCh
-	switch v := ff.(type) {
-	case v2.DataSetHeader:
-		header = v
-	case frames.Error:
-		cancel()
-		return nil, v
-	}
-
-	iter, columnsReady := newRowIterator(ctx, cancel, execResp, header, errors.OpQuery)
-
-	var sm stateMachine
-	if header.IsProgressive {
-		sm = &progressiveSM{
-			op:   errors.OpQuery,
-			iter: iter,
-			in:   execResp.frameCh,
-			ctx:  ctx,
-			wg:   &sync.WaitGroup{},
-		}
-	} else {
-		sm = &nonProgressiveSM{
-			op:   errors.OpQuery,
-			iter: iter,
-			in:   execResp.frameCh,
-			ctx:  ctx,
-			wg:   &sync.WaitGroup{},
-		}
-	}
-	go runSM(sm)
-
-	<-columnsReady
-
-	return iter, nil
-}
-
-func (c *Client) queryV1(
+func (c *Client) executeV1(
 	op errors.Op, call int,
 	ctx context.Context, db string, kqlQuery Statement, options ...QueryOption) (v1.Dataset, error) {
 	ctx, cancel := contextSetup(ctx)
@@ -193,7 +120,7 @@ func (c *Client) queryV1(
 		return nil, err
 	}
 
-	res, err := conn.rawQuery(ctx, db, kqlQuery, opts)
+	res, err := conn.rawQuery(ctx, mgmtCall, db, kqlQuery, opts)
 
 	if err != nil {
 		cancel()
@@ -203,13 +130,12 @@ func (c *Client) queryV1(
 	return v1.NewDatasetFromReader(ctx, opQuery, res)
 }
 
-// TODO: Rename these when we remove the old ones.
-func (c *Client) MgmtNew(ctx context.Context, db string, kqlQuery Statement, options ...QueryOption) (v1.Dataset, error) {
-	return c.queryV1(errors.OpMgmt, mgmtCall, ctx, db, kqlQuery, options...)
+func (c *Client) Mgmt(ctx context.Context, db string, kqlQuery Statement, options ...QueryOption) (v1.Dataset, error) {
+	return c.executeV1(errors.OpMgmt, mgmtCall, ctx, db, kqlQuery, options...)
 }
 
-func (c *Client) QueryNew(ctx context.Context, db string, kqlQuery Statement, options ...QueryOption) (queryv2.FullDataset, error) {
-	_, res, err := c.newV2(ctx, db, kqlQuery, options)
+func (c *Client) Query(ctx context.Context, db string, kqlQuery Statement, options ...QueryOption) (queryv2.FullDataset, error) {
+	_, res, err := c.executeV2(ctx, db, kqlQuery, options)
 	if err != nil {
 		return nil, err
 	}
@@ -218,7 +144,7 @@ func (c *Client) QueryNew(ctx context.Context, db string, kqlQuery Statement, op
 }
 
 func (c *Client) IterativeQuery(ctx context.Context, db string, kqlQuery Statement, options ...QueryOption) (queryv2.IterativeDataset, error) {
-	opts, res, err := c.newV2(ctx, db, kqlQuery, options)
+	opts, res, err := c.executeV2(ctx, db, kqlQuery, options)
 	if err != nil {
 		return nil, err
 	}
@@ -231,7 +157,7 @@ func (c *Client) IterativeQuery(ctx context.Context, db string, kqlQuery Stateme
 	return queryv2.NewStreamingDataSet(ctx, res, capacity)
 }
 
-func (c *Client) newV2(ctx context.Context, db string, kqlQuery Statement, options []QueryOption) (*queryOptions, io.ReadCloser, error) {
+func (c *Client) executeV2(ctx context.Context, db string, kqlQuery Statement, options []QueryOption) (*queryOptions, io.ReadCloser, error) {
 	ctx, cancel := contextSetup(ctx)
 
 	options = append(options, V2NewlinesBetweenFrames())
@@ -249,7 +175,7 @@ func (c *Client) newV2(ctx context.Context, db string, kqlQuery Statement, optio
 		return nil, nil, err
 	}
 
-	res, err := conn.rawQuery(ctx, db, kqlQuery, opts)
+	res, err := conn.rawQuery(ctx, queryCall, db, kqlQuery, opts)
 
 	if err != nil {
 		cancel()
@@ -271,7 +197,7 @@ func (c *Client) QueryToJson(ctx context.Context, db string, query Statement, op
 		return "", err
 	}
 
-	r, err := conn.rawQuery(ctx, db, query, opts)
+	r, err := conn.rawQuery(ctx, queryCall, db, query, opts)
 	if err != nil {
 		cancel()
 		return "", err
@@ -283,46 +209,6 @@ func (c *Client) QueryToJson(ctx context.Context, db string, query Statement, op
 	}
 
 	return string(all), nil
-}
-
-// Mgmt is used to do management queries to Kusto.
-// Details can be found at: https://docs.microsoft.com/en-us/azure/kusto/management/
-// Mgmt accepts a Stmt, but that Stmt cannot have any query parameters attached at this time.
-// Note that the server has a timeout of 10 minutes for a management call by default unless the context deadline is set.
-// There is a maximum of 1 hour.
-func (c *Client) Mgmt(ctx context.Context, db string, query Statement, options ...QueryOption) (*RowIterator, error) {
-	ctx, cancel := contextSetup(ctx) // Note: cancel is called when *RowIterator has Stop() called.
-
-	opts, err := setQueryOptions(ctx, errors.OpQuery, query, mgmtCall, options...)
-	if err != nil {
-		return nil, err
-	}
-
-	conn, err := c.getConn(mgmtCall, connOptions{queryOptions: opts})
-	if err != nil {
-		return nil, err
-	}
-
-	execResp, err := conn.mgmt(ctx, db, query, opts)
-	if err != nil {
-		cancel()
-		return nil, err
-	}
-
-	iter, columnsReady := newRowIterator(ctx, cancel, execResp, v2.DataSetHeader{}, errors.OpMgmt)
-	sm := &v1SM{
-		op:   errors.OpQuery,
-		iter: iter,
-		in:   execResp.frameCh,
-		ctx:  ctx,
-		wg:   &sync.WaitGroup{},
-	}
-
-	go runSM(sm)
-
-	<-columnsReady
-
-	return iter, nil
 }
 
 func setQueryOptions(ctx context.Context, op errors.Op, query Statement, queryType int, options ...QueryOption) (*queryOptions, error) {

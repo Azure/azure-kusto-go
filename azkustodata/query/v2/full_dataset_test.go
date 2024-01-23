@@ -259,8 +259,7 @@ func TestFullDataSet_PartialError(t *testing.T) {
 	assert.ErrorContains(t, err, "LimitsExceeded")
 
 	props := d.QueryProperties()
-	assert.NotNil(t, props)
-	assert.Len(t, props, 1)
+	assert.Nil(t, props)
 }
 
 func TestFullDataSet_DecodeTables_WithInvalidDataSetHeader(t *testing.T) {

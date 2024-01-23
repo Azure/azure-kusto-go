@@ -64,8 +64,16 @@ func (d *iterativeDataset) newTableFromHeader(th *TableHeader) (table, error) {
 	return newStreamingTable.(*streamingTable), nil
 }
 
-func (d *iterativeDataset) close() {
+func (d *iterativeDataset) Close() error {
 	close(d.results)
+	// try to close the error channel, but don't block if it's full
+	select {
+	case <-d.errorChannel:
+	default:
+	}
+	close(d.errorChannel)
+
+	return d.reader.Close()
 }
 
 func (d *iterativeDataset) GetAllTables() ([]query.Table, []error) {
@@ -84,8 +92,8 @@ func (d *iterativeDataset) GetAllTables() ([]query.Table, []error) {
 			continue
 		}
 
-		rows, errs2 := table.GetAllRows()
-		tables = append(tables, query.NewDataTable(d, table.Ordinal(), table.Id(), table.Name(), table.Kind(), table.Columns(), rows, errs2))
+		rows, err := table.GetAllRows()
+		tables = append(tables, query.NewDataTable(d, table.Ordinal(), table.Id(), table.Name(), table.Kind(), table.Columns(), rows, err))
 	}
 
 	return tables, errs

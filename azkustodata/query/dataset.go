@@ -12,3 +12,8 @@ type Dataset interface {
 	Context() context.Context
 	Op() errors.Op
 }
+
+type FullDataset interface {
+	Results() []Table
+	PrimaryResults() ([]Row, error)
+}

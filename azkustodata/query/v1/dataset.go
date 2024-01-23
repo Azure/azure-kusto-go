@@ -134,14 +134,14 @@ func parseTable[T any](table *RawTable, d *dataset, index *TableIndexRow) ([]T, 
 		return nil, err
 	}
 
-	indexRows, errs := fullTable.GetAllRows()
-	if errs != nil {
-		return nil, errors.GetCombinedError(errs...)
+	indexRows, err := fullTable.GetAllRows()
+	if err != nil {
+		return nil, err
 	}
 
-	rows, errs := query.ToStructs[T](indexRows)
-	if errs != nil {
-		return nil, errors.GetCombinedError(errs...)
+	rows, err := query.ToStructs[T](indexRows)
+	if err != nil {
+		return nil, err
 	}
 
 	return rows, nil
@@ -149,10 +149,6 @@ func parseTable[T any](table *RawTable, d *dataset, index *TableIndexRow) ([]T, 
 
 func (d *dataset) Results() []query.Table {
 	return d.results
-}
-
-func (d *dataset) PrimaryResults() query.Table {
-	return d.results[0]
 }
 
 func (d *dataset) Index() []TableIndexRow {
@@ -167,9 +163,17 @@ func (d *dataset) Info() []QueryProperties {
 	return d.info
 }
 
+func (d *dataset) PrimaryResults() ([]query.Row, error) {
+	if len(d.Results()) != 1 {
+		return nil, errors.ES(errors.OpUnknown, errors.KInternal, "expected exactly one table in dataset")
+	}
+
+	return d.Results()[0].GetAllRows()
+}
+
 type Dataset interface {
 	query.Dataset
-	Results() []query.Table
+	query.FullDataset
 	Index() []TableIndexRow
 	Status() []QueryStatus
 	Info() []QueryProperties
