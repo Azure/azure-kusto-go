@@ -65,7 +65,7 @@ func ExampleMgmt() {
 			println(row.Table().Name())
 
 			// For convenience, you can get the value from the row in the correct type
-			s, err := row.StringByOrdinal(0)
+			s, err := row.StringByIndex(0)
 			if err != nil {
 				panic(err)
 			}

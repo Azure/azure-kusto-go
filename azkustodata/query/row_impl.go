@@ -3,9 +3,12 @@ package query
 import (
 	"encoding/csv"
 	"github.com/Azure/azure-kusto-go/azkustodata/errors"
+	"github.com/Azure/azure-kusto-go/azkustodata/types"
 	"github.com/Azure/azure-kusto-go/azkustodata/value"
+	"github.com/shopspring/decimal"
 	"reflect"
 	"strings"
+	"time"
 )
 
 type row struct {
@@ -113,4 +116,178 @@ func (r *row) String() string {
 	}
 	w.Flush()
 	return b.String()
+}
+
+func conversionError(r *row, from string, to string) error {
+	return errors.ES(r.table.Op(), errors.KOther, "cannot convert %s to %s", from, to)
+}
+
+func columnNotFoundError(r *row, name string) error {
+	return errors.ES(r.table.Op(), errors.KOther, "column %s not found", name)
+}
+
+// contains all types *bool, etc
+type kustoTypeGeneric interface {
+	*bool | *int32 | *int64 | *float64 | *decimal.Decimal | string | interface{} | *time.Time | *time.Duration
+}
+
+func byIndex[T kustoTypeGeneric](r *row, colType types.Column, i int, defaultValue T) (T, error) {
+	val := r.Value(i)
+	if val.GetType() != colType {
+		return defaultValue, conversionError(r, string(val.GetType()), string(colType))
+	}
+
+	return val.GetValue().(T), nil
+}
+
+func byName[T kustoTypeGeneric](r *row, colType types.Column, name string, defaultValue T) (T, error) {
+	col := r.table.ColumnByName(name)
+	if col == nil {
+		return defaultValue, columnNotFoundError(r, name)
+	}
+	return byIndex(r, colType, col.Ordinal(), defaultValue)
+}
+
+func (r *row) BoolByIndex(i int) (*bool, error) {
+	return byIndex(r, types.Bool, i, (*bool)(nil))
+}
+
+func (r *row) IntByIndex(i int) (*int32, error) {
+	return byIndex(r, types.Int, i, (*int32)(nil))
+}
+
+func (r *row) LongByIndex(i int) (*int64, error) {
+	return byIndex(r, types.Long, i, (*int64)(nil))
+}
+
+func (r *row) RealByIndex(i int) (*float64, error) {
+	return byIndex(r, types.Real, i, (*float64)(nil))
+}
+
+func (r *row) DecimalByIndex(i int) (*decimal.Decimal, error) {
+	return byIndex(r, types.Decimal, i, (*decimal.Decimal)(nil))
+}
+
+func (r *row) StringByIndex(i int) (string, error) {
+	return byIndex(r, types.String, i, "")
+}
+
+func (r *row) DynamicByIndex(i int) (interface{}, error) {
+	return byIndex[interface{}](r, types.Dynamic, i, nil)
+}
+
+func (r *row) DateTimeByIndex(i int) (*time.Time, error) {
+	return byIndex(r, types.DateTime, i, (*time.Time)(nil))
+}
+
+func (r *row) TimespanByIndex(i int) (*time.Duration, error) {
+	return byIndex(r, types.Timespan, i, (*time.Duration)(nil))
+}
+
+func (r *row) BoolByName(name string) (*bool, error) {
+	return byName(r, types.Bool, name, (*bool)(nil))
+}
+
+func (r *row) IntByName(name string) (*int32, error) {
+	return byName(r, types.Int, name, (*int32)(nil))
+}
+
+func (r *row) LongByName(name string) (*int64, error) {
+	return byName(r, types.Long, name, (*int64)(nil))
+}
+
+func (r *row) RealByName(name string) (*float64, error) {
+	return byName(r, types.Real, name, (*float64)(nil))
+}
+
+func (r *row) DecimalByName(name string) (*decimal.Decimal, error) {
+	return byName(r, types.Decimal, name, (*decimal.Decimal)(nil))
+}
+
+func (r *row) StringByName(name string) (string, error) {
+	return byName(r, types.String, name, "")
+}
+
+func (r *row) DynamicByName(name string) (interface{}, error) {
+	return byName[interface{}](r, types.Dynamic, name, nil)
+}
+
+func (r *row) DateTimeByName(name string) (*time.Time, error) {
+	return byName(r, types.DateTime, name, (*time.Time)(nil))
+}
+
+func (r *row) TimespanByName(name string) (*time.Duration, error) {
+	return byName(r, types.Timespan, name, (*time.Duration)(nil))
+}
+
+// ToStructs converts a table, a non-iterative dataset or a slice of rows into a slice of structs.
+// If a dataset is provided, it should contain exactly one table.
+func ToStructs[T any](data interface{}) ([]T, error) {
+	var rows []Row
+	var errs error
+
+	switch v := data.(type) {
+	case Table:
+		var err error
+		rows, err = v.GetAllRows()
+		if err != nil {
+			return nil, err
+		}
+	case []Row:
+		rows = v
+	case Row:
+		rows = []Row{v}
+	case FullDataset:
+		var err error
+		rows, err = v.PrimaryResults()
+		if err != nil {
+			return nil, err
+		}
+	default:
+		return nil, errors.ES(errors.OpUnknown, errors.KInternal, "invalid data type - expected Table or []Row")
+	}
+
+	if rows == nil || len(rows) == 0 {
+		return nil, errs
+	}
+
+	out := make([]T, len(rows))
+	for i, r := range rows {
+		if err := r.ToStruct(&out[i]); err != nil {
+			out = out[:i]
+			if len(out) == 0 {
+				out = nil
+			}
+			return out, err
+		}
+	}
+
+	return out, errs
+}
+
+type StructResult[T any] struct {
+	Out T
+	Err error
+}
+
+func ToStructsIterative[T any](tb IterativeTable) chan StructResult[T] {
+	out := make(chan StructResult[T])
+
+	go func() {
+		defer close(out)
+		for rowResult := range tb.Rows() {
+			if rowResult.Err() != nil {
+				out <- StructResult[T]{Err: rowResult.Err()}
+			} else {
+				var s T
+				if err := rowResult.Row().ToStruct(&s); err != nil {
+					out <- StructResult[T]{Err: err}
+				} else {
+					out <- StructResult[T]{Out: s}
+				}
+			}
+		}
+	}()
+
+	return out
 }
