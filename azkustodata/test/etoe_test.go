@@ -32,6 +32,8 @@ type queryFunc func(ctx context.Context, db string, query azkustodata.Statement,
 
 type mgmtFunc func(ctx context.Context, db string, query azkustodata.Statement, options ...azkustodata.QueryOption) (v1.Dataset, error)
 
+// TODO: tests for iterative query
+
 type queryJsonFunc func(ctx context.Context, db string, query azkustodata.Statement, options ...azkustodata.QueryOption) (string, error)
 type DynamicTypeVariations struct {
 	PlainValue value.Dynamic
