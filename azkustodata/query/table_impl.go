@@ -84,6 +84,12 @@ func NewFullTable(base BaseTable, rows []Row) FullTable {
 	}
 }
 
+func ReplaceFullTableRows(t FullTable, rows []Row) FullTable {
+	// Sadly we need this escape hatchet because of the way v1 works - we need to supply the rows after the table is created.
+	t.(*fullTable).rows = rows
+	return t
+}
+
 func (t *fullTable) Rows() []Row {
 	return t.rows
 }

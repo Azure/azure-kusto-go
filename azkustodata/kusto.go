@@ -134,6 +134,15 @@ func (c *Client) Mgmt(ctx context.Context, db string, kqlQuery Statement, option
 	return c.executeV1(errors.OpMgmt, mgmtCall, ctx, db, kqlQuery, options...)
 }
 
+func (c *Client) Query(ctx context.Context, db string, kqlQuery Statement, options ...QueryOption) (queryv2.FullDataset, error) {
+	ds, err := c.IterativeQuery(ctx, db, kqlQuery, options...)
+	if err != nil {
+		return nil, err
+	}
+
+	return ds.ToFullDataset()
+}
+
 func (c *Client) IterativeQuery(ctx context.Context, db string, kqlQuery Statement, options ...QueryOption) (queryv2.IterativeDataset, error) {
 	opts, res, err := c.executeV2(ctx, db, kqlQuery, options)
 	if err != nil {

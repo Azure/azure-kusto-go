@@ -73,8 +73,7 @@ func TestDatasetSuccess(t *testing.T) {
 	}
 	assert.EqualValues(t, expectedInfo, ds.Info())
 
-	table1Rows, errs := ds.Results()[0].GetAllRows()
-	assert.Nil(t, errs)
+	table1Rows := ds.Tables()[0].Rows()
 	expectedTable1 := []firstTable{
 		{A: 1},
 		{A: 2},
@@ -92,8 +91,7 @@ func TestDatasetSuccess(t *testing.T) {
 		B int32  `kusto:"b"`
 	}
 
-	table2Rows, errs := ds.Results()[1].GetAllRows()
-	assert.Nil(t, errs)
+	table2Rows := ds.Tables()[1].Rows()
 	expectedTable2Rows := []secondTable{
 		{A: "a", B: 1},
 		{A: "b", B: 2},
@@ -113,17 +111,6 @@ func TestDatasetPartialErrors(t *testing.T) {
 	ctx := context.Background()
 	op := errors.OpQuery
 	ds, err := NewDatasetFromReader(ctx, op, reader)
-	assert.NotNil(t, ds)
+	assert.Nil(t, ds)
 	assert.ErrorContains(t, err, "Query execution has exceeded the allowed limits")
-
-	tb := ds.Results()[0]
-
-	rows, err := tb.GetAllRows()
-
-	assert.ErrorContains(t, err, "Query execution has exceeded the allowed limits")
-
-	assert.Equal(t, 1, len(rows))
-	ft := &firstTable{}
-	assert.NoError(t, rows[0].ToStruct(ft))
-	assert.Equal(t, int32(1), ft.A)
 }

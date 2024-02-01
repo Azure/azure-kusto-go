@@ -69,7 +69,7 @@ func BenchmarkQuery(b *testing.B) {
 				if err != nil {
 					panic(err)
 				}
-				for tableResult := range dataset.Results() {
+				for tableResult := range dataset.Tables() {
 					if tableResult.Err() != nil {
 						panic(tableResult.Err())
 					}
@@ -98,7 +98,7 @@ func BenchmarkQuery(b *testing.B) {
 				if err != nil {
 					panic(err)
 				}
-				for tableResult := range dataset.Results() {
+				for tableResult := range dataset.Tables() {
 					if tableResult.Err() != nil {
 						panic(tableResult.Err())
 					}
@@ -123,15 +123,14 @@ func BenchmarkQuery(b *testing.B) {
 
 			for n := 0; n < b.N; n++ {
 				reader := io.NopCloser(strings.NewReader(res))
-				dataset, err := queryv2.NewFullDataSet(ctx, reader)
+				dataset, err := queryv2.NewIterativeDataset(ctx, reader, 100)
 				if err != nil {
 					panic(err)
 				}
 
-				rows, err := dataset.Results()[0].GetAllRows()
-				if err != nil {
-					panic(err)
-				}
+				full, err := dataset.ToFullDataset()
+
+				rows := full.Tables()[0].Rows()
 
 				for _, tb := range rows {
 					sts, err := query.ToStructs[StormData](tb)

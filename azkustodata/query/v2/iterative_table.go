@@ -77,7 +77,7 @@ func NewIterativeTable(dataset query.Dataset, th TableHeader) (query.IterativeTa
 }
 
 func NewIterativeTableFromDataTable(dataset query.Dataset, dt DataTable) (query.IterativeTable, error) {
-	t, err := newIterativeTable(dataset, dt, len(dt.Rows()))
+	t, err := newIterativeTable(dataset, dt.(*EveryFrame), len(dt.Rows()))
 	if err != nil {
 		return nil, err
 	}

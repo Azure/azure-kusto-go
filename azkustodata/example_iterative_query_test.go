@@ -43,17 +43,17 @@ func ExampleIterativeQuery() {
 	// In most cases, you will only have a single primary result table, and you don't care about the other metadata tables,
 	// so you can just read the first table from the dataset
 
-	tableResult := <-dataset.Results()
+	tableResult := <-dataset.Tables()
 	if tableResult.Err() != nil {
 		panic(tableResult.Err())
 	}
 	table := tableResult.Table()
 	println(table.Name())
 
-	// Otherwise, you can iterate through the `Results()` channel to get them
+	// Otherwise, you can iterate through the `Tables()` channel to get them
 	// It is only possible to iterate through the results once - since they are streamed
 
-	for tableResult := range dataset.Results() {
+	for tableResult := range dataset.Tables() {
 		// Make sure to always check for errors
 		if tableResult.Err() != nil {
 			// It's possible to get an errors and still get a table - partial results

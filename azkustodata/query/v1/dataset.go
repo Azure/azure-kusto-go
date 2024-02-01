@@ -44,7 +44,7 @@ type QueryProperties struct {
 
 type dataset struct {
 	query.Dataset
-	results []query.Table
+	results []query.FullTable
 	index   []TableIndexRow
 	status  []QueryStatus
 	info    []QueryProperties
@@ -71,17 +71,16 @@ func NewDataset(ctx context.Context, op errors.Op, v1 V1) (Dataset, error) {
 
 	// Special case - if there is only one table, it is the primary result
 	if len(v1.Tables) == 1 {
+		if v1.Exceptions != nil {
+			return nil, errors.ES(d.Op(), errors.KInternal, "exceptions: %v", v1.Exceptions)
+		}
+
 		table, err := NewDataTable(d, &v1.Tables[0], primaryResultIndexRow)
 		if err != nil {
 			return nil, err
 		}
 
 		d.results = append(d.results, table)
-
-		err = nil
-		if v1.Exceptions != nil {
-			err = errors.ES(d.Op(), errors.KInternal, "exceptions: %v", v1.Exceptions)
-		}
 
 		return d, err
 	}
@@ -134,10 +133,7 @@ func parseTable[T any](table *RawTable, d *dataset, index *TableIndexRow) ([]T, 
 		return nil, err
 	}
 
-	indexRows, err := fullTable.GetAllRows()
-	if err != nil {
-		return nil, err
-	}
+	indexRows := fullTable.Rows()
 
 	rows, err := query.ToStructs[T](indexRows)
 	if err != nil {
@@ -147,7 +143,7 @@ func parseTable[T any](table *RawTable, d *dataset, index *TableIndexRow) ([]T, 
 	return rows, nil
 }
 
-func (d *dataset) Results() []query.Table {
+func (d *dataset) Tables() []query.FullTable {
 	return d.results
 }
 
@@ -161,14 +157,6 @@ func (d *dataset) Status() []QueryStatus {
 
 func (d *dataset) Info() []QueryProperties {
 	return d.info
-}
-
-func (d *dataset) PrimaryResults() ([]query.Row, error) {
-	if len(d.Results()) != 1 {
-		return nil, errors.ES(errors.OpUnknown, errors.KInternal, "expected exactly one table in dataset")
-	}
-
-	return d.Results()[0].GetAllRows()
 }
 
 type Dataset interface {

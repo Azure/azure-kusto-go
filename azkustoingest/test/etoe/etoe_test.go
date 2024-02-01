@@ -1204,10 +1204,7 @@ func waitForIngest(t *testing.T, ctx context.Context, client *azkustodata.Client
 			}
 
 			got = gotInit()
-			rows, err := dataset.PrimaryResults()
-			if !assert.NoError(t, err) {
-				return false, err
-			}
+			rows := dataset.Tables()[0].Rows()
 
 			for _, row := range rows {
 				if err := doer(row, got); err != nil {
@@ -1224,17 +1221,6 @@ func waitForIngest(t *testing.T, ctx context.Context, client *azkustodata.Client
 				time.Sleep(100 * time.Millisecond)
 				return true, nil
 			}
-
-			propertiesTable := dataset.QueryProperties()
-			assert.NotNil(t, propertiesTable)
-			assert.Greater(t, len(propertiesTable), 0)
-
-			completionTable := dataset.QueryCompletionInformation()
-			assert.NotNil(t, completionTable)
-			assert.Greater(t, len(completionTable), 0)
-
-			assert.NotNil(t, dataset.Header())
-			assert.NotNil(t, dataset.Completion())
 
 			return false, err
 		}()

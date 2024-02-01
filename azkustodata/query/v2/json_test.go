@@ -49,6 +49,7 @@ func TestReadFramesWithValidInput(t *testing.T) {
 
 	dataSetHeader := <-ch
 	assert.Equal(t, &EveryFrame{
+		FrameTypeJson:               DataSetHeaderFrameType,
 		IsProgressiveJson:           false,
 		VersionJson:                 "v2.0",
 		IsFragmentedJson:            true,
@@ -138,12 +139,10 @@ func TestReadFramesWithErrors(t *testing.T) {
 	}()
 
 	dataSetHeader := <-ch
-	assert.Equal(t, &EveryFrame{
-		IsProgressiveJson:           false,
-		VersionJson:                 "v2.0",
-		IsFragmentedJson:            true,
-		ErrorReportingPlacementJson: "EndOfTable",
-	}, dataSetHeader)
+	assert.Equal(t, false, dataSetHeader.IsProgressiveJson)
+	assert.Equal(t, "v2.0", dataSetHeader.VersionJson)
+	assert.Equal(t, true, dataSetHeader.IsFragmentedJson)
+	assert.Equal(t, "EndOfTable", dataSetHeader.ErrorReportingPlacementJson)
 
 	dataTable := <-ch
 	assert.Equal(t, dataTable.TableId(), 0)
@@ -275,10 +274,8 @@ func TestReadFramesWithInvalidFrameType(t *testing.T) {
 	}()
 
 	invalid := <-ch
-	assert.Nil(t, invalid)
-
-	err := <-errChan
-	require.ErrorContains(t, err, "unknown frame type: InvalidFrameType")
+	// Checking for invalid types moved to the frame iterator, so this should be valid
+	assert.Equal(t, FrameType("InvalidFrameType"), invalid.FrameTypeJson)
 }
 
 func TestReadFramesWithInvalidFrame(t *testing.T) {

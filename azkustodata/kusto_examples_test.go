@@ -38,7 +38,7 @@ func Example_simple() {
 		panic("add error handling")
 	}
 
-	primary := data.Results()[0]
+	primary := data.Tables()[0]
 
 	recs, err := query.ToStructs[NodeRec](primary)
 
@@ -85,7 +85,7 @@ func Example_complex() {
 		panic("add error handling")
 	}
 
-	primary := data.Results()[0]
+	primary := data.Tables()[0]
 
 	recs, err := query.ToStructs[NodeRec](primary)
 
@@ -139,7 +139,7 @@ func ExampleClient_Query_rows() {
 	}
 	defer iter.Close()
 
-	for res := range iter.Results() {
+	for res := range iter.Tables() {
 		if res.Err() != nil {
 			panic("add error handling")
 		}

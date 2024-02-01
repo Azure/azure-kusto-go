@@ -79,26 +79,18 @@ func (d *iterativeDataset) sendTable(tb *iterativeTable) {
 	d.results <- TableResultSuccess(tb)
 }
 
-func (d *iterativeDataset) Results() <-chan TableResult {
+func (d *iterativeDataset) Tables() <-chan TableResult {
 	return d.results
 }
 
 func (d *iterativeDataset) Close() error {
-	close(d.results)
-	// try to close the error channel, but don't block if it's full
-	select {
-	case <-d.errorChannel:
-	default:
-	}
-	close(d.errorChannel)
-
 	return d.reader.Close()
 }
 
 func (d *iterativeDataset) ToFullDataset() (FullDataset, error) {
 	tables := make([]query.FullTable, 0, len(d.results))
 
-	for tb := range d.Results() {
+	for tb := range d.Tables() {
 		if tb.Err() != nil {
 			return nil, tb.Err()
 		}
@@ -164,10 +156,10 @@ func decodeTables(d *iterativeDataset) {
 		} else if prog := f.AsTableProgress(); prog != nil {
 			d.reportError(errors.ES(op, errors.KInternal, "Unexpected TableProgress frame - progressive results are not supported"))
 			break
+		} else {
+			// Not a frame we know how to handle
+			d.reportError(errors.ES(op, errors.KInternal, "unknown frame type"))
 		}
-
-		// Not a frame we know how to handle
-		d.reportError(errors.ES(op, errors.KInternal, "unknown frame type"))
 	}
 }
 

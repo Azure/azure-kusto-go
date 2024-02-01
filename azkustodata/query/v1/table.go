@@ -7,7 +7,7 @@ import (
 	"github.com/Azure/azure-kusto-go/azkustodata/value"
 )
 
-func NewDataTable(d query.Dataset, dt *RawTable, index *TableIndexRow) (query.Table, error) {
+func NewDataTable(d query.Dataset, dt *RawTable, index *TableIndexRow) (query.FullTable, error) {
 	var id string
 	var kind string
 	var name string
@@ -37,13 +37,15 @@ func NewDataTable(d query.Dataset, dt *RawTable, index *TableIndexRow) (query.Ta
 		}
 	}
 
-	errs := make([]error, 0, len(dt.Rows))
+	table := query.NewFullTable(query.NewTable(d, ordinal, id, name, kind, columns), nil)
+
 	rows := make([]query.Row, 0, len(dt.Rows))
 
 	for i, r := range dt.Rows {
 		if r.Errors != nil && len(r.Errors) > 0 {
 			for _, e := range r.Errors {
-				errs = append(errs, errors.ES(op, errors.KInternal, "row[%d] error: %s", i, e))
+				err := errors.ES(op, errors.KInternal, "row %d has an error: %s", i, e)
+				return nil, err
 			}
 		}
 
@@ -62,8 +64,7 @@ func NewDataTable(d query.Dataset, dt *RawTable, index *TableIndexRow) (query.Ta
 			}
 			values[j] = parsed
 		}
-		rows = append(rows, query.NewRow(nil, i, values))
+		rows = append(rows, query.NewRow(table, i, values))
 	}
-
-	return query.NewDataTable(d, ordinal, id, name, kind, columns, rows, errs...), nil
+	return query.ReplaceFullTableRows(table, rows), nil
 }

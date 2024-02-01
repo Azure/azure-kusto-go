@@ -117,7 +117,7 @@ func ExampleMgmt() {
 		}
 	}
 	// Or convert the dataset to a slice of structs (or a specific table if there is more than one)
-	strts, errs := query.ToStructs[PopulationData](dataset) // or dataset.Results()[i]
+	strts, errs := query.ToStructs[PopulationData](dataset) // or dataset.Tables()[i]
 	println(len(strts), errs)
 
 	// Get metadata about the

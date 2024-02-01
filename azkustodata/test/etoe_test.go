@@ -118,8 +118,7 @@ func TestAuth(t *testing.T) {
 
 			res, err := client.Query(context.Background(), testConfig.Database, kql.New("print 1"))
 			assert.NoError(t, err)
-			rows, err := res.Results()[0].GetAllRows()
-			assert.NoError(t, err)
+			rows := res.Tables()[0].Rows()
 			assert.Equal(t, "1\n", rows[0].String())
 		})
 	}
@@ -241,48 +240,7 @@ func TestQueries(t *testing.T) {
 			want2: &[]MgmtProjectionResult{{A: "2"}},
 		},
 		{
-			desc:    "Query: Progressive query: make sure we can convert all data types from a row",
-			stmt:    kql.New("").AddTable(allDataTypesTable),
-			qcall:   client.Query,
-			options: []azkustodata.QueryOption{azkustodata.ResultsProgressiveEnabled()},
-			doer: func(row query.Row, update interface{}) error {
-				rec := AllDataType{}
-				if err := row.ToStruct(&rec); err != nil {
-					return err
-				}
-
-				valuesRec := AllDataType{}
-
-				err := row.ExtractValues(&valuesRec.Vnum,
-					&valuesRec.Vdec,
-					&valuesRec.Vdate,
-					&valuesRec.Vspan,
-					&valuesRec.Vobj,
-					&valuesRec.Vb,
-					&valuesRec.Vreal,
-					&valuesRec.Vstr,
-					&valuesRec.Vlong,
-					&valuesRec.Vguid,
-				)
-
-				if err != nil {
-					return err
-				}
-
-				assert.Equal(t, rec, valuesRec)
-
-				recs := update.(*[]AllDataType)
-				*recs = append(*recs, rec)
-				return nil
-			},
-			gotInit: func() interface{} {
-				ad := []AllDataType{}
-				return &ad
-			},
-			want: &[]AllDataType{getExpectedResult()},
-		},
-		{
-			desc:  "Query: Non-Progressive query: make sure we can convert all data types from a row",
+			desc:  "Query: make sure we can convert all data types from a row",
 			stmt:  kql.New("").AddTable(allDataTypesTable),
 			qcall: client.Query,
 			doer: func(row query.Row, update interface{}) error {
@@ -293,17 +251,7 @@ func TestQueries(t *testing.T) {
 
 				valuesRec := AllDataType{}
 
-				err := row.ExtractValues(&valuesRec.Vnum,
-					&valuesRec.Vdec,
-					&valuesRec.Vdate,
-					&valuesRec.Vspan,
-					&valuesRec.Vobj,
-					&valuesRec.Vb,
-					&valuesRec.Vreal,
-					&valuesRec.Vstr,
-					&valuesRec.Vlong,
-					&valuesRec.Vguid,
-				)
+				err := row.ToStruct(&valuesRec)
 
 				if err != nil {
 					return err
@@ -334,12 +282,7 @@ func TestQueries(t *testing.T) {
 
 				valuesRec := DynamicTypeVariations{}
 
-				err := row.ExtractValues(&valuesRec.PlainValue,
-					&valuesRec.PlainArray,
-					&valuesRec.PlainJson,
-					&valuesRec.JsonArray,
-				)
-
+				err := row.ToStruct(&valuesRec)
 				if err != nil {
 					return err
 				}
@@ -450,13 +393,12 @@ func TestQueries(t *testing.T) {
 			}
 
 			var got = test.gotInit()
-			results := dataset.Results()
+			results := dataset.Tables()
 
 			if test.want2 != nil {
 				var got = test.gotInit()
 				assert.Len(t, results, 2)
-				rows, err := results[1].GetAllRows()
-				require.Nilf(t, err, "TestQueries(%s): had table.GetAllTables() error: %s", test.desc, err)
+				rows := results[1].Rows()
 
 				assert.Len(t, rows, 1)
 
@@ -469,8 +411,7 @@ func TestQueries(t *testing.T) {
 				assert.Len(t, results, 1)
 			}
 
-			rows, err := results[0].GetAllRows()
-			require.Nilf(t, err, "TestQueries(%s): had table.GetAllTables() error: %s", test.desc, err)
+			rows := results[0].Rows()
 
 			assert.Greaterf(t, len(rows), 0, "TestQueries(%s): had no rows", test.desc)
 
@@ -516,21 +457,17 @@ func TestIterativeQuery(t *testing.T) {
 
 	res := getExpectedResult()
 
-	for tableResult := range dataset.Results() {
+	for tableResult := range dataset.Tables() {
 		require.NoError(t, tableResult.Err())
 
 		tb := tableResult.Table()
 		if tb.Name() == allDataTypesTable {
-			rows, errs := tb.GetAllRows()
-			require.Nilf(t, errs, "TestIterativeQuery: had table.GetAllTables() error: %s", errs)
-			structs, errs := query.ToStructs[AllDataType](rows)
+			structs, errs := query.ToStructs[AllDataType](tb)
 			require.Nil(t, errs)
 			require.Equal(t, []AllDataType{res}, structs)
 		}
 		if tb.Name() == allDataTypesTable+"_null" {
-			rows, errs := tb.GetAllRows()
-			require.Nilf(t, errs, "TestIterativeQuery: had table.GetAllTables() error: %s", errs)
-			structs, errs := query.ToStructs[AllDataType](rows)
+			structs, errs := query.ToStructs[AllDataType](tb)
 			require.Nil(t, errs)
 			require.Equal(t, []AllDataType{{}}, structs)
 		}
@@ -618,18 +555,7 @@ func TestStatement(t *testing.T) {
 
 				valuesRec := AllDataType{}
 
-				err := row.ExtractValues(&valuesRec.Vnum,
-					&valuesRec.Vdec,
-					&valuesRec.Vdate,
-					&valuesRec.Vspan,
-					&valuesRec.Vobj,
-					&valuesRec.Vb,
-					&valuesRec.Vreal,
-					&valuesRec.Vstr,
-					&valuesRec.Vlong,
-					&valuesRec.Vguid,
-				)
-
+				err := row.ToStruct(&valuesRec)
 				if err != nil {
 					return err
 				}
@@ -684,18 +610,7 @@ func TestStatement(t *testing.T) {
 
 				valuesRec := AllDataType{}
 
-				err := row.ExtractValues(&valuesRec.Vnum,
-					&valuesRec.Vdec,
-					&valuesRec.Vdate,
-					&valuesRec.Vspan,
-					&valuesRec.Vobj,
-					&valuesRec.Vb,
-					&valuesRec.Vreal,
-					&valuesRec.Vstr,
-					&valuesRec.Vlong,
-					&valuesRec.Vguid,
-				)
-
+				err := row.ToStruct(&valuesRec)
 				if err != nil {
 					return err
 				}
@@ -728,18 +643,7 @@ func TestStatement(t *testing.T) {
 
 				valuesRec := AllDataType{}
 
-				err := row.ExtractValues(&valuesRec.Vnum,
-					&valuesRec.Vdec,
-					&valuesRec.Vdate,
-					&valuesRec.Vspan,
-					&valuesRec.Vobj,
-					&valuesRec.Vb,
-					&valuesRec.Vreal,
-					&valuesRec.Vstr,
-					&valuesRec.Vlong,
-					&valuesRec.Vguid,
-				)
-
+				err := row.ToStruct(&valuesRec)
 				if err != nil {
 					return err
 				}
@@ -795,8 +699,7 @@ func TestStatement(t *testing.T) {
 
 			var got = test.gotInit()
 			if res != nil {
-				rows, err := res.Results()[0].GetAllRows()
-				assert.NoError(t, err)
+				rows := res.Tables()[0].Rows()
 				assert.Len(t, rows, 1)
 				err = test.doer(rows[0], got)
 
