@@ -26,6 +26,9 @@ func NewDataTable(ds Dataset, ordinal int64, id string, name string, kind string
 	return t
 }
 
-func (t *dataTable) GetAllRows() ([]Row, error) {
-	return t.rows, t.error
+func (t *dataTable) ToFullTable() (FullTable, error) {
+	if t.error != nil {
+		return nil, t.error
+	}
+	return NewFullTable(&t.baseTable, t.rows), nil
 }

@@ -9,8 +9,8 @@ import (
 // Row is an interface that represents a row in a table.
 // It provides methods to access and manipulate the data in the row.
 type Row interface {
-	// Ordinal returns the ordinal of the row.
-	Ordinal() int
+	// Index returns the index of the row.
+	Index() int
 
 	// Table returns the table that the row belongs to.
 	Table() Table
@@ -19,16 +19,12 @@ type Row interface {
 	Values() value.Values
 
 	// Value returns the value at the specified index.
-	Value(i int) value.Kusto
+	Value(i int) (value.Kusto, error)
 
-	ValueByColumn(c Column) value.Kusto
+	ValueByColumn(c Column) (value.Kusto, error)
 
 	// ValueByName returns the value with the specified column name.
-	ValueByName(name string) value.Kusto
-
-	// ExtractValues extracts the values from the row and assigns them to the provided pointers.
-	// It returns an error if the extraction fails.
-	ExtractValues(ptrs ...interface{}) error
+	ValueByName(name string) (value.Kusto, error)
 
 	// ToStruct converts the row into a struct and assigns it to the provided pointer.
 	// It returns an error if the conversion fails.

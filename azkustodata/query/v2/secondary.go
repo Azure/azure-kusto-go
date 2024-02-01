@@ -35,48 +35,18 @@ type QueryCompletionInformation struct {
 const QueryPropertiesKind = "QueryProperties"
 const QueryCompletionInformationKind = "QueryCompletionInformation"
 
-// parseSecondaryTable parses a secondary table, and stores it in the dataset.
-func (d *baseDataset) parseSecondaryTable(t query.Table) error {
-	d.lock.Lock()
-	defer d.lock.Unlock()
-
-	switch t.Kind() {
-	case QueryPropertiesKind:
-		if d.queryProperties != nil {
-			return errors.ES(errors.OpUnknown, errors.KInternal, "query properties already initialized")
-		}
-		rows, err := t.GetAllRows()
-		if err != nil {
-			return err
-		}
-		if len(rows) > 0 {
-			st, err := query.ToStructs[QueryProperties](rows)
-			d.queryProperties = st
-			if err != nil {
-				return err
-			}
-		}
-
-		return nil
-
-	case QueryCompletionInformationKind:
-		if d.queryCompletionInformation != nil {
-			return errors.ES(errors.OpUnknown, errors.KInternal, "query completion already initialized")
-		}
-		rows, err := t.GetAllRows()
-		if err != nil {
-			return err
-		}
-		if len(rows) > 0 {
-			st, err := query.ToStructs[QueryCompletionInformation](rows)
-			d.queryCompletionInformation = st
-			if err != nil {
-				return err
-			}
-		}
-		return nil
-
-	default:
-		return errors.ES(errors.OpUnknown, errors.KInternal, "unknown secondary table %s", t.Name())
+func AsQueryProperties(table query.Table) ([]QueryProperties, error) {
+	if table.Kind() != QueryPropertiesKind {
+		return nil, errors.ES(errors.OpQuery, errors.KWrongTableKind, "expected QueryProperties table, got %s", table.Kind())
 	}
+
+	return query.ToStructs[QueryProperties](table)
+}
+
+func AsQueryCompletionInformation(table query.Table) ([]QueryCompletionInformation, error) {
+	if table.Kind() != QueryCompletionInformationKind {
+		return nil, errors.ES(errors.OpQuery, errors.KWrongTableKind, "expected QueryCompletionInformation table, got %s", table.Kind())
+	}
+
+	return query.ToStructs[QueryCompletionInformation](table)
 }

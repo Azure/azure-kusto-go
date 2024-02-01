@@ -47,16 +47,17 @@ type Kind uint16
 
 //go:generate stringer -type Kind
 const (
-	KOther           Kind = 0 // Other indicates the error kind was not defined.
-	KIO              Kind = 1 // External I/O error such as network failure.
-	KInternal        Kind = 2 // Internal error or inconsistency at the server.
-	KDBNotExist      Kind = 3 // Database does not exist.
-	KTimeout         Kind = 4 // The request timed out.
-	KLimitsExceeded  Kind = 5 // The request was too large.
-	KClientArgs      Kind = 6 // The client supplied some type of arg(s) that were invalid.
-	KHTTPError       Kind = 7 // The HTTP client gave some type of error. This wraps the http library error types.
-	KBlobstore       Kind = 8 // The Blobstore API returned some type of error.
-	KLocalFileSystem Kind = 9 // The local fileystem had an error. This could be permission, missing file, etc....
+	KOther           Kind = 0  // Other indicates the error kind was not defined.
+	KIO              Kind = 1  // External I/O error such as network failure.
+	KInternal        Kind = 2  // Internal error or inconsistency at the server.
+	KDBNotExist      Kind = 3  // Database does not exist.
+	KTimeout         Kind = 4  // The request timed out.
+	KLimitsExceeded  Kind = 5  // The request was too large.
+	KClientArgs      Kind = 6  // The client supplied some type of arg(s) that were invalid.
+	KHTTPError       Kind = 7  // The HTTP client gave some type of error. This wraps the http library error types.
+	KBlobstore       Kind = 8  // The Blobstore API returned some type of error.
+	KLocalFileSystem Kind = 9  // The local fileystem had an error. This could be permission, missing file, etc....,
+	KWrongTableKind  Kind = 10 // The kind of the table requested did not match the kind of the table.
 )
 
 // Error is a core error for the Kusto package.

@@ -72,7 +72,7 @@ func ExampleIterativeQuery() {
 			if rowResult.Err() != nil {
 				println(rowResult.Err().Error())
 			} else {
-				println(rowResult.Row().Ordinal())
+				println(rowResult.Row().Index())
 			}
 		}
 

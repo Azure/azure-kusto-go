@@ -6,13 +6,13 @@ import (
 
 // column is a basic implementation of Column, to be used by specific implementations.
 type column struct {
-	ordinal   int
+	index     int
 	name      string
 	kustoType types.Column
 }
 
-func (c column) Ordinal() int {
-	return c.ordinal
+func (c column) Index() int {
+	return c.index
 }
 
 func (c column) Name() string {
@@ -25,7 +25,7 @@ func (c column) Type() types.Column {
 
 func NewColumn(ordinal int, name string, kustoType types.Column) Column {
 	return &column{
-		ordinal:   ordinal,
+		index:     ordinal,
 		name:      name,
 		kustoType: kustoType,
 	}

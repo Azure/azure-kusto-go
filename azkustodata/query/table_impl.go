@@ -6,7 +6,7 @@ import (
 
 type baseTable struct {
 	dataSet       Dataset
-	ordinal       int64
+	index         int64
 	id            string
 	name          string
 	kind          string
@@ -14,10 +14,10 @@ type baseTable struct {
 	columnsByName map[string]Column
 }
 
-func NewTable(ds Dataset, ordinal int64, id string, name string, kind string, columns []Column) BaseTable {
+func NewTable(ds Dataset, index int64, id string, name string, kind string, columns []Column) BaseTable {
 	b := &baseTable{
 		dataSet: ds,
-		ordinal: ordinal,
+		index:   index,
 		id:      id,
 		name:    name,
 		kind:    kind,
@@ -35,8 +35,8 @@ func (t *baseTable) Id() string {
 	return t.id
 }
 
-func (t *baseTable) Ordinal() int64 {
-	return t.ordinal
+func (t *baseTable) Index() int64 {
+	return t.index
 }
 
 func (t *baseTable) Name() string {
@@ -58,6 +58,12 @@ func (t *baseTable) ColumnByName(name string) Column {
 	return nil
 }
 
+const primaryResultKind = "PrimaryResult"
+
+func (t *baseTable) IsPrimaryResult() bool {
+	return t.Kind() == primaryResultKind
+}
+
 func (t *baseTable) Op() errors.Op {
 	set := t.dataSet
 	if set == nil {
@@ -66,12 +72,18 @@ func (t *baseTable) Op() errors.Op {
 	return set.Op()
 }
 
-type BaseTable interface {
-	Id() string
-	Ordinal() int64
-	Name() string
-	Columns() []Column
-	Kind() string
-	ColumnByName(name string) Column
-	Op() errors.Op
+type fullTable struct {
+	BaseTable
+	rows []Row
+}
+
+func NewFullTable(base BaseTable, rows []Row) FullTable {
+	return &fullTable{
+		BaseTable: base,
+		rows:      rows,
+	}
+}
+
+func (t *fullTable) Rows() []Row {
+	return t.rows
 }

@@ -14,6 +14,5 @@ type Dataset interface {
 }
 
 type FullDataset interface {
-	Results() []Table
-	PrimaryResults() ([]Row, error)
+	Tables() []FullTable
 }

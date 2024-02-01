@@ -4,7 +4,6 @@ import (
 	"bufio"
 	"bytes"
 	"encoding/json"
-	"fmt"
 	"github.com/Azure/azure-kusto-go/azkustodata/errors"
 	"io"
 )
@@ -42,59 +41,6 @@ func (r *RawRow) UnmarshalJSON(data []byte) error {
 	return nil
 }
 
-// Decode converts an unknown frame to a known frame type
-func (f *EveryFrame) Decode() (Frame, error) {
-	switch f.FrameType {
-	case DataSetHeaderFrameType:
-		return &DataSetHeader{
-			IsProgressive:           f.IsProgressive,
-			Version:                 f.Version,
-			IsFragmented:            f.IsFragmented,
-			ErrorReportingPlacement: f.ErrorReportingPlacement,
-		}, nil
-	case DataTableFrameType:
-		return &DataTable{
-			TableId:   f.TableId,
-			TableKind: f.TableKind,
-			TableName: f.TableName,
-			Columns:   f.Columns,
-			Rows:      f.Rows,
-		}, nil
-	case TableHeaderFrameType:
-		return &TableHeader{
-			TableId:   f.TableId,
-			TableKind: f.TableKind,
-			TableName: f.TableName,
-			Columns:   f.Columns,
-		}, nil
-	case TableFragmentFrameType:
-		return &TableFragment{
-			TableFragmentType: f.TableFragmentType,
-			TableId:           f.TableId,
-			Rows:              f.Rows,
-		}, nil
-	case TableCompletionFrameType:
-		return &TableCompletion{
-			TableId:      f.TableId,
-			RowCount:     f.RowCount,
-			OneApiErrors: f.OneApiErrors,
-		}, nil
-	case DataSetCompletionFrameType:
-		return &DataSetCompletion{
-			HasErrors:    f.HasErrors,
-			Cancelled:    f.Cancelled,
-			OneApiErrors: f.OneApiErrors,
-		}, nil
-	case TableProgressFrameType:
-		return &TableProgress{
-			TableId:  f.TableId,
-			Progress: f.TableProgress,
-		}, nil
-	default:
-		return nil, fmt.Errorf("unknown frame type: %s", f.FrameType)
-	}
-}
-
 // prepareReadBuffer checks for errors and returns a decoder
 func prepareReadBuffer(r io.Reader) (io.Reader, error) {
 	br := bufio.NewReader(r)
@@ -113,24 +59,8 @@ func prepareReadBuffer(r io.Reader) (io.Reader, error) {
 
 }
 
-// decodeFrame decode a single frame from a decoder
-func decodeFrame(dec *json.Decoder) (Frame, error) {
-	frame := EveryFrame{}
-	err := dec.Decode(&frame)
-	if err != nil {
-		return nil, err
-	}
-
-	f, err := frame.Decode()
-
-	if err != nil {
-		return nil, err
-	}
-	return f, nil
-}
-
 // readFramesIterative reads frames from a reader and sends them to a channel as they are read.
-func readFramesIterative(reader io.Reader, ch chan<- Frame) error {
+func readFramesIterative(reader io.Reader, ch chan<- *EveryFrame) error {
 	defer close(ch)
 
 	// Crazily enough, json.Decoder always puts THE ENTIRE READER IN MEMORY
@@ -151,7 +81,9 @@ func readFramesIterative(reader io.Reader, ch chan<- Frame) error {
 		dec := json.NewDecoder(bytes.NewReader(line))
 		dec.UseNumber()
 
-		f, err := decodeFrame(dec)
+		frame := EveryFrame{}
+		err = dec.Decode(&frame)
+
 		if err != nil {
 			if err == io.EOF {
 				return nil
@@ -159,7 +91,7 @@ func readFramesIterative(reader io.Reader, ch chan<- Frame) error {
 			return err
 		}
 
-		ch <- f
+		ch <- &frame
 	}
 
 	return nil
@@ -179,31 +111,4 @@ func handleKustoJson(line []byte) ([]byte, error) {
 	}
 
 	return line[1:], nil
-}
-
-// readFramesFull reads all frames from a reader and returns them as a slice.
-func readFramesFull(r io.Reader) ([]Frame, error) {
-	br, err := prepareReadBuffer(r)
-	if err != nil {
-		return nil, err
-	}
-
-	dec := json.NewDecoder(br)
-	dec.UseNumber()
-
-	var rawFrames []EveryFrame
-	err = dec.Decode(&rawFrames)
-	if err != nil {
-		return nil, err
-	}
-
-	frames := make([]Frame, len(rawFrames))
-	for i, f := range rawFrames {
-		frames[i], err = f.Decode()
-		if err != nil {
-			return nil, err
-		}
-	}
-
-	return frames, nil
 }

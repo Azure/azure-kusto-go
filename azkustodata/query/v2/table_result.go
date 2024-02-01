@@ -1,4 +1,9 @@
-package query
+package v2
+
+type TableResult interface {
+	Table() IterativeTable
+	Err() error
+}
 
 // TableResult is a structure that holds the result of a table operation.
 // It contains a Table and an error, if any occurred during the operation.

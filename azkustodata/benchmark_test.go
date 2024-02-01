@@ -65,7 +65,7 @@ func BenchmarkQuery(b *testing.B) {
 
 			for n := 0; n < b.N; n++ {
 				reader := io.NopCloser(strings.NewReader(res))
-				dataset, err := queryv2.NewStreamingDataSet(ctx, reader, 5)
+				dataset, err := queryv2.NewIterativeDataset(ctx, reader, 5)
 				if err != nil {
 					panic(err)
 				}
@@ -94,7 +94,7 @@ func BenchmarkQuery(b *testing.B) {
 
 			for n := 0; n < b.N; n++ {
 				reader := io.NopCloser(strings.NewReader(res))
-				dataset, err := queryv2.NewStreamingDataSet(ctx, reader, 0)
+				dataset, err := queryv2.NewIterativeDataset(ctx, reader, 0)
 				if err != nil {
 					panic(err)
 				}

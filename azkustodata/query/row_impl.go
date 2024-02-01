@@ -3,6 +3,7 @@ package query
 import (
 	"encoding/csv"
 	"github.com/Azure/azure-kusto-go/azkustodata/errors"
+	"github.com/Azure/azure-kusto-go/azkustodata/query/v2"
 	"github.com/Azure/azure-kusto-go/azkustodata/types"
 	"github.com/Azure/azure-kusto-go/azkustodata/value"
 	"github.com/shopspring/decimal"
@@ -25,7 +26,7 @@ func NewRow(t Table, ordinal int, values value.Values) Row {
 	}
 }
 
-func (r *row) Ordinal() int {
+func (r *row) Index() int {
 	return r.ordinal
 }
 
@@ -37,43 +38,24 @@ func (r *row) Values() value.Values {
 	return r.values
 }
 
-func (r *row) Value(i int) value.Kusto {
-	return r.values[i]
+func (r *row) Value(i int) (value.Kusto, error) {
+	if i < 0 || i >= len(r.values) {
+		return nil, errors.ES(r.table.Op(), errors.KClientArgs, "index %d out of range", i)
+	}
+
+	return r.values[i], nil
 }
 
-func (r *row) ValueByColumn(c Column) value.Kusto {
-	return r.values[c.Ordinal()]
+func (r *row) ValueByColumn(c Column) (value.Kusto, error) {
+	return r.Value(c.Index())
 }
 
-func (r *row) ValueByName(name string) value.Kusto {
+func (r *row) ValueByName(name string) (value.Kusto, error) {
 	col := r.table.ColumnByName(name)
 	if col == nil {
-		return nil
+		return nil, columnNotFoundError(r, name)
 	}
-	return r.values[col.Ordinal()]
-}
-
-// ExtractValues fetches all values in the row at once.
-// The value of the kth column will be decoded into the kth argument to ExtractValues.
-// The number of arguments must be equal to the number of columns.
-// Pass nil to specify that a column should be ignored.
-// ptrs should be compatible with column types. An error in decoding may leave
-// some ptrs set and others not.
-func (r *row) ExtractValues(ptrs ...interface{}) error {
-	if len(ptrs) != len(r.table.Columns()) {
-		return errors.ES(r.table.Op(), errors.KClientArgs, ".Columns() requires %d arguments for this row, had %d", len(r.table.Columns()), len(ptrs))
-	}
-
-	for i, val := range r.Values() {
-		if ptrs[i] == nil {
-			continue
-		}
-		if err := val.Convert(reflect.ValueOf(ptrs[i]).Elem()); err != nil {
-			return err
-		}
-	}
-
-	return nil
+	return r.Value(col.Index())
 }
 
 // ToStruct fetches the columns in a row into the fields of a struct. p must be a pointer to struct.
@@ -132,7 +114,10 @@ type kustoTypeGeneric interface {
 }
 
 func byIndex[T kustoTypeGeneric](r *row, colType types.Column, i int, defaultValue T) (T, error) {
-	val := r.Value(i)
+	val, err := r.Value(i)
+	if err != nil {
+		return defaultValue, err
+	}
 	if val.GetType() != colType {
 		return defaultValue, conversionError(r, string(val.GetType()), string(colType))
 	}
@@ -145,7 +130,7 @@ func byName[T kustoTypeGeneric](r *row, colType types.Column, name string, defau
 	if col == nil {
 		return defaultValue, columnNotFoundError(r, name)
 	}
-	return byIndex(r, colType, col.Ordinal(), defaultValue)
+	return byIndex(r, colType, col.Index(), defaultValue)
 }
 
 func (r *row) BoolByIndex(i int) (*bool, error) {
@@ -227,24 +212,29 @@ func ToStructs[T any](data interface{}) ([]T, error) {
 	var errs error
 
 	switch v := data.(type) {
+	case FullTable:
+		rows = v.Rows()
 	case Table:
-		var err error
-		rows, err = v.GetAllRows()
+		full, err := v.ToFullTable()
 		if err != nil {
 			return nil, err
 		}
+		rows = full.Rows()
 	case []Row:
 		rows = v
 	case Row:
 		rows = []Row{v}
 	case FullDataset:
-		var err error
-		rows, err = v.PrimaryResults()
-		if err != nil {
-			return nil, err
+		tables := v.Tables()
+		if len(tables) == 0 {
+			return nil, errors.ES(errors.OpUnknown, errors.KInternal, "dataset does not contain any tables")
 		}
+		if !tables[0].IsPrimaryResult() {
+			return nil, errors.ES(errors.OpUnknown, errors.KInternal, "dataset contains no primary results")
+		}
+		rows = tables[0].Rows()
 	default:
-		return nil, errors.ES(errors.OpUnknown, errors.KInternal, "invalid data type - expected Table or []Row")
+		return nil, errors.ES(errors.OpUnknown, errors.KInternal, "invalid data type - expected FullDataset, FullTable, Table or []Row")
 	}
 
 	if rows == nil || len(rows) == 0 {
@@ -270,7 +260,7 @@ type StructResult[T any] struct {
 	Err error
 }
 
-func ToStructsIterative[T any](tb IterativeTable) chan StructResult[T] {
+func ToStructsIterative[T any](tb v2.IterativeTable) chan StructResult[T] {
 	out := make(chan StructResult[T])
 
 	go func() {
