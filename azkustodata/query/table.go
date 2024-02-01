@@ -22,3 +22,12 @@ type FullTable interface {
 	Table
 	Rows() []Row
 }
+
+// IterativeTable is a table that returns rows one at a time.
+type IterativeTable interface {
+	Table
+	// Rows returns a channel that will be populated with rows as they are read.
+	Rows() <-chan RowResult
+	// SkipToEnd skips all remaining rows in the table.
+	SkipToEnd() []error
+}

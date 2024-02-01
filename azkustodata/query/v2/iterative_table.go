@@ -9,15 +9,6 @@ import (
 	"sync"
 )
 
-// IterativeTable is a table that returns rows one at a time.
-type IterativeTable interface {
-	query.Table
-	// Rows returns a channel that will be populated with rows as they are read.
-	Rows() <-chan RowResult
-	// SkipToEnd skips all remaining rows in the table.
-	SkipToEnd() []error
-}
-
 // iterativeTable represents a table that is streamed from the service.
 // It is used by the iterative dataset.
 // The rows are received from the service via the rawRows channel, and are parsed and sent to the rows channel.
@@ -25,7 +16,7 @@ type iterativeTable struct {
 	query.BaseTable
 	lock     sync.RWMutex
 	rawRows  chan RawRows
-	rows     chan RowResult
+	rows     chan query.RowResult
 	rowCount int
 	skip     bool
 	end      chan bool
@@ -60,7 +51,7 @@ func (t *iterativeTable) setSkip(skip bool) {
 	t.skip = skip
 }
 
-func newIterativeTable(dataset query.Dataset, th TableHeader, rowsSize int) (IterativeTable, error) {
+func newIterativeTable(dataset query.Dataset, th TableHeader, rowsSize int) (query.IterativeTable, error) {
 	columns := make([]query.Column, len(th.Columns()))
 	err := parseColumns(th, columns, dataset.Op())
 	if err != nil {
@@ -70,7 +61,7 @@ func newIterativeTable(dataset query.Dataset, th TableHeader, rowsSize int) (Ite
 	t := &iterativeTable{
 		BaseTable: query.NewTable(dataset, int64(th.TableId()), strconv.Itoa(th.TableId()), th.TableName(), th.TableKind(), columns),
 		rawRows:   make(chan RawRows, rowsSize),
-		rows:      make(chan RowResult, rowsSize),
+		rows:      make(chan query.RowResult, rowsSize),
 		end:       make(chan bool),
 	}
 
@@ -81,11 +72,11 @@ func newIterativeTable(dataset query.Dataset, th TableHeader, rowsSize int) (Ite
 
 const defaultRowsSize = 100
 
-func NewIterativeTable(dataset query.Dataset, th TableHeader) (IterativeTable, error) {
+func NewIterativeTable(dataset query.Dataset, th TableHeader) (query.IterativeTable, error) {
 	return newIterativeTable(dataset, th, defaultRowsSize)
 }
 
-func NewIterativeTableFromDataTable(dataset query.Dataset, dt DataTable) (IterativeTable, error) {
+func NewIterativeTableFromDataTable(dataset query.Dataset, dt DataTable) (query.IterativeTable, error) {
 	t, err := newIterativeTable(dataset, dt, len(dt.Rows()))
 	if err != nil {
 		return nil, err
@@ -142,7 +133,7 @@ func (t *iterativeTable) close(errors []OneApiError) {
 
 	if b {
 		for _, e := range errors {
-			t.rows <- RowResultError(&e)
+			t.rows <- query.RowResultError(&e)
 		}
 	}
 
@@ -159,27 +150,27 @@ func (t *iterativeTable) readRows() {
 		for _, r := range rows {
 			if r.Errors != nil {
 				for _, e := range r.Errors {
-					t.rows <- RowResultError(&e)
+					t.rows <- query.RowResultError(&e)
 				}
 				continue
 			}
 
 			if t.Skip() {
-				t.rows <- RowResultError(errors.ES(t.Op(), errors.KInternal, skipError))
+				t.rows <- query.RowResultError(errors.ES(t.Op(), errors.KInternal, skipError))
 			} else {
 				row, err := parseRow(r.Row, t)
 				if err != nil {
-					t.rows <- RowResultError(err)
+					t.rows <- query.RowResultError(err)
 					continue
 				}
-				t.rows <- RowResultSuccess(row)
+				t.rows <- query.RowResultSuccess(row)
 			}
 			t.rowCount++
 		}
 	}
 	t.end <- true
 }
-func (t *iterativeTable) Rows() <-chan RowResult {
+func (t *iterativeTable) Rows() <-chan query.RowResult {
 	return t.rows
 }
 

@@ -3,7 +3,6 @@ package query
 import (
 	"encoding/csv"
 	"github.com/Azure/azure-kusto-go/azkustodata/errors"
-	"github.com/Azure/azure-kusto-go/azkustodata/query/v2"
 	"github.com/Azure/azure-kusto-go/azkustodata/types"
 	"github.com/Azure/azure-kusto-go/azkustodata/value"
 	"github.com/shopspring/decimal"
@@ -260,7 +259,7 @@ type StructResult[T any] struct {
 	Err error
 }
 
-func ToStructsIterative[T any](tb v2.IterativeTable) chan StructResult[T] {
+func ToStructsIterative[T any](tb IterativeTable) chan StructResult[T] {
 	out := make(chan StructResult[T])
 
 	go func() {

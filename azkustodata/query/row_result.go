@@ -1,13 +1,11 @@
-package v2
-
-import "github.com/Azure/azure-kusto-go/azkustodata/query"
+package query
 
 type rowResult struct {
-	row query.Row
+	row Row
 	err error
 }
 
-func (r rowResult) Row() query.Row {
+func (r rowResult) Row() Row {
 	return r.row
 }
 
@@ -15,7 +13,7 @@ func (r rowResult) Err() error {
 	return r.err
 }
 
-func RowResultSuccess(row query.Row) RowResult {
+func RowResultSuccess(row Row) RowResult {
 	return rowResult{
 		row: row,
 	}
@@ -30,6 +28,6 @@ func RowResultError(err error) RowResult {
 // RowResult is a single streamed row from a table.
 // It can contain either a row or an error.
 type RowResult interface {
-	Row() query.Row
+	Row() Row
 	Err() error
 }
