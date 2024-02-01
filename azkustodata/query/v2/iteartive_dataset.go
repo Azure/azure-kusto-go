@@ -29,7 +29,7 @@ type iterativeDataset struct {
 	results chan TableResult
 }
 
-func NewIterativeDataSet(ctx context.Context, r io.ReadCloser, capacity int) (IterativeDataset, error) {
+func NewIterativeDataset(ctx context.Context, r io.ReadCloser, capacity int) (IterativeDataset, error) {
 	d := &iterativeDataset{
 		Dataset:      query.NewDataset(ctx, errors.OpQuery),
 		reader:       r,

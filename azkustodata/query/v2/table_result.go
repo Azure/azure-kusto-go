@@ -1,7 +1,9 @@
 package v2
 
+import "github.com/Azure/azure-kusto-go/azkustodata/query"
+
 type TableResult interface {
-	Table() IterativeTable
+	Table() query.IterativeTable
 	Err() error
 }
 
@@ -9,13 +11,13 @@ type TableResult interface {
 // It contains a Table and an error, if any occurred during the operation.
 type tableResult struct {
 	// Table is the result of the operation.
-	table IterativeTable
+	table query.IterativeTable
 	// Err is the error that occurred during the operation, if any.
 	err error
 }
 
 // Table returns the table that was the result of the operation.
-func (t *tableResult) Table() IterativeTable {
+func (t *tableResult) Table() query.IterativeTable {
 	return t.table
 }
 
@@ -24,7 +26,7 @@ func (t *tableResult) Err() error {
 	return t.err
 }
 
-func TableResultSuccess(table IterativeTable) TableResult {
+func TableResultSuccess(table query.IterativeTable) TableResult {
 	return &tableResult{
 		table: table,
 	}
