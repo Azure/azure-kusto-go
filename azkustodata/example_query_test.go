@@ -5,6 +5,7 @@ import (
 	"github.com/Azure/azure-kusto-go/azkustodata"
 	"github.com/Azure/azure-kusto-go/azkustodata/kql"
 	"github.com/Azure/azure-kusto-go/azkustodata/query"
+	v2 "github.com/Azure/azure-kusto-go/azkustodata/query/v2"
 	"github.com/Azure/azure-kusto-go/azkustodata/value"
 )
 
@@ -39,13 +40,30 @@ func ExampleQuery() {
 		panic("dataset is nil")
 	}
 
-	// access tables
-	tb1 := dataset.Results()[0]
+	// Access tables - Primary Results will always be the first tables in the dataset
+	tb1 := dataset.Tables()[0]
 	println(tb1.Name())
+	println(tb1.IsPrimaryResult())
 
-	for _, table := range dataset.Results() {
+	for _, table := range dataset.Tables() {
 		println(table.Name())
 		println(table.Id())
+
+		// You can check if the table is a primary result table
+		// Primary results will always be the first tables in the dataset
+		// otherwise, you can use helper methods to get the secondary tables
+		if !table.IsPrimaryResult() {
+			queryProps, err := v2.AsQueryProperties(table)
+			if err != nil {
+				panic(err)
+			}
+			println(queryProps[0].Value)
+
+			// Or you can simply use any of the normal table methods
+			println(table.Name())
+
+			continue
+		}
 
 		// Columns are available as well
 		for _, column := range table.Columns() {
@@ -55,16 +73,13 @@ func ExampleQuery() {
 		stateCol := table.ColumnByName("State")
 		println(stateCol.Name)
 
-		// Use GetAllRows() to get all rows as a slice
-		rows, errs := table.GetAllRows()
-		if errs != nil {
-			panic(errs)
-		}
+		// Use Rows() to get all rows as a slice
+		rows := table.Rows()
 
 		// Working with rows
 		for _, row := range rows {
 			// Each row has an index and a pointer to the table it belongs to
-			println(row.Ordinal())
+			println(row.Index())
 			println(row.Table().Name())
 
 			// For convenience, you can get the value from the row in the correct type
@@ -80,7 +95,10 @@ func ExampleQuery() {
 			println(i) // int is *int32 - since it can be nil
 
 			// There are a few ways to access the values of a row:
-			val := row.Value(0)
+			val, err := row.Value(0)
+			if err != nil {
+				panic(err)
+			}
 			println(val)
 			println(row.Values()[0])
 			println(row.ValueByColumn(stateCol))
@@ -122,17 +140,7 @@ func ExampleQuery() {
 
 	}
 
-	// Alternatively, get the primary results as a slice of rows, if there is only one table
-	rows, errs := dataset.PrimaryResults()
-	println(len(rows), errs)
-
 	// Or convert the dataset to a slice of structs (or a specific table if there is more than one)
 	strts, errs := query.ToStructs[PopulationData](dataset) // or dataset.Results()[i]
 	println(len(strts), errs)
-
-	// Get metadata about the query (if it was consumed - otherwise it will be nil)
-	println(dataset.Header())
-	println(dataset.QueryProperties())
-	println(dataset.QueryCompletionInformation())
-	println(dataset.Completion())
 }

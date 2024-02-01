@@ -19,6 +19,6 @@ type Table interface {
 }
 
 type FullTable interface {
-	BaseTable
+	Table
 	Rows() []Row
 }

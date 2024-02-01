@@ -5,6 +5,7 @@ import (
 	"github.com/Azure/azure-kusto-go/azkustodata"
 	"github.com/Azure/azure-kusto-go/azkustodata/kql"
 	"github.com/Azure/azure-kusto-go/azkustodata/query"
+	v2 "github.com/Azure/azure-kusto-go/azkustodata/query/v2"
 	"github.com/Azure/azure-kusto-go/azkustodata/value"
 )
 
@@ -39,7 +40,17 @@ func ExampleIterativeQuery() {
 		panic(err)
 	}
 
-	// The tables are streamed, so you need to iterate through the `Results()` channel to get them
+	// In most cases, you will only have a single primary result table, and you don't care about the other metadata tables,
+	// so you can just read the first table from the dataset
+
+	tableResult := <-dataset.Results()
+	if tableResult.Err() != nil {
+		panic(tableResult.Err())
+	}
+	table := tableResult.Table()
+	println(table.Name())
+
+	// Otherwise, you can iterate through the `Results()` channel to get them
 	// It is only possible to iterate through the results once - since they are streamed
 
 	for tableResult := range dataset.Results() {
@@ -51,6 +62,22 @@ func ExampleIterativeQuery() {
 
 		// You can access table metadata, such as the table name
 		table := tableResult.Table()
+
+		// You can check if the table is a primary result table
+		// Primary results will always be the first tables in the dataset
+		// otherwise, you can use helper methods to get the secondary tables
+		if !table.IsPrimaryResult() {
+			queryProps, err := v2.AsQueryProperties(table)
+			if err != nil {
+				panic(err)
+			}
+			println(queryProps[0].Value)
+
+			// Or you can simply use any of the normal table methods
+			println(table.Name())
+
+			continue
+		}
 
 		println(table.Name())
 		println(table.Id())
@@ -79,10 +106,11 @@ func ExampleIterativeQuery() {
 		// 2. SkipToEnd() - skips all rows and closes the table
 		table.SkipToEnd()
 
-		// 3. GetAllRows() - reads all rows and closes the table
-		rows, err := table.GetAllRows()
+		// 3. ToFullTable() - reads all rows into memory and returns a full table
+		fullTable, err := table.ToFullTable()
+		rows := fullTable.Rows()
 		for _, row := range rows {
-			println(row.Ordinal())
+			println(row.Index())
 		}
 		if err != nil {
 			println(err.Error())
@@ -91,7 +119,7 @@ func ExampleIterativeQuery() {
 		// Working with rows
 		for _, row := range rows {
 			// Each row has an index and a pointer to the table it belongs to
-			println(row.Ordinal())
+			println(row.Index())
 			println(row.Table().Name())
 
 			// For convenience, you can get the value from the row in the correct type
@@ -107,7 +135,11 @@ func ExampleIterativeQuery() {
 			println(i) // int is *int32 - since it can be nil
 
 			// There are a few ways to access the values of a row:
-			val := row.Value(0)
+			val, err := row.Value(0)
+			if err != nil {
+				panic(err)
+			}
+
 			println(val)
 			println(row.Values()[0])
 			println(row.ValueByColumn(stateCol))
@@ -160,19 +192,14 @@ func ExampleIterativeQuery() {
 
 	}
 
-	// Alternatively, you can consume the stream and get tables.
+	// Alternatively, you can consume the stream to get a full dataset
 	// Only if you haven't consumed them in any other way
-	tables, errors := dataset.GetAllTables()
-	if len(errors) > 0 {
-		panic(errors[0])
+	ds, err := dataset.ToFullDataset()
+	if err != nil {
+		panic(err)
 	}
-	// Now you can access tables and row with random access
-	rows, err := tables[1].GetAllRows()
-	println(rows, err)
 
-	// Get metadata about the query (if it was consumed - otherwise it will be nil)
-	println(dataset.Header())
-	println(dataset.QueryProperties())
-	println(dataset.QueryCompletionInformation())
-	println(dataset.Completion())
+	// Now you can access tables and row with random access
+	rows := ds.Tables()[1].Rows()
+	println(rows)
 }

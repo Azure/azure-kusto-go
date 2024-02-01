@@ -87,3 +87,7 @@ func NewFullTable(base BaseTable, rows []Row) FullTable {
 func (t *fullTable) Rows() []Row {
 	return t.rows
 }
+
+func (t *fullTable) ToFullTable() (FullTable, error) {
+	return t, nil
+}

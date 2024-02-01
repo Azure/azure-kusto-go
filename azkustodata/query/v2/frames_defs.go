@@ -76,85 +76,85 @@ type TableProgress interface {
 type RawRows []RawRow
 
 type EveryFrame struct {
-	frameType               FrameType     `json:"FrameType"`
-	isProgressive           bool          `json:"IsProgressive"`
-	version                 string        `json:"Version"`
-	isFragmented            bool          `json:"IsFragmented"`
-	errorReportingPlacement string        `json:"ErrorReportingPlacement"`
-	tableId                 int           `json:"TableId"`
-	tableKind               string        `json:"TableKind"`
-	tableName               string        `json:"TableName"`
-	columns                 []FrameColumn `json:"Columns"`
-	rows                    RawRows       `json:"Rows"`
-	tableFragmentType       string        `json:"TableFragmentType"`
-	rowCount                int           `json:"RowCount"`
-	oneApiErrors            []OneApiError `json:"OneApiErrors"`
-	hasErrors               bool          `json:"HasErrors"`
-	cancelled               bool          `json:"Cancelled"`
-	tableProgress           float64       `json:"TableProgress"`
+	FrameTypeJson               FrameType     `json:"FrameType"`
+	IsProgressiveJson           bool          `json:"IsProgressive"`
+	VersionJson                 string        `json:"Version"`
+	IsFragmentedJson            bool          `json:"IsFragmented"`
+	ErrorReportingPlacementJson string        `json:"ErrorReportingPlacement"`
+	TableIdJson                 int           `json:"TableId"`
+	TableKindJson               string        `json:"TableKind"`
+	TableNameJson               string        `json:"TableName"`
+	ColumnsJson                 []FrameColumn `json:"Columns"`
+	RowsJson                    RawRows       `json:"Rows"`
+	TableFragmentTypeJson       string        `json:"TableFragmentType"`
+	RowCountJson                int           `json:"RowCount"`
+	OneApiErrorsJson            []OneApiError `json:"OneApiErrors"`
+	HasErrorsJson               bool          `json:"HasErrors"`
+	CancelledJson               bool          `json:"Cancelled"`
+	TableProgressJson           float64       `json:"TableProgress"`
 }
 
-func (f *EveryFrame) FrameType() FrameType            { return f.frameType }
-func (f *EveryFrame) IsProgressive() bool             { return f.isProgressive }
-func (f *EveryFrame) Version() string                 { return f.version }
-func (f *EveryFrame) IsFragmented() bool              { return f.isFragmented }
-func (f *EveryFrame) ErrorReportingPlacement() string { return f.errorReportingPlacement }
-func (f *EveryFrame) TableId() int                    { return f.tableId }
-func (f *EveryFrame) TableKind() string               { return f.tableKind }
-func (f *EveryFrame) TableName() string               { return f.tableName }
-func (f *EveryFrame) Columns() []FrameColumn          { return f.columns }
-func (f *EveryFrame) Rows() RawRows                   { return f.rows }
-func (f *EveryFrame) TableFragmentType() string       { return f.tableFragmentType }
-func (f *EveryFrame) RowCount() int                   { return f.rowCount }
-func (f *EveryFrame) OneApiErrors() []OneApiError     { return f.oneApiErrors }
-func (f *EveryFrame) HasErrors() bool                 { return f.hasErrors }
-func (f *EveryFrame) Cancelled() bool                 { return f.cancelled }
-func (f *EveryFrame) TableProgress() float64          { return f.tableProgress }
+func (f *EveryFrame) FrameType() FrameType            { return f.FrameTypeJson }
+func (f *EveryFrame) IsProgressive() bool             { return f.IsProgressiveJson }
+func (f *EveryFrame) Version() string                 { return f.VersionJson }
+func (f *EveryFrame) IsFragmented() bool              { return f.IsFragmentedJson }
+func (f *EveryFrame) ErrorReportingPlacement() string { return f.ErrorReportingPlacementJson }
+func (f *EveryFrame) TableId() int                    { return f.TableIdJson }
+func (f *EveryFrame) TableKind() string               { return f.TableKindJson }
+func (f *EveryFrame) TableName() string               { return f.TableNameJson }
+func (f *EveryFrame) Columns() []FrameColumn          { return f.ColumnsJson }
+func (f *EveryFrame) Rows() RawRows                   { return f.RowsJson }
+func (f *EveryFrame) TableFragmentType() string       { return f.TableFragmentTypeJson }
+func (f *EveryFrame) RowCount() int                   { return f.RowCountJson }
+func (f *EveryFrame) OneApiErrors() []OneApiError     { return f.OneApiErrorsJson }
+func (f *EveryFrame) HasErrors() bool                 { return f.HasErrorsJson }
+func (f *EveryFrame) Cancelled() bool                 { return f.CancelledJson }
+func (f *EveryFrame) TableProgress() float64          { return f.TableProgressJson }
 
 func (f *EveryFrame) AsDataSetHeader() DataSetHeader {
-	if f.frameType == DataSetHeaderFrameType {
+	if f.FrameTypeJson == DataSetHeaderFrameType {
 		return f
 	} else {
 		return nil
 	}
 }
 func (f *EveryFrame) AsDataTable() DataTable {
-	if f.frameType == DataTableFrameType {
+	if f.FrameTypeJson == DataTableFrameType {
 		return f
 	} else {
 		return nil
 	}
 }
 func (f *EveryFrame) AsTableHeader() TableHeader {
-	if f.frameType == TableHeaderFrameType {
+	if f.FrameTypeJson == TableHeaderFrameType {
 		return f
 	} else {
 		return nil
 	}
 }
 func (f *EveryFrame) AsTableFragment() TableFragment {
-	if f.frameType == TableFragmentFrameType {
+	if f.FrameTypeJson == TableFragmentFrameType {
 		return f
 	} else {
 		return nil
 	}
 }
 func (f *EveryFrame) AsTableCompletion() TableCompletion {
-	if f.frameType == TableCompletionFrameType {
+	if f.FrameTypeJson == TableCompletionFrameType {
 		return f
 	} else {
 		return nil
 	}
 }
 func (f *EveryFrame) AsDataSetCompletion() DataSetCompletion {
-	if f.frameType == DataSetCompletionFrameType {
+	if f.FrameTypeJson == DataSetCompletionFrameType {
 		return f
 	} else {
 		return nil
 	}
 }
 func (f *EveryFrame) AsTableProgress() TableProgress {
-	if f.frameType == TableProgressFrameType {
+	if f.FrameTypeJson == TableProgressFrameType {
 		return f
 	} else {
 		return nil

@@ -34,7 +34,7 @@ func ExampleMgmt() {
 		panic(err)
 	}
 
-	for _, tb := range dataset.Results() {
+	for _, tb := range dataset.Tables() {
 		println(tb.Name())
 		println(tb.Id())
 
@@ -46,22 +46,17 @@ func ExampleMgmt() {
 		stateCol := tb.ColumnByName("State")
 		println(stateCol.Name())
 
-		// Use GetAllRows() to get all rows as a slice
-		rows, errs := tb.GetAllRows()
-
-		// Make sure to always check for errors
-		if errs != nil {
-			panic(errs)
-		}
+		// Use Rows() to get all rows as a slice
+		rows := tb.Rows()
 
 		// You can randomly access rows
 		row := rows[0]
-		println(row.Ordinal())
+		println(row.Index())
 
 		// Or iterate over all rows
 		for _, row := range rows {
 			// Each row has an index and a pointer to the table it belongs to
-			println(row.Ordinal())
+			println(row.Index())
 			println(row.Table().Name())
 
 			// For convenience, you can get the value from the row in the correct type
@@ -77,7 +72,10 @@ func ExampleMgmt() {
 			println(i) // int is *int32 - since it can be nil
 
 			// There are a few ways to access the values of a row:
-			val := row.Value(0)
+			val, err := row.Value(0)
+			if err != nil {
+				panic(err)
+			}
 			println(val)
 			println(row.Values()[0])
 			println(row.ValueByColumn(stateCol))
@@ -118,11 +116,6 @@ func ExampleMgmt() {
 			println(tableData.TableName)
 		}
 	}
-
-	// Alternatively, get the primary results as a slice of rows, if there is only one table
-	rows, errs := dataset.PrimaryResults()
-	println(len(rows), errs)
-
 	// Or convert the dataset to a slice of structs (or a specific table if there is more than one)
 	strts, errs := query.ToStructs[PopulationData](dataset) // or dataset.Results()[i]
 	println(len(strts), errs)
