@@ -26,7 +26,7 @@ func TestStreamingDataSet_ReadFrames_WithError(t *testing.T) {
 	t.Parallel()
 	reader := strings.NewReader("invalid")
 	d := &iterativeDataset{
-		Dataset:      query.NewDataset(context.Background(), errors.OpQuery),
+		Dataset:      query.NewDataset(context.Background(), errors.OpQuery, PrimaryResultTableKind),
 		reader:       io.NopCloser(reader),
 		frames:       make(chan *EveryFrame, DefaultFrameCapacity),
 		errorChannel: make(chan error, 1),
