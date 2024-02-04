@@ -124,7 +124,7 @@ func decodeTables(d *iterativeDataset) {
 	defer func() {
 		_ = d.Close()
 		if currentTable != nil {
-			currentTable.close([]OneApiError{})
+			currentTable.finishTable([]OneApiError{})
 		}
 	}()
 
@@ -225,12 +225,7 @@ func handleTableCompletion(d *iterativeDataset, tablePtr **iterativeTable, tc Ta
 		d.reportError(err)
 	}
 
-	(*tablePtr).close(tc.OneApiErrors())
-
-	if (*tablePtr).RowCount() != tc.RowCount() {
-		err := errors.ES(d.Op(), errors.KInternal, "received a TableCompletion frame for table %d with row count %d while %d rows were received", tc.TableId(), tc.RowCount(), (*tablePtr).RowCount())
-		d.reportError(err)
-	}
+	(*tablePtr).finishTable(tc.OneApiErrors())
 
 	*tablePtr = nil
 

@@ -407,7 +407,13 @@ func TestQueries(t *testing.T) {
 
 				require.Equal(t, test.want2, got)
 			} else {
-				assert.Len(t, results, 1)
+				if _, ok := dataset.(v1.Dataset); ok {
+					assert.Equal(t, "QueryResult", results[0].Kind())
+				} else {
+					assert.Equal(t, "PrimaryResult", results[0].Kind())
+					assert.Equal(t, "QueryProperties", results[1].Kind())
+					assert.Equal(t, "QueryCompletionInformation", results[2].Kind())
+				}
 			}
 
 			rows := results[0].Rows()

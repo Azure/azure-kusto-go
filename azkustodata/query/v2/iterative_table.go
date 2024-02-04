@@ -19,8 +19,6 @@ type iterativeTable struct {
 	rows     chan query.RowResult
 	rowCount int
 	skip     bool
-	end      chan bool
-	closed   bool
 }
 
 func (t *iterativeTable) addRawRows(rows RawRows) {
@@ -71,7 +69,6 @@ func newIterativeTable(dataset query.Dataset, th TableHeader, rowsSize int) (que
 		Table:   baseTable,
 		rawRows: make(chan RawRows, rowsSize),
 		rows:    make(chan query.RowResult, rowsSize),
-		end:     make(chan bool),
 	}
 
 	go t.readRows()
@@ -111,32 +108,13 @@ func parseRow(r []interface{}, t query.Table, index int) (query.Row, *errors.Err
 	return row, nil
 }
 
-func (t *iterativeTable) close(errors []OneApiError) {
-	t.lock.Lock()
-
-	if t.closed {
-		t.lock.Unlock()
-		return
-	}
-
-	t.closed = true
-
-	close(t.rawRows)
-
-	t.lock.Unlock()
-
-	b := <-t.end
-
-	if b {
+func (t *iterativeTable) finishTable(errors []OneApiError) {
+	if errors != nil {
 		for _, e := range errors {
 			t.rows <- query.RowResultError(&e)
 		}
 	}
-
-	t.lock.Lock()
-	defer t.lock.Unlock()
-
-	close(t.rows)
+	close(t.rawRows)
 }
 
 const skipError = "skipping row"
@@ -164,7 +142,8 @@ func (t *iterativeTable) readRows() {
 			t.rowCount++
 		}
 	}
-	t.end <- true
+
+	close(t.rows)
 }
 func (t *iterativeTable) Rows() <-chan query.RowResult {
 	return t.rows
@@ -186,8 +165,8 @@ func (t *iterativeTable) SkipToEnd() []error {
 func (t *iterativeTable) ToFullTable() (query.FullTable, error) {
 	t.lock.RLock()
 	defer t.lock.RUnlock()
-	if t.closed {
-		return nil, errors.ES(t.Op(), errors.KInternal, "table is closed")
+	if t.skip {
+		return nil, errors.ES(t.Op(), errors.KInternal, "table is already skipped to the end")
 	}
 
 	var rows []query.Row
