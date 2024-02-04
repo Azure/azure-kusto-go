@@ -26,16 +26,16 @@ type iterativeDataset struct {
 	// errorChannel is a channel to report errors during the parsing of frames
 	errorChannel chan error
 	// results is a channel that sends the parsed results as they are decoded.
-	results chan TableResult
+	results chan query.TableResult
 }
 
-func NewIterativeDataset(ctx context.Context, r io.ReadCloser, capacity int) (IterativeDataset, error) {
+func NewIterativeDataset(ctx context.Context, r io.ReadCloser, capacity int) (query.IterativeDataset, error) {
 	d := &iterativeDataset{
 		Dataset:      query.NewDataset(ctx, errors.OpQuery),
 		reader:       r,
 		frames:       make(chan *EveryFrame, capacity),
 		errorChannel: make(chan error, 1),
-		results:      make(chan TableResult, 1),
+		results:      make(chan query.TableResult, 1),
 	}
 
 	br, err := prepareReadBuffer(d.reader)
@@ -72,22 +72,30 @@ func (d *iterativeDataset) getNextFrame() *EveryFrame {
 }
 
 func (d *iterativeDataset) reportError(err error) {
-	d.results <- TableResultError(err)
+	d.results <- query.TableResultError(err)
 }
 
-func (d *iterativeDataset) sendTable(tb *iterativeTable) {
-	d.results <- TableResultSuccess(tb)
+func (d *iterativeDataset) sendTable(tb query.IterativeTable) {
+	d.results <- query.TableResultSuccess(tb)
 }
 
-func (d *iterativeDataset) Tables() <-chan TableResult {
+func (d *iterativeDataset) Tables() <-chan query.TableResult {
 	return d.results
 }
 
 func (d *iterativeDataset) Close() error {
+	close(d.results)
+	// try to close the error channel, but don't block if it's full
+	select {
+	case <-d.errorChannel:
+	default:
+	}
+	close(d.errorChannel)
+
 	return d.reader.Close()
 }
 
-func (d *iterativeDataset) ToFullDataset() (FullDataset, error) {
+func (d *iterativeDataset) ToFullDataset() (query.FullDataset, error) {
 	tables := make([]query.FullTable, 0, len(d.results))
 
 	for tb := range d.Tables() {
@@ -111,7 +119,7 @@ func decodeTables(d *iterativeDataset) {
 
 	gotDataSetCompletion := false
 	var currentTable *iterativeTable
-	var queryProperties *iterativeTable
+	var queryProperties query.IterativeTable
 
 	defer func() {
 		_ = d.Close()
@@ -142,7 +150,7 @@ func decodeTables(d *iterativeDataset) {
 				break
 			}
 		} else if th := f.AsTableHeader(); th != nil {
-			if !handleTableHeader(d, currentTable, th) {
+			if !handleTableHeader(d, &currentTable, th) {
 				break
 			}
 		} else if tf := f.AsTableFragment(); tf != nil {
@@ -150,7 +158,7 @@ func decodeTables(d *iterativeDataset) {
 				break
 			}
 		} else if tc := f.AsTableCompletion(); tc != nil {
-			if !handleTableCompletion(d, currentTable, tc) {
+			if !handleTableCompletion(d, &currentTable, tc) {
 				break
 			}
 		} else if prog := f.AsTableProgress(); prog != nil {
@@ -159,6 +167,7 @@ func decodeTables(d *iterativeDataset) {
 		} else {
 			// Not a frame we know how to handle
 			d.reportError(errors.ES(op, errors.KInternal, "unknown frame type"))
+			break
 		}
 	}
 }
@@ -171,7 +180,7 @@ func handleDatasetCompletion(d *iterativeDataset, c DataSetCompletion) {
 	}
 }
 
-func handleDataTable(d *iterativeDataset, queryProperties **iterativeTable, dt DataTable) bool {
+func handleDataTable(d *iterativeDataset, queryProperties *query.IterativeTable, dt DataTable) bool {
 	if dt.TableKind() == PrimaryResultTableKind {
 		d.reportError(errors.ES(d.Op(), errors.KInternal, "received a DataTable frame for a primary result table"))
 		return false
@@ -180,23 +189,23 @@ func handleDataTable(d *iterativeDataset, queryProperties **iterativeTable, dt D
 	case QueryPropertiesKind:
 		// When we get this, we want to store it and not send it to the user immediately.
 		// We will wait until after the primary results (when we get the QueryCompletionInformation table) and then send it.
-		res, err := NewIterativeTableFromDataTable(d, dt)
+		res, err := newFullTable(d, dt)
 		if err != nil {
 			d.reportError(err)
 			return false
 		}
-		*queryProperties = res.(*iterativeTable)
+		*queryProperties = iterativeWrapper{res}
 	case QueryCompletionInformationKind:
-		if *queryProperties == nil {
+		if *queryProperties != nil {
 			d.sendTable(*queryProperties)
 		}
 
-		res, err := NewIterativeTableFromDataTable(d, dt)
+		res, err := newFullTable(d, dt)
 		if err != nil {
 			d.reportError(err)
 			return false
 		}
-		d.sendTable(res.(*iterativeTable))
+		d.sendTable(iterativeWrapper{res})
 
 	default:
 		d.reportError(errors.ES(d.Op(), errors.KInternal, "unknown secondary table - %s %s", dt.TableName(), dt.TableKind()))
@@ -205,25 +214,25 @@ func handleDataTable(d *iterativeDataset, queryProperties **iterativeTable, dt D
 	return true
 }
 
-func handleTableCompletion(d *iterativeDataset, table *iterativeTable, tc TableCompletion) bool {
-	if table == nil {
+func handleTableCompletion(d *iterativeDataset, tablePtr **iterativeTable, tc TableCompletion) bool {
+	if *tablePtr == nil {
 		err := errors.ES(d.Op(), errors.KInternal, "received a TableCompletion frame while no streaming table was open")
 		d.reportError(err)
 		return false
 	}
-	if int(table.Index()) != tc.TableId() {
-		err := errors.ES(d.Op(), errors.KInternal, "received a TableCompletion frame for table %d while table %d was open", tc.TableId(), int(table.Index()))
+	if int((*tablePtr).Index()) != tc.TableId() {
+		err := errors.ES(d.Op(), errors.KInternal, "received a TableCompletion frame for table %d while table %d was open", tc.TableId(), int((*tablePtr).Index()))
 		d.reportError(err)
 	}
 
-	table.close(tc.OneApiErrors())
+	(*tablePtr).close(tc.OneApiErrors())
 
-	if table.RowCount() != tc.RowCount() {
-		err := errors.ES(d.Op(), errors.KInternal, "received a TableCompletion frame for table %d with row count %d while %d rows were received", tc.TableId(), tc.RowCount(), table.RowCount())
+	if (*tablePtr).RowCount() != tc.RowCount() {
+		err := errors.ES(d.Op(), errors.KInternal, "received a TableCompletion frame for table %d with row count %d while %d rows were received", tc.TableId(), tc.RowCount(), (*tablePtr).RowCount())
 		d.reportError(err)
 	}
 
-	table = nil
+	*tablePtr = nil
 
 	return true
 }
@@ -244,8 +253,8 @@ func handleTableFragment(d *iterativeDataset, table *iterativeTable, tf TableFra
 	return true
 }
 
-func handleTableHeader(d *iterativeDataset, table *iterativeTable, th TableHeader) bool {
-	if table != nil {
+func handleTableHeader(d *iterativeDataset, table **iterativeTable, th TableHeader) bool {
+	if *table != nil {
 		err := errors.ES(d.Op(), errors.KInternal, "received a TableHeader frame while a streaming table was still open")
 		d.reportError(err)
 		return false
@@ -265,8 +274,8 @@ func handleTableHeader(d *iterativeDataset, table *iterativeTable, th TableHeade
 		return false
 	}
 
-	table = t.(*iterativeTable)
-	d.sendTable(table)
+	*table = t.(*iterativeTable)
+	d.sendTable(*table)
 
 	return true
 }

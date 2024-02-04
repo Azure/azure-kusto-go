@@ -160,7 +160,6 @@ func (d *dataset) Info() []QueryProperties {
 }
 
 type Dataset interface {
-	query.Dataset
 	query.FullDataset
 	Index() []TableIndexRow
 	Status() []QueryStatus

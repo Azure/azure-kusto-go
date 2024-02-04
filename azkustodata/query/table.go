@@ -2,7 +2,7 @@ package query
 
 import "github.com/Azure/azure-kusto-go/azkustodata/errors"
 
-type BaseTable interface {
+type Table interface {
 	Id() string
 	Index() int64
 	Name() string
@@ -11,11 +11,6 @@ type BaseTable interface {
 	ColumnByName(name string) Column
 	Op() errors.Op
 	IsPrimaryResult() bool
-}
-
-type Table interface {
-	BaseTable
-	ToFullTable() (FullTable, error)
 }
 
 type FullTable interface {
@@ -30,4 +25,5 @@ type IterativeTable interface {
 	Rows() <-chan RowResult
 	// SkipToEnd skips all remaining rows in the table.
 	SkipToEnd() []error
+	ToFullTable() (FullTable, error)
 }

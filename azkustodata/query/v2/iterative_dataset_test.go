@@ -30,7 +30,7 @@ func TestStreamingDataSet_ReadFrames_WithError(t *testing.T) {
 		reader:       io.NopCloser(reader),
 		frames:       make(chan *EveryFrame, DefaultFrameCapacity),
 		errorChannel: make(chan error, 1),
-		results:      make(chan TableResult, 1),
+		results:      make(chan query.TableResult, 1),
 	}
 
 	br, err := prepareReadBuffer(d.reader)

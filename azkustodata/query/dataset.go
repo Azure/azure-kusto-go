@@ -14,5 +14,14 @@ type Dataset interface {
 }
 
 type FullDataset interface {
+	Dataset
 	Tables() []FullTable
+}
+
+// IterativeDataset represents an iterative result from kusto - where the tables are streamed as they are received from the service.
+type IterativeDataset interface {
+	Dataset
+	Tables() <-chan TableResult
+	ToFullDataset() (FullDataset, error)
+	Close() error
 }

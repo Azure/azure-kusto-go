@@ -213,7 +213,7 @@ func ToStructs[T any](data interface{}) ([]T, error) {
 	switch v := data.(type) {
 	case FullTable:
 		rows = v.Rows()
-	case Table:
+	case IterativeTable:
 		full, err := v.ToFullTable()
 		if err != nil {
 			return nil, err

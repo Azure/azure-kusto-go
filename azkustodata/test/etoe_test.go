@@ -8,7 +8,6 @@ import (
 	"github.com/Azure/azure-kusto-go/azkustodata/kql"
 	"github.com/Azure/azure-kusto-go/azkustodata/query"
 	v1 "github.com/Azure/azure-kusto-go/azkustodata/query/v1"
-	v2 "github.com/Azure/azure-kusto-go/azkustodata/query/v2"
 	"github.com/Azure/azure-kusto-go/azkustodata/testshared"
 	"github.com/Azure/azure-kusto-go/azkustodata/utils"
 	"github.com/Azure/azure-kusto-go/azkustodata/value"
@@ -28,7 +27,7 @@ import (
 	"unicode"
 )
 
-type queryFunc func(ctx context.Context, db string, query azkustodata.Statement, options ...azkustodata.QueryOption) (v2.FullDataset, error)
+type queryFunc func(ctx context.Context, db string, query azkustodata.Statement, options ...azkustodata.QueryOption) (query.FullDataset, error)
 
 type mgmtFunc func(ctx context.Context, db string, query azkustodata.Statement, options ...azkustodata.QueryOption) (v1.Dataset, error)
 

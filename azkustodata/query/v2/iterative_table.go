@@ -13,7 +13,7 @@ import (
 // It is used by the iterative dataset.
 // The rows are received from the service via the rawRows channel, and are parsed and sent to the rows channel.
 type iterativeTable struct {
-	query.BaseTable
+	query.Table
 	lock     sync.RWMutex
 	rawRows  chan RawRows
 	rows     chan query.RowResult
@@ -51,18 +51,27 @@ func (t *iterativeTable) setSkip(skip bool) {
 	t.skip = skip
 }
 
-func newIterativeTable(dataset query.Dataset, th TableHeader, rowsSize int) (query.IterativeTable, error) {
+func newTable(dataset query.Dataset, th TableHeader) (query.Table, error) {
 	columns := make([]query.Column, len(th.Columns()))
 	err := parseColumns(th, columns, dataset.Op())
 	if err != nil {
 		return nil, err
 	}
 
+	return query.NewTable(dataset, int64(th.TableId()), strconv.Itoa(th.TableId()), th.TableName(), th.TableKind(), columns), nil
+}
+
+func newIterativeTable(dataset query.Dataset, th TableHeader, rowsSize int) (query.IterativeTable, error) {
+	baseTable, err := newTable(dataset, th)
+	if err != nil {
+		return nil, err
+	}
+
 	t := &iterativeTable{
-		BaseTable: query.NewTable(dataset, int64(th.TableId()), strconv.Itoa(th.TableId()), th.TableName(), th.TableKind(), columns),
-		rawRows:   make(chan RawRows, rowsSize),
-		rows:      make(chan query.RowResult, rowsSize),
-		end:       make(chan bool),
+		Table:   baseTable,
+		rawRows: make(chan RawRows, rowsSize),
+		rows:    make(chan query.RowResult, rowsSize),
+		end:     make(chan bool),
 	}
 
 	go t.readRows()
@@ -76,19 +85,6 @@ func NewIterativeTable(dataset query.Dataset, th TableHeader) (query.IterativeTa
 	return newIterativeTable(dataset, th, defaultRowsSize)
 }
 
-func NewIterativeTableFromDataTable(dataset query.Dataset, dt DataTable) (query.IterativeTable, error) {
-	t, err := newIterativeTable(dataset, dt.(*EveryFrame), len(dt.Rows()))
-	if err != nil {
-		return nil, err
-	}
-
-	table := t.(*iterativeTable)
-
-	table.rawRows <- dt.Rows()
-
-	return table, nil
-}
-
 func parseColumns(th TableHeader, columns []query.Column, op errors.Op) *errors.Error {
 	for i, c := range th.Columns() {
 		columns[i] = query.NewColumn(i, c.ColumnName, types.Column(c.ColumnType))
@@ -99,7 +95,7 @@ func parseColumns(th TableHeader, columns []query.Column, op errors.Op) *errors.
 	return nil
 }
 
-func parseRow(r []interface{}, t *iterativeTable) (query.Row, *errors.Error) {
+func parseRow(r []interface{}, t query.Table, index int) (query.Row, *errors.Error) {
 	values := make(value.Values, len(r))
 	columns := t.Columns()
 	for j, v := range r {
@@ -111,7 +107,7 @@ func parseRow(r []interface{}, t *iterativeTable) (query.Row, *errors.Error) {
 		}
 		values[j] = parsed
 	}
-	row := query.NewRow(t, t.RowCount(), values)
+	row := query.NewRow(t, index, values)
 	return row, nil
 }
 
@@ -158,7 +154,7 @@ func (t *iterativeTable) readRows() {
 			if t.Skip() {
 				t.rows <- query.RowResultError(errors.ES(t.Op(), errors.KInternal, skipError))
 			} else {
-				row, err := parseRow(r.Row, t)
+				row, err := parseRow(r.Row, t, t.RowCount())
 				if err != nil {
 					t.rows <- query.RowResultError(err)
 					continue
@@ -203,5 +199,5 @@ func (t *iterativeTable) ToFullTable() (query.FullTable, error) {
 		}
 	}
 
-	return query.NewFullTable(t.BaseTable, rows), nil
+	return query.NewFullTable(t.Table, rows), nil
 }

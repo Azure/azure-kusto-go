@@ -14,7 +14,7 @@ type baseTable struct {
 	columnsByName map[string]Column
 }
 
-func NewTable(ds Dataset, index int64, id string, name string, kind string, columns []Column) BaseTable {
+func NewTable(ds Dataset, index int64, id string, name string, kind string, columns []Column) Table {
 	b := &baseTable{
 		dataSet: ds,
 		index:   index,
@@ -73,14 +73,14 @@ func (t *baseTable) Op() errors.Op {
 }
 
 type fullTable struct {
-	BaseTable
+	Table
 	rows []Row
 }
 
-func NewFullTable(base BaseTable, rows []Row) FullTable {
+func NewFullTable(base Table, rows []Row) FullTable {
 	return &fullTable{
-		BaseTable: base,
-		rows:      rows,
+		Table: base,
+		rows:  rows,
 	}
 }
 

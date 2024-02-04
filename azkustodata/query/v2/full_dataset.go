@@ -28,7 +28,7 @@ func (d *fullDataset) Tables() []query.FullTable {
 	return d.tables
 }
 
-func NewFullDataset(base query.Dataset, tables []query.FullTable) FullDataset {
+func NewFullDataset(base query.Dataset, tables []query.FullTable) query.FullDataset {
 	return &fullDataset{
 		base:   base,
 		tables: tables,
