@@ -8,7 +8,6 @@ import (
 	"github.com/Azure/azure-kusto-go/azkustodata/errors"
 	"github.com/Azure/azure-kusto-go/azkustodata/kql"
 	"github.com/Azure/azure-kusto-go/azkustodata/query"
-	v2 "github.com/Azure/azure-kusto-go/azkustodata/query/v2"
 	"github.com/Azure/azure-kusto-go/azkustodata/testshared"
 	"github.com/Azure/azure-kusto-go/azkustodata/value"
 	"github.com/Azure/azure-kusto-go/azkustoingest"
@@ -1190,7 +1189,7 @@ func waitForIngest(t *testing.T, ctx context.Context, client *azkustodata.Client
 			}
 			failed = false
 
-			var dataset v2.FullDataset
+			var dataset query.FullDataset
 			var err error
 
 			if tableName != "" {

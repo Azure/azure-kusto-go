@@ -28,6 +28,10 @@ func (d *fullDataset) Tables() []query.FullTable {
 	return d.tables
 }
 
+func (d *fullDataset) PrimaryResultKind() string {
+	return d.base.PrimaryResultKind()
+}
+
 func NewFullDataset(base query.Dataset, tables []query.FullTable) query.FullDataset {
 	return &fullDataset{
 		base:   base,

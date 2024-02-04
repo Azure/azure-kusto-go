@@ -11,6 +11,8 @@ import (
 type Dataset interface {
 	Context() context.Context
 	Op() errors.Op
+
+	PrimaryResultKind() string
 }
 
 type FullDataset interface {

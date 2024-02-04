@@ -17,10 +17,12 @@ type TableIndexRow struct {
 	PrettyName string
 }
 
+const PrimaryResultKind = "QueryResult"
+
 var primaryResultIndexRow = &TableIndexRow{
 	Ordinal:    0,
 	Kind:       "QueryResult",
-	Name:       "PrimaryResult",
+	Name:       PrimaryResultKind,
 	Id:         "00000000-0000-0000-0000-000000000000",
 	PrettyName: "",
 }
@@ -62,7 +64,7 @@ func NewDatasetFromReader(ctx context.Context, op errors.Op, reader io.ReadClose
 
 func NewDataset(ctx context.Context, op errors.Op, v1 V1) (Dataset, error) {
 	d := &dataset{
-		Dataset: query.NewDataset(ctx, op),
+		Dataset: query.NewDataset(ctx, op, PrimaryResultKind),
 	}
 
 	if len(v1.Tables) == 0 {

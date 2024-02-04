@@ -58,10 +58,8 @@ func (t *baseTable) ColumnByName(name string) Column {
 	return nil
 }
 
-const primaryResultKind = "PrimaryResult"
-
 func (t *baseTable) IsPrimaryResult() bool {
-	return t.Kind() == primaryResultKind
+	return t.Kind() == t.dataSet.PrimaryResultKind()
 }
 
 func (t *baseTable) Op() errors.Op {

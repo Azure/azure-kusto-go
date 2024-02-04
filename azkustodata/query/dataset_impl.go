@@ -7,8 +7,9 @@ import (
 
 // dataset is a basic implementation of Dataset, to be used by specific implementations.
 type dataset struct {
-	ctx context.Context
-	op  errors.Op
+	ctx                context.Context
+	op                 errors.Op
+	primaryResultsKind string
 }
 
 func (d *dataset) Context() context.Context {
@@ -19,9 +20,14 @@ func (d *dataset) Op() errors.Op {
 	return d.op
 }
 
-func NewDataset(ctx context.Context, op errors.Op) Dataset {
+func (d *dataset) PrimaryResultKind() string {
+	return d.primaryResultsKind
+}
+
+func NewDataset(ctx context.Context, op errors.Op, primaryResultsKind string) Dataset {
 	return &dataset{
-		ctx: ctx,
-		op:  op,
+		ctx:                ctx,
+		op:                 op,
+		primaryResultsKind: primaryResultsKind,
 	}
 }

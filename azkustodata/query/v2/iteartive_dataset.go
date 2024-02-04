@@ -31,7 +31,7 @@ type iterativeDataset struct {
 
 func NewIterativeDataset(ctx context.Context, r io.ReadCloser, capacity int) (query.IterativeDataset, error) {
 	d := &iterativeDataset{
-		Dataset:      query.NewDataset(ctx, errors.OpQuery),
+		Dataset:      query.NewDataset(ctx, errors.OpQuery, PrimaryResultTableKind),
 		reader:       r,
 		frames:       make(chan *EveryFrame, capacity),
 		errorChannel: make(chan error, 1),

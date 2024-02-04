@@ -4,8 +4,8 @@ import (
 	"context"
 	"github.com/Azure/azure-kusto-go/azkustodata"
 	"github.com/Azure/azure-kusto-go/azkustodata/errors"
+	"github.com/Azure/azure-kusto-go/azkustodata/query"
 	"github.com/Azure/azure-kusto-go/azkustodata/query/v1"
-	"github.com/Azure/azure-kusto-go/azkustodata/query/v2"
 	"github.com/Azure/azure-kusto-go/azkustodata/types"
 	"net/http"
 )
@@ -16,11 +16,11 @@ type mockClient struct {
 	onMgmt   func(ctx context.Context, db string, query azkustodata.Statement, options ...azkustodata.QueryOption) (v1.Dataset, error)
 }
 
-func (m mockClient) Query(_ context.Context, _ string, _ azkustodata.Statement, _ ...azkustodata.QueryOption) (v2.FullDataset, error) {
+func (m mockClient) Query(_ context.Context, _ string, _ azkustodata.Statement, _ ...azkustodata.QueryOption) (query.FullDataset, error) {
 	panic("not implemented")
 }
 
-func (m mockClient) IterativeQuery(_ context.Context, _ string, _ azkustodata.Statement, _ ...azkustodata.QueryOption) (v2.IterativeDataset, error) {
+func (m mockClient) IterativeQuery(_ context.Context, _ string, _ azkustodata.Statement, _ ...azkustodata.QueryOption) (query.IterativeDataset, error) {
 	panic("not implemented")
 }
 
