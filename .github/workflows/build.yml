@@ -80,7 +80,10 @@ jobs:
     needs: build
     runs-on: ubuntu-latest
     if: always()
-
+    permissions:
+      checks: write
+      pull-requests: write
+      
     steps:
       - name: Download Artifacts
         uses: actions/download-artifact@v2
