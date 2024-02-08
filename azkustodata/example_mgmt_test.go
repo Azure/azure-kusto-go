@@ -86,14 +86,14 @@ func ExampleMgmt() {
 
 			// Get the value as a string
 			// Note that values are pointers - since they can be null
-			if s, ok := val.GetValue().(*string); ok {
+			if s, ok := val.GetValue().(*int); ok {
 				if s != nil {
 					println(*s)
 				}
 			}
 
 			// Or cast directly to the kusto type
-			if s, ok := val.GetValue().(value.String); ok {
+			if s, ok := val.(*value.Int); ok {
 				if s.Valid {
 					println(s.Value)
 				}

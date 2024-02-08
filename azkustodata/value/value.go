@@ -41,10 +41,90 @@ import (
 	"reflect"
 )
 
+type pointerValue[T any] struct {
+	value *T
+}
+
+func newPointerValue[T any](v *T) pointerValue[T] {
+	return pointerValue[T]{value: v}
+}
+
+func (p *pointerValue[T]) String() string {
+	if p.value == nil {
+		return ""
+	}
+	return fmt.Sprintf("%v", *p.value)
+}
+
+func (p *pointerValue[T]) GetValue() interface{} {
+	if p.value == nil {
+		return nil
+	}
+	return p.value
+}
+
+func (p *pointerValue[T]) Value() *T {
+	return p.value
+}
+
+func (p *pointerValue[T]) Unmarshal(i interface{}) error {
+	if i == nil {
+		p.value = nil
+		return nil
+	}
+
+	v, ok := i.(T)
+	if !ok {
+		return fmt.Errorf("column with type '%T' had value that was %T", p, i)
+	}
+
+	p.value = &v
+	return nil
+}
+
+func TryConvert[T any](holder interface{}, p *pointerValue[T], v reflect.Value, kind *reflect.Kind) bool {
+	t := v.Type()
+
+	if kind != nil && t.Kind() == *kind {
+		if p.value != nil {
+			v.Set(reflect.ValueOf(*p.value))
+		}
+		return true
+	}
+
+	if t.ConvertibleTo(reflect.TypeOf(p.value)) {
+		if p.value != nil {
+			v.Set(reflect.ValueOf(p.value))
+		}
+		return true
+	}
+
+	newT := new(T)
+	if t.ConvertibleTo(reflect.TypeOf(newT)) {
+		if p.value != nil {
+			b := newT
+			*b = *p.value
+			v.Set(reflect.ValueOf(b))
+		}
+		return true
+	}
+
+	if t.ConvertibleTo(reflect.TypeOf(holder)) {
+		v.Set(reflect.ValueOf(holder))
+		return true
+	}
+
+	if t.ConvertibleTo(reflect.TypeOf(&holder)) {
+		v.Set(reflect.ValueOf(&holder))
+		return true
+	}
+
+	return false
+}
+
 // Kusto represents a Kusto value.
 type Kusto interface {
 	fmt.Stringer
-	isKustoVal()
 	Convert(v reflect.Value) error
 	GetValue() interface{}
 	GetType() types.Column

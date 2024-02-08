@@ -6,40 +6,46 @@ import (
 	"github.com/Azure/azure-kusto-go/azkustodata/types"
 	"math"
 	"reflect"
-	"strconv"
 )
 
-// Int represents a Kusto int type. Values int type's are int32 values.  Int implements Kusto.
+// Int represents a Kusto boolean type. Bool implements Kusto.
 type Int struct {
-	// Value holds the value of the type.
-	Value int32
-	// Valid indicates if this value was set.
-	Valid bool
+	pointerValue[int32]
 }
 
-func NewInt(i int32) *Int {
-	return &Int{Value: i, Valid: true}
+func NewInt(v int32) *Int {
+	return &Int{newPointerValue[int32](&v)}
 }
 
 func NewNullInt() *Int {
-	return &Int{Valid: false}
+	return &Int{newPointerValue[int32](nil)}
 }
 
-func (*Int) isKustoVal() {}
-
-// String implements fmt.Stringer.
-func (in *Int) String() string {
-	if !in.Valid {
-		return ""
+// Convert Int into reflect value.
+func (in *Int) Convert(v reflect.Value) error {
+	kind := reflect.Int32
+	if TryConvert[int32](in, &in.pointerValue, v, &kind) {
+		return nil
 	}
-	return strconv.Itoa(int(in.Value))
+
+	if v.Type().Kind() == reflect.Int {
+		if in.value != nil {
+			v.SetInt(int64(*in.value))
+		}
+		return nil
+	}
+
+	return fmt.Errorf("column with type 'int' had value that was %T", v)
 }
 
-// Unmarshal unmarshals i into Int. i must be an int32 or nil.
+// GetType returns the type of the value.
+func (in *Int) GetType() types.Column {
+	return types.Int
+}
+
 func (in *Int) Unmarshal(i interface{}) error {
 	if i == nil {
-		in.Value = 0
-		in.Valid = false
+		in.value = nil
 		return nil
 	}
 
@@ -66,56 +72,7 @@ func (in *Int) Unmarshal(i interface{}) error {
 	if myInt > math.MaxInt32 {
 		return fmt.Errorf("Column with type 'int' had value that was greater than an int32 can hold, was %d", myInt)
 	}
-	in.Value = int32(myInt)
-	in.Valid = true
+	val := int32(myInt)
+	in.value = &val
 	return nil
-}
-
-// Convert Int into reflect value.
-func (in *Int) Convert(v reflect.Value) error {
-	t := v.Type()
-	switch {
-	case t.Kind() == reflect.Int32:
-		if in.Valid {
-			v.Set(reflect.ValueOf(in.Value))
-		}
-		return nil
-	case t.Kind() == reflect.Int:
-		if in.Valid {
-			val := int(in.Value)
-			if int32(val) != in.Value {
-				return fmt.Errorf("column with type 'int' had value that was greater than an int32 can hold, was %d", in.Value)
-			}
-
-			v.Set(reflect.ValueOf(val))
-		}
-		return nil
-	case t.ConvertibleTo(reflect.TypeOf(new(int32))):
-		if in.Valid {
-			i := &in.Value
-			v.Set(reflect.ValueOf(i))
-		}
-		return nil
-	case t.ConvertibleTo(reflect.TypeOf(Int{})):
-		v.Set(reflect.ValueOf(*in))
-		return nil
-	case t.ConvertibleTo(reflect.TypeOf(&Int{})):
-		v.Set(reflect.ValueOf(in))
-		return nil
-	}
-	return fmt.Errorf("Column was type Kusto.Int, receiver had base Kind %s ", t.Kind())
-
-}
-
-// GetValue returns the value of the type.
-func (in *Int) GetValue() interface{} {
-	if !in.Valid {
-		return nil
-	}
-	return in.Value
-}
-
-// GetType returns the type of the value.
-func (in *Int) GetType() types.Column {
-	return types.Int
 }
