@@ -10,37 +10,6 @@ import (
 
 // this file contains the decoding of v2 frames, including parsing the format and converting the frames.
 
-// UnmarshalJSON decodes a RawRow from JSON, it needs special handling because the row can be either a row (list of values) or an error (objecT).
-func (r *RawRow) UnmarshalJSON(data []byte) error {
-	var row []interface{}
-	var errs struct {
-		OneApiErrors []OneApiError `json:"OneApiErrors"`
-	}
-
-	var err error
-
-	reader := bytes.NewReader(data)
-	dec := json.NewDecoder(reader)
-	dec.UseNumber()
-
-	if err = dec.Decode(&row); err != nil {
-		_, err := reader.Seek(0, io.SeekStart)
-		if err != nil {
-			return err
-		}
-
-		if err = dec.Decode(&errs); err != nil {
-			return err
-		}
-		r.Errors = errs.OneApiErrors
-		r.Row = nil
-		return nil
-	}
-	r.Row = row
-	r.Errors = nil
-	return nil
-}
-
 // prepareReadBuffer checks for errors and returns a decoder
 func prepareReadBuffer(r io.Reader) (io.Reader, error) {
 	br := bufio.NewReader(r)
@@ -67,6 +36,8 @@ func readFramesIterative(reader io.Reader, ch chan<- *EveryFrame) error {
 	// So we have to manually split the reader into lines and decode each line with a new decoder
 
 	scanner := bufio.NewScanner(reader)
+	buf := make([]byte, 0, 1024*1024)
+	scanner.Buffer(buf, 64*1024*1024)
 	for scanner.Scan() {
 		line := scanner.Bytes()
 

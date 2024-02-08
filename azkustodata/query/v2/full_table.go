@@ -15,20 +15,8 @@ func newFullTable(dataset query.Dataset, dt DataTable) (query.FullTable, error) 
 
 	rows := make([]query.Row, 0, len(dt.Rows()))
 
-	errs := make([]error, 0)
-
 	for i, raw := range dt.Rows() {
-		if raw.Errors != nil {
-			for _, e := range raw.Errors {
-				errs = append(errs, &e)
-			}
-			return nil, errors.TryCombinedError(errs...)
-		}
-		if raw.Row == nil {
-			break
-		}
-
-		r, err := parseRow(raw.Row, f, i)
+		r, err := parseRow(raw, f, i)
 		if err != nil {
 			return nil, err
 		}

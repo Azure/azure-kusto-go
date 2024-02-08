@@ -122,17 +122,10 @@ const skipError = "skipping row"
 func (t *iterativeTable) readRows() {
 	for rows := range t.rawRows {
 		for _, r := range rows {
-			if r.Errors != nil {
-				for _, e := range r.Errors {
-					t.rows <- query.RowResultError(&e)
-				}
-				continue
-			}
-
 			if t.Skip() {
 				t.rows <- query.RowResultError(errors.ES(t.Op(), errors.KInternal, skipError))
 			} else {
-				row, err := parseRow(r.Row, t, t.RowCount())
+				row, err := parseRow(r, t, t.RowCount())
 				if err != nil {
 					t.rows <- query.RowResultError(err)
 					continue

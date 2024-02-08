@@ -2,13 +2,10 @@ package v2
 
 // This file contains the raw JSON frames that are received from the Kusto service.
 
-type RawRow struct {
-	Row    []interface{}
-	Errors []OneApiError
-}
+type RawRow []interface{}
 
 func NewRawRow(items ...interface{}) RawRow {
-	return RawRow{Row: items}
+	return RawRow{items}
 }
 
 type FrameColumn struct {

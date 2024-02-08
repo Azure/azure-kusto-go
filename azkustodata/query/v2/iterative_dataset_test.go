@@ -199,7 +199,7 @@ func TestStreamingDataSet_DecodeTables_GetRows(t *testing.T) {
 				rows := expectedTable.rows
 				expectedRow := rows[i]
 				for j, val := range rowResult.Row().Values() {
-					assert.Equal(t, expectedRow.Values()[j].GetValue(), val.GetValue())
+					assert.Equal(t, expectedRow.Values()[j], val)
 				}
 				i++
 			}
