@@ -1,7 +1,6 @@
 package value
 
 import (
-	"fmt"
 	"github.com/Azure/azure-kusto-go/azkustodata/types"
 	"reflect"
 
@@ -10,80 +9,37 @@ import (
 
 // GUID represents a Kusto GUID type.  GUID implements Kusto.
 type GUID struct {
-	// Value holds the value of the type.
-	Value uuid.NullUUID
+	pointerValue[uuid.UUID]
 }
 
-func NewGUID(v uuid.UUID) *GUID {
-	return &GUID{Value: uuid.NullUUID{UUID: v, Valid: true}}
-}
+// NewGUID creates a new GUID.
+func NewGUID(v uuid.UUID) *GUID { return &GUID{newPointerValue[uuid.UUID](&v)} }
 
-func NewNullGUID() *GUID {
-	return &GUID{Value: uuid.NullUUID{Valid: false}}
-}
-
-func (*GUID) isKustoVal() {}
-
-// String implements fmt.Stringer.
-func (g *GUID) String() string {
-	if !g.Value.Valid {
-		return ""
-	}
-	return g.Value.UUID.String()
-}
+// NewNullGUID creates a new null GUID.
+func NewNullGUID() *GUID { return &GUID{newPointerValue[uuid.UUID](nil)} }
 
 // Unmarshal unmarshals i into GUID. i must be a string representing a GUID or nil.
 func (g *GUID) Unmarshal(i interface{}) error {
 	if i == nil {
-		g.Value = uuid.NullUUID{}
+		g.value = nil
 		return nil
 	}
 	str, ok := i.(string)
 	if !ok {
-		return fmt.Errorf("Column with type 'guid' was not stored as a string, was %T", i)
+		return convertError(g, i)
 	}
 	u, err := uuid.Parse(str)
 	if err != nil {
-		return fmt.Errorf("Column with type 'guid' did not store a valid uuid(%s): %s", str, err)
+		return parseError(g, i, err)
 	}
-	g.Value = uuid.NullUUID{
-		UUID:  u,
-		Valid: true,
-	}
+
+	g.value = &u
 	return nil
 }
 
 // Convert GUID into reflect value.
 func (g *GUID) Convert(v reflect.Value) error {
-	t := v.Type()
-	switch {
-	case t.AssignableTo(reflect.TypeOf(uuid.UUID{})):
-		if g.Value.Valid {
-			v.Set(reflect.ValueOf(g.Value.UUID))
-		}
-		return nil
-	case t.ConvertibleTo(reflect.TypeOf(new(uuid.UUID))):
-		if g.Value.Valid {
-			t := &g.Value.UUID
-			v.Set(reflect.ValueOf(t))
-		}
-		return nil
-	case t.ConvertibleTo(reflect.TypeOf(GUID{})):
-		v.Set(reflect.ValueOf(*g))
-		return nil
-	case t.ConvertibleTo(reflect.TypeOf(&GUID{})):
-		v.Set(reflect.ValueOf(g))
-		return nil
-	}
-	return fmt.Errorf("Column was type Kusto.GUID, receiver had base Kind %s ", t.Kind())
-}
-
-// GetValue returns the value of the type.
-func (g *GUID) GetValue() interface{} {
-	if !g.Value.Valid {
-		return nil
-	}
-	return g.Value.UUID
+	return Convert[uuid.UUID](*g, &g.pointerValue, v)
 }
 
 // GetType returns the type of the value.

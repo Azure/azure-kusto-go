@@ -40,6 +40,7 @@ const (
 	OpFileIngest    Op = 5 // OpFileIngest indicates the client is making a file ingestion call.
 	OpCloudInfo     Op = 6 // OpCloudInfo indicates an error fetching data from the cloud metadata.
 	OpTokenProvider Op = 7 // OpTokenProvider indicates an error creating a token provider.
+	OpTableAccess   Op = 8 // OpTableAccess indicates an error accessing a table.
 )
 
 // Kind field classifies the error as one of a set of standard conditions.
@@ -58,6 +59,8 @@ const (
 	KBlobstore       Kind = 8  // The Blobstore API returned some type of error.
 	KLocalFileSystem Kind = 9  // The local fileystem had an error. This could be permission, missing file, etc....,
 	KWrongTableKind  Kind = 10 // The kind of the table requested did not match the kind of the table.
+	KWrongColumnType Kind = 11 // The type of the column requested did not match the type of the column.
+	KFailedToParse   Kind = 12 // The client failed to parse the value.
 )
 
 // Error is a core error for the Kusto package.
@@ -224,7 +227,12 @@ func ES(o Op, k Kind, s string, args ...interface{}) *Error {
 
 // HTTP constructs an *Error from an *http.Response and a prefix to the error message.
 func HTTP(o Op, status string, statusCode int, body io.ReadCloser, prefix string) *HttpError {
-	defer body.Close()
+	defer func(body io.ReadCloser) {
+		err := body.Close()
+		if err != nil {
+			// TODO: Handle this when we have a logger.
+		}
+	}(body)
 	bodyBytes, err := io.ReadAll(body)
 	if err != nil {
 		bodyBytes = []byte(fmt.Sprintf("Failed to read body: %v", err))

@@ -37,6 +37,7 @@ package value
 
 import (
 	"fmt"
+	"github.com/Azure/azure-kusto-go/azkustodata/errors"
 	"github.com/Azure/azure-kusto-go/azkustodata/types"
 	"reflect"
 )
@@ -63,8 +64,19 @@ func (p *pointerValue[T]) GetValue() interface{} {
 	return p.value
 }
 
-func (p *pointerValue[T]) Value() *T {
+func (p *pointerValue[T]) Ptr() *T {
 	return p.value
+}
+
+func convertError(expected interface{}, actual interface{}) error {
+	if ref, ok := actual.(reflect.Value); ok {
+		return errors.ES(errors.OpTableAccess, errors.KWrongColumnType, "column with type '%T' had value that was %v", expected, ref.Type())
+	}
+	return errors.ES(errors.OpTableAccess, errors.KWrongColumnType, "column with type '%T' had value that was %T", expected, actual)
+}
+
+func parseError(expected interface{}, actual interface{}, err error) error {
+	return errors.ES(errors.OpTableAccess, errors.KFailedToParse, "column with type '%T' had value %s which did not parse: %s", expected, actual, err)
 }
 
 func (p *pointerValue[T]) Unmarshal(i interface{}) error {
@@ -75,51 +87,50 @@ func (p *pointerValue[T]) Unmarshal(i interface{}) error {
 
 	v, ok := i.(T)
 	if !ok {
-		return fmt.Errorf("column with type '%T' had value that was %T", p, i)
+		return convertError(p, i)
 	}
 
 	p.value = &v
 	return nil
 }
 
-func TryConvert[T any](holder interface{}, p *pointerValue[T], v reflect.Value, kind *reflect.Kind) bool {
+func TryConvert[T any](holder interface{}, p *pointerValue[T], v reflect.Value) bool {
 	t := v.Type()
 
-	if kind != nil && t.Kind() == *kind {
-		if p.value != nil {
-			v.Set(reflect.ValueOf(*p.value))
-		}
+	if holder == nil || p.value == nil {
+		v.Set(reflect.Zero(t))
 		return true
 	}
 
-	if t.ConvertibleTo(reflect.TypeOf(p.value)) {
-		if p.value != nil {
-			v.Set(reflect.ValueOf(p.value))
-		}
+	if reflect.TypeOf(*p.value).ConvertibleTo(t) {
+		v.Set(reflect.ValueOf(*p.value).Convert(t))
 		return true
 	}
 
-	newT := new(T)
-	if t.ConvertibleTo(reflect.TypeOf(newT)) {
-		if p.value != nil {
-			b := newT
-			*b = *p.value
-			v.Set(reflect.ValueOf(b))
-		}
+	if reflect.TypeOf(p.value).ConvertibleTo(t) {
+		v.Set(reflect.ValueOf(p.value).Convert(t))
 		return true
 	}
 
-	if t.ConvertibleTo(reflect.TypeOf(holder)) {
-		v.Set(reflect.ValueOf(holder))
+	if reflect.TypeOf(holder).ConvertibleTo(t) {
+		v.Set(reflect.ValueOf(holder).Convert(t))
 		return true
 	}
 
-	if t.ConvertibleTo(reflect.TypeOf(&holder)) {
-		v.Set(reflect.ValueOf(&holder))
+	if reflect.TypeOf(&holder).ConvertibleTo(t) {
+		v.Set(reflect.ValueOf(&holder).Convert(t))
 		return true
 	}
 
 	return false
+}
+
+func Convert[T any](holder interface{}, p *pointerValue[T], v reflect.Value) error {
+	if !TryConvert[T](holder, p, v) {
+		return convertError(holder, v)
+	}
+
+	return nil
 }
 
 // Kusto represents a Kusto value.
@@ -144,7 +155,7 @@ func Default(t types.Column) Kusto {
 	case types.Decimal:
 		return NewNullDecimal()
 	case types.String:
-		return NewNullString()
+		return NewString("")
 	case types.Dynamic:
 		return NewNullDynamic()
 	case types.DateTime:

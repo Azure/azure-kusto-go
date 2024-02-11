@@ -1,7 +1,6 @@
 package value
 
 import (
-	"fmt"
 	"github.com/Azure/azure-kusto-go/azkustodata/types"
 	"reflect"
 )
@@ -21,12 +20,7 @@ func NewNullBool() *Bool {
 
 // Convert Bool into reflect value.
 func (bo *Bool) Convert(v reflect.Value) error {
-	kind := reflect.Bool
-	if !TryConvert[bool](bo, &bo.pointerValue, v, &kind) {
-		return fmt.Errorf("column with type 'bool' had value that was %T", v)
-	}
-
-	return nil
+	return Convert[bool](*bo, &bo.pointerValue, v)
 }
 
 // GetType returns the type of the value.

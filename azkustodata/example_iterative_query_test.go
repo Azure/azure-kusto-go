@@ -157,8 +157,9 @@ func ExampleIterativeQuery() {
 
 			// Or cast directly to the kusto type
 			if s, ok := val.(*value.Int); ok {
-				if s.Valid {
-					println(s.Value)
+				i := s.Ptr()
+				if i != nil {
+					println(*i)
 				}
 			}
 

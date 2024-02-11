@@ -5,7 +5,7 @@ package v2
 type RawRow []interface{}
 
 func NewRawRow(items ...interface{}) RawRow {
-	return RawRow{items}
+	return items
 }
 
 type FrameColumn struct {

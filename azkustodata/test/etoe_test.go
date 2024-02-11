@@ -297,10 +297,10 @@ func TestQueries(t *testing.T) {
 			},
 			want: &[]DynamicTypeVariations{
 				{
-					PlainValue: value.Dynamic{Value: []byte("1"), Valid: true},
-					PlainArray: value.Dynamic{Value: []byte("[1,2,3]"), Valid: true},
-					PlainJson:  value.Dynamic{Value: []byte(`{ "a": 1}`), Valid: true},
-					JsonArray:  value.Dynamic{Value: []byte(`[{ "a": 1}, { "a": 2}]`), Valid: true},
+					PlainValue: *value.NewDynamic([]byte("1")),
+					PlainArray: *value.NewDynamic([]byte("[1,2,3]")),
+					PlainJson:  *value.NewDynamic([]byte(`{ "a": 1}`)),
+					JsonArray:  *value.NewDynamic([]byte(`[{ "a": 1}, { "a": 2}]`)),
 				},
 			},
 		},
@@ -770,12 +770,10 @@ func getExpectedResult() AllDataType {
 	}
 
 	return AllDataType{
-		Vnum: 1,
-		Vdec: value.Decimal{
-			Value: decimal.NewNullDecimal(decimal.RequireFromString("2.00000000000001")),
-		},
+		Vnum:  1,
+		Vdec:  *value.NewDecimal(decimal.RequireFromString("2.00000000000001")),
 		Vdate: t,
-		Vspan: value.Timespan{Value: d, Valid: true},
+		Vspan: *value.NewTimespan(d),
 		Vobj: map[string]interface{}{
 			"moshe": "value",
 		},
@@ -783,9 +781,7 @@ func getExpectedResult() AllDataType {
 		Vreal: 0.01,
 		Vstr:  "asdf",
 		Vlong: 9223372036854775807,
-		Vguid: value.GUID{
-			Value: uuid.NullUUID{UUID: g, Valid: true},
-		},
+		Vguid: *value.NewGUID(g),
 	}
 }
 

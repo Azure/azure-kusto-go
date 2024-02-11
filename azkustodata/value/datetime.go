@@ -48,12 +48,12 @@ func (d *DateTime) Unmarshal(i interface{}) error {
 
 	str, ok := i.(string)
 	if !ok {
-		return fmt.Errorf("Column with type 'datetime' had value that was %T", i)
+		return convertError(d, i)
 	}
 
 	t, err := time.Parse(time.RFC3339Nano, str)
 	if err != nil {
-		return fmt.Errorf("Column with type 'datetime' had value %s which did not parse: %s", str, err)
+		return parseError(d, i, err)
 	}
 	d.value = &t
 	return nil
@@ -61,12 +61,7 @@ func (d *DateTime) Unmarshal(i interface{}) error {
 
 // Convert DateTime into reflect value.
 func (d *DateTime) Convert(v reflect.Value) error {
-	kind := reflect.String
-	if !TryConvert[time.Time](d, &d.pointerValue, v, &kind) {
-		return fmt.Errorf("column with type 'datetime' had value that was %T", v)
-	}
-
-	return nil
+	return Convert[time.Time](*d, &d.pointerValue, v)
 }
 
 // GetType returns the type of the value.

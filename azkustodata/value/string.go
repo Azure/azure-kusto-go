@@ -10,25 +10,14 @@ import (
 type String struct {
 	// Value holds the value of the type.
 	Value string
-	// Valid indicates if this value was set.
-	Valid bool
 }
 
 func NewString(v string) *String {
-	return &String{Value: v, Valid: true}
+	return &String{Value: v}
 }
-
-func NewNullString() *String {
-	return &String{Valid: false}
-}
-
-func (*String) isKustoVal() {}
 
 // String implements fmt.Stringer.
 func (s *String) String() string {
-	if !s.Valid {
-		return ""
-	}
 	return s.Value
 }
 
@@ -36,17 +25,15 @@ func (s *String) String() string {
 func (s *String) Unmarshal(i interface{}) error {
 	if i == nil {
 		s.Value = ""
-		s.Valid = false
 		return nil
 	}
 
 	v, ok := i.(string)
 	if !ok {
-		return fmt.Errorf("Column with type 'string' had type %T", i)
+		return convertError(s, i)
 	}
 
 	s.Value = v
-	s.Valid = true
 	return nil
 }
 
@@ -55,15 +42,11 @@ func (s *String) Convert(v reflect.Value) error {
 	t := v.Type()
 	switch {
 	case t.Kind() == reflect.String:
-		if s.Valid {
-			v.Set(reflect.ValueOf(s.Value))
-		}
+		v.Set(reflect.ValueOf(s.Value))
 		return nil
 	case t.ConvertibleTo(reflect.TypeOf(new(string))):
-		if s.Valid {
-			i := &s.Value
-			v.Set(reflect.ValueOf(i))
-		}
+		i := &s.Value
+		v.Set(reflect.ValueOf(i))
 		return nil
 	case t.ConvertibleTo(reflect.TypeOf(String{})):
 		v.Set(reflect.ValueOf(*s))
@@ -77,9 +60,6 @@ func (s *String) Convert(v reflect.Value) error {
 
 // GetValue returns the value of the type.
 func (s *String) GetValue() interface{} {
-	if !s.Valid {
-		return nil
-	}
 	return s.Value
 }
 

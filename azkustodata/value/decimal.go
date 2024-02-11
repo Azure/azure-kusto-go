@@ -38,7 +38,7 @@ func (*Decimal) isKustoVal() {}
 // ParseFloat provides builtin support for Go's *big.Float conversion where that type meets your needs.
 func (d *Decimal) ParseFloat(base int, prec uint, mode big.RoundingMode) (f *big.Float, b int, err error) {
 	if d.value == nil {
-		return nil, 0, fmt.Errorf("Decimal was not valid")
+		return nil, 0, parseError(d, nil, fmt.Errorf("nil value"))
 	}
 	return big.ParseFloat(d.value.String(), base, prec, mode)
 }
@@ -52,12 +52,12 @@ func (d *Decimal) Unmarshal(i interface{}) error {
 
 	v, ok := i.(string)
 	if !ok {
-		return fmt.Errorf("column with type 'decimal' had type %T", i)
+		return convertError(d, i)
 	}
 
 	dec, err := decimal.NewFromString(v)
 	if err != nil {
-		return fmt.Errorf("Column with type 'decimal' had value %s which did not parse: %s", v, err)
+		return parseError(d, i, err)
 	}
 
 	d.value = &dec
@@ -67,19 +67,18 @@ func (d *Decimal) Unmarshal(i interface{}) error {
 
 // Convert Decimal into reflect value.
 func (d *Decimal) Convert(v reflect.Value) error {
-	if !TryConvert[decimal.Decimal](d, &d.pointerValue, v, nil) {
-		return fmt.Errorf("column with type 'decimal' had value that was %T", v)
-	}
-
-	return nil
-}
-
-// GetValue returns the value of the type.
-func (d *Decimal) GetValue() interface{} {
-	if d.value == nil {
+	if TryConvert[decimal.Decimal](*d, &d.pointerValue, v) {
 		return nil
 	}
-	return d.value
+
+	if v.Type().Kind() == reflect.String {
+		if d.value != nil {
+			v.SetString(d.value.String())
+		}
+		return nil
+	}
+
+	return convertError(d, v)
 }
 
 // GetType returns the type of the value.

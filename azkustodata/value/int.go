@@ -23,8 +23,7 @@ func NewNullInt() *Int {
 
 // Convert Int into reflect value.
 func (in *Int) Convert(v reflect.Value) error {
-	kind := reflect.Int32
-	if TryConvert[int32](in, &in.pointerValue, v, &kind) {
+	if TryConvert[int32](*in, &in.pointerValue, v) {
 		return nil
 	}
 
@@ -35,7 +34,7 @@ func (in *Int) Convert(v reflect.Value) error {
 		return nil
 	}
 
-	return fmt.Errorf("column with type 'int' had value that was %T", v)
+	return convertError(in, v)
 }
 
 // GetType returns the type of the value.
@@ -56,21 +55,21 @@ func (in *Int) Unmarshal(i interface{}) error {
 		var err error
 		myInt, err = v.Int64()
 		if err != nil {
-			return fmt.Errorf("Column with type 'int' had value json.Number that had error on .Int64(): %s", err)
+			return parseError(in, i, err)
 		}
 	case float64:
 		if v != math.Trunc(v) {
-			return fmt.Errorf("Column with type 'int' had value float64(%v) that did not represent a whole number", v)
+			return parseError(in, i, fmt.Errorf("float64 value was not an integer"))
 		}
 		myInt = int64(v)
 	case int:
 		myInt = int64(v)
 	default:
-		return fmt.Errorf("Column with type 'int' had value that was not a json.Number or int, was %T", i)
+		return convertError(in, i)
 	}
 
 	if myInt > math.MaxInt32 {
-		return fmt.Errorf("Column with type 'int' had value that was greater than an int32 can hold, was %d", myInt)
+		return parseError(in, i, fmt.Errorf("value was too large for int32"))
 	}
 	val := int32(myInt)
 	in.value = &val

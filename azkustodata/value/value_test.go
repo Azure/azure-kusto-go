@@ -402,9 +402,9 @@ func TestString(t *testing.T) {
 			err:  true,
 		},
 		{
-			desc: "value is nil",
-			i:    nil,
-			want: *NewNullString(),
+			desc: "value is empty",
+			i:    "",
+			want: *NewString(""),
 		},
 		{
 			desc: "value is string",
@@ -461,7 +461,7 @@ func TestTimespan(t *testing.T) {
 			i:    "00:00",
 			err:  true,
 		},
-		{i: "00:00:00", want: Timespan{Valid: true}},
+		{i: "00:00:00", want: *NewTimespan(time.Duration(0))},
 		{i: "00:00:03", want: *NewTimespan(3 * time.Second)},
 		{i: "00:04:03", want: *NewTimespan(4*time.Minute + 3*time.Second)},
 		{i: "02:04:03", want: *NewTimespan(2*time.Hour + 4*time.Minute + 3*time.Second)},
@@ -471,7 +471,7 @@ func TestTimespan(t *testing.T) {
 		{i: "02.04:05:07", want: *NewTimespan(2*24*time.Hour + 4*time.Hour + 5*time.Minute + 7*time.Second)},
 		{i: "-01.00:00:00", want: *NewTimespan(-24 * time.Hour)},
 		{i: "-02.04:05:07", want: *NewTimespan(time.Duration(-1) * (2*24*time.Hour + 4*time.Hour + 5*time.Minute + 7*time.Second))},
-		{i: "00.00:00.00:00.000", want: Timespan{Valid: true}},
+		{i: "00.00:00.00:00.000", want: *NewTimespan(time.Duration(0))},
 		{i: "02.04:05:07.789", want: *NewTimespan(2*24*time.Hour + 4*time.Hour + 5*time.Minute + 7*time.Second + 789*time.Millisecond)},
 		{i: "03.00:00:00.111", want: *NewTimespan(3*24*time.Hour + 111*time.Millisecond)},
 		{i: "03.00:00:00.111", want: *NewTimespan(3*24*time.Hour + 111*time.Millisecond)},
@@ -496,7 +496,7 @@ func TestTimespan(t *testing.T) {
 
 			strGot := got.Marshal()
 
-			if test.i == nil || !got.Valid {
+			if test.i == nil || got.value == nil {
 				assert.Equal(t, "00:00:00", strGot)
 				return
 			}
