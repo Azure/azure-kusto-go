@@ -57,9 +57,9 @@ func TestReadFramesWithValidInput(t *testing.T) {
 	}, dataSetHeader)
 
 	dataTable := <-ch
-	assert.Equal(t, dataTable.TableId(), 0)
-	assert.Equal(t, dataTable.TableKind(), "QueryProperties")
-	assert.Equal(t, dataTable.TableName(), "@ExtendedProperties")
+	assert.Equal(t, 0, dataTable.TableId())
+	assert.Equal(t, "QueryProperties", dataTable.TableKind())
+	assert.Equal(t, "@ExtendedProperties", dataTable.TableName())
 	assert.Equal(t, dataTable.Columns(), []FrameColumn{
 		{"TableId", "int"},
 		{"Key", "string"},
@@ -72,9 +72,9 @@ func TestReadFramesWithValidInput(t *testing.T) {
 	})
 
 	tableHeader := <-ch
-	assert.Equal(t, tableHeader.TableId(), 1)
-	assert.Equal(t, tableHeader.TableKind(), "PrimaryResult")
-	assert.Equal(t, tableHeader.TableName(), "AllDataTypes")
+	assert.Equal(t, 1, tableHeader.TableId())
+	assert.Equal(t, "PrimaryResult", tableHeader.TableKind())
+	assert.Equal(t, "AllDataTypes", tableHeader.TableName())
 	assert.Equal(t, tableHeader.Columns(), []FrameColumn{
 		{"vnum", "int"},
 		{"vdec", "decimal"},
@@ -89,9 +89,9 @@ func TestReadFramesWithValidInput(t *testing.T) {
 	})
 
 	tableFragment := <-ch
-	assert.Equal(t, tableFragment.TableFragmentType(), "DataAppend")
-	assert.Equal(t, tableFragment.TableId(), 1)
-	assert.Equal(t, tableFragment.Rows(), RawRows{
+	assert.Equal(t, "DataAppend", tableFragment.TableFragmentType())
+	assert.Equal(t, 1, tableFragment.TableId())
+	assert.Equal(t, RawRows{
 		NewRawRow(json.Number("1"),
 			"2.00000000000001",
 			"2020-03-04T14:05:01.3109965Z",
@@ -102,21 +102,21 @@ func TestReadFramesWithValidInput(t *testing.T) {
 			"asdf",
 			json.Number("9223372036854775807"),
 			"123e27de-1e4e-49d9-b579-fe0b331d3642"),
-	})
+	}, tableFragment.Rows())
 
 	tableCompletion := <-ch
-	assert.Equal(t, tableCompletion.TableId(), 1)
-	assert.Equal(t, tableCompletion.RowCount(), 1)
-	assert.Equal(t, tableCompletion.OneApiErrors(), []OneApiError(nil))
+	assert.Equal(t, 1, tableCompletion.TableId())
+	assert.Equal(t, 1, tableCompletion.RowCount())
+	assert.Equal(t, []OneApiError(nil), tableCompletion.OneApiErrors())
 
 	dataTable = <-ch
-	assert.Equal(t, dataTable.TableId(), 2)
-	assert.Equal(t, dataTable.TableKind(), "QueryCompletionInformation")
-	assert.Equal(t, dataTable.TableName(), "QueryCompletionInformation")
+	assert.Equal(t, 2, dataTable.TableId())
+	assert.Equal(t, "QueryCompletionInformation", dataTable.TableKind())
+	assert.Equal(t, "QueryCompletionInformation", dataTable.TableName())
 
 	dataSetCompletion := <-ch
-	assert.Equal(t, dataSetCompletion.HasErrors(), false)
-	assert.Equal(t, dataSetCompletion.Cancelled(), false)
+	assert.Equal(t, false, dataSetCompletion.HasErrors())
+	assert.Equal(t, false, dataSetCompletion.Cancelled())
 	assert.Equal(t, dataSetCompletion.OneApiErrors(), []OneApiError(nil))
 
 	assert.Nil(t, <-ch)
@@ -139,45 +139,45 @@ func TestReadFramesWithErrors(t *testing.T) {
 	}()
 
 	dataSetHeader := <-ch
-	assert.Equal(t, false, dataSetHeader.IsProgressiveJson)
-	assert.Equal(t, "v2.0", dataSetHeader.VersionJson)
-	assert.Equal(t, true, dataSetHeader.IsFragmentedJson)
-	assert.Equal(t, "EndOfTable", dataSetHeader.ErrorReportingPlacementJson)
+	assert.Equal(t, dataSetHeader.IsProgressiveJson, false)
+	assert.Equal(t, dataSetHeader.VersionJson, "v2.0")
+	assert.Equal(t, dataSetHeader.IsFragmentedJson, true)
+	assert.Equal(t, dataSetHeader.ErrorReportingPlacementJson, "EndOfTable")
 
 	dataTable := <-ch
-	assert.Equal(t, dataTable.TableId(), 0)
-	assert.Equal(t, dataTable.TableKind(), "QueryProperties")
-	assert.Equal(t, dataTable.TableName(), "@ExtendedProperties")
-	assert.Equal(t, dataTable.Columns(), []FrameColumn{
+	assert.Equal(t, 0, dataTable.TableId())
+	assert.Equal(t, "QueryProperties", dataTable.TableKind())
+	assert.Equal(t, "@ExtendedProperties", dataTable.TableName())
+	assert.Equal(t, []FrameColumn{
 		{"TableId", "int"},
 		{"Key", "string"},
 		{"Value", "dynamic"},
-	})
-	assert.Equal(t, dataTable.Rows(), RawRows{
+	}, dataTable.Columns())
+	assert.Equal(t, RawRows{
 		NewRawRow(json.Number("1"),
 			"Visualization",
 			`{"Visualization":null,"Title":null,"XColumn":null,"Series":null,"YColumns":null,"AnomalyColumns":null,"XTitle":null,"YTitle":null,"XAxis":null,"YAxis":null,"Legend":null,"YSplit":null,"Accumulate":false,"IsQuerySorted":false,"Kind":null,"Ymin":"NaN","Ymax":"NaN","Xmin":null,"Xmax":null}`),
-	})
+	}, dataTable.Rows())
 
 	tableHeader := <-ch
-	assert.Equal(t, tableHeader.TableId(), 1)
-	assert.Equal(t, tableHeader.TableKind(), "PrimaryResult")
-	assert.Equal(t, tableHeader.TableName(), "PrimaryResult")
-	assert.Equal(t, tableHeader.Columns(), []FrameColumn{
+	assert.Equal(t, 1, tableHeader.TableId())
+	assert.Equal(t, "PrimaryResult", tableHeader.TableKind())
+	assert.Equal(t, "PrimaryResult", tableHeader.TableName())
+	assert.Equal(t, []FrameColumn{
 		{"A", "int"},
-	})
+	}, tableHeader.Columns())
 
 	tableFragment := <-ch
-	assert.Equal(t, tableFragment.TableFragmentType(), "DataAppend")
-	assert.Equal(t, tableFragment.TableId(), 1)
-	assert.Equal(t, tableFragment.Rows(), RawRows{
+	assert.Equal(t, "DataAppend", tableFragment.TableFragmentType())
+	assert.Equal(t, 1, tableFragment.TableId())
+	assert.Equal(t, RawRows{
 		NewRawRow(json.Number("1")),
-	})
+	}, tableFragment.Rows())
 
 	tableCompletion := <-ch
-	assert.Equal(t, tableCompletion.TableId(), 1)
-	assert.Equal(t, tableCompletion.RowCount(), 1)
-	assert.Equal(t, tableCompletion.OneApiErrors(), []OneApiError{
+	assert.Equal(t, 1, tableCompletion.TableId())
+	assert.Equal(t, 1, tableCompletion.RowCount())
+	assert.Equal(t, []OneApiError{
 		{
 			ErrorMessage: ErrorMessage{
 				Code:        "LimitsExceeded",
@@ -201,12 +201,12 @@ func TestReadFramesWithErrors(t *testing.T) {
 				IsPermanent: false,
 			},
 		},
-	})
+	}, tableCompletion.OneApiErrors())
 
 	dataSetCompletion := <-ch
-	assert.Equal(t, dataSetCompletion.HasErrors(), true)
-	assert.Equal(t, dataSetCompletion.Cancelled(), false)
-	assert.Equal(t, dataSetCompletion.OneApiErrors(), []OneApiError{
+	assert.Equal(t, true, dataSetCompletion.HasErrors())
+	assert.Equal(t, false, dataSetCompletion.Cancelled())
+	assert.Equal(t, []OneApiError{
 		{
 			ErrorMessage: ErrorMessage{
 				Code:        "LimitsExceeded",
@@ -230,7 +230,7 @@ func TestReadFramesWithErrors(t *testing.T) {
 				IsPermanent: false,
 			},
 		},
-	})
+	}, dataSetCompletion.OneApiErrors())
 
 	assert.Nil(t, <-ch)
 
@@ -275,7 +275,7 @@ func TestReadFramesWithInvalidFrameType(t *testing.T) {
 
 	invalid := <-ch
 	// Checking for invalid types moved to the frame iterator, so this should be valid
-	assert.Equal(t, FrameType("InvalidFrameType"), invalid.FrameTypeJson)
+	assert.Equal(t, invalid.FrameTypeJson, FrameType("InvalidFrameType"))
 }
 
 func TestReadFramesWithInvalidFrame(t *testing.T) {
