@@ -8,7 +8,7 @@ import (
 )
 
 // DefaultFrameCapacity is the default capacity of the channel that receives frames from the Kusto service. Lower capacity means less memory usage, but might cause the channel to block if the frames are not consumed fast enough.
-const DefaultFrameCapacity = 5
+const DefaultFrameCapacity = 100
 
 const version = "v2.0"
 const PrimaryResultTableKind = "PrimaryResult"

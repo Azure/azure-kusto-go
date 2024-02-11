@@ -100,28 +100,26 @@ func (c *Client) Endpoint() string {
 type callType int8
 
 const (
-	unknownCallType = 0
-	queryCall       = 1
-	mgmtCall        = 2
+	queryCall = 1
+	mgmtCall  = 2
 )
 
-func (c *Client) executeV1(
-	op errors.Op, call int,
-	ctx context.Context, db string, kqlQuery Statement, options ...QueryOption) (v1.Dataset, error) {
+func (c *Client) Mgmt(ctx context.Context, db string, kqlQuery Statement, options ...QueryOption) (v1.Dataset, error) {
 	ctx, cancel := contextSetup(ctx)
 
-	opQuery := op
+	opQuery := errors.OpMgmt
+	call := mgmtCall
 	opts, err := setQueryOptions(ctx, opQuery, kqlQuery, call, options...)
 	if err != nil {
 		return nil, err
 	}
 
-	conn, err := c.getConn(mgmtCall, connOptions{queryOptions: opts})
+	conn, err := c.getConn(callType(call), connOptions{queryOptions: opts})
 	if err != nil {
 		return nil, err
 	}
 
-	res, err := conn.rawQuery(ctx, mgmtCall, db, kqlQuery, opts)
+	res, err := conn.rawQuery(ctx, callType(call), db, kqlQuery, opts)
 
 	if err != nil {
 		cancel()
@@ -129,10 +127,6 @@ func (c *Client) executeV1(
 	}
 
 	return v1.NewDatasetFromReader(ctx, opQuery, res)
-}
-
-func (c *Client) Mgmt(ctx context.Context, db string, kqlQuery Statement, options ...QueryOption) (v1.Dataset, error) {
-	return c.executeV1(errors.OpMgmt, mgmtCall, ctx, db, kqlQuery, options...)
 }
 
 func (c *Client) Query(ctx context.Context, db string, kqlQuery Statement, options ...QueryOption) (query.FullDataset, error) {
@@ -145,7 +139,11 @@ func (c *Client) Query(ctx context.Context, db string, kqlQuery Statement, optio
 }
 
 func (c *Client) IterativeQuery(ctx context.Context, db string, kqlQuery Statement, options ...QueryOption) (query.IterativeDataset, error) {
-	opts, res, err := c.executeV2(ctx, db, kqlQuery, options)
+	options = append(options, V2NewlinesBetweenFrames())
+	options = append(options, V2FragmentPrimaryTables())
+	options = append(options, ResultsErrorReportingPlacement(ResultsErrorReportingPlacementEndOfTable))
+
+	opts, res, err := c.rawV2(ctx, db, kqlQuery, options)
 	if err != nil {
 		return nil, err
 	}
@@ -158,13 +156,8 @@ func (c *Client) IterativeQuery(ctx context.Context, db string, kqlQuery Stateme
 	return queryv2.NewIterativeDataset(ctx, res, capacity)
 }
 
-func (c *Client) executeV2(ctx context.Context, db string, kqlQuery Statement, options []QueryOption) (*queryOptions, io.ReadCloser, error) {
+func (c *Client) rawV2(ctx context.Context, db string, kqlQuery Statement, options []QueryOption) (*queryOptions, io.ReadCloser, error) {
 	ctx, cancel := contextSetup(ctx)
-
-	options = append(options, V2NewlinesBetweenFrames())
-	options = append(options, V2FragmentPrimaryTables())
-	options = append(options, ResultsErrorReportingPlacement(ResultsErrorReportingPlacementEndOfTable))
-
 	opQuery := errors.OpQuery
 	opts, err := setQueryOptions(ctx, opQuery, kqlQuery, queryCall, options...)
 	if err != nil {
@@ -186,25 +179,12 @@ func (c *Client) executeV2(ctx context.Context, db string, kqlQuery Statement, o
 }
 
 func (c *Client) QueryToJson(ctx context.Context, db string, query Statement, options ...QueryOption) (string, error) {
-	ctx, cancel := contextSetup(ctx) // Note: cancel is called when *RowIterator has Stop() called.
-
-	opts, err := setQueryOptions(ctx, errors.OpQuery, query, queryCall, options...)
+	_, res, err := c.rawV2(ctx, db, query, options)
 	if err != nil {
 		return "", err
 	}
 
-	conn, err := c.getConn(queryCall, connOptions{queryOptions: opts})
-	if err != nil {
-		return "", err
-	}
-
-	r, err := conn.rawQuery(ctx, queryCall, db, query, opts)
-	if err != nil {
-		cancel()
-		return "", err
-	}
-
-	all, err := io.ReadAll(r)
+	all, err := io.ReadAll(res)
 	if err != nil {
 		return "", err
 	}
