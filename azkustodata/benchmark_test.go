@@ -32,7 +32,7 @@ func benchmarkIterative(b *testing.B, k int) {
 	b.ResetTimer()
 
 	for k := 0; k < b.N; k++ {
-		dataset, err := queryv2.NewIterativeDataset(ctx, io.NopCloser(strings.NewReader(res)), 5)
+		dataset, err := queryv2.NewIterativeDataset(ctx, io.NopCloser(strings.NewReader(res)), 100)
 		if err != nil {
 			panic(err)
 		}
