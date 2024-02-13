@@ -37,7 +37,7 @@ func NewDataTable(d query.Dataset, dt *RawTable, index *TableIndexRow) (query.Fu
 		}
 	}
 
-	table := query.NewFullTable(query.NewTable(d, ordinal, id, name, kind, columns), nil)
+	baseTable := query.NewTable(d, ordinal, id, name, kind, columns)
 
 	rows := make([]query.Row, 0, len(dt.Rows))
 
@@ -64,7 +64,7 @@ func NewDataTable(d query.Dataset, dt *RawTable, index *TableIndexRow) (query.Fu
 			}
 			values[j] = parsed
 		}
-		rows = append(rows, query.NewRow(table, i, values))
+		rows = append(rows, query.NewRowFromParts(baseTable.Columns(), baseTable.ColumnByName, i, values))
 	}
-	return query.ReplaceFullTableRows(table, rows), nil
+	return query.NewFullTable(baseTable, rows), nil
 }

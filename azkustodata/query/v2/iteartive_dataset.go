@@ -110,7 +110,7 @@ func (d *iterativeDataset) ToFullDataset() (query.FullDataset, error) {
 		tables = append(tables, table)
 	}
 
-	return NewFullDataset(d, tables), nil
+	return query.NewFullDataset(d, tables), nil
 }
 
 // decodeTables decodes the frames from the frames channel and sends the results to the results channel.

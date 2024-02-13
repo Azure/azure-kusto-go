@@ -12,25 +12,31 @@ import (
 )
 
 type row struct {
-	table   Table
-	values  value.Values
-	ordinal int
+	columns      Columns
+	columnByName func(string) Column
+	values       value.Values
+	ordinal      int
 }
 
 func NewRow(t Table, ordinal int, values value.Values) Row {
+	return NewRowFromParts(t.Columns(), t.ColumnByName, ordinal, values)
+}
+
+func NewRowFromParts(c Columns, columnByName func(string) Column, ordinal int, values value.Values) Row {
 	return &row{
-		table:   t,
-		ordinal: ordinal,
-		values:  values,
+		columns:      c,
+		columnByName: columnByName,
+		ordinal:      ordinal,
+		values:       values,
 	}
+}
+
+func (r *row) Columns() Columns {
+	return r.columns
 }
 
 func (r *row) Index() int {
 	return r.ordinal
-}
-
-func (r *row) Table() Table {
-	return r.table
 }
 
 func (r *row) Values() value.Values {
@@ -39,7 +45,7 @@ func (r *row) Values() value.Values {
 
 func (r *row) Value(i int) (value.Kusto, error) {
 	if i < 0 || i >= len(r.values) {
-		return nil, errors.ES(r.table.Op(), errors.KClientArgs, "index %d out of range", i)
+		return nil, errors.ES(errors.OpTableAccess, errors.KClientArgs, "index %d out of range", i)
 	}
 
 	return r.values[i], nil
@@ -50,9 +56,9 @@ func (r *row) ValueByColumn(c Column) (value.Kusto, error) {
 }
 
 func (r *row) ValueByName(name string) (value.Kusto, error) {
-	col := r.table.ColumnByName(name)
+	col := r.columnByName(name)
 	if col == nil {
-		return nil, columnNotFoundError(r, name)
+		return nil, columnNotFoundError(name)
 	}
 	return r.Value(col.Index())
 }
@@ -74,13 +80,13 @@ func (r *row) ValueByName(name string) (value.Kusto, error) {
 func (r *row) ToStruct(p interface{}) error {
 	// Check if p is a pointer to a struct
 	if t := reflect.TypeOf(p); t == nil || t.Kind() != reflect.Ptr || t.Elem().Kind() != reflect.Struct {
-		return errors.ES(r.table.Op(), errors.KClientArgs, "type %T is not a pointer to a struct", p)
+		return errors.ES(errors.OpTableAccess, errors.KClientArgs, "type %T is not a pointer to a struct", p)
 	}
-	if len(r.table.Columns()) != len(r.Values()) {
-		return errors.ES(r.table.Op(), errors.KClientArgs, "row does not have the correct number of values(%d) for the number of columns(%d)", len(r.Values()), len(r.table.Columns()))
+	if len(r.Columns()) != len(r.Values()) {
+		return errors.ES(errors.OpTableAccess, errors.KClientArgs, "row does not have the correct number of values(%d) for the number of columns(%d)", len(r.Values()), len(r.Columns()))
 	}
 
-	return decodeToStruct(r.table.Columns(), r.Values(), p)
+	return decodeToStruct(r.Columns(), r.Values(), p)
 }
 
 // String implements fmt.Stringer for a Row. This simply outputs a CSV version of the row.
@@ -99,12 +105,12 @@ func (r *row) String() string {
 	return b.String()
 }
 
-func conversionError(r *row, from string, to string) error {
-	return errors.ES(r.table.Op(), errors.KOther, "cannot convert %s to %s", from, to)
+func conversionError(from string, to string) error {
+	return errors.ES(errors.OpTableAccess, errors.KOther, "cannot convert %s to %s", from, to)
 }
 
-func columnNotFoundError(r *row, name string) error {
-	return errors.ES(r.table.Op(), errors.KOther, "column %s not found", name)
+func columnNotFoundError(name string) error {
+	return errors.ES(errors.OpTableAccess, errors.KOther, "column %s not found", name)
 }
 
 // contains all types *bool, etc
@@ -118,16 +124,16 @@ func byIndex[T kustoTypeGeneric](r *row, colType types.Column, i int, defaultVal
 		return defaultValue, err
 	}
 	if val.GetType() != colType {
-		return defaultValue, conversionError(r, string(val.GetType()), string(colType))
+		return defaultValue, conversionError(string(val.GetType()), string(colType))
 	}
 
 	return val.GetValue().(T), nil
 }
 
 func byName[T kustoTypeGeneric](r *row, colType types.Column, name string, defaultValue T) (T, error) {
-	col := r.table.ColumnByName(name)
+	col := r.columnByName(name)
 	if col == nil {
-		return defaultValue, columnNotFoundError(r, name)
+		return defaultValue, columnNotFoundError(name)
 	}
 	return byIndex(r, colType, col.Index(), defaultValue)
 }

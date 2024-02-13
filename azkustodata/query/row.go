@@ -12,8 +12,8 @@ type Row interface {
 	// Index returns the index of the row.
 	Index() int
 
-	// Table returns the table that the row belongs to.
-	Table() Table
+	// Columns returns the columns of the table that the row belongs to.
+	Columns() Columns
 
 	// Values returns all the values in the row.
 	Values() value.Values

@@ -11,21 +11,17 @@ func newFullTable(dataset query.Dataset, dt DataTable) (query.FullTable, error) 
 		return nil, err
 	}
 
-	f := query.NewFullTable(base, nil)
-
 	rows := make([]query.Row, 0, len(dt.Rows()))
 
 	for i, raw := range dt.Rows() {
-		r, err := parseRow(raw, f, i)
+		r, err := parseRow(raw, base, i)
 		if err != nil {
 			return nil, err
 		}
 		rows = append(rows, r)
 	}
 
-	query.ReplaceFullTableRows(f, rows)
-
-	return f, nil
+	return query.NewFullTable(base, rows), nil
 }
 
 type iterativeWrapper struct {

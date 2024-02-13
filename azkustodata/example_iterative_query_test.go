@@ -2,6 +2,7 @@ package azkustodata_test
 
 import (
 	"context"
+	"fmt"
 	"github.com/Azure/azure-kusto-go/azkustodata"
 	"github.com/Azure/azure-kusto-go/azkustodata/kql"
 	"github.com/Azure/azure-kusto-go/azkustodata/query"
@@ -36,6 +37,9 @@ func ExampleIterativeQuery() {
 
 	dataset, err := client.IterativeQuery(ctx, "Samples", kql.New("PopulationData"))
 
+	// Important - close the dataset when you're done with it
+	defer dataset.Close()
+
 	if err != nil {
 		panic(err)
 	}
@@ -50,128 +54,137 @@ func ExampleIterativeQuery() {
 	table := tableResult.Table()
 	println(table.Name())
 
-	// Otherwise, you can iterate through the `Tables()` channel to get them
-	// It is only possible to iterate through the results once - since they are streamed
+	// Columns are available as well
+	for _, column := range table.Columns() {
+		println(column.Name)
+	}
+	// or by name
+	stateCol := table.ColumnByName("State")
+	println(stateCol.Name)
 
-	for tableResult := range dataset.Tables() {
-		// Make sure to always check for errors
-		if tableResult.Err() != nil {
-			// It's possible to get an errors and still get a table - partial results
-			println(tableResult.Err())
+	// WARNING: streaming tables must be consumed, or the dataset will be blocked
+
+	// There are a few ways to consume a streaming table:
+	// Note: Only one of these methods should be used per table
+	// 1. Rows() - reads rows as they are received
+	for rowResult := range table.Rows() {
+		if rowResult.Err() != nil {
+			println(rowResult.Err().Error())
+		} else {
+			println(rowResult.Row().Index())
 		}
+	}
 
-		// You can access table metadata, such as the table name
-		table := tableResult.Table()
+	// 2. SkipToEnd() - skips all rows and closes the table
+	table.SkipToEnd()
 
-		// You can check if the table is a primary result table
-		// Primary results will always be the first tables in the dataset
-		// otherwise, you can use helper methods to get the secondary tables
-		if !table.IsPrimaryResult() {
-			queryProps, err := v2.AsQueryProperties(table)
-			if err != nil {
-				panic(err)
-			}
-			println(queryProps[0].Value)
+	// 3. ToFullTable() - reads all rows into memory and returns a full table
+	fullTable, err := table.ToFullTable()
+	rows := fullTable.Rows()
+	for _, row := range rows {
+		println(row.Index())
+	}
+	if err != nil {
+		println(err.Error())
+	}
 
-			// Or you can simply use any of the normal table methods
-			println(table.Name())
+	// Working with rows
+	for _, row := range rows {
+		// Each row has an index and columns
+		println(row.Index())
+		println(row.Columns())
 
-			continue
-		}
-
-		println(table.Name())
-		println(table.Id())
-
-		// Columns are available as well
-		for _, column := range table.Columns() {
-			println(column.Name)
-		}
-		// or by name
-		stateCol := table.ColumnByName("State")
-		println(stateCol.Name)
-
-		// WARNING: streaming tables must be consumed, or the dataset will be blocked
-
-		// There are a few ways to consume a streaming table:
-		// Note: Only one of these methods should be used per table
-		// 1. Rows() - reads rows as they are received
-		for rowResult := range table.Rows() {
-			if rowResult.Err() != nil {
-				println(rowResult.Err().Error())
-			} else {
-				println(rowResult.Row().Index())
-			}
-		}
-
-		// 2. SkipToEnd() - skips all rows and closes the table
-		table.SkipToEnd()
-
-		// 3. ToFullTable() - reads all rows into memory and returns a full table
-		fullTable, err := table.ToFullTable()
-		rows := fullTable.Rows()
-		for _, row := range rows {
-			println(row.Index())
-		}
+		// For convenience, you can get the value from the row in the correct type
+		s, err := row.StringByIndex(0)
 		if err != nil {
-			println(err.Error())
+			panic(err)
+		}
+		println(s)
+		i, err := row.IntByName("Population")
+		if err != nil {
+			panic(err)
+		}
+		println(i) // int is *int32 - since it can be nil
+
+		// There are a few ways to access the values of a row:
+		val, err := row.Value(0)
+		if err != nil {
+			panic(err)
 		}
 
-		// Working with rows
-		for _, row := range rows {
-			// Each row has an index and a pointer to the table it belongs to
-			println(row.Index())
-			println(row.Table().Name())
+		println(val)
+		println(row.Values()[0])
+		println(row.ValueByColumn(stateCol))
 
-			// For convenience, you can get the value from the row in the correct type
-			s, err := row.StringByIndex(0)
-			if err != nil {
-				panic(err)
+		// Get the type of the value
+		println(val.GetType()) // prints "string"
+
+		// Get the value as a string
+		// Note that values are pointers - since they can be null
+		if s, ok := val.GetValue().(*int); ok {
+			if s != nil {
+				println(*s)
 			}
-			println(s)
-			i, err := row.IntByName("Population")
-			if err != nil {
-				panic(err)
+		}
+
+		// Or cast directly to the kusto type
+		if s, ok := val.(*value.Int); ok {
+			i := s.Ptr()
+			if i != nil {
+				println(*i)
 			}
-			println(i) // int is *int32 - since it can be nil
+		}
 
-			// There are a few ways to access the values of a row:
-			val, err := row.Value(0)
-			if err != nil {
-				panic(err)
+		// Or convert the row to a struct
+
+		var pd PopulationData
+		err = row.ToStruct(&pd)
+		if err != nil {
+			panic(err)
+		}
+		println(pd.State)
+		println(pd.Pop)
+
+		// Otherwise, you can iterate through the `Tables()` channel to get them
+		// It is only possible to iterate through the results once - since they are streamed
+
+		for tableResult := range dataset.Tables() {
+			// Make sure to always check for errors
+			if tableResult.Err() != nil {
+				// It's possible to get an errors and still get a table - partial results
+				println(tableResult.Err())
 			}
 
-			println(val)
-			println(row.Values()[0])
-			println(row.ValueByColumn(stateCol))
+			// You can access table metadata, such as the table name
+			table := tableResult.Table()
 
-			// Get the type of the value
-			println(val.GetType()) // prints "string"
-
-			// Get the value as a string
-			// Note that values are pointers - since they can be null
-			if s, ok := val.GetValue().(*int); ok {
-				if s != nil {
-					println(*s)
+			// You can check if the table is a primary result table
+			// Primary results will always be the first tables in the dataset
+			// otherwise, you can use helper methods to get the secondary tables
+			if !table.IsPrimaryResult() {
+				switch table.Kind() {
+				case v2.QueryPropertiesKind:
+					queryProps, err := v2.AsQueryProperties(table)
+					if err != nil {
+						panic(err)
+					}
+					fmt.Printf("%v\n", queryProps[0].Value)
+				case v2.QueryCompletionInformationKind:
+					queryProps, err := v2.AsQueryCompletionInformation(table)
+					if err != nil {
+						panic(err)
+					}
+					fmt.Printf("%v\n", queryProps[0].ActivityId)
 				}
+
+				// Or you can simply use any of the normal table methods
+				println(table.Name())
+
+				continue
 			}
 
-			// Or cast directly to the kusto type
-			if s, ok := val.(*value.Int); ok {
-				i := s.Ptr()
-				if i != nil {
-					println(*i)
-				}
-			}
-
-			// Or convert the row to a struct
-
-			var pd PopulationData
-			err = row.ToStruct(&pd)
-			if err != nil {
-				panic(err)
-			}
-			println(pd.State)
-			println(pd.Pop)
+			println(table.Name())
+			println(table.Id())
 
 		}
 
@@ -201,6 +214,6 @@ func ExampleIterativeQuery() {
 	}
 
 	// Now you can access tables and row with random access
-	rows := ds.Tables()[1].Rows()
+	rows = ds.Tables()[1].Rows()
 	println(rows)
 }

@@ -31,3 +31,19 @@ func NewDataset(ctx context.Context, op errors.Op, primaryResultsKind string) Da
 		primaryResultsKind: primaryResultsKind,
 	}
 }
+
+type fullDataset struct {
+	Dataset
+	tables []FullTable
+}
+
+func NewFullDataset(base Dataset, tables []FullTable) FullDataset {
+	return &fullDataset{
+		Dataset: base,
+		tables:  tables,
+	}
+}
+
+func (d *fullDataset) Tables() []FullTable {
+	return d.tables
+}

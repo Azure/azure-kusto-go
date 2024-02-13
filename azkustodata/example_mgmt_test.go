@@ -26,13 +26,19 @@ func ExampleMgmt() {
 
 	ctx := context.Background()
 
-	// Simple query - single table
-
 	dataset, err := client.Mgmt(ctx, "Samples", kql.New(".show tables"))
 
 	if err != nil {
 		panic(err)
 	}
+
+	// In most cases, you will only have a single primary result table, and you don't care about the other metadata tables,
+	// so you can just read the first table from the dataset
+
+	table := dataset.Tables()[0]
+	println(table.Name())
+
+	//Other times, you might want to go over all of the primary results tables:
 
 	for _, tb := range dataset.Tables() {
 		println(tb.Name())
@@ -55,9 +61,9 @@ func ExampleMgmt() {
 
 		// Or iterate over all rows
 		for _, row := range rows {
-			// Each row has an index and a pointer to the table it belongs to
+			// Each row has an index and columns
 			println(row.Index())
-			println(row.Table().Name())
+			println(row.Columns())
 
 			// For convenience, you can get the value from the row in the correct type
 			s, err := row.StringByIndex(0)
@@ -84,7 +90,7 @@ func ExampleMgmt() {
 			// Get the type of the value
 			println(val.GetType()) // prints "string"
 
-			// Get the value as a string
+			// Get the value as an int
 			// Note that values are pointers - since they can be null
 			if s, ok := val.GetValue().(*int); ok {
 				if s != nil {
@@ -121,7 +127,8 @@ func ExampleMgmt() {
 	strts, errs := query.ToStructs[PopulationData](dataset) // or dataset.Tables()[i]
 	println(len(strts), errs)
 
-	// Get metadata about the
+	// Unlike queries, metadata is not included as normal tables, but instead as additional methods.
+	// This is due the lack of results streaming.
 	println(dataset.Info())
 	println(dataset.Status())
 }

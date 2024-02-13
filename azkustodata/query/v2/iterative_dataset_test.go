@@ -93,7 +93,7 @@ func TestStreamingDataSet_DecodeTables_GetRows(t *testing.T) {
 				query.NewColumn(2, "Value", "dynamic"),
 			},
 			rows: []query.Row{
-				query.NewRow(nil, 0, value.Values{
+				query.NewRowFromParts(nil, nil, 0, value.Values{
 					value.NewInt(1),
 					value.NewString("Visualization"),
 					value.NewDynamic([]byte("{\"Visualization\":null,\"Title\":null,\"XColumn\":null,\"Series\":null,\"YColumns\":null,\"AnomalyColumns\":null,\"XTitle\":null,\"YTitle\":null,\"XAxis\":null,\"YAxis\":null,\"Legend\":null,\"YSplit\":null,\"Accumulate\":false,\"IsQuerySorted\":false,\"Kind\":null,\"Ymin\":\"NaN\",\"Ymax\":\"NaN\",\"Xmin\":null,\"Xmax\":null}")),
@@ -118,7 +118,7 @@ func TestStreamingDataSet_DecodeTables_GetRows(t *testing.T) {
 				query.NewColumn(9, "vguid", "guid"),
 			},
 			rows: []query.Row{
-				query.NewRow(nil, 0, value.Values{
+				query.NewRowFromParts(nil, nil, 0, value.Values{
 					value.NewInt(1),
 					value.DecimalFromString("2.00000000000001"),
 					value.NewDateTime(time.Date(2020, 3, 4, 14, 5, 1, 310996500, time.UTC)),
@@ -151,7 +151,7 @@ func TestStreamingDataSet_DecodeTables_GetRows(t *testing.T) {
 				query.NewColumn(11, "Payload", "string"),
 			},
 			rows: []query.Row{
-				query.NewRow(nil, 0, value.Values{
+				query.NewRowFromParts(nil, nil, 0, value.Values{
 					value.NewDateTime(time.Date(2023, 11, 26, 13, 34, 17, 73147800, time.UTC)),
 					value.NewString("blab6"),
 					value.NewGUID(u),
@@ -165,7 +165,7 @@ func TestStreamingDataSet_DecodeTables_GetRows(t *testing.T) {
 					value.NewString("QueryInfo"),
 					value.NewString("{\"Count\":1,\"Text\":\"Query completed successfully\"}"),
 				}),
-				query.NewRow(nil, 1, value.Values{
+				query.NewRowFromParts(nil, nil, 1, value.Values{
 					value.NewDateTime(time.Date(2023, 11, 26, 13, 34, 17, 73147800, time.UTC)),
 					value.NewString("blab6"),
 					value.NewGUID(u),
