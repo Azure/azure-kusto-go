@@ -5,6 +5,7 @@ import (
 	"github.com/Azure/azure-kusto-go/azkustodata/value"
 	"reflect"
 	"strings"
+	"sync"
 )
 
 type fieldMap struct {
@@ -12,6 +13,7 @@ type fieldMap struct {
 }
 
 var typeMapper = map[reflect.Type]fieldMap{}
+var typeMapperLock = sync.RWMutex{}
 
 // decodeToStruct takes a list of columns and a row to decode into "p" which will be a pointer
 // to a struct (enforce in the decoder).
@@ -30,9 +32,14 @@ func decodeToStruct(cols []Column, row value.Values, p interface{}) error {
 
 // newFields takes in the Columns from our row and the reflect.Type of our *struct.
 func newFields(ptr reflect.Type) fieldMap {
-	if f, ok := typeMapper[ptr]; ok {
+	typeMapperLock.RLock()
+	f, ok := typeMapper[ptr]
+	typeMapperLock.RUnlock()
+	if ok {
 		return f
 	} else {
+		typeMapperLock.Lock()
+		defer typeMapperLock.Unlock()
 		nFields := fieldMap{colNameToFieldName: make(map[string]string, ptr.Elem().NumField())}
 		for i := 0; i < ptr.Elem().NumField(); i++ {
 			field := ptr.Elem().Field(i)
