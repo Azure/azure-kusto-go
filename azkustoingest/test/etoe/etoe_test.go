@@ -1189,7 +1189,7 @@ func waitForIngest(t *testing.T, ctx context.Context, client *azkustodata.Client
 			}
 			failed = false
 
-			var dataset query.FullDataset
+			var dataset query.Dataset
 			var err error
 
 			if tableName != "" {

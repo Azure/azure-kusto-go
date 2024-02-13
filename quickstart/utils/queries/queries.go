@@ -12,7 +12,7 @@ import (
 // ExecuteCommand Executes a Command using a premade client
 func ExecuteCommand(kustoClient *azkustodata.Client, databaseName string, command azkustodata.Statement, options ...azkustodata.QueryOption) {
 	ctx := context.Background()
-	var result query.FullDataset
+	var result query.Dataset
 	var err error
 	if strings.HasPrefix(command.String(), ".") {
 		result, err = kustoClient.Mgmt(ctx, databaseName, command)

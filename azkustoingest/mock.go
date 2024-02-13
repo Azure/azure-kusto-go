@@ -16,7 +16,7 @@ type mockClient struct {
 	onMgmt   func(ctx context.Context, db string, query azkustodata.Statement, options ...azkustodata.QueryOption) (v1.Dataset, error)
 }
 
-func (m mockClient) Query(_ context.Context, _ string, _ azkustodata.Statement, _ ...azkustodata.QueryOption) (query.FullDataset, error) {
+func (m mockClient) Query(_ context.Context, _ string, _ azkustodata.Statement, _ ...azkustodata.QueryOption) (query.Dataset, error) {
 	panic("not implemented")
 }
 

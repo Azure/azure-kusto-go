@@ -5,7 +5,6 @@ import (
 	"github.com/Azure/azure-kusto-go/azkustodata/query"
 	"github.com/Azure/azure-kusto-go/azkustodata/types"
 	"github.com/Azure/azure-kusto-go/azkustodata/value"
-	"strconv"
 	"sync"
 )
 
@@ -13,7 +12,7 @@ import (
 // It is used by the iterative dataset.
 // The rows are received from the service via the rawRows channel, and are parsed and sent to the rows channel.
 type iterativeTable struct {
-	query.Table
+	query.BaseTable
 	lock     sync.RWMutex
 	rawRows  chan RawRows
 	rows     chan query.RowResult
@@ -49,26 +48,16 @@ func (t *iterativeTable) setSkip(skip bool) {
 	t.skip = skip
 }
 
-func newTable(dataset query.Dataset, th TableHeader) (query.Table, error) {
-	columns := make([]query.Column, len(th.Columns()))
-	err := parseColumns(th, columns, dataset.Op())
-	if err != nil {
-		return nil, err
-	}
-
-	return query.NewTable(dataset, int64(th.TableId()), strconv.Itoa(th.TableId()), th.TableName(), th.TableKind(), columns), nil
-}
-
-func newIterativeTable(dataset query.Dataset, th TableHeader, rowsSize int) (query.IterativeTable, error) {
-	baseTable, err := newTable(dataset, th)
+func newIterativeTable(dataset query.BaseDataset, th TableHeader, rowsSize int) (query.IterativeTable, error) {
+	baseTable, err := newBaseTable(dataset, th)
 	if err != nil {
 		return nil, err
 	}
 
 	t := &iterativeTable{
-		Table:   baseTable,
-		rawRows: make(chan RawRows, rowsSize),
-		rows:    make(chan query.RowResult, rowsSize),
+		BaseTable: baseTable,
+		rawRows:   make(chan RawRows, rowsSize),
+		rows:      make(chan query.RowResult, rowsSize),
 	}
 
 	go t.readRows()
@@ -78,7 +67,7 @@ func newIterativeTable(dataset query.Dataset, th TableHeader, rowsSize int) (que
 
 const defaultRowsSize = 100
 
-func NewIterativeTable(dataset query.Dataset, th TableHeader) (query.IterativeTable, error) {
+func NewIterativeTable(dataset query.BaseDataset, th TableHeader) (query.IterativeTable, error) {
 	return newIterativeTable(dataset, th, defaultRowsSize)
 }
 
@@ -92,7 +81,7 @@ func parseColumns(th TableHeader, columns []query.Column, op errors.Op) *errors.
 	return nil
 }
 
-func parseRow(r []interface{}, t query.Table, index int) (query.Row, *errors.Error) {
+func parseRow(r []interface{}, t query.BaseTable, index int) (query.Row, *errors.Error) {
 	values := make(value.Values, len(r))
 	columns := t.Columns()
 	for j, v := range r {
@@ -155,7 +144,7 @@ func (t *iterativeTable) SkipToEnd() []error {
 	return errs
 }
 
-func (t *iterativeTable) ToFullTable() (query.FullTable, error) {
+func (t *iterativeTable) ToTable() (query.Table, error) {
 	t.lock.RLock()
 	defer t.lock.RUnlock()
 	if t.skip {
@@ -171,5 +160,5 @@ func (t *iterativeTable) ToFullTable() (query.FullTable, error) {
 		}
 	}
 
-	return query.NewFullTable(t.Table, rows), nil
+	return query.NewTable(t.BaseTable, rows), nil
 }

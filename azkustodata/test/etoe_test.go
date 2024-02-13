@@ -27,7 +27,7 @@ import (
 	"unicode"
 )
 
-type queryFunc func(ctx context.Context, db string, query azkustodata.Statement, options ...azkustodata.QueryOption) (query.FullDataset, error)
+type queryFunc func(ctx context.Context, db string, query azkustodata.Statement, options ...azkustodata.QueryOption) (query.Dataset, error)
 
 type mgmtFunc func(ctx context.Context, db string, query azkustodata.Statement, options ...azkustodata.QueryOption) (v1.Dataset, error)
 
@@ -345,7 +345,7 @@ func TestQueries(t *testing.T) {
 				}()
 			}
 
-			var dataset query.FullDataset
+			var dataset query.Dataset
 			var err error
 			switch {
 			case test.qcall != nil:
@@ -685,7 +685,7 @@ func TestStatement(t *testing.T) {
 				}()
 			}
 
-			var res query.FullDataset
+			var res query.Dataset
 			var err error
 			switch {
 			case test.qcall != nil:

@@ -5,45 +5,45 @@ import (
 	"github.com/Azure/azure-kusto-go/azkustodata/errors"
 )
 
-// dataset is a basic implementation of Dataset, to be used by specific implementations.
-type dataset struct {
+// baseDataset is a basic implementation of BaseDataset, to be used by specific implementations.
+type baseDataset struct {
 	ctx                context.Context
 	op                 errors.Op
 	primaryResultsKind string
 }
 
-func (d *dataset) Context() context.Context {
+func (d *baseDataset) Context() context.Context {
 	return d.ctx
 }
 
-func (d *dataset) Op() errors.Op {
+func (d *baseDataset) Op() errors.Op {
 	return d.op
 }
 
-func (d *dataset) PrimaryResultKind() string {
+func (d *baseDataset) PrimaryResultKind() string {
 	return d.primaryResultsKind
 }
 
-func NewDataset(ctx context.Context, op errors.Op, primaryResultsKind string) Dataset {
-	return &dataset{
+func NewBaseDataset(ctx context.Context, op errors.Op, primaryResultsKind string) BaseDataset {
+	return &baseDataset{
 		ctx:                ctx,
 		op:                 op,
 		primaryResultsKind: primaryResultsKind,
 	}
 }
 
-type fullDataset struct {
-	Dataset
-	tables []FullTable
+type dataset struct {
+	BaseDataset
+	tables []Table
 }
 
-func NewFullDataset(base Dataset, tables []FullTable) FullDataset {
-	return &fullDataset{
-		Dataset: base,
-		tables:  tables,
+func NewDataset(base BaseDataset, tables []Table) Dataset {
+	return &dataset{
+		BaseDataset: base,
+		tables:      tables,
 	}
 }
 
-func (d *fullDataset) Tables() []FullTable {
+func (d *dataset) Tables() []Table {
 	return d.tables
 }

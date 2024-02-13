@@ -5,7 +5,7 @@ import (
 )
 
 type baseTable struct {
-	dataSet       Dataset
+	dataSet       BaseDataset
 	index         int64
 	id            string
 	name          string
@@ -14,7 +14,7 @@ type baseTable struct {
 	columnsByName map[string]Column
 }
 
-func NewTable(ds Dataset, index int64, id string, name string, kind string, columns []Column) Table {
+func NewBaseTable(ds BaseDataset, index int64, id string, name string, kind string, columns []Column) BaseTable {
 	b := &baseTable{
 		dataSet: ds,
 		index:   index,
@@ -70,18 +70,18 @@ func (t *baseTable) Op() errors.Op {
 	return set.Op()
 }
 
-type fullTable struct {
-	Table
+type table struct {
+	BaseTable
 	rows []Row
 }
 
-func NewFullTable(base Table, rows []Row) FullTable {
-	return &fullTable{
-		Table: base,
-		rows:  rows,
+func NewTable(base BaseTable, rows []Row) Table {
+	return &table{
+		BaseTable: base,
+		rows:      rows,
 	}
 }
 
-func (t *fullTable) Rows() []Row {
+func (t *table) Rows() []Row {
 	return t.rows
 }

@@ -35,7 +35,7 @@ type QueryCompletionInformation struct {
 const QueryPropertiesKind = "QueryProperties"
 const QueryCompletionInformationKind = "QueryCompletionInformation"
 
-func AsQueryProperties(table query.Table) ([]QueryProperties, error) {
+func AsQueryProperties(table query.BaseTable) ([]QueryProperties, error) {
 	if table.Kind() != QueryPropertiesKind {
 		return nil, errors.ES(errors.OpQuery, errors.KWrongTableKind, "expected QueryProperties table, got %s", table.Kind())
 	}
@@ -43,7 +43,7 @@ func AsQueryProperties(table query.Table) ([]QueryProperties, error) {
 	return query.ToStructs[QueryProperties](table)
 }
 
-func AsQueryCompletionInformation(table query.Table) ([]QueryCompletionInformation, error) {
+func AsQueryCompletionInformation(table query.BaseTable) ([]QueryCompletionInformation, error) {
 	if table.Kind() != QueryCompletionInformationKind {
 		return nil, errors.ES(errors.OpQuery, errors.KWrongTableKind, "expected QueryCompletionInformation table, got %s", table.Kind())
 	}

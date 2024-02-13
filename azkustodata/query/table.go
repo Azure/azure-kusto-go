@@ -2,7 +2,7 @@ package query
 
 import "github.com/Azure/azure-kusto-go/azkustodata/errors"
 
-type Table interface {
+type BaseTable interface {
 	Id() string
 	Index() int64
 	Name() string
@@ -13,17 +13,17 @@ type Table interface {
 	IsPrimaryResult() bool
 }
 
-type FullTable interface {
-	Table
+type Table interface {
+	BaseTable
 	Rows() []Row
 }
 
 // IterativeTable is a table that returns rows one at a time.
 type IterativeTable interface {
-	Table
+	BaseTable
 	// Rows returns a channel that will be populated with rows as they are read.
 	Rows() <-chan RowResult
 	// SkipToEnd skips all remaining rows in the table.
 	SkipToEnd() []error
-	ToFullTable() (FullTable, error)
+	ToTable() (Table, error)
 }

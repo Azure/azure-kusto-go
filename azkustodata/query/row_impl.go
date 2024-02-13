@@ -18,7 +18,7 @@ type row struct {
 	ordinal      int
 }
 
-func NewRow(t Table, ordinal int, values value.Values) Row {
+func NewRow(t BaseTable, ordinal int, values value.Values) Row {
 	return NewRowFromParts(t.Columns(), t.ColumnByName, ordinal, values)
 }
 
@@ -217,10 +217,10 @@ func ToStructs[T any](data interface{}) ([]T, error) {
 	var errs error
 
 	switch v := data.(type) {
-	case FullTable:
+	case Table:
 		rows = v.Rows()
 	case IterativeTable:
-		full, err := v.ToFullTable()
+		full, err := v.ToTable()
 		if err != nil {
 			return nil, err
 		}
@@ -229,7 +229,7 @@ func ToStructs[T any](data interface{}) ([]T, error) {
 		rows = v
 	case Row:
 		rows = []Row{v}
-	case FullDataset:
+	case Dataset:
 		tables := v.Tables()
 		if len(tables) == 0 {
 			return nil, errors.ES(errors.OpUnknown, errors.KInternal, "dataset does not contain any tables")
@@ -239,7 +239,7 @@ func ToStructs[T any](data interface{}) ([]T, error) {
 		}
 		rows = tables[0].Rows()
 	default:
-		return nil, errors.ES(errors.OpUnknown, errors.KInternal, "invalid data type - expected FullDataset, FullTable, Table or []Row")
+		return nil, errors.ES(errors.OpUnknown, errors.KInternal, "invalid data type - expected Dataset, Table, BaseTable or []Row")
 	}
 
 	if rows == nil || len(rows) == 0 {

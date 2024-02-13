@@ -75,7 +75,7 @@ func benchmarkFull(b *testing.B, k int) {
 			panic(err)
 		}
 
-		full, err := dataset.ToFullDataset()
+		full, err := dataset.ToDataset()
 		if err != nil {
 			panic(err)
 		}

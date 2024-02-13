@@ -45,8 +45,8 @@ type QueryProperties struct {
 }
 
 type dataset struct {
-	query.Dataset
-	results []query.FullTable
+	query.BaseDataset
+	results []query.Table
 	index   []TableIndexRow
 	status  []QueryStatus
 	info    []QueryProperties
@@ -64,7 +64,7 @@ func NewDatasetFromReader(ctx context.Context, op errors.Op, reader io.ReadClose
 
 func NewDataset(ctx context.Context, op errors.Op, v1 V1) (Dataset, error) {
 	d := &dataset{
-		Dataset: query.NewDataset(ctx, op, PrimaryResultKind),
+		BaseDataset: query.NewBaseDataset(ctx, op, PrimaryResultKind),
 	}
 
 	if len(v1.Tables) == 0 {
@@ -77,7 +77,7 @@ func NewDataset(ctx context.Context, op errors.Op, v1 V1) (Dataset, error) {
 			return nil, errors.ES(d.Op(), errors.KInternal, "exceptions: %v", v1.Exceptions)
 		}
 
-		table, err := NewDataTable(d, &v1.Tables[0], primaryResultIndexRow)
+		table, err := NewTable(d, &v1.Tables[0], primaryResultIndexRow)
 		if err != nil {
 			return nil, err
 		}
@@ -111,7 +111,7 @@ func NewDataset(ctx context.Context, op errors.Op, v1 V1) (Dataset, error) {
 			}
 			d.info = queryInfo
 		} else if r.Kind == "QueryResult" {
-			table, err := NewDataTable(d, &v1.Tables[i], &r)
+			table, err := NewTable(d, &v1.Tables[i], &r)
 			if err != nil {
 				return nil, err
 			}
@@ -129,13 +129,13 @@ func NewDataset(ctx context.Context, op errors.Op, v1 V1) (Dataset, error) {
 	return d, err
 }
 
-func parseTable[T any](table *RawTable, d *dataset, index *TableIndexRow) ([]T, error) {
-	fullTable, err := NewDataTable(d, table, index)
+func parseTable[T any](rawTable *RawTable, d *dataset, index *TableIndexRow) ([]T, error) {
+	table, err := NewTable(d, rawTable, index)
 	if err != nil {
 		return nil, err
 	}
 
-	indexRows := fullTable.Rows()
+	indexRows := table.Rows()
 
 	rows, err := query.ToStructs[T](indexRows)
 	if err != nil {
@@ -145,7 +145,7 @@ func parseTable[T any](table *RawTable, d *dataset, index *TableIndexRow) ([]T, 
 	return rows, nil
 }
 
-func (d *dataset) Tables() []query.FullTable {
+func (d *dataset) Tables() []query.Table {
 	return d.results
 }
 
@@ -162,7 +162,7 @@ func (d *dataset) Info() []QueryProperties {
 }
 
 type Dataset interface {
-	query.FullDataset
+	query.Dataset
 	Index() []TableIndexRow
 	Status() []QueryStatus
 	Info() []QueryProperties

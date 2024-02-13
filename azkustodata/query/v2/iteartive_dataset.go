@@ -15,9 +15,8 @@ const PrimaryResultTableKind = "PrimaryResult"
 
 // iterativeDataset contains the main logic of parsing a v2 dataset.
 // v2 is made from a series of frames, which are decoded by turn.
-// This supports both full and streaming datasets, via fullDataset and iterativeDataset  respectively.
 type iterativeDataset struct {
-	query.Dataset
+	query.BaseDataset
 
 	// reader is an io.ReadCloser used to read the data from the Kusto service.
 	reader io.ReadCloser
@@ -31,7 +30,7 @@ type iterativeDataset struct {
 
 func NewIterativeDataset(ctx context.Context, r io.ReadCloser, capacity int) (query.IterativeDataset, error) {
 	d := &iterativeDataset{
-		Dataset:      query.NewDataset(ctx, errors.OpQuery, PrimaryResultTableKind),
+		BaseDataset:  query.NewBaseDataset(ctx, errors.OpQuery, PrimaryResultTableKind),
 		reader:       r,
 		frames:       make(chan *EveryFrame, capacity),
 		errorChannel: make(chan error, 1),
@@ -95,22 +94,22 @@ func (d *iterativeDataset) Close() error {
 	return d.reader.Close()
 }
 
-func (d *iterativeDataset) ToFullDataset() (query.FullDataset, error) {
-	tables := make([]query.FullTable, 0, len(d.results))
+func (d *iterativeDataset) ToDataset() (query.Dataset, error) {
+	tables := make([]query.Table, 0, len(d.results))
 
 	for tb := range d.Tables() {
 		if tb.Err() != nil {
 			return nil, tb.Err()
 		}
 
-		table, err := tb.Table().ToFullTable()
+		table, err := tb.Table().ToTable()
 		if err != nil {
 			return nil, err
 		}
 		tables = append(tables, table)
 	}
 
-	return query.NewFullDataset(d, tables), nil
+	return query.NewDataset(d, tables), nil
 }
 
 // decodeTables decodes the frames from the frames channel and sends the results to the results channel.
@@ -189,7 +188,7 @@ func handleDataTable(d *iterativeDataset, queryProperties *query.IterativeTable,
 	case QueryPropertiesKind:
 		// When we get this, we want to store it and not send it to the user immediately.
 		// We will wait until after the primary results (when we get the QueryCompletionInformation table) and then send it.
-		res, err := newFullTable(d, dt)
+		res, err := newTable(d, dt)
 		if err != nil {
 			d.reportError(err)
 			return false
@@ -200,7 +199,7 @@ func handleDataTable(d *iterativeDataset, queryProperties *query.IterativeTable,
 			d.sendTable(*queryProperties)
 		}
 
-		res, err := newFullTable(d, dt)
+		res, err := newTable(d, dt)
 		if err != nil {
 			d.reportError(err)
 			return false

@@ -51,15 +51,15 @@ func ExampleIterativeQuery() {
 	if tableResult.Err() != nil {
 		panic(tableResult.Err())
 	}
-	table := tableResult.Table()
-	println(table.Name())
+	iterativeTable := tableResult.Table()
+	println(iterativeTable.Name())
 
 	// Columns are available as well
-	for _, column := range table.Columns() {
+	for _, column := range iterativeTable.Columns() {
 		println(column.Name)
 	}
 	// or by name
-	stateCol := table.ColumnByName("State")
+	stateCol := iterativeTable.ColumnByName("State")
 	println(stateCol.Name)
 
 	// WARNING: streaming tables must be consumed, or the dataset will be blocked
@@ -67,7 +67,7 @@ func ExampleIterativeQuery() {
 	// There are a few ways to consume a streaming table:
 	// Note: Only one of these methods should be used per table
 	// 1. Rows() - reads rows as they are received
-	for rowResult := range table.Rows() {
+	for rowResult := range iterativeTable.Rows() {
 		if rowResult.Err() != nil {
 			println(rowResult.Err().Error())
 		} else {
@@ -76,11 +76,11 @@ func ExampleIterativeQuery() {
 	}
 
 	// 2. SkipToEnd() - skips all rows and closes the table
-	table.SkipToEnd()
+	iterativeTable.SkipToEnd()
 
-	// 3. ToFullTable() - reads all rows into memory and returns a full table
-	fullTable, err := table.ToFullTable()
-	rows := fullTable.Rows()
+	// 3. ToTable() - reads all rows into memory and returns an in-memory table.
+	table, err := iterativeTable.ToTable()
+	rows := table.Rows()
 	for _, row := range rows {
 		println(row.Index())
 	}
@@ -189,7 +189,7 @@ func ExampleIterativeQuery() {
 		}
 
 		// Or you can easily get the results as a slice of structs Iteratively
-		for res := range query.ToStructsIterative[PopulationData](table) {
+		for res := range query.ToStructsIterative[PopulationData](iterativeTable) {
 			if res.Err != nil {
 				println(res.Err.Error())
 			} else {
@@ -198,7 +198,7 @@ func ExampleIterativeQuery() {
 		}
 
 		// Or all at once
-		strts, errs := query.ToStructs[PopulationData](table)
+		strts, errs := query.ToStructs[PopulationData](iterativeTable)
 		if errs != nil {
 			panic(errs)
 		}
@@ -208,7 +208,7 @@ func ExampleIterativeQuery() {
 
 	// Alternatively, you can consume the stream to get a full dataset
 	// Only if you haven't consumed them in any other way
-	ds, err := dataset.ToFullDataset()
+	ds, err := dataset.ToDataset()
 	if err != nil {
 		panic(err)
 	}

@@ -129,13 +129,13 @@ func (c *Client) Mgmt(ctx context.Context, db string, kqlQuery Statement, option
 	return v1.NewDatasetFromReader(ctx, opQuery, res)
 }
 
-func (c *Client) Query(ctx context.Context, db string, kqlQuery Statement, options ...QueryOption) (query.FullDataset, error) {
+func (c *Client) Query(ctx context.Context, db string, kqlQuery Statement, options ...QueryOption) (query.Dataset, error) {
 	ds, err := c.IterativeQuery(ctx, db, kqlQuery, options...)
 	if err != nil {
 		return nil, err
 	}
 
-	return ds.ToFullDataset()
+	return ds.ToDataset()
 }
 
 func (c *Client) IterativeQuery(ctx context.Context, db string, kqlQuery Statement, options ...QueryOption) (query.IterativeDataset, error) {

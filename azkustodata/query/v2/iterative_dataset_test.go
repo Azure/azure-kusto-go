@@ -26,7 +26,7 @@ func TestStreamingDataSet_ReadFrames_WithError(t *testing.T) {
 	t.Parallel()
 	reader := strings.NewReader("invalid")
 	d := &iterativeDataset{
-		Dataset:      query.NewDataset(context.Background(), errors.OpQuery, PrimaryResultTableKind),
+		BaseDataset:  query.NewBaseDataset(context.Background(), errors.OpQuery, PrimaryResultTableKind),
 		reader:       io.NopCloser(reader),
 		frames:       make(chan *EveryFrame, DefaultFrameCapacity),
 		errorChannel: make(chan error, 1),
@@ -316,7 +316,7 @@ func TestStreamingDataSet_PartialErrors_Streaming(t *testing.T) {
 	for result := range d.Tables() {
 		if result.Table() != nil {
 			tb := result.Table()
-			_, err := tb.ToFullTable()
+			_, err := tb.ToTable()
 			assert.ErrorContains(t, err, "LimitsExceeded")
 		} else if result.Err() != nil {
 			assert.ErrorContains(t, result.Err(), "LimitsExceeded")
@@ -329,7 +329,7 @@ func TestStreamingDataSet_PartialErrors_GetAll(t *testing.T) {
 	reader := strings.NewReader(partialErrors)
 	d, err := NewIterativeDataset(context.Background(), io.NopCloser(reader), DefaultFrameCapacity)
 	assert.NoError(t, err)
-	_, err = d.ToFullDataset()
+	_, err = d.ToDataset()
 	assert.ErrorContains(t, err, "LimitsExceeded")
 }
 
