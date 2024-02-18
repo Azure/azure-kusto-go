@@ -196,7 +196,7 @@ fmt.Println(params.ToDeclarationString()) // declare query_parameters(startTime:
 
 // You can then use the same query with different parameters:
 params2 :=  kql.NewParameters().AddDateTime("startTime", dt).AddInt("nodeIdValue", 2)
-results, err = client.Query(ctx, database, query, QueryParameters(params2))
+dataset, err = client.Query(ctx, database, query, QueryParameters(params2))
 ```
 
 #### Queries with inline parameters
@@ -233,31 +233,46 @@ Building queries like this is useful for queries that are built from user input,
 The kusto `table` package queries data into a ***table.Row** which can be printed or have the column data extracted.
 
 ```go
-// table package is: github.com/Azure/azure-kusto-go/azkustodata/table
-
 // Query our database table "systemNodes" for the CollectionTimes and the NodeIds.
-iter, err := client.Query(ctx, "database", query)
+dataset, err := client.IterativeQuery(ctx, "database", query)
 if err != nil {
 	panic("add error handling")
 }
-defer iter.Stop()
+// Don't forget to close the dataset when you're done. 
+defer dataset.Close()
 
-// .Do() will call the function for every row in the table.
-err = iter.DoOnRowOrError(
-    func(row *table.Row, e *kustoErrors.Error) error {
-        if e != nil {
-            return e
-        }
-        if row.Replace {
-            fmt.Println("---") // Replace flag indicates that the query result should be cleared and replaced with this row
-        }
-        fmt.Println(row) // As a convenience, printing a *table.Row will output csv
-        return nil
-	},
-)
-if err != nil {
-	panic("add error handling")
+primaryResult := <-dataset.Tables() // The first table in the dataset will be the primary results.
+
+// Make sure to check for errors.
+if primaryResult.Err() != nil {
+    panic("add error handling")
 }
+
+for rowResult := range primaryResult.Table().Rows() {
+	if rowResult.Err() != nil {
+        panic("add error handling")
+	}
+	row := rowResult.Row()
+	
+    fmt.Println(row) // As a convenience, printing a *table.Row will output csv
+	// or Access the columns directly
+    fmt.Println(row.IntByName("EventId"))
+    fmt.Println(row.StringByIndex(1))
+}
+
+// Alternatively, use the `Query` method to get all of the data at once.
+dataset, err := client.Query(ctx, "database", query)
+if err != nil {
+    panic("add error handling")
+}
+
+for _, row := range dataset.Tables()[0].Rows() {
+    fmt.Println(row) // As a convenience, printing a *table.Row will output csv
+    // or Access the columns directly
+    fmt.Println(row.IntByName("EventId"))
+    fmt.Println(row.StringByIndex(1))
+}
+
 ```
 
 #### Query Into Structs
@@ -274,32 +289,44 @@ type NodeRec struct {
 	CollectionTime time.Time
 }
 
-iter, err := client.Query(ctx, "database", query)
+dataset, err := client.IterativeQuery(ctx, "database", query)
 if err != nil {
-	panic("add error handling")
+panic("add error handling")
 }
-defer iter.Stop()
+// Don't forget to close the dataset when you're done. 
+defer dataset.Close()
 
-recs := []NodeRec{}
-err = iter.DoOnRowOrError(
-    func(row *table.Row, e *kustoErrors.Error) error {
-        if e != nil {
-        return e
-        }
-		rec := NodeRec{}
-		if err := row.ToStruct(&rec); err != nil {
-			return err
-		}
-		if row.Replace {
-			recs = recs[:0] // Replace flag indicates that the query result should be cleared and replaced with this row
-		}
-		recs = append(recs, rec)
-		return nil
-	},
-)
-if err != nil {
-	panic("add error handling")
+primaryResult := <-dataset.Tables() // The first table in the dataset will be the primary results.
+
+// Make sure to check for errors.
+if primaryResult.Err() != nil {
+panic("add error handling")
 }
+
+for result := range query.ToStructsIterative[NodeRec](primaryResult.Table()) {
+    if result.Err() != nil {
+        panic("add error handling")
+    }
+    node := result.Struct()
+    fmt.Println(node.ID)
+}	
+
+// Or use the `Query` method to get all of the data at once.
+dataset, err := client.Query(ctx, "database", query)
+if err != nil {
+    panic("add error handling")
+}
+
+// You can use the `ToStructs` method directly on the dataset, or on a specific table.
+structs, err := query.ToStructs[NodeRec](dataset)
+if err != nil {
+    panic("add error handling")
+}
+
+for _, node := range structs {
+    fmt.Println(node.ID)
+}
+
 ```
 
 ### Ingestion

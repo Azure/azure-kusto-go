@@ -5,53 +5,58 @@ import (
 	"errors"
 	"fmt"
 	"github.com/Azure/azure-kusto-go/azkustodata"
+	dataErrors "github.com/Azure/azure-kusto-go/azkustodata/errors"
+	v1 "github.com/Azure/azure-kusto-go/azkustodata/query/v1"
 	"io"
 
-	"github.com/Azure/azure-kusto-go/azkustodata/table"
 	"github.com/Azure/azure-kusto-go/azkustodata/types"
 	"github.com/Azure/azure-kusto-go/azkustodata/value"
 	"github.com/Azure/azure-kusto-go/azkustoingest/internal/properties"
 )
 
 type FakeMgmt struct {
-	mock       *azkustodata.MockRows
 	DBEqual    string
 	QueryEqual string
-	mgmtErr    bool
+	err        error
+	dataset    v1.Dataset
 }
 
 func FakeResources(rows []value.Values, setErr bool) *FakeMgmt {
-	cols := table.Columns{
-		{
-			Name: "ResourceTypeName",
-			Type: types.String,
-		},
-		{
-			Name: "StorageRoot",
-			Type: types.String,
-		},
+	cols := []v1.RawColumn{
+		{ColumnName: "ResourceTypeName", ColumnType: string(types.String)},
+		{ColumnName: "StorageRoot", ColumnType: string(types.String)},
 	}
 
 	fm := NewFakeMgmt(cols, rows, setErr)
 	return fm
 }
 
-func NewFakeMgmt(columns table.Columns, rows []value.Values, setErr bool) *FakeMgmt {
-	mock, err := azkustodata.NewMockRows(columns)
-	if err != nil {
-		panic(err)
+func NewFakeMgmt(columns []v1.RawColumn, vals []value.Values, setErr bool) *FakeMgmt {
+	outRows := make([]v1.RawRow, 0, len(vals))
+	for _, rowVal := range vals {
+		row := make([]interface{}, 0, len(rowVal))
+		for _, val := range rowVal {
+			row = append(row, val.GetValue())
+		}
+		outRows = append(outRows, v1.RawRow{Row: row})
 	}
 
-	for _, row := range rows {
-		_ = mock.Row(row)
-	}
-
+	var err error
 	if setErr {
-		_ = mock.Error(errors.New("some error"))
+		err = dataErrors.ES(dataErrors.OpMgmt, dataErrors.KOther, "some error")
 	}
 
+	dataset, _ := v1.NewDataset(context.Background(), dataErrors.OpMgmt, v1.V1{
+		Tables: []v1.RawTable{
+			{
+				TableName: "Table",
+				Columns:   columns,
+				Rows:      outRows,
+			},
+		}})
 	return &FakeMgmt{
-		mock: mock,
+		dataset: dataset,
+		err:     err,
 	}
 }
 
@@ -66,11 +71,11 @@ func (f *FakeMgmt) SetQueryEquals(s string) *FakeMgmt {
 }
 
 func (f *FakeMgmt) SetMgmtErr() *FakeMgmt {
-	f.mgmtErr = true
+	f.err = errors.New("Set some error")
 	return f
 }
 
-func (f *FakeMgmt) Mgmt(_ context.Context, db string, query azkustodata.Statement, _ ...azkustodata.MgmtOption) (*azkustodata.RowIterator, error) {
+func (f *FakeMgmt) Mgmt(_ context.Context, db string, query azkustodata.Statement, _ ...azkustodata.QueryOption) (v1.Dataset, error) {
 	if f.DBEqual != "" {
 		if db != f.DBEqual {
 			panic(fmt.Sprintf("expected db to be %q, was %q", f.DBEqual, db))
@@ -81,38 +86,24 @@ func (f *FakeMgmt) Mgmt(_ context.Context, db string, query azkustodata.Statemen
 			panic(fmt.Sprintf("expected query to be %q, was %q", f.QueryEqual, db))
 		}
 	}
-	if f.mgmtErr {
-		return nil, fmt.Errorf("some mgmt error")
+
+	if f.err != nil {
+		return nil, f.err
 	}
-	iter := &azkustodata.RowIterator{}
-	if err := iter.Mock(f.mock); err != nil {
-		panic(err)
-	}
-	return iter, nil
+
+	return f.dataset, nil
 }
 
 func SuccessfulFakeResources() *FakeMgmt {
 	return FakeResources(
 		[]value.Values{
 			{
-				value.String{
-					Valid: true,
-					Value: "TempStorage",
-				},
-				value.String{
-					Valid: true,
-					Value: "https://account.blob.core.windows.net/storageroot0",
-				},
+				value.NewString("TempStorage"),
+				value.NewString("https://account.blob.core.windows.net/storageroot0"),
 			},
 			{
-				value.String{
-					Valid: true,
-					Value: "SecuredReadyForAggregationQueue",
-				},
-				value.String{
-					Valid: true,
-					Value: "https://account.blob.core.windows.net/storageroot1",
-				},
+				value.NewString("SecuredReadyForAggregationQueue"),
+				value.NewString("https://account.blob.core.windows.net/storageroot1"),
 			},
 		},
 		false,

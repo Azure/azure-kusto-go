@@ -1,7 +1,7 @@
 name: Go
 on:
   push:
-    branches: [ "**" ]
+    branches: [ "master" ]
   pull_request:
     branches: [ "**" ]
 
@@ -9,8 +9,10 @@ jobs:
   build:
     name: Build
     runs-on: ubuntu-latest
+    permissions:
+      checks: write
+      pull-requests: write
     steps:
-
       - name: Check out code into the Go module directory
         uses: actions/checkout@v2
 

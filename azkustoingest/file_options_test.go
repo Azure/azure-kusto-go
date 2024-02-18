@@ -3,7 +3,6 @@ package azkustoingest
 import (
 	"bytes"
 	"context"
-	"github.com/Azure/azure-kusto-go/azkustodata"
 	"github.com/Azure/azure-kusto-go/azkustoingest/internal/properties"
 	"testing"
 
@@ -23,7 +22,7 @@ const (
 func TestOptions(t *testing.T) {
 	t.Parallel()
 
-	client := azkustodata.NewMockClient()
+	client := newMockClient()
 
 	queuedClient, err := newFromClient(client, &Ingestion{})
 	require.NoError(t, err)
@@ -204,7 +203,7 @@ func TestFileFormatAndMapping(t *testing.T) {
 		},
 	}
 
-	client := azkustodata.NewMockClient()
+	client := newMockClient()
 
 	queuedClient, err := newFromClient(client, &Ingestion{})
 	require.NoError(t, err)

@@ -1,75 +1,12 @@
 package azkustoingest
 
 import (
-	"context"
 	"github.com/Azure/azure-kusto-go/azkustodata"
-	"net/http"
 	"testing"
 
-	"github.com/Azure/azure-kusto-go/azkustodata/table"
-	"github.com/Azure/azure-kusto-go/azkustodata/types"
 	"github.com/Azure/azure-kusto-go/azkustoingest/internal/resources"
 	"github.com/stretchr/testify/assert"
 )
-
-type mockClient struct {
-	endpoint string
-	auth     azkustodata.Authorization
-	onMgmt   func(ctx context.Context, db string, query azkustodata.Statement, options ...azkustodata.MgmtOption) (*azkustodata.RowIterator, error)
-}
-
-func (m mockClient) ClientDetails() *azkustodata.ClientDetails {
-	return azkustodata.NewClientDetails("test", "test")
-}
-func (m mockClient) HttpClient() *http.Client {
-	return &http.Client{}
-}
-
-func (m mockClient) Close() error {
-	return nil
-}
-
-func (m mockClient) Auth() azkustodata.Authorization {
-	return m.auth
-}
-
-func (m mockClient) Endpoint() string {
-	return m.endpoint
-}
-
-func (m mockClient) Query(context.Context, string, azkustodata.Statement, ...azkustodata.QueryOption) (*azkustodata.RowIterator, error) {
-	panic("not implemented")
-}
-
-func (m mockClient) Mgmt(ctx context.Context, db string, query azkustodata.Statement, options ...azkustodata.MgmtOption) (*azkustodata.RowIterator, error) {
-	if m.onMgmt != nil {
-		rows, err := m.onMgmt(ctx, db, query, options...)
-		if err != nil || rows != nil {
-			return rows, err
-		}
-	}
-
-	rows, err := azkustodata.NewMockRows(table.Columns{
-		{
-			Name: "ResourceTypeName",
-			Type: types.String,
-		},
-		{
-			Name: "StorageRoot",
-			Type: types.String,
-		},
-	})
-	if err != nil {
-		return nil, err
-	}
-	iter := &azkustodata.RowIterator{}
-	err = iter.Mock(rows)
-	if err != nil {
-		return nil, err
-	}
-
-	return iter, nil
-}
 
 func TestIngestion(t *testing.T) {
 

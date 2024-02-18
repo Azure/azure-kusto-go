@@ -4,15 +4,10 @@ import (
 	"context"
 	"fmt"
 	"github.com/Azure/azure-kusto-go/azkustodata/kql"
-	"io"
+	"github.com/Azure/azure-kusto-go/azkustodata/query"
 	"net/http"
 	"net/url"
-	"sync"
 	"time"
-
-	kustoErrors "github.com/Azure/azure-kusto-go/azkustodata/errors"
-
-	"github.com/Azure/azure-kusto-go/azkustodata/table"
 )
 
 func Example_simple() {
@@ -38,30 +33,14 @@ func Example_simple() {
 	ctx := context.Background()
 
 	// Query our database table "systemNodes" for the CollectionTimes and the NodeIds.
-	iter, err := client.Query(ctx, "database", kql.New("systemNodes | project CollectionTime, NodeId"))
+	data, err := client.Query(ctx, "database", kql.New("systemNodes | project CollectionTime, NodeId"))
 	if err != nil {
 		panic("add error handling")
 	}
-	defer iter.Stop()
 
-	var recs []NodeRec
+	primary := data.Tables()[0]
 
-	err = iter.DoOnRowOrError(
-		func(row *table.Row, e *kustoErrors.Error) error {
-			if e != nil {
-				return e
-			}
-			rec := NodeRec{}
-			if err := row.ToStruct(&rec); err != nil {
-				return err
-			}
-			if row.Replace {
-				recs = recs[:0]
-			}
-			recs = append(recs, rec)
-			return nil
-		},
-	)
+	recs, err := query.ToStructs[NodeRec](primary)
 
 	if err != nil {
 		panic("add error handling")
@@ -76,7 +55,7 @@ func Example_complex() {
 	// This example sets up a Query where we want to query for nodes that have a NodeId (a Kusto Long type) that has a
 	// particular NodeId. The will require inserting a value where ParamNodeId is in the query.
 	// We will used a parameterized query to do this.
-	query := kql.New("systemNodes | project CollectionTime, NodeId | where NodeId == ParamNodeId")
+	q := kql.New("systemNodes | project CollectionTime, NodeId | where NodeId == ParamNodeId")
 	params := kql.NewParameters()
 
 	// NodeRec represents our Kusto data that will be returned.
@@ -101,27 +80,22 @@ func Example_complex() {
 
 	// Query our database table "systemNodes" for our specific node. We are only doing a single query here as an example,
 	// normally you would take in requests of some type for different NodeIds.
-	iter, err := client.Query(ctx, "database", query, QueryParameters(params))
+	data, err := client.Query(ctx, "database", q, QueryParameters(params))
 	if err != nil {
 		panic("add error handling")
 	}
-	defer iter.Stop()
 
-	rec := NodeRec{} // We are assuming unique NodeId, so we will only get 1 row.
-	err = iter.DoOnRowOrError(
-		func(row *table.Row, e *kustoErrors.Error) error {
-			if e != nil {
-				return e
-			}
-			return row.ToStruct(&rec)
-		},
-	)
+	primary := data.Tables()[0]
+
+	recs, err := query.ToStructs[NodeRec](primary)
 
 	if err != nil {
 		panic("add error handling")
 	}
 
-	fmt.Println(rec.ID)
+	for _, rec := range recs {
+		fmt.Println(rec.ID)
+	}
 }
 
 func ExampleAuthorization_config() {
@@ -159,149 +133,28 @@ func ExampleClient_Query_rows() {
 	ctx := context.Background()
 
 	// Query our database table "systemNodes" for the CollectionTimes and the NodeIds.
-	iter, err := client.Query(ctx, "database", kql.New("systemNodes | project CollectionTime, NodeId"))
+	iter, err := client.IterativeQuery(ctx, "database", kql.New("systemNodes | project CollectionTime, NodeId"))
 	if err != nil {
 		panic("add error handling")
 	}
-	defer iter.Stop()
+	defer iter.Close()
 
-	// Iterate through the returned rows until we get an error or receive an io.EOF, indicating the end of
-	// the data being returned.
-	for {
-		row, inlineErr, err := iter.NextRowOrError()
-		if inlineErr != nil {
+	for res := range iter.Tables() {
+		if res.Err() != nil {
 			panic("add error handling")
 		}
-		if err != nil {
-			if err == io.EOF {
-				break
-			}
-			if err != nil {
+		var tb = res.Table()
+		for rowResult := range tb.Rows() {
+			if rowResult.Err() != nil {
 				panic("add error handling")
 			}
-		}
-
-		// Print out the row values
-		for _, v := range row.Values {
-			fmt.Printf("%s,", v)
-		}
-		fmt.Println("") // Add a carriage return
-	}
-}
-
-func ExampleClient_Query_do() {
-	// This is similar to our (Row) example. In this one though, we use the RowIterator.Do() method instead of
-	// manually iterating over the row. This makes for shorter code while maintaining readability.
-
-	kcsb := NewConnectionStringBuilder("endpoint").WithAadAppKey("clientID", "clientSecret", "tenentID")
-
-	client, err := New(kcsb)
-	if err != nil {
-		panic("add error handling")
-	}
-	// Be sure to close the client when you're done. (Error handling omitted for brevity.)
-	defer client.Close()
-
-	ctx := context.Background()
-
-	// Query our database table "systemNodes" for the CollectionTimes and the NodeIds.
-	iter, err := client.Query(ctx, "database", kql.New("systemNodes | project CollectionTime, NodeId"))
-	if err != nil {
-		panic("add error handling")
-	}
-	defer iter.Stop()
-
-	// Iterate through the returned rows until we get an error or receive an io.EOF, indicating the end of
-	// the data being returned.
-
-	err = iter.DoOnRowOrError(
-		func(row *table.Row, e *kustoErrors.Error) error {
-			if e != nil {
-				return e
-			}
-			if row.Replace {
-				fmt.Println("---") // Replace flag indicates that the query result should be cleared and replaced with this row
-			}
-			for _, v := range row.Values {
+			var row = rowResult.Row()
+			for _, v := range row.Values() {
 				fmt.Printf("%s,", v)
 			}
 			fmt.Println("") // Add a carriage return
-			return nil
-		},
-	)
-	if err != nil {
-		panic("add error handling")
-	}
-}
-
-func ExampleClient_Query_struct() {
-	// Capture our values into a struct and sends those values into a channel. Normally this would be done between
-	// a couple of functions representing a sender and a receiver.
-
-	// NodeRec represents our Kusto data that will be returned.
-	type NodeRec struct {
-		// ID is the table's NodeId. We use the field tag here to instruct our client to convert NodeId to ID.
-		ID int64 `kusto:"NodeId"`
-		// CollectionTime is Go representation of the Kusto datetime type.
-		CollectionTime time.Time
-
-		// err is used internally to signal downstream that we encounter an error.
-		err error
-	}
-
-	kcsb := NewConnectionStringBuilder("endpoint").WithAadAppKey("clientID", "clientSecret", "tenentID")
-
-	client, err := New(kcsb)
-	if err != nil {
-		panic("add error handling")
-	}
-	// Be sure to close the client when you're done. (Error handling omitted for brevity.)
-	defer client.Close()
-
-	ctx := context.Background()
-
-	// Query our database table "systemNodes" for the CollectionTimes and the NodeIds.
-	iter, err := client.Query(ctx, "database", kql.New("systemNodes | project CollectionTime, NodeId"))
-	if err != nil {
-		panic("add error handling")
-	}
-	defer iter.Stop()
-
-	// printCh is used to receive NodeRecs for printing.
-	printCh := make(chan NodeRec, 1)
-
-	// Iterate through the returned rows, convert them to NodeRecs and send them on printCh to be printed.
-	go func() {
-		// Note: we ignore the error here because we send it on a channel and an error will automatically
-		// end the iteration.
-		_ = iter.DoOnRowOrError(
-			func(row *table.Row, e *kustoErrors.Error) error {
-				if e != nil {
-					return e
-				}
-				rec := NodeRec{}
-				rec.err = row.ToStruct(&rec)
-				printCh <- rec
-				return rec.err
-			},
-		)
-	}()
-
-	// Receive the NodeRecs on printCh and print them to the screen.
-	wg := sync.WaitGroup{}
-	wg.Add(1)
-	go func() {
-		defer wg.Done()
-		for rec := range printCh {
-			if rec.err != nil {
-				fmt.Println("Got error: ", err)
-				return
-			}
-			fmt.Printf("NodeID: %d, CollectionTime: %s\n", rec.ID, rec.CollectionTime)
 		}
-	}()
-
-	wg.Wait()
+	}
 }
 
 func ExampleCustomHttpClient() { // nolint:govet // Example code

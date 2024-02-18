@@ -37,37 +37,37 @@ func TestDynamicConverter(t *testing.T) {
 	testCases := []DynamicConverterTestCase{
 		{
 			Desc:   "convert to dynamic",
-			Value:  value.Dynamic{Value: []byte(`hello`), Valid: true},
+			Value:  *value.NewDynamic([]byte(`hello`)),
 			Target: reflect.ValueOf(&value.Dynamic{}),
-			Want:   &value.Dynamic{Value: []byte(`hello`), Valid: true},
+			Want:   value.NewDynamic([]byte(`hello`)),
 		},
 		{
 			Desc:   "convert to []byte",
-			Value:  value.Dynamic{Value: []byte(`hello`), Valid: true},
+			Value:  *value.NewDynamic([]byte(`hello`)),
 			Target: reflect.ValueOf(&[]byte{}),
 			Want:   &wantByteArray,
 		},
 		{
 			Desc:   "convert to string",
-			Value:  value.Dynamic{Value: []byte(`hello`), Valid: true},
+			Value:  *value.NewDynamic([]byte(`hello`)),
 			Target: reflect.ValueOf(&emptyStr),
 			Want:   &wantStr,
 		},
 		{
 			Desc:   "convert to []string",
-			Value:  value.Dynamic{Value: []byte(`["hello", "world"]`), Valid: true},
+			Value:  *value.NewDynamic([]byte(`["hello", "world"]`)),
 			Target: reflect.ValueOf(&[]string{}),
 			Want:   &[]string{"hello", "world"},
 		},
 		{
 			Desc:   "convert to []int64",
-			Value:  value.Dynamic{Value: []byte(`[1,2,3]`), Valid: true},
+			Value:  *value.NewDynamic([]byte(`[1,2,3]`)),
 			Target: reflect.ValueOf(&[]int64{}),
 			Want:   &[]int64{1, 2, 3},
 		},
 		{
 			Desc:   "convert to []struct",
-			Value:  value.Dynamic{Value: []byte(`[{"name":"A","id":1},{"name":"B","id":2}]`), Valid: true},
+			Value:  *value.NewDynamic([]byte(`[{"name":"A","id":1},{"name":"B","id":2}]`)),
 			Target: reflect.ValueOf(&[]TestStruct{}),
 			Want: &[]TestStruct{
 				{Name: "A", ID: 1},
@@ -76,7 +76,7 @@ func TestDynamicConverter(t *testing.T) {
 		},
 		{
 			Desc:   "convert to []map[string]interface{}",
-			Value:  value.Dynamic{Value: []byte(`[{"name":"A","id":1},{"name":"B","id":2}]`), Valid: true},
+			Value:  *value.NewDynamic([]byte(`[{"name":"A","id":1},{"name":"B","id":2}]`)),
 			Target: reflect.ValueOf(&[]map[string]interface{}{}),
 			Want: &[]map[string]interface{}{
 				{"name": "A", "id": float64(1)},
@@ -85,7 +85,7 @@ func TestDynamicConverter(t *testing.T) {
 		},
 		{
 			Desc:   "convert to []map[string]struct",
-			Value:  value.Dynamic{Value: []byte(`[{"group1":{"name":"A","id":1}},{"group2":{"name":"B","id":2}}]`), Valid: true},
+			Value:  *value.NewDynamic([]byte(`[{"group1":{"name":"A","id":1}},{"group2":{"name":"B","id":2}}]`)),
 			Target: reflect.ValueOf(&[]map[string]TestStruct{}),
 			Want: &[]map[string]TestStruct{
 				{"group1": {Name: "A", ID: 1}},
@@ -94,7 +94,7 @@ func TestDynamicConverter(t *testing.T) {
 		},
 		{
 			Desc:   "convert to struct",
-			Value:  value.Dynamic{Value: []byte(`{"name":"A","id":1}`), Valid: true},
+			Value:  *value.NewDynamic([]byte(`{"name":"A","id":1}`)),
 			Target: reflect.ValueOf(&TestStruct{}),
 			Want: &TestStruct{
 				Name: "A",
@@ -103,7 +103,7 @@ func TestDynamicConverter(t *testing.T) {
 		},
 		{
 			Desc:   "convert to map[string]interface{}",
-			Value:  value.Dynamic{Value: []byte(`{"name":"A","id":1}`), Valid: true},
+			Value:  *value.NewDynamic([]byte(`{"name":"A","id":1}`)),
 			Target: reflect.ValueOf(&map[string]interface{}{}),
 			Want: &map[string]interface{}{
 				"name": "A",
@@ -112,7 +112,7 @@ func TestDynamicConverter(t *testing.T) {
 		},
 		{
 			Desc:   "convert to map[string]struct",
-			Value:  value.Dynamic{Value: []byte(`{"group1": {"name":"A","id":1}}`), Valid: true},
+			Value:  *value.NewDynamic([]byte(`{"group1": {"name":"A","id":1}}`)),
 			Target: reflect.ValueOf(&map[string]TestStruct{}),
 			Want: &map[string]TestStruct{
 				"group1": {
@@ -148,49 +148,49 @@ func TestDynamicConverterNegative(t *testing.T) {
 	testCases := []DynamicConverterNegativeTestCase{
 		{
 			Desc:   "fail to convert to []string",
-			Value:  value.Dynamic{Value: []byte(`["hello", "world`), Valid: true},
+			Value:  *value.NewDynamic([]byte(`["hello", "world`)),
 			Target: reflect.ValueOf(&[]string{}),
 			Error:  "Error occurred while trying to unmarshal Dynamic into a slice: unexpected end of JSON input",
 		},
 		{
 			Desc:   "fail to convert to []int64",
-			Value:  value.Dynamic{Value: []byte(`[1,2,"3"]`), Valid: true},
+			Value:  *value.NewDynamic([]byte(`[1,2,"3"]`)),
 			Target: reflect.ValueOf(&[]int64{}),
 			Error:  "Error occurred while trying to unmarshal Dynamic into a slice: json: cannot unmarshal string into Go value of type int64",
 		},
 		{
 			Desc:   "fail to convert to []struct",
-			Value:  value.Dynamic{Value: []byte(`[{"name":"A","id":1},{"name":"B","id":2}`), Valid: true},
+			Value:  *value.NewDynamic([]byte(`[{"name":"A","id":1},{"name":"B","id":2}`)),
 			Target: reflect.ValueOf(&[]TestStruct{}),
 			Error:  "Error occurred while trying to unmarshal Dynamic into a slice: unexpected end of JSON input",
 		},
 		{
 			Desc:   "convert to []map[string]interface{}",
-			Value:  value.Dynamic{Value: []byte(`[{"name":"A","id":1},{"name":"B","id":2}`), Valid: true},
+			Value:  *value.NewDynamic([]byte(`[{"name":"A","id":1},{"name":"B","id":2}`)),
 			Target: reflect.ValueOf(&[]map[string]interface{}{}),
 			Error:  "Error occurred while trying to unmarshal Dynamic into a slice: unexpected end of JSON input",
 		},
 		{
 			Desc:   "convert to []map[string]struct",
-			Value:  value.Dynamic{Value: []byte(`[{"group1":{"name":"A","id":1}},{"group2":{"name":"B","id":2}}`), Valid: true},
+			Value:  *value.NewDynamic([]byte(`[{"group1":{"name":"A","id":1}},{"group2":{"name":"B","id":2}}`)),
 			Target: reflect.ValueOf(&[]map[string]TestStruct{}),
 			Error:  "Error occurred while trying to unmarshal Dynamic into a slice: unexpected end of JSON input",
 		},
 		{
 			Desc:   "convert to struct",
-			Value:  value.Dynamic{Value: []byte(`{"name":"A","id":1`), Valid: true},
+			Value:  *value.NewDynamic([]byte(`{"name":"A","id":1`)),
 			Target: reflect.ValueOf(&TestStruct{}),
 			Error:  "Could not unmarshal type dynamic into receiver: unexpected end of JSON input",
 		},
 		{
 			Desc:   "convert to map[string]interface{}",
-			Value:  value.Dynamic{Value: []byte(`{"named":"A","id":1`), Valid: true},
+			Value:  *value.NewDynamic([]byte(`{"named":"A","id":1`)),
 			Target: reflect.ValueOf(&map[string]interface{}{}),
 			Error:  "Error occurred while trying to unmarshal Dynamic into a map: unexpected end of JSON input",
 		},
 		{
 			Desc:   "convert to map[string]struct",
-			Value:  value.Dynamic{Value: []byte(`{"group1":{"named":"A","id":1}`), Valid: true},
+			Value:  *value.NewDynamic([]byte(`{"group1":{"named":"A","id":1}`)),
 			Target: reflect.ValueOf(&map[string]TestStruct{}),
 			Error:  "Error occurred while trying to unmarshal Dynamic into a map: unexpected end of JSON input",
 		},

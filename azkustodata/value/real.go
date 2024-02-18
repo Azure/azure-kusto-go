@@ -2,34 +2,26 @@ package value
 
 import (
 	"encoding/json"
-	"fmt"
+	"github.com/Azure/azure-kusto-go/azkustodata/types"
 	"reflect"
-	"strconv"
 )
 
 // Real represents a Kusto real type.  Real implements Kusto.
 type Real struct {
-	// Value holds the value of the type.
-	Value float64
-	// Valid indicates if this value was set.
-	Valid bool
+	pointerValue[float64]
 }
 
-func (Real) isKustoVal() {}
-
-// String implements fmt.Stringer.
-func (r Real) String() string {
-	if !r.Valid {
-		return ""
-	}
-	return strconv.FormatFloat(r.Value, 'e', -1, 64)
+func NewReal(i float64) *Real {
+	return &Real{newPointerValue[float64](&i)}
+}
+func NewNullReal() *Real {
+	return &Real{newPointerValue[float64](nil)}
 }
 
 // Unmarshal unmarshals i into Real. i must be a json.Number(that is a float64), float64 or nil.
 func (r *Real) Unmarshal(i interface{}) error {
 	if i == nil {
-		r.Value = 0.0
-		r.Valid = false
+		r.value = nil
 		return nil
 	}
 
@@ -40,40 +32,35 @@ func (r *Real) Unmarshal(i interface{}) error {
 		var err error
 		myFloat, err = v.Float64()
 		if err != nil {
-			return fmt.Errorf("Column with type 'real' had value json.Number that had error on .Float64(): %s", err)
+			return parseError(r, i, err)
 		}
 	case float64:
 		myFloat = v
 	default:
-		return fmt.Errorf("Column with type 'real' had value that was not a json.Number or float64, was %T", i)
+		return convertError(r, i)
 	}
 
-	r.Value = myFloat
-	r.Valid = true
+	r.value = &myFloat
 	return nil
 }
 
 // Convert Real into reflect value.
-func (r Real) Convert(v reflect.Value) error {
-	t := v.Type()
-	switch {
-	case t.Kind() == reflect.Float64:
-		if r.Valid {
-			v.Set(reflect.ValueOf(r.Value))
-		}
-		return nil
-	case t.ConvertibleTo(reflect.TypeOf(new(float64))):
-		if r.Valid {
-			i := &r.Value
-			v.Set(reflect.ValueOf(i))
-		}
-		return nil
-	case t.ConvertibleTo(reflect.TypeOf(Real{})):
-		v.Set(reflect.ValueOf(r))
-		return nil
-	case t.ConvertibleTo(reflect.TypeOf(&Real{})):
-		v.Set(reflect.ValueOf(&r))
+func (r *Real) Convert(v reflect.Value) error {
+	if TryConvert[float64](*r, &r.pointerValue, v) {
 		return nil
 	}
-	return fmt.Errorf("Column was type Kusto.Real, receiver had base Kind %s ", t.Kind())
+
+	if v.Type().Kind() == reflect.Int || v.Type().Kind() == reflect.Int32 {
+		if r.value != nil {
+			v.SetInt(int64(*r.value))
+		}
+		return nil
+	}
+
+	return convertError(r, v)
+}
+
+// GetType returns the type of the value.
+func (r *Real) GetType() types.Column {
+	return types.Real
 }

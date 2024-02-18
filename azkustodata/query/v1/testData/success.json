@@ -1,0 +1,213 @@
+{
+  "Tables": [
+    {
+      "TableName": "Table_0",
+      "Columns": [
+        {
+          "ColumnName": "a",
+          "DataType": "Int32",
+          "ColumnType": "int"
+        }
+      ],
+      "Rows": [
+        [
+          1
+        ],
+        [
+          2
+        ],
+        [
+          3
+        ]
+      ]
+    },
+    {
+      "TableName": "Table_1",
+      "Columns": [
+        {
+          "ColumnName": "a",
+          "DataType": "String",
+          "ColumnType": "string"
+        },
+        {
+          "ColumnName": "b",
+          "DataType": "Int32",
+          "ColumnType": "int"
+        }
+      ],
+      "Rows": [
+        [
+          "a",
+          1
+        ],
+        [
+          "b",
+          2
+        ],
+        [
+          "c",
+          3
+        ]
+      ]
+    },
+    {
+      "TableName": "Table_2",
+      "Columns": [
+        {
+          "ColumnName": "Value",
+          "DataType": "String",
+          "ColumnType": "string"
+        }
+      ],
+      "Rows": [
+        [
+          "{\"Visualization\":null,\"Title\":null,\"XColumn\":null,\"Series\":null,\"YColumns\":null,\"AnomalyColumns\":null,\"XTitle\":null,\"YTitle\":null,\"XAxis\":null,\"YAxis\":null,\"Legend\":null,\"YSplit\":null,\"Accumulate\":false,\"IsQuerySorted\":false,\"Kind\":null,\"Ymin\":\"NaN\",\"Ymax\":\"NaN\",\"Xmin\":null,\"Xmax\":null}"
+        ],
+        [
+          "{\"Visualization\":null,\"Title\":null,\"XColumn\":null,\"Series\":null,\"YColumns\":null,\"AnomalyColumns\":null,\"XTitle\":null,\"YTitle\":null,\"XAxis\":null,\"YAxis\":null,\"Legend\":null,\"YSplit\":null,\"Accumulate\":false,\"IsQuerySorted\":false,\"Kind\":null,\"Ymin\":\"NaN\",\"Ymax\":\"NaN\",\"Xmin\":null,\"Xmax\":null}"
+        ]
+      ]
+    },
+    {
+      "TableName": "Table_3",
+      "Columns": [
+        {
+          "ColumnName": "Timestamp",
+          "DataType": "DateTime",
+          "ColumnType": "datetime"
+        },
+        {
+          "ColumnName": "Severity",
+          "DataType": "Int32",
+          "ColumnType": "int"
+        },
+        {
+          "ColumnName": "SeverityName",
+          "DataType": "String",
+          "ColumnType": "string"
+        },
+        {
+          "ColumnName": "StatusCode",
+          "DataType": "Int32",
+          "ColumnType": "int"
+        },
+        {
+          "ColumnName": "StatusDescription",
+          "DataType": "String",
+          "ColumnType": "string"
+        },
+        {
+          "ColumnName": "Count",
+          "DataType": "Int32",
+          "ColumnType": "int"
+        },
+        {
+          "ColumnName": "RequestId",
+          "DataType": "Guid",
+          "ColumnType": "guid"
+        },
+        {
+          "ColumnName": "ActivityId",
+          "DataType": "Guid",
+          "ColumnType": "guid"
+        },
+        {
+          "ColumnName": "SubActivityId",
+          "DataType": "Guid",
+          "ColumnType": "guid"
+        },
+        {
+          "ColumnName": "ClientActivityId",
+          "DataType": "String",
+          "ColumnType": "string"
+        }
+      ],
+      "Rows": [
+        [
+          "2023-12-03T13:17:49.4832956Z",
+          4,
+          "Info",
+          0,
+          "Query completed successfully",
+          1,
+          "6b4c0ab2-180e-46d8-b97e-593e6aea1e7a",
+          "6b4c0ab2-180e-46d8-b97e-593e6aea1e7a",
+          "2a41ff99-6429-418e-8bae-5cf703c5138a",
+          "blab6"
+        ],
+        [
+          "2023-12-03T13:17:49.4832956Z",
+          6,
+          "Stats",
+          0,
+          "{\"ExecutionTime\":0.0,\"resource_usage\":{\"cache\":{\"memory\":{\"hits\":0,\"misses\":0,\"total\":0},\"disk\":{\"hits\":0,\"misses\":0,\"total\":0},\"shards\":{\"hot\":{\"hitbytes\":0,\"missbytes\":0,\"retrievebytes\":0},\"cold\":{\"hitbytes\":0,\"missbytes\":0,\"retrievebytes\":0},\"bypassbytes\":0}},\"cpu\":{\"user\":\"00:00:00\",\"kernel\":\"00:00:00\",\"total cpu\":\"00:00:00\"},\"memory\":{\"peak_per_node\":524384},\"network\":{\"inter_cluster_total_bytes\":962,\"cross_cluster_total_bytes\":0}},\"input_dataset_statistics\":{\"extents\":{\"total\":0,\"scanned\":0,\"scanned_min_datetime\":\"0001-01-01T00:00:00.0000000Z\",\"scanned_max_datetime\":\"0001-01-01T00:00:00.0000000Z\"},\"rows\":{\"total\":0,\"scanned\":0},\"rowstores\":{\"scanned_rows\":0,\"scanned_values_size\":0},\"shards\":{\"queries_generic\":0,\"queries_specialized\":0}},\"dataset_statistics\":[{\"table_row_count\":3,\"table_size\":15},{\"table_row_count\":3,\"table_size\":43}],\"cross_cluster_resource_usage\":{}}",
+          1,
+          "6b4c0ab2-180e-46d8-b97e-593e6aea1e7a",
+          "6b4c0ab2-180e-46d8-b97e-593e6aea1e7a",
+          "2a41ff99-6429-418e-8bae-5cf703c5138a",
+          "blab6"
+        ]
+      ]
+    },
+    {
+      "TableName": "Table_4",
+      "Columns": [
+        {
+          "ColumnName": "Ordinal",
+          "DataType": "Int64",
+          "ColumnType": "long"
+        },
+        {
+          "ColumnName": "Kind",
+          "DataType": "String",
+          "ColumnType": "string"
+        },
+        {
+          "ColumnName": "Name",
+          "DataType": "String",
+          "ColumnType": "string"
+        },
+        {
+          "ColumnName": "Id",
+          "DataType": "String",
+          "ColumnType": "string"
+        },
+        {
+          "ColumnName": "PrettyName",
+          "DataType": "String",
+          "ColumnType": "string"
+        }
+      ],
+      "Rows": [
+        [
+          0,
+          "QueryResult",
+          "PrimaryResult",
+          "e43f725a-26fd-4219-8869-30c21e1b139c",
+          ""
+        ],
+        [
+          1,
+          "QueryResult",
+          "PrimaryResult",
+          "0f66e92a-8d0e-43da-8a66-ddb6bf84c49d",
+          ""
+        ],
+        [
+          2,
+          "QueryProperties",
+          "@ExtendedProperties",
+          "d52bc55b-fc74-4a63-adb9-b72ff939e4c2",
+          ""
+        ],
+        [
+          3,
+          "QueryStatus",
+          "QueryStatus",
+          "00000000-0000-0000-0000-000000000000",
+          ""
+        ]
+      ]
+    }
+  ]
+}

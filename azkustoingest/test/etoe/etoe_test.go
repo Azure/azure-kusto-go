@@ -7,7 +7,7 @@ import (
 	"github.com/Azure/azure-kusto-go/azkustodata"
 	"github.com/Azure/azure-kusto-go/azkustodata/errors"
 	"github.com/Azure/azure-kusto-go/azkustodata/kql"
-	"github.com/Azure/azure-kusto-go/azkustodata/table"
+	"github.com/Azure/azure-kusto-go/azkustodata/query"
 	"github.com/Azure/azure-kusto-go/azkustodata/testshared"
 	"github.com/Azure/azure-kusto-go/azkustodata/value"
 	"github.com/Azure/azure-kusto-go/azkustoingest"
@@ -110,7 +110,7 @@ func TestFileIngestion(t *testing.T) { //ok
 		// teardown is a function that will be called before the test ends.
 		teardown func() error
 		// doer is called from within the function passed to RowIterator.Do(). It allows us to collect the data we receive.
-		doer func(row *table.Row, update interface{}) error
+		doer func(row query.Row, update interface{}) error
 		// gotInit creates the variable that will be used by doer's update argument.
 		gotInit func() interface{}
 		// want is the data we want to receive from the query.
@@ -136,7 +136,7 @@ func TestFileIngestion(t *testing.T) { //ok
 			options:  []azkustoingest.FileOption{azkustoingest.IngestionMappingRef("Logs_mapping", azkustoingest.JSON)},
 			stmt:     countStatement,
 			table:    streamingTable,
-			doer: func(row *table.Row, update interface{}) error {
+			doer: func(row query.Row, update interface{}) error {
 				rec := testshared.CountResult{}
 				if err := row.ToStruct(&rec); err != nil {
 					return err
@@ -158,7 +158,7 @@ func TestFileIngestion(t *testing.T) { //ok
 			options:  []azkustoingest.FileOption{azkustoingest.IngestionMappingRef("Logs_mapping", azkustoingest.JSON)},
 			stmt:     countStatement,
 			table:    managedTable,
-			doer: func(row *table.Row, update interface{}) error {
+			doer: func(row query.Row, update interface{}) error {
 				rec := testshared.CountResult{}
 				if err := row.ToStruct(&rec); err != nil {
 					return err
@@ -180,7 +180,7 @@ func TestFileIngestion(t *testing.T) { //ok
 			options:  []azkustoingest.FileOption{azkustoingest.IngestionMappingRef("Logs_mapping", azkustoingest.JSON)},
 			stmt:     countStatement,
 			table:    queuedTable,
-			doer: func(row *table.Row, update interface{}) error {
+			doer: func(row query.Row, update interface{}) error {
 				rec := testshared.CountResult{}
 				if err := row.ToStruct(&rec); err != nil {
 					return err
@@ -202,7 +202,7 @@ func TestFileIngestion(t *testing.T) { //ok
 			options:  []azkustoingest.FileOption{azkustoingest.IgnoreFirstRecord()},
 			stmt:     countStatement,
 			table:    queuedTable,
-			doer: func(row *table.Row, update interface{}) error {
+			doer: func(row query.Row, update interface{}) error {
 				rec := testshared.CountResult{}
 				if err := row.ToStruct(&rec); err != nil {
 					return err
@@ -224,7 +224,7 @@ func TestFileIngestion(t *testing.T) { //ok
 			options:  []azkustoingest.FileOption{azkustoingest.IngestionMappingRef("Logs_mapping", azkustoingest.JSON)},
 			stmt:     countStatement,
 			table:    managedTable,
-			doer: func(row *table.Row, update interface{}) error {
+			doer: func(row query.Row, update interface{}) error {
 				rec := testshared.CountResult{}
 				if err := row.ToStruct(&rec); err != nil {
 					return err
@@ -251,7 +251,7 @@ func TestFileIngestion(t *testing.T) { //ok
 			},
 			stmt:  countStatement,
 			table: queuedTable,
-			doer: func(row *table.Row, update interface{}) error {
+			doer: func(row query.Row, update interface{}) error {
 				rec := testshared.CountResult{}
 				if err := row.ToStruct(&rec); err != nil {
 					return err
@@ -272,7 +272,7 @@ func TestFileIngestion(t *testing.T) { //ok
 			src:      csvFileFromString(t),
 			stmt:     countStatement,
 			table:    queuedTable,
-			doer: func(row *table.Row, update interface{}) error {
+			doer: func(row query.Row, update interface{}) error {
 				rec := testshared.CountResult{}
 				if err := row.ToStruct(&rec); err != nil {
 					return err
@@ -293,7 +293,7 @@ func TestFileIngestion(t *testing.T) { //ok
 			src:      createCsvFileFromData(t, mockRows),
 			stmt:     kql.New("table(tableName) | order by header_api_version asc"),
 			table:    queuedTable,
-			doer: func(row *table.Row, update interface{}) error {
+			doer: func(row query.Row, update interface{}) error {
 				rec := LogRow{}
 				if err := row.ToStruct(&rec); err != nil {
 					return err
@@ -315,7 +315,7 @@ func TestFileIngestion(t *testing.T) { //ok
 			options:  []azkustoingest.FileOption{azkustoingest.IngestionMappingRef("Logs_mapping", azkustoingest.JSON)},
 			stmt:     countStatement,
 			table:    streamingTable,
-			doer: func(row *table.Row, update interface{}) error {
+			doer: func(row query.Row, update interface{}) error {
 				rec := testshared.CountResult{}
 				if err := row.ToStruct(&rec); err != nil {
 					return err
@@ -336,7 +336,7 @@ func TestFileIngestion(t *testing.T) { //ok
 			src:      csvFileFromString(t),
 			stmt:     countStatement,
 			table:    streamingTable,
-			doer: func(row *table.Row, update interface{}) error {
+			doer: func(row query.Row, update interface{}) error {
 				rec := testshared.CountResult{}
 				if err := row.ToStruct(&rec); err != nil {
 					return err
@@ -357,7 +357,7 @@ func TestFileIngestion(t *testing.T) { //ok
 			src:      createCsvFileFromData(t, mockRows),
 			stmt:     kql.New("table(tableName)  | order by header_api_version asc"),
 			table:    streamingTable,
-			doer: func(row *table.Row, update interface{}) error {
+			doer: func(row query.Row, update interface{}) error {
 				rec := LogRow{}
 				if err := row.ToStruct(&rec); err != nil {
 					return err
@@ -379,7 +379,7 @@ func TestFileIngestion(t *testing.T) { //ok
 			options:  []azkustoingest.FileOption{azkustoingest.IngestionMappingRef("Logs_mapping", azkustoingest.JSON)},
 			stmt:     countStatement,
 			table:    managedTable,
-			doer: func(row *table.Row, update interface{}) error {
+			doer: func(row query.Row, update interface{}) error {
 				rec := testshared.CountResult{}
 				if err := row.ToStruct(&rec); err != nil {
 					return err
@@ -401,7 +401,7 @@ func TestFileIngestion(t *testing.T) { //ok
 			options:  []azkustoingest.FileOption{azkustoingest.DontCompress()},
 			stmt:     countStatement,
 			table:    managedTable,
-			doer: func(row *table.Row, update interface{}) error {
+			doer: func(row query.Row, update interface{}) error {
 				rec := testshared.CountResult{}
 				if err := row.ToStruct(&rec); err != nil {
 					return err
@@ -429,7 +429,7 @@ func TestFileIngestion(t *testing.T) { //ok
 			fTable := ""
 			if test.table != "" {
 				fTable = fmt.Sprintf("%s_%d_%d", test.table, time.Now().UnixNano(), rand.Int())
-				require.NoError(t, testshared.CreateTestTable(t, client, fTable, false))
+				require.NoError(t, testshared.CreateTestTable(t, client, fTable))
 				test.options = append(test.options, azkustoingest.Table(fTable))
 			}
 
@@ -539,7 +539,7 @@ func TestReaderIngestion(t *testing.T) { // ok
 		// teardown is a function that will be called before the test ends.
 		teardown func() error
 		// doer is called from within the function passed to RowIterator.Do(). It allows us to collect the data we receive.
-		doer func(row *table.Row, update interface{}) error
+		doer func(row query.Row, update interface{}) error
 		// gotInit creates the variable that will be used by doer's update argument.
 		gotInit func() interface{}
 		// want is the data we want to receive from the query.
@@ -568,7 +568,7 @@ func TestReaderIngestion(t *testing.T) { // ok
 			},
 			stmt:  countStatement,
 			table: queuedTable,
-			doer: func(row *table.Row, update interface{}) error {
+			doer: func(row query.Row, update interface{}) error {
 				rec := testshared.CountResult{}
 				if err := row.ToStruct(&rec); err != nil {
 					return err
@@ -596,7 +596,7 @@ func TestReaderIngestion(t *testing.T) { // ok
 			},
 			stmt:  countStatement,
 			table: queuedTable,
-			doer: func(row *table.Row, update interface{}) error {
+			doer: func(row query.Row, update interface{}) error {
 				rec := testshared.CountResult{}
 				if err := row.ToStruct(&rec); err != nil {
 					return err
@@ -620,7 +620,7 @@ func TestReaderIngestion(t *testing.T) { // ok
 			},
 			stmt:  kql.New("table(tableName) | order by header_api_version asc"),
 			table: queuedTable,
-			doer: func(row *table.Row, update interface{}) error {
+			doer: func(row query.Row, update interface{}) error {
 				rec := LogRow{}
 				if err := row.ToStruct(&rec); err != nil {
 					return err
@@ -645,7 +645,7 @@ func TestReaderIngestion(t *testing.T) { // ok
 			},
 			stmt:  countStatement,
 			table: streamingTable,
-			doer: func(row *table.Row, update interface{}) error {
+			doer: func(row query.Row, update interface{}) error {
 				rec := testshared.CountResult{}
 				if err := row.ToStruct(&rec); err != nil {
 					return err
@@ -669,7 +669,7 @@ func TestReaderIngestion(t *testing.T) { // ok
 			},
 			stmt:  countStatement,
 			table: streamingTable,
-			doer: func(row *table.Row, update interface{}) error {
+			doer: func(row query.Row, update interface{}) error {
 				rec := testshared.CountResult{}
 				if err := row.ToStruct(&rec); err != nil {
 					return err
@@ -693,7 +693,7 @@ func TestReaderIngestion(t *testing.T) { // ok
 			src:   createCsvFileFromData(t, mockRows),
 			stmt:  kql.New("table(tableName) | order by header_api_version asc"),
 			table: streamingTable,
-			doer: func(row *table.Row, update interface{}) error {
+			doer: func(row query.Row, update interface{}) error {
 				rec := LogRow{}
 				if err := row.ToStruct(&rec); err != nil {
 					return err
@@ -718,7 +718,7 @@ func TestReaderIngestion(t *testing.T) { // ok
 			},
 			stmt:  countStatement,
 			table: managedTable,
-			doer: func(row *table.Row, update interface{}) error {
+			doer: func(row query.Row, update interface{}) error {
 				rec := testshared.CountResult{}
 				if err := row.ToStruct(&rec); err != nil {
 					return err
@@ -746,7 +746,7 @@ func TestReaderIngestion(t *testing.T) { // ok
 			var fTable string
 			if test.table != "" {
 				fTable = fmt.Sprintf("%s_%d_%d", test.table, time.Now().UnixNano(), rand.Int())
-				require.NoError(t, testshared.CreateTestTable(t, client, fTable, false))
+				require.NoError(t, testshared.CreateTestTable(t, client, fTable))
 				test.options = append(test.options, azkustoingest.Table(fTable))
 			}
 
@@ -901,7 +901,7 @@ func TestMultipleClusters(t *testing.T) { //ok
 		// stmt is used to query for the results.
 		stmt azkustodata.Statement
 		// doer is called from within the function passed to RowIterator.Do(). It allows us to collect the data we receive.
-		doer func(row *table.Row, update interface{}) error
+		doer func(row query.Row, update interface{}) error
 		// gotInit creates the variable that will be used by doer's update argument.
 		gotInit func() interface{}
 		// want is the data we want to receive from the query.
@@ -915,7 +915,7 @@ func TestMultipleClusters(t *testing.T) { //ok
 			secondaryIngestor: secondaryQueuedIngestor,
 			src:               csvFileFromString(t),
 			stmt:              countStatement,
-			doer: func(row *table.Row, update interface{}) error {
+			doer: func(row query.Row, update interface{}) error {
 				rec := testshared.CountResult{}
 				if err := row.ToStruct(&rec); err != nil {
 					return err
@@ -938,7 +938,7 @@ func TestMultipleClusters(t *testing.T) { //ok
 			secondaryIngestor: secondaryStreamingIngestor,
 			src:               csvFileFromString(t),
 			stmt:              countStatement,
-			doer: func(row *table.Row, update interface{}) error {
+			doer: func(row query.Row, update interface{}) error {
 				rec := testshared.CountResult{}
 				if err := row.ToStruct(&rec); err != nil {
 					return err
@@ -975,7 +975,7 @@ func TestMultipleClusters(t *testing.T) { //ok
 			go func() {
 				defer wg.Done()
 
-				require.NoError(t, testshared.CreateTestTableWithDB(t, client, testConfig.Database, fTable, false))
+				require.NoError(t, testshared.CreateDefaultTestTableWithDB(t, client, testConfig.Database, fTable))
 
 				var options []azkustoingest.FileOption
 				if _, ok := test.ingestor.(*azkustoingest.Ingestion); ok {
@@ -1002,7 +1002,7 @@ func TestMultipleClusters(t *testing.T) { //ok
 			go func() {
 				defer wg.Done()
 
-				require.NoError(t, testshared.CreateTestTableWithDB(t, secondaryClient, testConfig.SecondaryDatabase, fSecondaryTable, false))
+				require.NoError(t, testshared.CreateDefaultTestTableWithDB(t, secondaryClient, testConfig.SecondaryDatabase, fSecondaryTable))
 
 				var options []azkustoingest.FileOption
 				if _, ok := test.secondaryIngestor.(*azkustoingest.Ingestion); ok {
@@ -1073,27 +1073,27 @@ func createMockLogRows() []LogRow {
 	return []LogRow{
 		// One empty line
 		{
-			HeaderTime:       value.DateTime{},
-			HeaderId:         value.GUID{},
-			HeaderApiVersion: value.String{Value: "", Valid: true},
-			PayloadData:      value.String{Value: "", Valid: true},
-			PayloadUser:      value.String{Value: "", Valid: true},
+			HeaderTime:       *value.NewNullDateTime(),
+			HeaderId:         *value.NewNullGUID(),
+			HeaderApiVersion: *value.NewString(""),
+			PayloadData:      *value.NewString(""),
+			PayloadUser:      *value.NewString(""),
 		},
 		// One full line
 		{
-			HeaderTime:       value.DateTime{Value: fakeTime, Valid: true},
-			HeaderId:         value.GUID{Value: fakeUid, Valid: true},
-			HeaderApiVersion: value.String{Value: "v0.0.1", Valid: true},
-			PayloadData:      value.String{Value: "Hello world!", Valid: true},
-			PayloadUser:      value.String{Value: "Daniel Dubovski", Valid: true},
+			HeaderTime:       *value.NewDateTime(fakeTime),
+			HeaderId:         *value.NewGUID(fakeUid),
+			HeaderApiVersion: *value.NewString("v0.0.1"),
+			PayloadData:      *value.NewString("Hello world!"),
+			PayloadUser:      *value.NewString("Daniel Dubovski"),
 		},
 		// Partial Data
 		{
-			HeaderTime:       value.DateTime{Value: fakeTime, Valid: true},
-			HeaderId:         value.GUID{},
-			HeaderApiVersion: value.String{Value: "v0.0.2", Valid: true},
-			PayloadData:      value.String{Value: "", Valid: true},
-			PayloadUser:      value.String{Value: "", Valid: true},
+			HeaderTime:       *value.NewDateTime(fakeTime),
+			HeaderId:         *value.NewNullGUID(),
+			HeaderApiVersion: *value.NewString("v0.0.2"),
+			PayloadData:      *value.NewString(""),
+			PayloadUser:      *value.NewString(""),
 		},
 	}
 }
@@ -1173,7 +1173,7 @@ func bigCsvFileFromString(t *testing.T) string {
 	2020-03-10T20:59:30.694177Z,,v0.0.2,,`)
 }
 
-func waitForIngest(t *testing.T, ctx context.Context, client *azkustodata.Client, database string, tableName string, stmt azkustodata.Statement, doer func(row *table.Row, update interface{}) error, want interface{}, gotInit func() interface{}) error {
+func waitForIngest(t *testing.T, ctx context.Context, client *azkustodata.Client, database string, tableName string, stmt azkustodata.Statement, doer func(row query.Row, update interface{}) error, want interface{}, gotInit func() interface{}) error {
 
 	deadline := time.Now().Add(1 * time.Minute)
 
@@ -1189,27 +1189,28 @@ func waitForIngest(t *testing.T, ctx context.Context, client *azkustodata.Client
 			}
 			failed = false
 
-			var iter *azkustodata.RowIterator
+			var dataset query.Dataset
 			var err error
 
 			if tableName != "" {
 				params := azkustodata.QueryParameters(kql.NewParameters().AddString("tableName", tableName))
-				iter, err = client.Query(ctx, database, stmt, params)
+				dataset, err = client.Query(ctx, database, stmt, params)
 			} else {
-				iter, err = client.Query(ctx, database, stmt)
+				dataset, err = client.Query(ctx, database, stmt)
 			}
 			if err != nil {
 				return false, err
 			}
-			defer iter.Stop()
 
 			got = gotInit()
-			err = iter.DoOnRowOrError(func(row *table.Row, e *errors.Error) error {
-				if e != nil {
-					require.NoError(t, e)
+			rows := dataset.Tables()[0].Rows()
+
+			for _, row := range rows {
+				if err := doer(row, got); err != nil {
+					return false, err
 				}
-				return doer(row, got)
-			})
+			}
+
 			if !assert.NoError(t, err) {
 				return false, err
 			}
@@ -1219,26 +1220,6 @@ func waitForIngest(t *testing.T, ctx context.Context, client *azkustodata.Client
 				time.Sleep(100 * time.Millisecond)
 				return true, nil
 			}
-
-			properties, err := iter.GetExtendedProperties()
-			if !assert.NoError(t, err) {
-				return false, err
-			}
-
-			assert.Equal(t, "QueryProperties", string(properties.TableKind))
-			assert.Equal(t, "TableId", properties.Columns[0].Name)
-			assert.Equal(t, "Key", properties.Columns[1].Name)
-			assert.Equal(t, "Value", properties.Columns[2].Name)
-
-			completion, err := iter.GetQueryCompletionInformation()
-			if !assert.NoError(t, err) {
-				return false, err
-			}
-
-			assert.Equal(t, "QueryCompletionInformation", string(completion.TableKind))
-			assert.Equal(t, "Timestamp", completion.Columns[0].Name)
-			assert.Equal(t, "ClientRequestId", completion.Columns[1].Name)
-			assert.Equal(t, "ActivityId", completion.Columns[2].Name)
 
 			return false, err
 		}()

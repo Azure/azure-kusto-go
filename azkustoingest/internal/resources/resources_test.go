@@ -2,11 +2,11 @@ package resources
 
 import (
 	"context"
+	v1 "github.com/Azure/azure-kusto-go/azkustodata/query/v1"
 	"testing"
 
 	"github.com/stretchr/testify/assert"
 
-	"github.com/Azure/azure-kusto-go/azkustodata/table"
 	"github.com/Azure/azure-kusto-go/azkustodata/types"
 	"github.com/Azure/azure-kusto-go/azkustodata/value"
 )
@@ -92,10 +92,10 @@ func TestParse(t *testing.T) {
 }
 
 func FakeAuthContext(rows []value.Values, setErr bool) *FakeMgmt {
-	cols := table.Columns{
+	cols := []v1.RawColumn{
 		{
-			Name: "AuthorizationContext",
-			Type: types.String,
+			ColumnName: "AuthorizationContext",
+			ColumnType: string(types.String),
 		},
 	}
 
@@ -117,10 +117,7 @@ func TestAuthContext(t *testing.T) {
 			fakeMgmt: FakeAuthContext(
 				[]value.Values{
 					{
-						value.String{
-							Valid: true,
-							Value: "authtoken",
-						},
+						value.NewString("authtoken"),
 					},
 				},
 				false,
@@ -132,16 +129,10 @@ func TestAuthContext(t *testing.T) {
 			fakeMgmt: FakeAuthContext(
 				[]value.Values{
 					{
-						value.String{
-							Valid: true,
-							Value: "authtoken",
-						},
+						value.NewString("authtoken"),
 					},
 					{
-						value.String{
-							Valid: true,
-							Value: "authtoken2",
-						},
+						value.NewString("authtoken2"),
 					},
 				},
 				false,
@@ -153,10 +144,7 @@ func TestAuthContext(t *testing.T) {
 			fakeMgmt: FakeAuthContext(
 				[]value.Values{
 					{
-						value.String{
-							Valid: true,
-							Value: "authtoken",
-						},
+						value.NewString("authtoken"),
 					},
 				},
 				false,
@@ -215,14 +203,8 @@ func TestResources(t *testing.T) {
 			fakeMgmt: FakeResources(
 				[]value.Values{
 					{
-						value.String{
-							Valid: true,
-							Value: "TempStorage",
-						},
-						value.String{
-							Valid: true,
-							Value: "https://.blob.core.windows.net/storageroot",
-						},
+						value.NewString("TempStorage"),
+						value.NewString("https://.blob.core.windows.net/storageroot"),
 					},
 				},
 				false,

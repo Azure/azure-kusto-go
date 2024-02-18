@@ -3,7 +3,7 @@ package kql
 import (
 	"errors"
 	"fmt"
-	"github.com/Azure/azure-kusto-go/azkustodata/types"
+	"github.com/Azure/azure-kusto-go/azkustodata/value"
 	"github.com/google/uuid"
 	"github.com/shopspring/decimal"
 	"strings"
@@ -43,6 +43,11 @@ func (b *Builder) addBase(value fmt.Stringer) *Builder {
 	return b
 }
 
+func (b *Builder) AddValue(v value.Kusto) *Builder {
+	b.builder.WriteString(QuoteValue(v))
+	return b
+}
+
 // AddUnsafe enables unsafe actions on a Builder - adds a string as is, no validation checking or escaping.
 // This turns off safety features that could allow a service client to compromise your data store.
 // USE AT YOUR OWN RISK!
@@ -55,44 +60,48 @@ func (b *Builder) AddLiteral(value stringConstant) *Builder {
 	return b.addBase(value)
 }
 
-func (b *Builder) AddBool(value bool) *Builder {
-	return b.addBase(newValue(value, types.Bool))
+func (b *Builder) AddBool(v bool) *Builder {
+	return b.AddValue(value.NewBool(v))
 }
 
-func (b *Builder) AddDateTime(value time.Time) *Builder {
-	return b.addBase(newValue(value, types.DateTime))
+func (b *Builder) AddDateTime(v time.Time) *Builder {
+	return b.AddValue(value.NewDateTime(v))
 }
 
-func (b *Builder) AddDynamic(value interface{}) *Builder {
-	return b.addBase(newValue(value, types.Dynamic))
+func (b *Builder) AddDynamic(v interface{}) *Builder {
+	return b.AddValue(value.DynamicFromInterface(v))
 }
 
-func (b *Builder) AddGUID(value uuid.UUID) *Builder {
-	return b.addBase(newValue(value, types.GUID))
+func (b *Builder) AddSerializedDynamic(v []byte) *Builder {
+	return b.AddValue(value.NewDynamic(v))
 }
 
-func (b *Builder) AddInt(value int32) *Builder {
-	return b.addBase(newValue(value, types.Int))
+func (b *Builder) AddGUID(v uuid.UUID) *Builder {
+	return b.AddValue(value.NewGUID(v))
 }
 
-func (b *Builder) AddLong(value int64) *Builder {
-	return b.addBase(newValue(value, types.Long))
+func (b *Builder) AddInt(v int32) *Builder {
+	return b.AddValue(value.NewInt(v))
 }
 
-func (b *Builder) AddReal(value float64) *Builder {
-	return b.addBase(newValue(value, types.Real))
+func (b *Builder) AddLong(v int64) *Builder {
+	return b.AddValue(value.NewLong(v))
 }
 
-func (b *Builder) AddString(value string) *Builder {
-	return b.addBase(newValue(value, types.String))
+func (b *Builder) AddReal(v float64) *Builder {
+	return b.AddValue(value.NewReal(v))
 }
 
-func (b *Builder) AddTimespan(value time.Duration) *Builder {
-	return b.addBase(newValue(value, types.Timespan))
+func (b *Builder) AddString(v string) *Builder {
+	return b.AddValue(value.NewString(v))
 }
 
-func (b *Builder) AddDecimal(value decimal.Decimal) *Builder {
-	return b.addBase(newValue(value, types.Decimal))
+func (b *Builder) AddTimespan(v time.Duration) *Builder {
+	return b.AddValue(value.NewTimespan(v))
+}
+
+func (b *Builder) AddDecimal(v decimal.Decimal) *Builder {
+	return b.AddValue(value.NewDecimal(v))
 }
 
 func (b *Builder) GetParameters() (map[string]string, error) {

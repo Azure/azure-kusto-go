@@ -3,34 +3,24 @@ package value
 import (
 	"encoding/json"
 	"fmt"
+	"github.com/Azure/azure-kusto-go/azkustodata/types"
 	"math"
 	"reflect"
-	"strconv"
 )
 
 // Long represents a Kusto long type, which is an int64.  Long implements Kusto.
 type Long struct {
-	// Value holds the value of the type.
-	Value int64
-	// Valid indicates if this value was set.
-	Valid bool
+	pointerValue[int64]
 }
 
-func (Long) isKustoVal() {}
+func NewLong(i int64) *Long { return &Long{newPointerValue[int64](&i)} }
 
-// String implements fmt.Stringer.
-func (l Long) String() string {
-	if !l.Valid {
-		return ""
-	}
-	return strconv.Itoa(int(l.Value))
-}
+func NewNullLong() *Long { return &Long{newPointerValue[int64](nil)} }
 
 // Unmarshal unmarshals i into Long. i must be an int64 or nil.
 func (l *Long) Unmarshal(i interface{}) error {
 	if i == nil {
-		l.Value = 0
-		l.Valid = false
+		l.value = nil
 		return nil
 	}
 
@@ -41,46 +31,38 @@ func (l *Long) Unmarshal(i interface{}) error {
 		var err error
 		myInt, err = v.Int64()
 		if err != nil {
-			return fmt.Errorf("Column with type 'long' had value json.Number that had error on .Int64(): %s", err)
+			return parseError(l, i, err)
 		}
-	case int:
-		myInt = int64(v)
 	case float64:
 		if v != math.Trunc(v) {
-			return fmt.Errorf("Column with type 'int' had value float64(%v) that did not represent a whole number", v)
+			return parseError(l, i, fmt.Errorf("float64 value was not an integer"))
 		}
 		myInt = int64(v)
+	case int:
+		myInt = int64(v)
 	default:
-		return fmt.Errorf("Column with type 'ong' had value that was not a json.Number or int, was %T", i)
+		return convertError(l, i)
 	}
 
-	l.Value = myInt
-	l.Valid = true
+	l.value = &myInt
 	return nil
 }
 
 // Convert Long into reflect value.
-func (l Long) Convert(v reflect.Value) error {
-	t := v.Type()
-	switch {
-	case t.Kind() == reflect.Int64:
-		if l.Valid {
-			v.Set(reflect.ValueOf(l.Value))
-		}
-		return nil
-	case t.ConvertibleTo(reflect.TypeOf(new(int64))):
-		if l.Valid {
-			i := &l.Value
-			fmt.Println(i)
-			v.Set(reflect.ValueOf(i))
-		}
-		return nil
-	case t.ConvertibleTo(reflect.TypeOf(Long{})):
-		v.Set(reflect.ValueOf(l))
-		return nil
-	case t.ConvertibleTo(reflect.TypeOf(&Long{})):
-		v.Set(reflect.ValueOf(&l))
+func (l *Long) Convert(v reflect.Value) error {
+	if TryConvert[int64](*l, &l.pointerValue, v) {
 		return nil
 	}
-	return fmt.Errorf("Column was type Kusto.Long, receiver had base Kind %s ", t.Kind())
+
+	if v.Type().Kind() == reflect.Int || v.Type().Kind() == reflect.Int32 {
+		if l.value != nil {
+			v.SetInt(*l.value)
+		}
+		return nil
+	}
+
+	return convertError(l, v)
 }
+
+// GetType returns the type of the value.
+func (l *Long) GetType() types.Column { return types.Long }

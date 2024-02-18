@@ -7,6 +7,8 @@ import (
 	"errors"
 	"fmt"
 	"github.com/Azure/azure-kusto-go/azkustodata"
+	"github.com/Azure/azure-kusto-go/azkustodata/query"
+	v1 "github.com/Azure/azure-kusto-go/azkustodata/query/v1"
 	"net/url"
 	"strings"
 	"sync"
@@ -15,7 +17,6 @@ import (
 
 	kustoErrors "github.com/Azure/azure-kusto-go/azkustodata/errors"
 	"github.com/Azure/azure-kusto-go/azkustodata/kql"
-	"github.com/Azure/azure-kusto-go/azkustodata/table"
 	"github.com/cenkalti/backoff/v4"
 )
 
@@ -28,7 +29,7 @@ const (
 
 // mgmter is a private interface that allows us to write hermetic tests against the azkustodata.Client.Mgmt() method.
 type mgmter interface {
-	Mgmt(ctx context.Context, db string, query azkustodata.Statement, options ...azkustodata.MgmtOption) (*azkustodata.RowIterator, error)
+	Mgmt(ctx context.Context, db string, statement azkustodata.Statement, options ...azkustodata.QueryOption) (v1.Dataset, error)
 }
 
 var objectTypes = map[string]bool{
@@ -210,11 +211,11 @@ func (m *Manager) AuthContext(ctx context.Context) (string, error) {
 		return m.kustoToken.AuthContext, nil
 	}
 
-	var rows *azkustodata.RowIterator
+	var dataset v1.Dataset
 	retryCtx := backoff.WithContext(initBackoff(), ctx)
 	err := backoff.Retry(func() error {
 		var err error
-		rows, err = m.client.Mgmt(ctx, "NetDefaultDB", kql.New(".get kusto identity token"))
+		dataset, err = m.client.Mgmt(ctx, "NetDefaultDB", kql.New(".get kusto identity token"))
 		if err == nil {
 			return nil
 		}
@@ -231,27 +232,21 @@ func (m *Manager) AuthContext(ctx context.Context) (string, error) {
 		return "", fmt.Errorf("problem getting authorization context from Kusto via Mgmt: %s", err)
 	}
 
-	count := 0
-	token := token{}
-	err = rows.DoOnRowOrError(
-		func(r *table.Row, e *kustoErrors.Error) error {
-			if e != nil {
-				return e
-			}
-			if count != 0 {
-				return fmt.Errorf("call for AuthContext returned more than 1 Row")
-			}
-			count++
-			return r.ToStruct(&token)
-		},
-	)
+	tokens, err := query.ToStructs[token](dataset)
 	if err != nil {
 		return "", err
 	}
+	if tokens == nil {
+		return "", fmt.Errorf("call for AuthContext returned no Rows")
+	}
 
-	m.kustoToken = token
+	if len(tokens) != 1 {
+		return "", fmt.Errorf("call for AuthContext returned more than 1 Row")
+	}
+
+	m.kustoToken = tokens[0]
 	m.authTokenCacheExpiration = time.Now().UTC().Add(time.Hour)
-	return token.AuthContext, nil
+	return tokens[0].AuthContext, nil
 }
 
 // ingestResc represents a kusto Mgmt() record about a resource
@@ -334,11 +329,11 @@ func (m *Manager) fetch(ctx context.Context) error {
 	m.fetchLock.Lock()
 	defer m.fetchLock.Unlock()
 
-	var rows *azkustodata.RowIterator
+	var dataset v1.Dataset
 	retryCtx := backoff.WithContext(initBackoff(), ctx)
 	err := backoff.Retry(func() error {
 		var err error
-		rows, err = m.client.Mgmt(ctx, "NetDefaultDB", kql.New(".get ingestion resources"))
+		dataset, err = m.client.Mgmt(ctx, "NetDefaultDB", kql.New(".get ingestion resources"))
 		if err == nil {
 			return nil
 		}
@@ -356,21 +351,18 @@ func (m *Manager) fetch(ctx context.Context) error {
 	}
 
 	ingest := Ingestion{}
-	err = rows.DoOnRowOrError(
-		func(r *table.Row, e *kustoErrors.Error) error {
-			if e != nil {
-				return e
-			}
-			rec := ingestResc{}
-			if err := r.ToStruct(&rec); err != nil {
-				return err
-			}
-			if err := ingest.importRec(rec, m.rankedStorageAccount); err != nil && err != errDoNotCare {
-				return err
-			}
-			return nil
-		},
-	)
+
+	resc, err := query.ToStructs[ingestResc](dataset)
+	if err != nil {
+		return err
+	}
+
+	for _, rec := range resc {
+		if err := ingest.importRec(rec, m.rankedStorageAccount); err != nil && !errors.Is(err, errDoNotCare) {
+			return err
+		}
+	}
+
 	if err != nil {
 		return fmt.Errorf("problem reading ingestion resources from Kusto: %s", err)
 	}

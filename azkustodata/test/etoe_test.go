@@ -6,9 +6,9 @@ import (
 	"github.com/Azure/azure-kusto-go/azkustodata"
 	"github.com/Azure/azure-kusto-go/azkustodata/errors"
 	"github.com/Azure/azure-kusto-go/azkustodata/kql"
-	"github.com/Azure/azure-kusto-go/azkustodata/table"
+	"github.com/Azure/azure-kusto-go/azkustodata/query"
+	v1 "github.com/Azure/azure-kusto-go/azkustodata/query/v1"
 	"github.com/Azure/azure-kusto-go/azkustodata/testshared"
-	"github.com/Azure/azure-kusto-go/azkustodata/types"
 	"github.com/Azure/azure-kusto-go/azkustodata/utils"
 	"github.com/Azure/azure-kusto-go/azkustodata/value"
 	"github.com/Azure/azure-sdk-for-go/sdk/azcore"
@@ -27,20 +27,13 @@ import (
 	"unicode"
 )
 
-type queryFunc func(ctx context.Context, db string, query azkustodata.Statement, options ...azkustodata.QueryOption) (*azkustodata.RowIterator, error)
+type queryFunc func(ctx context.Context, db string, query azkustodata.Statement, options ...azkustodata.QueryOption) (query.Dataset, error)
 
-type mgmtFunc func(ctx context.Context, db string, query azkustodata.Statement, options ...azkustodata.MgmtOption) (*azkustodata.RowIterator, error)
+type mgmtFunc func(ctx context.Context, db string, query azkustodata.Statement, options ...azkustodata.QueryOption) (v1.Dataset, error)
+
+// TODO: tests for iterative query
 
 type queryJsonFunc func(ctx context.Context, db string, query azkustodata.Statement, options ...azkustodata.QueryOption) (string, error)
-
-var pTableStmtOld = azkustodata.NewStmt("table(tableName)").MustDefinitions(
-	azkustodata.NewDefinitions().Must(
-		azkustodata.ParamTypes{
-			"tableName": azkustodata.ParamType{Type: types.String},
-		},
-	),
-)
-
 type DynamicTypeVariations struct {
 	PlainValue value.Dynamic
 	PlainArray value.Dynamic
@@ -122,17 +115,10 @@ func TestAuth(t *testing.T) {
 				}
 			}(client)
 
-			query, err := client.Query(context.Background(), testConfig.Database, kql.New("print 1"))
-			defer func() {
-				query.Stop()
-				_, _ = query.GetQueryCompletionInformation() // make sure it stops
-			}()
-			require.NoError(t, err)
-
-			row, inlineError, err := query.NextRowOrError()
-			require.NoError(t, err)
-			require.Nil(t, inlineError)
-			assert.Equal(t, "1\n", row.String())
+			res, err := client.Query(context.Background(), testConfig.Database, kql.New("print 1"))
+			assert.NoError(t, err)
+			rows := res.Tables()[0].Rows()
+			assert.Equal(t, "1\n", rows[0].String())
 		})
 	}
 
@@ -159,7 +145,7 @@ func TestQueries(t *testing.T) {
 	})
 
 	allDataTypesTable := fmt.Sprintf("goe2e_all_data_types_%d_%d", time.Now().UnixNano(), rand.Int())
-	err = testshared.CreateTestTable(t, client, allDataTypesTable, true)
+	err = testshared.CreateAllDataTypesTable(t, client, allDataTypesTable)
 	require.NoError(t, err)
 
 	tests := []struct {
@@ -176,17 +162,18 @@ func TestQueries(t *testing.T) {
 		qjcall   queryJsonFunc
 		options  interface{} // either []azkustodata.QueryOption or []azkustodata.MgmtOption
 		// doer is called from within the function passed to RowIterator.Do(). It allows us to collect the data we receive.
-		doer func(row *table.Row, update interface{}) error
+		doer func(row query.Row, update interface{}) error
 		// gotInit creates the variable that will be used by doer's update argument.
 		gotInit func() interface{}
 		// want is the data we want to receive from the query.
-		want interface{}
+		want  interface{}
+		want2 interface{}
 	}{
 		{
 			desc:  "Query: Retrieve count of the number of rows that match",
 			stmt:  kql.New("").AddTable(allDataTypesTable).AddLiteral("| count"),
 			qcall: client.Query,
-			doer: func(row *table.Row, update interface{}) error {
+			doer: func(row query.Row, update interface{}) error {
 				rec := testshared.CountResult{}
 				if err := row.ToStruct(&rec); err != nil {
 					return err
@@ -205,7 +192,7 @@ func TestQueries(t *testing.T) {
 			desc:  "Mgmt(regression github.com/Azure/azure-kusto-go/issues/11): make sure we can retrieve .show databases, but we do not check the results at this time",
 			stmt:  kql.New(`.show databases`),
 			mcall: client.Mgmt,
-			doer: func(row *table.Row, update interface{}) error {
+			doer: func(row query.Row, update interface{}) error {
 				return nil
 			},
 			gotInit: func() interface{} {
@@ -216,7 +203,7 @@ func TestQueries(t *testing.T) {
 			desc:  "Mgmt(https://github.com/Azure/azure-kusto-go/issues/55): transformations on mgmt queries",
 			stmt:  kql.New(`.show databases | project A="1" | take 1`),
 			mcall: client.Mgmt,
-			doer: func(row *table.Row, update interface{}) error {
+			doer: func(row query.Row, update interface{}) error {
 				rec := MgmtProjectionResult{}
 				if err := row.ToStruct(&rec); err != nil {
 					return err
@@ -235,7 +222,7 @@ func TestQueries(t *testing.T) {
 			desc:  "Mgmt(https://github.com/Azure/azure-kusto-go/issues/55): transformations on mgmt queries - multiple tables",
 			stmt:  kql.New(`.show databases | project A="1" | take 1;`).AddTable(allDataTypesTable).AddLiteral(" | project A=\"2\" | take 1"),
 			mcall: client.Mgmt,
-			doer: func(row *table.Row, update interface{}) error {
+			doer: func(row query.Row, update interface{}) error {
 				rec := MgmtProjectionResult{}
 				if err := row.ToStruct(&rec); err != nil {
 					return err
@@ -248,54 +235,14 @@ func TestQueries(t *testing.T) {
 				v := []MgmtProjectionResult{}
 				return &v
 			},
-			want: &[]MgmtProjectionResult{{A: "1"}, {A: "2"}},
+			want:  &[]MgmtProjectionResult{{A: "1"}},
+			want2: &[]MgmtProjectionResult{{A: "2"}},
 		},
 		{
-			desc:    "Query: Progressive query: make sure we can convert all data types from a row",
-			stmt:    kql.New("").AddTable(allDataTypesTable),
-			qcall:   client.Query,
-			options: []azkustodata.QueryOption{azkustodata.ResultsProgressiveEnabled()},
-			doer: func(row *table.Row, update interface{}) error {
-				rec := AllDataType{}
-				if err := row.ToStruct(&rec); err != nil {
-					return err
-				}
-
-				valuesRec := AllDataType{}
-
-				err := row.ExtractValues(&valuesRec.Vnum,
-					&valuesRec.Vdec,
-					&valuesRec.Vdate,
-					&valuesRec.Vspan,
-					&valuesRec.Vobj,
-					&valuesRec.Vb,
-					&valuesRec.Vreal,
-					&valuesRec.Vstr,
-					&valuesRec.Vlong,
-					&valuesRec.Vguid,
-				)
-
-				if err != nil {
-					return err
-				}
-
-				assert.Equal(t, rec, valuesRec)
-
-				recs := update.(*[]AllDataType)
-				*recs = append(*recs, rec)
-				return nil
-			},
-			gotInit: func() interface{} {
-				ad := []AllDataType{}
-				return &ad
-			},
-			want: &[]AllDataType{getExpectedResult()},
-		},
-		{
-			desc:  "Query: Non-Progressive query: make sure we can convert all data types from a row",
+			desc:  "Query: make sure we can convert all data types from a row",
 			stmt:  kql.New("").AddTable(allDataTypesTable),
 			qcall: client.Query,
-			doer: func(row *table.Row, update interface{}) error {
+			doer: func(row query.Row, update interface{}) error {
 				rec := AllDataType{}
 				if err := row.ToStruct(&rec); err != nil {
 					return err
@@ -303,138 +250,7 @@ func TestQueries(t *testing.T) {
 
 				valuesRec := AllDataType{}
 
-				err := row.ExtractValues(&valuesRec.Vnum,
-					&valuesRec.Vdec,
-					&valuesRec.Vdate,
-					&valuesRec.Vspan,
-					&valuesRec.Vobj,
-					&valuesRec.Vb,
-					&valuesRec.Vreal,
-					&valuesRec.Vstr,
-					&valuesRec.Vlong,
-					&valuesRec.Vguid,
-				)
-
-				if err != nil {
-					return err
-				}
-
-				assert.Equal(t, rec, valuesRec)
-
-				recs := update.(*[]AllDataType)
-				*recs = append(*recs, rec)
-				return nil
-			},
-			gotInit: func() interface{} {
-				ad := []AllDataType{}
-				return &ad
-			},
-			want: &[]AllDataType{getExpectedResult()},
-		},
-		{
-			desc: "Query: All parameter types are working",
-			stmt: pTableStmtOld.Add(" | where  vnum == num and vdec == dec and vdate == dt and vspan == span and tostring(vobj) == tostring(obj) and vb == b and vreal" +
-				" == rl and vstr == str and vlong == lg and vguid == guid ").
-				MustDefinitions(azkustodata.NewDefinitions().Must(
-					azkustodata.ParamTypes{
-						"tableName": azkustodata.ParamType{Type: types.String},
-						"num":       azkustodata.ParamType{Type: types.Int},
-						"dec":       azkustodata.ParamType{Type: types.Decimal},
-						"dt":        azkustodata.ParamType{Type: types.DateTime},
-						"span":      azkustodata.ParamType{Type: types.Timespan},
-						"obj":       azkustodata.ParamType{Type: types.Dynamic},
-						"b":         azkustodata.ParamType{Type: types.Bool},
-						"rl":        azkustodata.ParamType{Type: types.Real},
-						"str":       azkustodata.ParamType{Type: types.String},
-						"lg":        azkustodata.ParamType{Type: types.Long},
-						"guid":      azkustodata.ParamType{Type: types.GUID},
-					})).
-				MustParameters(azkustodata.NewParameters().Must(azkustodata.QueryValues{
-					"tableName": allDataTypesTable,
-					"num":       int32(1),
-					"dec":       "2.00000000000001",
-					"dt":        time.Date(2020, 03, 04, 14, 05, 01, 310996500, time.UTC),
-					"span":      time.Hour + 23*time.Minute + 45*time.Second + 678900000*time.Nanosecond,
-					"obj":       map[string]interface{}{"moshe": "value"},
-					"b":         true,
-					"rl":        0.01,
-					"str":       "asdf",
-					"lg":        int64(9223372036854775807),
-					"guid":      uuid.MustParse("74be27de-1e4e-49d9-b579-fe0b331d3642"),
-				})),
-			qcall: client.Query,
-			doer: func(row *table.Row, update interface{}) error {
-				rec := AllDataType{}
-				if err := row.ToStruct(&rec); err != nil {
-					return err
-				}
-
-				valuesRec := AllDataType{}
-
-				err := row.ExtractValues(&valuesRec.Vnum,
-					&valuesRec.Vdec,
-					&valuesRec.Vdate,
-					&valuesRec.Vspan,
-					&valuesRec.Vobj,
-					&valuesRec.Vb,
-					&valuesRec.Vreal,
-					&valuesRec.Vstr,
-					&valuesRec.Vlong,
-					&valuesRec.Vguid,
-				)
-
-				if err != nil {
-					return err
-				}
-
-				assert.Equal(t, rec, valuesRec)
-
-				recs := update.(*[]AllDataType)
-				*recs = append(*recs, rec)
-				return nil
-			},
-			gotInit: func() interface{} {
-				ad := []AllDataType{}
-				return &ad
-			},
-			want: &[]AllDataType{getExpectedResult()},
-		},
-		{
-			desc: "Query: All parameter types are working with defaults",
-			stmt: pTableStmtOld.Add(" | where  vnum == num and vdec == dec and vdate == dt and vspan == span and vb == b and vreal == rl and vstr == str and vlong == lg and vguid == guid ").
-				MustDefinitions(azkustodata.NewDefinitions().Must(
-					azkustodata.ParamTypes{
-						"tableName": azkustodata.ParamType{Type: types.String, Default: allDataTypesTable},
-						"num":       azkustodata.ParamType{Type: types.Int, Default: int32(1)},
-						"dec":       azkustodata.ParamType{Type: types.Decimal, Default: "2.00000000000001"},
-						"dt":        azkustodata.ParamType{Type: types.DateTime, Default: time.Date(2020, 03, 04, 14, 05, 01, 310996500, time.UTC)},
-						"span":      azkustodata.ParamType{Type: types.Timespan, Default: time.Hour + 23*time.Minute + 45*time.Second + 678900000*time.Nanosecond},
-						"b":         azkustodata.ParamType{Type: types.Bool, Default: true},
-						"rl":        azkustodata.ParamType{Type: types.Real, Default: 0.01},
-						"str":       azkustodata.ParamType{Type: types.String, Default: "asdf"},
-						"lg":        azkustodata.ParamType{Type: types.Long, Default: int64(9223372036854775807)},
-						"guid":      azkustodata.ParamType{Type: types.GUID, Default: uuid.MustParse("74be27de-1e4e-49d9-b579-fe0b331d3642")},
-					})),
-			qcall: client.Query,
-			doer: func(row *table.Row, update interface{}) error {
-				rec := AllDataType{}
-				if err := row.ToStruct(&rec); err != nil {
-					return err
-				}
-
-				valuesRec := AllDataType{}
-
-				err := row.ExtractValues(&valuesRec.Vnum,
-					&valuesRec.Vdec,
-					&valuesRec.Vdate,
-					&valuesRec.Vspan,
-					&valuesRec.Vobj,
-					&valuesRec.Vb,
-					&valuesRec.Vreal,
-					&valuesRec.Vstr,
-					&valuesRec.Vlong,
-					&valuesRec.Vguid,
-				)
+				err := row.ToStruct(&valuesRec)
 
 				if err != nil {
 					return err
@@ -456,7 +272,7 @@ func TestQueries(t *testing.T) {
 			desc:  "Query: make sure Dynamic data type variations can be parsed",
 			stmt:  kql.New(`print PlainValue = dynamic('1'), PlainArray = dynamic('[1,2,3]'), PlainJson= dynamic('{ "a": 1}'), JsonArray= dynamic('[{ "a": 1}, { "a": 2}]')`),
 			qcall: client.Query,
-			doer: func(row *table.Row, update interface{}) error {
+			doer: func(row query.Row, update interface{}) error {
 				rec := DynamicTypeVariations{}
 				if err := row.ToStruct(&rec); err != nil {
 					return err
@@ -465,12 +281,7 @@ func TestQueries(t *testing.T) {
 
 				valuesRec := DynamicTypeVariations{}
 
-				err := row.ExtractValues(&valuesRec.PlainValue,
-					&valuesRec.PlainArray,
-					&valuesRec.PlainJson,
-					&valuesRec.JsonArray,
-				)
-
+				err := row.ToStruct(&valuesRec)
 				if err != nil {
 					return err
 				}
@@ -486,10 +297,10 @@ func TestQueries(t *testing.T) {
 			},
 			want: &[]DynamicTypeVariations{
 				{
-					PlainValue: value.Dynamic{Value: []byte("1"), Valid: true},
-					PlainArray: value.Dynamic{Value: []byte("[1,2,3]"), Valid: true},
-					PlainJson:  value.Dynamic{Value: []byte(`{ "a": 1}`), Valid: true},
-					JsonArray:  value.Dynamic{Value: []byte(`[{ "a": 1}, { "a": 2}]`), Valid: true},
+					PlainValue: *value.NewDynamic([]byte("1")),
+					PlainArray: *value.NewDynamic([]byte("[1,2,3]")),
+					PlainJson:  *value.NewDynamic([]byte(`{ "a": 1}`)),
+					JsonArray:  *value.NewDynamic([]byte(`[{ "a": 1}, { "a": 2}]`)),
 				},
 			},
 		},
@@ -500,7 +311,7 @@ func TestQueries(t *testing.T) {
 				azkustodata.RequestDescription("9bff424f-711d-48b8-9a6e-d3a618748334"), azkustodata.Application("aaa"), azkustodata.User("bbb"),
 				azkustodata.CustomQueryOption("additional", "additional")},
 			qcall: client.Query,
-			doer: func(row *table.Row, update interface{}) error {
+			doer: func(row query.Row, update interface{}) error {
 				rec := testshared.CountResult{}
 				if err := row.ToStruct(&rec); err != nil {
 					return err
@@ -534,7 +345,7 @@ func TestQueries(t *testing.T) {
 				}()
 			}
 
-			var iter *azkustodata.RowIterator
+			var dataset query.Dataset
 			var err error
 			switch {
 			case test.qcall != nil:
@@ -542,16 +353,16 @@ func TestQueries(t *testing.T) {
 				if test.options != nil {
 					options = test.options.([]azkustodata.QueryOption)
 				}
-				iter, err = test.qcall(context.Background(), testConfig.Database, test.stmt, options...)
+				dataset, err = test.qcall(context.Background(), testConfig.Database, test.stmt, options...)
 
 				require.Nilf(t, err, "TestQueries(%s): had test.qcall error: %s", test.desc, err)
 
 			case test.mcall != nil:
-				var options []azkustodata.MgmtOption
+				var options []azkustodata.QueryOption
 				if test.options != nil {
-					options = test.options.([]azkustodata.MgmtOption)
+					options = test.options.([]azkustodata.QueryOption)
 				}
-				iter, err = test.mcall(context.Background(), testConfig.Database, test.stmt, options...)
+				dataset, err = test.mcall(context.Background(), testConfig.Database, test.stmt, options...)
 
 				require.Nilf(t, err, "TestQueries(%s): had test.mcall error: %s", test.desc, err)
 
@@ -580,17 +391,91 @@ func TestQueries(t *testing.T) {
 				require.Fail(t, "test setup failure")
 			}
 
-			defer iter.Stop()
-
 			var got = test.gotInit()
-			err = iter.DoOnRowOrError(func(row *table.Row, e *errors.Error) error {
-				return test.doer(row, got)
-			})
+			results := dataset.Tables()
 
-			require.Nilf(t, err, "TestQueries(%s): had iter.Do() error: %s", test.desc, err)
+			if test.want2 != nil {
+				var got = test.gotInit()
+				assert.Len(t, results, 2)
+				rows := results[1].Rows()
+
+				assert.Len(t, rows, 1)
+
+				err = test.doer(rows[0], got)
+
+				require.Nilf(t, err, "TestQueries(%s): had dataset.Do() error: %s", test.desc, err)
+
+				require.Equal(t, test.want2, got)
+			} else {
+				if _, ok := dataset.(v1.Dataset); ok {
+					assert.Equal(t, "QueryResult", results[0].Kind())
+				} else {
+					assert.Equal(t, "PrimaryResult", results[0].Kind())
+					assert.Equal(t, "QueryProperties", results[1].Kind())
+					assert.Equal(t, "QueryCompletionInformation", results[2].Kind())
+				}
+			}
+
+			rows := results[0].Rows()
+
+			assert.Greaterf(t, len(rows), 0, "TestQueries(%s): had no rows", test.desc)
+
+			err = test.doer(rows[0], got)
+
+			require.Nilf(t, err, "TestQueries(%s): had dataset.Do() error: %s", test.desc, err)
 
 			require.Equal(t, test.want, got)
 		})
+	}
+}
+
+func TestIterativeQuery(t *testing.T) {
+	t.Parallel()
+
+	if skipETOE || testing.Short() {
+		t.Skipf("end to end tests disabled: missing config.json file in etoe directory")
+	}
+
+	_, cancel := context.WithCancel(context.Background())
+	defer cancel()
+	client, err := azkustodata.New(testConfig.kcsb)
+	if err != nil {
+		panic(err)
+	}
+
+	t.Cleanup(func() {
+		t.Log("Closing client")
+		require.NoError(t, client.Close())
+		t.Log("Closed client")
+	})
+
+	allDataTypesTable := fmt.Sprintf("goe2e_v2_all_data_types_%d_%d", time.Now().UnixNano(), rand.Int())
+	err = testshared.CreateAllDataTypesTable(t, client, allDataTypesTable)
+	require.NoError(t, err)
+
+	err = testshared.CreateAllDataTypesNullTable(t, client, allDataTypesTable+"_null")
+	require.NoError(t, err)
+
+	dataset, err := client.IterativeQuery(context.Background(), testConfig.Database, kql.New("").AddTable(allDataTypesTable).AddLiteral(";").AddTable(allDataTypesTable+"_null"))
+
+	require.NoError(t, err)
+
+	res := getExpectedResult()
+
+	for tableResult := range dataset.Tables() {
+		require.NoError(t, tableResult.Err())
+
+		tb := tableResult.Table()
+		if tb.Name() == allDataTypesTable {
+			structs, errs := query.ToStructs[AllDataType](tb)
+			require.Nil(t, errs)
+			require.Equal(t, []AllDataType{res}, structs)
+		}
+		if tb.Name() == allDataTypesTable+"_null" {
+			structs, errs := query.ToStructs[AllDataType](tb)
+			require.Nil(t, errs)
+			require.Equal(t, []AllDataType{{}}, structs)
+		}
 	}
 }
 
@@ -616,7 +501,7 @@ func TestStatement(t *testing.T) {
 	})
 
 	allDataTypesTable := fmt.Sprintf("goe2e_all_data_types_%d_%d", time.Now().UnixNano(), rand.Int())
-	require.NoError(t, testshared.CreateTestTable(t, client, allDataTypesTable, true))
+	require.NoError(t, testshared.CreateAllDataTypesTable(t, client, allDataTypesTable))
 	dt, err := time.Parse(time.RFC3339Nano, "2020-03-04T14:05:01.3109965Z")
 	require.NoError(t, err)
 	ts, err := time.ParseDuration("1h23m45.6789s")
@@ -637,7 +522,7 @@ func TestStatement(t *testing.T) {
 		qjcall   queryJsonFunc
 		options  interface{} // either []azkustodata.QueryOption or []azkustodata.MgmtOption
 		// doer is called from within the function passed to RowIterator.Do(). It allows us to collect the data we receive.
-		doer func(row *table.Row, update interface{}) error
+		doer func(row query.Row, update interface{}) error
 		// gotInit creates the variable that will be used by doer's update argument.
 		gotInit func() interface{}
 		// want is the data we want to receive from the query.
@@ -657,6 +542,9 @@ func TestStatement(t *testing.T) {
 				AddFunction("tostring").AddLiteral("(").AddColumn("vobj").AddLiteral(")").
 				AddLiteral(" == ").AddFunction("tostring").AddLiteral("(").
 				AddDynamic(map[string]interface{}{"moshe": "value"}).AddLiteral(")").AddLiteral(" and ").
+				AddFunction("tostring").AddLiteral("(").
+				AddColumn("vobj").AddLiteral(")").AddLiteral(" == ").AddFunction("tostring").AddLiteral("(").
+				AddSerializedDynamic([]byte("{\"moshe\": \"value\"}")).AddLiteral(")").AddLiteral(" and ").
 				AddColumn("vb").AddLiteral(" == ").AddBool(true).AddLiteral(" and ").
 				AddColumn("vreal").AddLiteral(" == ").AddReal(0.01).AddLiteral(" and ").
 				AddColumn("vstr").AddLiteral(" == ").AddString("asdf").AddLiteral(" and ").
@@ -664,7 +552,7 @@ func TestStatement(t *testing.T) {
 				AddColumn("vguid").AddLiteral(" == ").AddGUID(guid),
 			options: []azkustodata.QueryOption{},
 			qcall:   client.Query,
-			doer: func(row *table.Row, update interface{}) error {
+			doer: func(row query.Row, update interface{}) error {
 				rec := AllDataType{}
 				if err := row.ToStruct(&rec); err != nil {
 					return err
@@ -672,18 +560,7 @@ func TestStatement(t *testing.T) {
 
 				valuesRec := AllDataType{}
 
-				err := row.ExtractValues(&valuesRec.Vnum,
-					&valuesRec.Vdec,
-					&valuesRec.Vdate,
-					&valuesRec.Vspan,
-					&valuesRec.Vobj,
-					&valuesRec.Vb,
-					&valuesRec.Vreal,
-					&valuesRec.Vstr,
-					&valuesRec.Vlong,
-					&valuesRec.Vguid,
-				)
-
+				err := row.ToStruct(&valuesRec)
 				if err != nil {
 					return err
 				}
@@ -703,7 +580,18 @@ func TestStatement(t *testing.T) {
 		},
 		{
 			desc: "Complex query with Builder Builder and parameters",
-			stmt: kql.New("table(tableName) | where vnum == num and vdec == dec and vdate == dt and vspan == span and tostring(vobj) == tostring(obj) and vb == b and vreal == rl and vstr == str and vlong == lg and vguid == guid"),
+			stmt: kql.New("").
+				AddLiteral("table(tableName)").
+				AddLiteral(" | where vnum == num").
+				AddLiteral(" and vdec == dec").
+				AddLiteral(" and vdate == dt").
+				AddLiteral(" and vspan == span").
+				AddLiteral(" and tostring(vobj) == tostring(obj)").
+				AddLiteral(" and vb == b").
+				AddLiteral(" and vreal == rl").
+				AddLiteral(" and vstr == str").
+				AddLiteral(" and vlong == lg").
+				AddLiteral(" and vguid == guid"),
 			options: []azkustodata.QueryOption{azkustodata.QueryParameters(kql.NewParameters().
 				AddString("tableName", allDataTypesTable).
 				AddInt("num", 1).
@@ -719,7 +607,7 @@ func TestStatement(t *testing.T) {
 				AddLong("lg", 9223372036854775807).
 				AddGUID("guid", guid))},
 			qcall: client.Query,
-			doer: func(row *table.Row, update interface{}) error {
+			doer: func(row query.Row, update interface{}) error {
 				rec := AllDataType{}
 				if err := row.ToStruct(&rec); err != nil {
 					return err
@@ -727,18 +615,7 @@ func TestStatement(t *testing.T) {
 
 				valuesRec := AllDataType{}
 
-				err := row.ExtractValues(&valuesRec.Vnum,
-					&valuesRec.Vdec,
-					&valuesRec.Vdate,
-					&valuesRec.Vspan,
-					&valuesRec.Vobj,
-					&valuesRec.Vb,
-					&valuesRec.Vreal,
-					&valuesRec.Vstr,
-					&valuesRec.Vlong,
-					&valuesRec.Vguid,
-				)
-
+				err := row.ToStruct(&valuesRec)
 				if err != nil {
 					return err
 				}
@@ -763,7 +640,7 @@ func TestStatement(t *testing.T) {
 				AddString("tableName", "goe2e_all_data_types\"").
 				AddString("txt", "asdf"))},
 			qcall: client.Query,
-			doer: func(row *table.Row, update interface{}) error {
+			doer: func(row query.Row, update interface{}) error {
 				rec := AllDataType{}
 				if err := row.ToStruct(&rec); err != nil {
 					return err
@@ -771,18 +648,7 @@ func TestStatement(t *testing.T) {
 
 				valuesRec := AllDataType{}
 
-				err := row.ExtractValues(&valuesRec.Vnum,
-					&valuesRec.Vdec,
-					&valuesRec.Vdate,
-					&valuesRec.Vspan,
-					&valuesRec.Vobj,
-					&valuesRec.Vb,
-					&valuesRec.Vreal,
-					&valuesRec.Vstr,
-					&valuesRec.Vlong,
-					&valuesRec.Vguid,
-				)
-
+				err := row.ToStruct(&valuesRec)
 				if err != nil {
 					return err
 				}
@@ -819,7 +685,7 @@ func TestStatement(t *testing.T) {
 				}()
 			}
 
-			var iter *azkustodata.RowIterator
+			var res query.Dataset
 			var err error
 			switch {
 			case test.qcall != nil:
@@ -827,7 +693,7 @@ func TestStatement(t *testing.T) {
 				if test.options != nil {
 					options = test.options.([]azkustodata.QueryOption)
 				}
-				iter, err = test.qcall(context.Background(), testConfig.Database, test.stmt, options...)
+				res, err = test.qcall(context.Background(), testConfig.Database, test.stmt, options...)
 				if (!test.failFlag && err != nil) || (test.failFlag && err == nil) {
 					require.Nilf(t, err, "TestQueries(%s): had iter.Do() error: %s.", test.desc, err)
 				}
@@ -837,11 +703,11 @@ func TestStatement(t *testing.T) {
 			}
 
 			var got = test.gotInit()
-			if iter != nil {
-				defer iter.Stop()
-				err = iter.DoOnRowOrError(func(row *table.Row, e *errors.Error) error {
-					return test.doer(row, got)
-				})
+			if res != nil {
+				rows := res.Tables()[0].Rows()
+				assert.Len(t, rows, 1)
+				err = test.doer(rows[0], got)
+
 				require.Nilf(t, err, "TestQueries(%s): had iter.Do() error: %s.", test.desc, err)
 			}
 
@@ -864,10 +730,7 @@ func TestNoRedirects(t *testing.T) {
 				t.Log("Closed client")
 			})
 
-			q, err := client.Query(context.Background(), "db", kql.New("table"))
-			if q != nil {
-				defer q.Stop()
-			}
+			_, err = client.Query(context.Background(), "db", kql.New("table"))
 			require.Error(t, err)
 			assert.Contains(t, err.Error(), fmt.Sprintf("%d", code))
 		})
@@ -882,10 +745,8 @@ func TestNoRedirects(t *testing.T) {
 				t.Log("Closed client")
 			})
 
-			q, err := client.Query(context.Background(), "db", kql.New("table"))
-			if q != nil {
-				defer q.Stop()
-			}
+			_, err = client.Query(context.Background(), "db", kql.New("table"))
+
 			require.Error(t, err)
 			convErr, ok := err.(*errors.HttpError)
 			require.True(t, ok)
@@ -909,13 +770,10 @@ func getExpectedResult() AllDataType {
 	}
 
 	return AllDataType{
-		Vnum: 1,
-		Vdec: value.Decimal{
-			Value: "2.00000000000001",
-			Valid: true,
-		},
+		Vnum:  1,
+		Vdec:  *value.NewDecimal(decimal.RequireFromString("2.00000000000001")),
 		Vdate: t,
-		Vspan: value.Timespan{Value: d, Valid: true},
+		Vspan: *value.NewTimespan(d),
 		Vobj: map[string]interface{}{
 			"moshe": "value",
 		},
@@ -923,10 +781,7 @@ func getExpectedResult() AllDataType {
 		Vreal: 0.01,
 		Vstr:  "asdf",
 		Vlong: 9223372036854775807,
-		Vguid: value.GUID{
-			Value: g,
-			Valid: true,
-		},
+		Vguid: *value.NewGUID(g),
 	}
 }
 
@@ -942,12 +797,8 @@ func TestError(t *testing.T) {
 		t.Log("Closed client")
 	})
 
-	q, err := client.Query(context.Background(), testConfig.Database, kql.New("table(tableName) | count"),
+	_, err = client.Query(context.Background(), testConfig.Database, kql.New("table(tableName) | count"),
 		azkustodata.QueryParameters(kql.NewParameters().AddString("tableName", uuid.NewString())))
-
-	if q != nil {
-		defer q.Stop()
-	}
 
 	kustoError, ok := errors.GetKustoError(err)
 	require.True(t, ok)

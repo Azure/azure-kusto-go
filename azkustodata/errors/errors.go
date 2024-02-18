@@ -40,6 +40,7 @@ const (
 	OpFileIngest    Op = 5 // OpFileIngest indicates the client is making a file ingestion call.
 	OpCloudInfo     Op = 6 // OpCloudInfo indicates an error fetching data from the cloud metadata.
 	OpTokenProvider Op = 7 // OpTokenProvider indicates an error creating a token provider.
+	OpTableAccess   Op = 8 // OpTableAccess indicates an error accessing a table.
 )
 
 // Kind field classifies the error as one of a set of standard conditions.
@@ -47,16 +48,19 @@ type Kind uint16
 
 //go:generate stringer -type Kind
 const (
-	KOther           Kind = 0 // Other indicates the error kind was not defined.
-	KIO              Kind = 1 // External I/O error such as network failure.
-	KInternal        Kind = 2 // Internal error or inconsistency at the server.
-	KDBNotExist      Kind = 3 // Database does not exist.
-	KTimeout         Kind = 4 // The request timed out.
-	KLimitsExceeded  Kind = 5 // The request was too large.
-	KClientArgs      Kind = 6 // The client supplied some type of arg(s) that were invalid.
-	KHTTPError       Kind = 7 // The HTTP client gave some type of error. This wraps the http library error types.
-	KBlobstore       Kind = 8 // The Blobstore API returned some type of error.
-	KLocalFileSystem Kind = 9 // The local fileystem had an error. This could be permission, missing file, etc....
+	KOther           Kind = 0  // Other indicates the error kind was not defined.
+	KIO              Kind = 1  // External I/O error such as network failure.
+	KInternal        Kind = 2  // Internal error or inconsistency at the server.
+	KDBNotExist      Kind = 3  // Database does not exist.
+	KTimeout         Kind = 4  // The request timed out.
+	KLimitsExceeded  Kind = 5  // The request was too large.
+	KClientArgs      Kind = 6  // The client supplied some type of arg(s) that were invalid.
+	KHTTPError       Kind = 7  // The HTTP client gave some type of error. This wraps the http library error types.
+	KBlobstore       Kind = 8  // The Blobstore API returned some type of error.
+	KLocalFileSystem Kind = 9  // The local fileystem had an error. This could be permission, missing file, etc....,
+	KWrongTableKind  Kind = 10 // The kind of the table requested did not match the kind of the table.
+	KWrongColumnType Kind = 11 // The type of the column requested did not match the type of the column.
+	KFailedToParse   Kind = 12 // The client failed to parse the value.
 )
 
 // Error is a core error for the Kusto package.
@@ -223,7 +227,12 @@ func ES(o Op, k Kind, s string, args ...interface{}) *Error {
 
 // HTTP constructs an *Error from an *http.Response and a prefix to the error message.
 func HTTP(o Op, status string, statusCode int, body io.ReadCloser, prefix string) *HttpError {
-	defer body.Close()
+	defer func(body io.ReadCloser) {
+		err := body.Close()
+		if err != nil {
+			// TODO: Handle this when we have a logger.
+		}
+	}(body)
 	bodyBytes, err := io.ReadAll(body)
 	if err != nil {
 		bodyBytes = []byte(fmt.Sprintf("Failed to read body: %v", err))
@@ -412,6 +421,66 @@ func (c CombinedError) Error() string {
 	return result
 }
 
-func GetCombinedError(errs ...error) *CombinedError {
-	return &CombinedError{Errors: errs}
+// Flatten flattens and combines errors. If the error is not a *CombinedError, it is returned as is.
+func Flatten(e error) error {
+	if c, ok := e.(*CombinedError); ok {
+		if len(c.Errors) == 0 {
+			return nil
+		}
+		errorQueue := make([]error, 0, len(c.Errors))
+		errorSet := make(map[string]bool, len(c.Errors))
+
+		for _, err := range c.Errors {
+			errorQueue = append(errorQueue, err)
+		}
+
+		res := make([]error, 0, len(errorQueue))
+
+		for len(errorQueue) > 0 {
+			err := errorQueue[0]
+			errorQueue = errorQueue[1:]
+			if combined, ok := err.(*CombinedError); ok {
+				for _, err := range combined.Errors {
+					if _, ok := errorSet[err.Error()]; !ok {
+						errorSet[err.Error()] = true
+						errorQueue = append(errorQueue, err)
+					}
+				}
+			} else {
+				if _, ok := errorSet[err.Error()]; !ok {
+					errorSet[err.Error()] = true
+					res = append(res, err)
+				}
+			}
+		}
+
+		if len(res) == 0 {
+			return nil
+		}
+		if len(res) == 1 {
+			return res[0]
+		}
+		return &CombinedError{Errors: res}
+	} else {
+		return e
+	}
+}
+
+func TryCombinedError(errs ...error) error {
+	// filter out nil errors
+	nonulls := make([]error, 0, len(errs))
+	for _, err := range errs {
+		if err != nil {
+			nonulls = append(nonulls, err)
+		}
+	}
+
+	if len(nonulls) == 0 {
+		return nil
+	}
+	if len(nonulls) == 1 {
+		return Flatten(nonulls[0])
+	}
+
+	return Flatten(&CombinedError{Errors: nonulls})
 }

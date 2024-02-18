@@ -18,7 +18,7 @@ import (
 )
 
 const (
-	scheme  string = "(rownumber:int, rowguid:string, xdouble:real, xfloat:real, xbool:bool, xint16:int, xint32:int, xint64:long, xuint8:long, xuint16:long, xuint32:long, xuint64:long, xdate:datetime, xsmalltext:string, xtext:string, xnumberAsText:string, xtime:timespan, xtextWithNulls:string, xdynamicWithNulls:dynamic)"
+	schema  string = "(rownumber:int, rowguid:string, xdouble:real, xfloat:real, xbool:bool, xint16:int, xint32:int, xint64:long, xuint8:long, xuint16:long, xuint32:long, xuint64:long, xdate:datetime, xsmalltext:string, xtext:string, xnumberAsText:string, xtime:timespan, xtextWithNulls:string, xdynamicWithNulls:dynamic)"
 	csvFile string = "testdata/dataset.csv"
 )
 
@@ -49,7 +49,7 @@ func TestIngestionStatus(t *testing.T) {
 		t.Log("Closed ingestor")
 	})
 
-	err = testshared.CreateTestTableWithDBAndScheme(t, client, testConfig.Database, tableName, false, scheme)
+	err = testshared.CreateTestTableWithDBAndScheme(t, client, testConfig.Database, tableName, schema, "", "")
 	require.NoError(t, err)
 
 	// Change the ingestion batching time
@@ -243,7 +243,12 @@ func TestIngestionStatus(t *testing.T) {
 
 		f, err := os.Open(csvFile)
 		require.NoError(t, err)
-		defer f.Close()
+		defer func(f *os.File) {
+			err := f.Close()
+			if err != nil {
+				require.NoError(t, err)
+			}
+		}(f)
 
 		reader, writer := io.Pipe()
 		go func() {

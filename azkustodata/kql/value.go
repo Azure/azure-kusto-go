@@ -4,49 +4,40 @@ import (
 	"fmt"
 	"github.com/Azure/azure-kusto-go/azkustodata/types"
 	"github.com/Azure/azure-kusto-go/azkustodata/value"
+	"github.com/google/uuid"
+	"github.com/shopspring/decimal"
 	"time"
 )
 
-type Value interface {
-	fmt.Stringer
-	Value() interface{}
-	Type() types.Column
-}
+func QuoteValue(v value.Kusto) string {
+	val := v.GetValue()
+	t := v.GetType()
+	if val == nil {
+		return fmt.Sprintf("%v(null)", t)
+	}
 
-type kqlValue struct {
-	value     interface{}
-	kustoType types.Column
-}
-
-func (v *kqlValue) Value() interface{} {
-	return v.value
-}
-
-func (v *kqlValue) Type() types.Column {
-	return v.kustoType
-}
-
-func (v *kqlValue) String() string {
-	val := v.value
-	switch v.kustoType {
+	switch t {
 	case types.String:
-		return QuoteString(val.(string), false)
+		return QuoteString(v.String(), false)
 	case types.DateTime:
-		val = FormatDatetime(val.(time.Time))
+		val = FormatDatetime(*val.(*time.Time))
 	case types.Timespan:
-		val = FormatTimespan(val.(time.Duration))
+		val = FormatTimespan(*val.(*time.Duration))
 	case types.Dynamic:
-		got := value.Dynamic{}
-		_ = got.Unmarshal(val)
-		val = got
+		val = string(*val.(*[]byte))
+	case types.Bool:
+		val = *val.(*bool)
+	case types.Int:
+		val = *val.(*int32)
+	case types.Long:
+		val = *val.(*int64)
+	case types.Real:
+		val = *val.(*float64)
+	case types.Decimal:
+		val = *val.(*decimal.Decimal)
+	case types.GUID:
+		val = *val.(*uuid.UUID)
 	}
 
-	return fmt.Sprintf("%v(%v)", v.kustoType, val)
-}
-
-func newValue(value interface{}, kustoType types.Column) Value {
-	return &kqlValue{
-		value:     value,
-		kustoType: kustoType,
-	}
+	return fmt.Sprintf("%v(%v)", t, val)
 }

@@ -52,8 +52,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ## [0.14.1] - 2023-09-27
 
 ### Added
-
 - Support new playfab domain
+
 
 ### Fixed
 

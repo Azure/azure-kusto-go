@@ -3,34 +3,48 @@ package value
 import (
 	"encoding/json"
 	"fmt"
+	"github.com/Azure/azure-kusto-go/azkustodata/types"
 	"math"
 	"reflect"
-	"strconv"
 )
 
-// Int represents a Kusto int type. Values int type's are int32 values.  Int implements Kusto.
+// Int represents a Kusto boolean type. Bool implements Kusto.
 type Int struct {
-	// Value holds the value of the type.
-	Value int32
-	// Valid indicates if this value was set.
-	Valid bool
+	pointerValue[int32]
 }
 
-func (Int) isKustoVal() {}
+func NewInt(v int32) *Int {
+	return &Int{newPointerValue[int32](&v)}
+}
 
-// String implements fmt.Stringer.
-func (in Int) String() string {
-	if !in.Valid {
-		return ""
+func NewNullInt() *Int {
+	return &Int{newPointerValue[int32](nil)}
+}
+
+// Convert Int into reflect value.
+func (in *Int) Convert(v reflect.Value) error {
+	if TryConvert[int32](*in, &in.pointerValue, v) {
+		return nil
 	}
-	return strconv.Itoa(int(in.Value))
+
+	if v.Type().Kind() == reflect.Int {
+		if in.value != nil {
+			v.SetInt(int64(*in.value))
+		}
+		return nil
+	}
+
+	return convertError(in, v)
 }
 
-// Unmarshal unmarshals i into Int. i must be an int32 or nil.
+// GetType returns the type of the value.
+func (in *Int) GetType() types.Column {
+	return types.Int
+}
+
 func (in *Int) Unmarshal(i interface{}) error {
 	if i == nil {
-		in.Value = 0
-		in.Valid = false
+		in.value = nil
 		return nil
 	}
 
@@ -41,48 +55,23 @@ func (in *Int) Unmarshal(i interface{}) error {
 		var err error
 		myInt, err = v.Int64()
 		if err != nil {
-			return fmt.Errorf("Column with type 'int' had value json.Number that had error on .Int64(): %s", err)
+			return parseError(in, i, err)
 		}
 	case float64:
 		if v != math.Trunc(v) {
-			return fmt.Errorf("Column with type 'int' had value float64(%v) that did not represent a whole number", v)
+			return parseError(in, i, fmt.Errorf("float64 value was not an integer"))
 		}
 		myInt = int64(v)
 	case int:
 		myInt = int64(v)
 	default:
-		return fmt.Errorf("Column with type 'int' had value that was not a json.Number or int, was %T", i)
+		return convertError(in, i)
 	}
 
 	if myInt > math.MaxInt32 {
-		return fmt.Errorf("Column with type 'int' had value that was greater than an int32 can hold, was %d", myInt)
+		return parseError(in, i, fmt.Errorf("value was too large for int32"))
 	}
-	in.Value = int32(myInt)
-	in.Valid = true
+	val := int32(myInt)
+	in.value = &val
 	return nil
-}
-
-// Convert Int into reflect value.
-func (in Int) Convert(v reflect.Value) error {
-	t := v.Type()
-	switch {
-	case t.Kind() == reflect.Int32:
-		if in.Valid {
-			v.Set(reflect.ValueOf(in.Value))
-		}
-		return nil
-	case t.ConvertibleTo(reflect.TypeOf(new(int32))):
-		if in.Valid {
-			i := &in.Value
-			v.Set(reflect.ValueOf(i))
-		}
-		return nil
-	case t.ConvertibleTo(reflect.TypeOf(Int{})):
-		v.Set(reflect.ValueOf(in))
-		return nil
-	case t.ConvertibleTo(reflect.TypeOf(&Int{})):
-		v.Set(reflect.ValueOf(&in))
-		return nil
-	}
-	return fmt.Errorf("Column was type Kusto.Int, receiver had base Kind %s ", t.Kind())
 }

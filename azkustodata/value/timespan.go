@@ -2,6 +2,7 @@ package value
 
 import (
 	"fmt"
+	"github.com/Azure/azure-kusto-go/azkustodata/types"
 	"reflect"
 	"strconv"
 	"strings"
@@ -12,30 +13,34 @@ const tick = 100 * time.Nanosecond
 
 // Timespan represents a Kusto timespan type.  Timespan implements Kusto.
 type Timespan struct {
-	// Value holds the value of the type.
-	Value time.Duration
-	// Valid indicates if this value was set.
-	Valid bool
+	pointerValue[time.Duration]
 }
 
-func (Timespan) isKustoVal() {}
+func NewTimespan(v time.Duration) *Timespan {
+	return &Timespan{newPointerValue[time.Duration](&v)}
+}
 
-// String implements fmt.Stringer.
-func (t Timespan) String() string {
-	if !t.Valid {
-		return ""
+func NewNullTimespan() *Timespan {
+	return &Timespan{newPointerValue[time.Duration](nil)}
+}
+
+func TimespanFromString(s string) (*Timespan, error) {
+	t := &Timespan{}
+	err := t.Unmarshal(s)
+	if err != nil {
+		return nil, err
 	}
-	return t.Value.String()
+	return t, nil
 }
 
 // Marshal marshals the Timespan into a Kusto compatible string. The string is the contant invariant(c)
 // format. See https://docs.microsoft.com/en-us/dotnet/standard/base-types/standard-timespan-format-strings .
-func (t Timespan) Marshal() string {
+func (t *Timespan) Marshal() string {
 	const (
 		day = 24 * time.Hour
 	)
 
-	if !t.Valid {
+	if t.value == nil {
 		return "00:00:00"
 	}
 
@@ -43,12 +48,12 @@ func (t Timespan) Marshal() string {
 	// For example, after we write to our string the number of days that value had, we remove those days
 	// from the duration. We continue doing this until val only holds values < 10 millionth of a second (tick)
 	// as that is the lowest precision in our string representation.
-	val := t.Value
+	val := *t.value
 
 	sb := strings.Builder{}
 
 	// Add a - sign if we have a negative value. Convert our value to positive for easier processing.
-	if t.Value < 0 {
+	if val < 0 {
 		sb.WriteString("-")
 		val = val * -1
 	}
@@ -95,14 +100,13 @@ func (t *Timespan) Unmarshal(i interface{}) error {
 	)
 
 	if i == nil {
-		t.Value = 0
-		t.Valid = false
+		t.value = nil
 		return nil
 	}
 
 	v, ok := i.(string)
 	if !ok {
-		return fmt.Errorf("Column with type 'timespan' had type %T", i)
+		return convertError(t, i)
 	}
 
 	negative := false
@@ -115,26 +119,26 @@ func (t *Timespan) Unmarshal(i interface{}) error {
 
 	sp := strings.Split(v, ":")
 	if len(sp) != 3 {
-		return fmt.Errorf("value to unmarshal into Timespan does not seem to fit format '00:00:00', where values are decimal(%s)", v)
+		return parseError(v, sp, fmt.Errorf("value to unmarshal into Timespan does not seem to fit format '00:00:00', where values are decimal(%s)", v))
 	}
 
 	var sum time.Duration
 
 	d, err := t.unmarshalDaysHours(sp[hoursIndex])
 	if err != nil {
-		return err
+		return parseError(v, sp, err)
 	}
 	sum += d
 
 	d, err = t.unmarshalMinutes(sp[minutesIndex])
 	if err != nil {
-		return err
+		return parseError(v, sp, err)
 	}
 	sum += d
 
 	d, err = t.unmarshalSeconds(sp[secondsIndex])
 	if err != nil {
-		return err
+		return parseError(v, sp, err)
 	}
 
 	sum += d
@@ -143,8 +147,7 @@ func (t *Timespan) Unmarshal(i interface{}) error {
 		sum = sum * time.Duration(-1)
 	}
 
-	t.Value = sum
-	t.Valid = true
+	t.value = &sum
 	return nil
 }
 
@@ -241,26 +244,35 @@ func (t *Timespan) unmarshalSeconds(s string) (time.Duration, error) {
 }
 
 // Convert Timespan into reflect value.
-func (ts Timespan) Convert(v reflect.Value) error {
-	t := v.Type()
+func (t *Timespan) Convert(v reflect.Value) error {
+	pt := v.Type()
 	switch {
-	case t.AssignableTo(reflect.TypeOf(time.Duration(0))):
-		if ts.Valid {
-			v.Set(reflect.ValueOf(ts.Value))
+	case pt.AssignableTo(reflect.TypeOf(time.Duration(0))):
+		if t.value != nil {
+			v.Set(reflect.ValueOf(*t.value))
 		}
 		return nil
-	case t.ConvertibleTo(reflect.TypeOf(new(time.Duration))):
-		if ts.Valid {
-			t := &ts.Value
-			v.Set(reflect.ValueOf(t))
+	case pt.ConvertibleTo(reflect.TypeOf(new(time.Duration))):
+		if t.value != nil {
+			pt := t.value
+			v.Set(reflect.ValueOf(pt))
 		}
 		return nil
-	case t.ConvertibleTo(reflect.TypeOf(Timespan{})):
-		v.Set(reflect.ValueOf(ts))
+	case pt.ConvertibleTo(reflect.TypeOf(Timespan{})):
+		v.Set(reflect.ValueOf(*t))
 		return nil
-	case t.ConvertibleTo(reflect.TypeOf(&Timespan{})):
-		v.Set(reflect.ValueOf(&ts))
+	case pt.ConvertibleTo(reflect.TypeOf(&Timespan{})):
+		v.Set(reflect.ValueOf(t))
 		return nil
 	}
-	return fmt.Errorf("Column was type Kusto.Timespan, receiver had base Kind %s ", t.Kind())
+	return convertError(t, v)
+}
+
+func TimespanString(d time.Duration) string {
+	return NewTimespan(d).Marshal()
+}
+
+// GetType returns the type of the value.
+func (t *Timespan) GetType() types.Column {
+	return types.Timespan
 }
