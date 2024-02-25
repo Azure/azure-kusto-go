@@ -1,4 +1,4 @@
-# Microsoft Azure Data Explorer Public Preview (Kusto) [![GoDoc](https://godoc.org/github.com/Azure/azure-kusto-go?status.svg)](https://pkg.go.dev/github.com/Azure/azure-kusto-go/azkustodata) [![GoDoc](https://godoc.org/github.com/Azure/azure-kusto-go?status.svg)](https://pkg.go.dev/github.com/Azure/azure-kusto-go/azkustoingest)
+# Microsoft Azure Data Explorer (Kusto) [![GoDoc](https://godoc.org/github.com/Azure/azure-kusto-go?status.svg)](https://pkg.go.dev/github.com/Azure/azure-kusto-go/azkustodata) [![GoDoc](https://godoc.org/github.com/Azure/azure-kusto-go?status.svg)](https://pkg.go.dev/github.com/Azure/azure-kusto-go/azkustoingest)
 
 - [About Azure Data Explorer](https://azure.microsoft.com/en-us/services/data-explorer/)
 - [Data Client documentation](https://godoc.org/github.com/Azure/azure-kusto-go/azkustodata)
@@ -11,13 +11,7 @@ Instead, there are two new packages:
 - `github.com/Azure/azure-kusto-go/azkustodata` - for query and management commands.
 - `github.com/Azure/azure-kusto-go/azkustoingest` - for interacting with the ingesting data.
 
-In addition, the way to construct ingest clients has changed, see below for more details.
-
-Required code changes to upgrade to v1.0.0:
-- Replace your `github.com/Azure/azure-kusto-go` imports with `github.com/Azure/azure-kusto-go/azkustodata` or `github.com/Azure/azure-kusto-go/azkustoingest` depending on your use case (Use tools or IDEs to do this)
-- Replace the `kusto` qualifier with `azkustodata`
-- Replace the `ingest` qualifier with `azkustoingest`
-- Change the constructors for your ingest clients
+For more information, see the [migration guide](MIGRATION.md).
 
 
 ## Intro

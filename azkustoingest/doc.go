@@ -1,87 +1,35 @@
 /*
-Package ingest provides data ingestion from various external sources into Kusto.
+Package azkustoingest provides a client for ingesting data into Azure Data Explorer (Kusto) clusters.
 
-For more information on Kusto Data Ingestion, please see: https://docs.microsoft.com/en-us/azure/kusto/management/data-ingestion/
+This package enables users to use different ingestion methods including queued, streaming, and managed ingestion from
+various sources such as local files, Azure Blob Storage urls, streams, or any `io.Reader`.
 
-# Create a client
+To start using this package, create an instance of the Ingestor, passing in a connection string built using the
+NewConnectionStringBuilder() function from the azkustodata package.
 
-Creating a client simply requires a *azkustodata.Client, the name of the database and the name of the table to be ingested into.
+Example FromFile usage:
 
-	in, err := azkustoingest.New(kustoClient, "database", "table")
+	kcsb := azkustodata.NewConnectionStringBuilder(`endpoint`).WithAadAppKey("clientID", "clientSecret", "tenentID")
+	ingestor, err := azkustoingest.New(kcsb, azkustoingest.WithDefaultDatabase("database"), azkustoingest.WithDefaultTable("table"))
+
 	if err != nil {
-		panic("add error handling")
+		// Handle error
 	}
 
-# Ingestion from a local file
+	defer ingestor.Close() // Always close the ingestor when done.
 
-Ingesting a local file requires simply passing the path to the file to be ingested:
+	ctx, cancel := context.WithTimeout(context.Background(), 10*time.Minute)
+	defer cancel()
 
-	if _, err := in.FromFile(ctx, "/path/to/a/local/file"); err != nil {
-		panic("add error handling")
-	}
+	_, err = ingestor.FromFile(ctx, "/path/to/file", azkustoingest.DeleteSource())
 
-FromFile() will accept Unix path names on Unix platforms and Windows path names on Windows platforms.
-The file will not be deleted after upload (there is an option that will allow that though).
+	... // Handle any errors and status
 
-# Ingestion from an Azure Blob Storage file
+The package supports advanced features such as status reporting to Kusto tables, file deletion after ingestion, and handling of
+retryable errors.
 
-This package will also accept ingestion from an Azure Blob Storage file:
-
-	if _, err := in.FromFile(ctx, "https://myaccount.blob.core.windows.net/$root/myblob"); err != nil {
-		panic("add error handling")
-	}
-
-This will ingest a file from Azure Blob Storage. We only support https:// paths and your domain name may differ than what is here.
-
-# Ingestion from an io.Reader
-
-Sometimes you want to ingest a stream of data that you have in memory without writing to disk.  You can do this simply by chunking the
-data via an io.Reader.
-
-	r, w := io.Pipe()
-
-	enc := json.NewEncoder(w)
-	go func() {
-		defer w.Close()
-		for _, data := range dataSet {
-			if err := enc.Encode(data); err != nil {
-				panic("add error handling")
-			}
-		}
-	}()
-
-	if _, err := in.FromReader(ctx, r); err != nil {
-		panic("add error handling")
-	}
-
-It is important to remember that FromReader() will terminate when it receives an io.EOF from the io.Reader.  Use io.Readers that won't
-return io.EOF until the io.Writer is closed (such as io.Pipe).
-
-# Ingestion with Status Reporting
-
-You can use Kusto Go SDK to get table-based status reporting of ingestion operations.
-Ingestion commands run using FromFile() and FromReader() return an error and a channel that can be waited upon for a final status.
-If the error is not nil, the operation has failed locally.
-If the error is nil and Table Status Reporting option was used, the SDK user can wait on the channel for a success (nil) or failure (Error) status.
-
-Note!
-This feature is not suitable for users running ingestion at high rates, and may slow down the ingestion operation.
-
-	status, err := ingestor.FromFile(ctx, "/path/to/file", azkustoingest.ReportResultToTable())
-	if err != nil {
-		// The ingestion command failed to be sent, Do something
-	}
-
-	err = <-status.Wait(ctx)
-	if err != nil {
-		// the operation complete with an error
-		if azkustoingest.IsRetryable(err) {
-			// Handle retries
-		} else {
-			// inspect the failure
-			// statusCode, _ := azkustoingest.GetIngestionStatus(err)
-			// failureStatus, _ := azkustoingest.GetIngestionFailureStatus(err)
-		}
-	}
+For complete documentation, please visit:
+https://github.com/Azure/azure-kusto-go
+https://pkg.go.dev/github.com/Azure/azure-kusto-go/azkustoingest
 */
 package azkustoingest
