@@ -68,7 +68,7 @@ kustoConnectionStringBuilder := azkustodata.NewConnectionStringBuilder(endpoint)
 
 Same for ingestion operations:
 
-Old SDK Ingestion Client Creation:
+Old SDK Ingestion Client Creation(Queued Example):
 ```go
 in, err := ingest.New(kustoClient, "database", "table")
 ```
