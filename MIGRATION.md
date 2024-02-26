@@ -80,7 +80,7 @@ in, err := azkustoingest.New(kustoConnectionString)
 
 ## 3. Building Queries
 
-The new SDK introduces a new way to build queries.:
+The new SDK introduces a new way to build queries:
 The old SDK used a `kusto.NewStmt` method to build queries:
 ```go
     query := kusto.NewStmt("systemNodes | project CollectionTime, NodeId")
