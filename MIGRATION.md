@@ -6,7 +6,7 @@ The release of version `1.0.0` introduces breaking changes, which include change
 
 ## 1. Changes in Dependencies and go.mod File
 
-To migrate from the old SDK to the new one, you'll need to update your `go.mod` file's dependencies.
+To migrate to version 1.x from older versions, you'll need to update your `go.mod` file's dependencies.
 
 **Old SDK:**
 ```bash
