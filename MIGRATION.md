@@ -24,7 +24,7 @@ go get github.com/Azure/azure-kusto-go/azkustodata
 go get github.com/Azure/azure-kusto-go/azkustoingest
 ```
 
-Manually update your go.mod file by replacing `github.com/Azure/azure-kusto-go` with the specific package(s) you need.
+Alternatively, manually update your go.mod file by replacing `github.com/Azure/azure-kusto-go` with the specific package(s) you need.
 
 ## 2. Changes in Package Arrangement
 
@@ -58,12 +58,14 @@ For exmaple:
 
 Old SDK:
 ```go
-kustoConnectionStringBuilder := kusto.NewConnectionStringBuilder(endpoint)
+kscb := kusto.NewConnectionStringBuilder(endpoint)
+client, err = kusto.New(kscb)
 ```
 
 New SDK (For Data Operations):
 ```go
-kustoConnectionStringBuilder := azkustodata.NewConnectionStringBuilder(endpoint)
+kscb := azkustodata.NewConnectionStringBuilder(endpoint)
+client, err = azkustodata.New(kscb)
 ```
 
 Same for ingestion operations:
@@ -132,19 +134,64 @@ if err != nil {
 }
 ```
 
-The new SDK returns a dataset object, with the ability to handle different tables as they come:
+In 1.0.0, the "Query" method returns a dataset object, which contains all of the tables returned by the query. The primary results table(s) always come first, therefore in the common case, it's possible to access it like this:
+```go
+dataset, err := client.Query(ctx, "database", query)
+if err != nil {
+    panic("error handling")
+}
+
+primaryResult := dataset.Tables()[0]
+
+for _, row := range primaryResult.Rows() {
+    fmt.Println(row) // Process each row
+}
+```
+
+If needed, it's possible to iterate over the dataset and handle each table separately.
+```go
+import github.com/Azure/azure-kusto-go/azkustodata/query/v2
+
+for _, table := range dataset.Tables() {
+        switch table.Kind() {
+        case v2.QueryPropertiesKind:
+            queryProps, err := v2.AsQueryProperties(table)
+            if err != nil {
+                panic(err)
+            }
+            fmt.Printf("%v\n", queryProps[0].Value)
+        case v2.QueryCompletionInformationKind:
+            queryProps, err := v2.AsQueryCompletionInformation(table)
+            if err != nil {
+                panic(err)
+            }
+            fmt.Printf("%v\n", queryProps[0].ActivityId)
+        }
+        case v2.PrimaryResultKind:
+        for _, row := range table.Rows() {
+            fmt.Println(row) // Process each row
+        }
+}
+}
+```
+
+
+Alternatively, use the `QueryIterative` method to iterate tables as they arrive:
 ```go
 dataset, err := client.QueryIterative(ctx, "database", query)
 if err != nil {
     panic("error handling")
 }
+// Make sure to close the dataset when done.
 defer dataset.Close()
 
 for tableResult := range dataset.Tables() {
     if tableResult.Err() != nil {
         panic("table error handling")
     }
-    for rowResult := range primaryResult.Table().Rows() {
+	
+	// Make sure to consume the rows, or the Tables() channel will block.
+    for rowResult := range tableResult.Table().Rows() {
         if rowResult.Err() != nil {
             panic("row error handling")
         }
@@ -153,20 +200,6 @@ for tableResult := range dataset.Tables() {
 }
 ```
 
-You can also use the `Query` method to get all the results at once:
-```go
-dataset, err := client.Query(ctx, "database", query)
-if err != nil {
-    panic("error handling")
-}
-
-tables := dataset.Tables()
-for _, table := range tables {
-    for _, row := range table.Rows() {
-        fmt.Println(row) // Process each row
-    }
-}
-```
 
 Working with rows also got easier, with methods to extract specific types:
 ```go
