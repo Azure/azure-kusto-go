@@ -8,7 +8,13 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Changed
 
-- Changed binary files data format compression to false
+- Binary data formats are no longer compressed, as it is inefficient.
+
+### Fixed
+
+- Type aliases for int32 now work correctly when converting.
+
+
 
 ## [0.15.0] - 2023-12-04
 
