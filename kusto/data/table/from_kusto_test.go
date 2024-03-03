@@ -21,6 +21,8 @@ type SomeJSON struct {
 	ID   int
 }
 
+type IntAlias int32
+
 func TestFieldsConvert(t *testing.T) {
 	t.Parallel()
 
@@ -416,24 +418,27 @@ func TestFieldsConvert(t *testing.T) {
 			desc: "valid Int",
 			columns: Columns{
 				{Type: types.Int, Name: "int"},
+				{Type: types.Int, Name: "IntAlias"},
 				{Type: types.Int, Name: "ptrint"},
 				{Type: types.Int, Name: "kInt"},
 				{Type: types.Int, Name: "PtrkInt"},
 			},
 			k: value.Int{Value: 1, Valid: true},
 			ptrStruct: &struct {
-				Int     int32     `kusto:"int"`
-				PtrInt  *int32    `kusto:"ptrint"`
-				KInt    value.Int `kusto:"kInt"`
-				PtrkInt *value.Int
+				Int      int32 `kusto:"int"`
+				IntAlias IntAlias
+				PtrInt   *int32    `kusto:"ptrint"`
+				KInt     value.Int `kusto:"kInt"`
+				PtrkInt  *value.Int
 			}{},
 			err: false,
 			want: &struct {
-				Int     int32     `kusto:"int"`
-				PtrInt  *int32    `kusto:"ptrint"`
-				KInt    value.Int `kusto:"kInt"`
-				PtrkInt *value.Int
-			}{1, int32Ptr(1), value.Int{Value: 1, Valid: true}, &value.Int{Value: 1, Valid: true}},
+				Int      int32 `kusto:"int"`
+				IntAlias IntAlias
+				PtrInt   *int32    `kusto:"ptrint"`
+				KInt     value.Int `kusto:"kInt"`
+				PtrkInt  *value.Int
+			}{1, 1, int32Ptr(1), value.Int{Value: 1, Valid: true}, &value.Int{Value: 1, Valid: true}},
 		},
 		{
 			desc: "non-valid Int",
