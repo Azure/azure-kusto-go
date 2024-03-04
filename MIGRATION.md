@@ -232,8 +232,42 @@ Management commands are now called using the `Mgmt` method on the client, and ha
     fmt.Println(row) // Process each row
   }
 ```
+## 5. Queries with parameters
 
-## 5. Ingesting Data
+It is recommended to use parameters for queries that contain user input.  
+Management commands can not use parameters, and therefore should be built using the builder (see next section).
+
+Parameters can be implicitly referenced in a query:
+
+```go
+query := kql.New("systemNodes | project CollectionTime, NodeId | where CollectionTime > startTime and NodeId == nodeIdValue")
+```
+
+Here, `startTime` and `nodeIdValue` are parameters that can be passed to the query.
+
+To Pass the parameters values to the query, create `kql.Parameters`:
+
+```
+params :=  kql.NewParameters().AddDateTime("startTime", dt).AddInt("nodeIdValue", 1)
+```
+
+And then pass it to the `Query` method, as an option:
+```go
+results, err := client.Query(ctx, database, query, QueryParameters(params))
+if err != nil {
+    panic("add error handling")
+}
+
+// You can see the generated parameters using the ToDeclarationString() method:
+fmt.Println(params.ToDeclarationString()) // declare query_parameters(startTime:datetime, nodeIdValue:int);
+
+// You can then use the same query with different parameters:
+params2 :=  kql.NewParameters().AddDateTime("startTime", dt).AddInt("nodeIdValue", 2)
+dataset, err = client.Query(ctx, database, query, QueryParameters(params2))
+```
+
+
+## 6. Ingesting Data
 
 The Ingestion API stayed the same, only using the new package:
 ```go
