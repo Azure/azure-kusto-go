@@ -4,12 +4,13 @@ All notable changes to this project will be documented in this file.
 
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
-## [Unreleased]
+## [1.0.0]
 
 ### Added
 - [BREAKING] [MAJOR] Split the main module into two packages:
     - azkustodata - contains querying, management APIs.
     - azkustoingest - contains ingestion in all its forms.
+- [BREAKING] [MAJOR] New API for querying, see MIGRATION.md for more details.
 - [BREAKING] [MAJOR] Constructing ingest clients is now done using a KustoConnectionStringBuilder, and not a client struct.
 - [BREAKING] [MAJOR] Changes in the kusto type system
     - Decimal values are now represented as `decimal.Decimal` instead of `string`. This is to maintain efficiency and ease of use.
@@ -26,6 +27,12 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - ManagedStreamingClient constructor now only requires the query endpoint, and will infer the ingest endpoint from it. If you want to use a different endpoint, use the `azkustoingest.WithCustomIngestConnectionString()` option.
 - Removed the old deprecated Stream() method on queued ingest client, instead use azkustoingest.NewStreaming() or azkustoingest.NewManaged() for proper streaming ingest client.
 - Removed `QueryIngestion()` option for Query client. If you want to perform commands against the dm, create a query client with the "ingest-" endpoint.
+
+## [0.15.1] - 2024-03-04
+
+### Changed
+
+- Changed binary files data format compression to false
 
 ## [0.15.0] - 2023-12-04
 
