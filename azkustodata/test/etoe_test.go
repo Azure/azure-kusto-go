@@ -457,6 +457,7 @@ func TestIterativeQuery(t *testing.T) {
 	require.NoError(t, err)
 
 	dataset, err := client.IterativeQuery(context.Background(), testConfig.Database, kql.New("").AddTable(allDataTypesTable).AddLiteral(";").AddTable(allDataTypesTable+"_null"))
+	defer dataset.Close()
 
 	require.NoError(t, err)
 
