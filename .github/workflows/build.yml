@@ -1,8 +1,7 @@
 name: Go
-
 on:
   push:
-    branches: [ master ]
+    branches: [ "master" ]
   pull_request:
     branches: [ "**" ]
 
@@ -14,17 +13,16 @@ jobs:
       checks: write
       pull-requests: write
     steps:
-
       - name: Check out code into the Go module directory
         uses: actions/checkout@v2
 
       - name: Setup Golang with cache
         uses: magnetikonline/action-golang-cache@v3
         with:
-          go-version: '^1.19.0'
+          go-version: '^1.22.0'
 
       - name: Setup JUnit Report
-        run: go install github.com/jstemmer/go-junit-report/v2@bfac3ec
+        run: go install github.com/jstemmer/go-junit-report/v2@7933520
 
       - name: Set up tparse
         run: go install github.com/mfridman/tparse@latest
@@ -32,20 +30,23 @@ jobs:
       - name: Check Format
         run: if [ "$(gofmt -d -s -l . | tee /dev/fd/2 | wc -l)" -gt 0 ]; then exit 1; fi
 
+      - name: Go Work Sync
+        run: go work sync
+
       - name: Get dependencies
         run: |
-          cd kusto
+          cd azkustodata
           go get -v -t -d ./...
 
-      - name: Build
+      - name: Build data
         run: |
-          cd kusto
+          cd azkustodata
           go build -v ./...
 
-      - name: Run tests
+      - name: Run tests data
         run: |
-          cd kusto
-          go test -p 100 -race -coverprofile=coverage.out -json -v ./... 2>&1 > /tmp/gotest.log
+          cd azkustodata
+          go test -p 100 -race -coverprofile=coverage.out -json ./... 2>&1 > /tmp/gotest-data.log
         env:
           ENGINE_CONNECTION_STRING: ${{ secrets.ENGINE_CONNECTION_STRING }}
           AZURE_CLIENT_ID: ${{ secrets.APP_ID }}
@@ -56,22 +57,56 @@ jobs:
           SECONDARY_DATABASE: ${{ secrets.SECONDARY_DATABASE }}
           GOMAXPROCS: 200
 
-      - name: Display tests
+      - name: Get dependencies ingest
+        run: |
+          cd azkustoingest
+          go get -v -t -d ./...
+
+      - name: Build ingest
+        run: |
+          cd azkustoingest
+          go build -v ./...
+
+      - name: Run tests ingest
+        run: |
+          cd azkustoingest
+          go test -p 100 -race -coverprofile=coverage.out -json ./... 2>&1 > /tmp/gotest-ingest.log
+        env:
+          ENGINE_CONNECTION_STRING: ${{ secrets.ENGINE_CONNECTION_STRING }}
+          AZURE_CLIENT_ID: ${{ secrets.APP_ID }}
+          AZURE_CLIENT_SECRET: ${{ secrets.APP_KEY }}
+          AZURE_TENANT_ID: ${{ secrets.AUTH_ID }}
+          TEST_DATABASE: ${{ secrets.TEST_DATABASE }}
+          SECONDARY_ENGINE_CONNECTION_STRING: ${{ secrets.SECONDARY_ENGINE_CONNECTION_STRING }}
+          SECONDARY_DATABASE: ${{ secrets.SECONDARY_DATABASE }}
+          GOMAXPROCS: 200
+
+      - name: Display tests data
         if: always()
         run: |
-          tparse -all -file=/tmp/gotest.log
+          tparse -all -file=/tmp/gotest-data.log
 
-      - name: Parse tests
+      - name: Parse tests data
+        if: always()
+        run: cat /tmp/gotest-data.log | go-junit-report -parser gojson > report-data.xml
+
+      - name: Display tests ingest
         if: always()
         run: |
-          go-junit-report -parser gojson < /tmp/gotest.log > report.xml
+          tparse -all -file=/tmp/gotest-ingest.log
 
-      - name: Upload Test Results
+      - name: Parse tests ingest
         if: always()
-        uses: actions/upload-artifact@v2
+        run: cat /tmp/gotest-ingest.log | go-junit-report -parser gojson > report-ingest.xml
+
+      - name: Test Results
+        if: always()
+        uses: EnricoMi/publish-unit-test-result-action@v2
         with:
-          name: Unit Test Results
-          path: report.xml
+          files: report*.xml
+          report_individual_runs: true
+          report_suite_logs: error
+
       - name: Upload coverage to Codecov
         uses: codecov/codecov-action@v2
 
@@ -83,7 +118,6 @@ jobs:
     permissions:
       checks: write
       pull-requests: write
-      
     steps:
       - name: Download Artifacts
         uses: actions/download-artifact@v2

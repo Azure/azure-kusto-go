@@ -4,8 +4,8 @@ package ingestion
 import (
 	"context"
 	"fmt"
-	"github.com/Azure/azure-kusto-go/kusto/data/errors"
-	"github.com/Azure/azure-kusto-go/kusto/ingest"
+	"github.com/Azure/azure-kusto-go/azkustodata/errors"
+	"github.com/Azure/azure-kusto-go/azkustoingest"
 	"github.com/Azure/azure-kusto-go/quickstart/utils"
 	"time"
 )
@@ -27,7 +27,7 @@ func WaitForIngestionToComplete(waitForIngestSeconds int) {
 }
 
 // IngestSource Ingests both files and blob sources and handles error accordingly
-func IngestSource(ingestClient *ingest.Ingestion, DataSourceUri string, ctx context.Context, options []ingest.FileOption, databaseName string, tableName string, source string) {
+func IngestSource(ingestClient *azkustoingest.Ingestion, DataSourceUri string, ctx context.Context, options []azkustoingest.FileOption, databaseName string, tableName string, source string) {
 	_, err := ingestClient.FromFile(ctx, DataSourceUri, options...)
 
 	if err != nil {

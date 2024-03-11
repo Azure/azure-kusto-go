@@ -3,7 +3,7 @@ package authentication
 
 import (
 	"fmt"
-	"github.com/Azure/azure-kusto-go/kusto"
+	"github.com/Azure/azure-kusto-go/azkustodata"
 	"github.com/Azure/azure-kusto-go/quickstart/utils"
 	"os"
 )
@@ -18,10 +18,10 @@ const (
 )
 
 // GenerateConnectionString  Generates Kusto Connection String based on given Authentication Mode.
-func GenerateConnectionString(clusterUrl string, authenticationMode AuthenticationModeOptions) *kusto.ConnectionStringBuilder {
+func GenerateConnectionString(clusterUrl string, authenticationMode AuthenticationModeOptions) *azkustodata.ConnectionStringBuilder {
 	// Learn More: For additional information on how to authorize users and apps in Kusto, see:
 	// https://docs.microsoft.com/azure/data-explorer/manage-database-permissions
-	var kcs = kusto.NewConnectionStringBuilder(clusterUrl)
+	var kcs = azkustodata.NewConnectionStringBuilder(clusterUrl)
 	switch authenticationMode {
 	case UserPrompt:
 		// Prompt user for credentials
@@ -49,7 +49,7 @@ func GenerateConnectionString(clusterUrl string, authenticationMode Authenticati
 }
 
 // createApplicationCertificateConnectionString Generates Kusto Connection String based on 'AppCertificate' Authentication Mode
-func createApplicationCertificateConnectionString(kcs *kusto.ConnectionStringBuilder) *kusto.ConnectionStringBuilder {
+func createApplicationCertificateConnectionString(kcs *azkustodata.ConnectionStringBuilder) *azkustodata.ConnectionStringBuilder {
 	var appId = os.Getenv("APP_ID")
 	var cert = os.Getenv("PUBLIC_CERT_FILE_PATH")
 	var thumbprint = os.Getenv("CERT_THUMBPRINT")
