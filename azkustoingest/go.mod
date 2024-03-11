@@ -43,6 +43,3 @@ require (
 	golang.org/x/text v0.14.0 // indirect
 	gopkg.in/yaml.v3 v3.0.1 // indirect
 )
-
-// todo - azkustodata replace when version is available
-replace github.com/Azure/azure-kusto-go/azkustodata v1.0.0-preview => ../azkustodata
