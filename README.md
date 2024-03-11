@@ -4,14 +4,14 @@
 - [Data Client documentation](https://godoc.org/github.com/Azure/azure-kusto-go/azkustodata)
 - [Ingest Client documentation](https://godoc.org/github.com/Azure/azure-kusto-go/azkustoingest)
 
-# Version 1.0.0 Released (BREAKING CHANGES)
-Version 1.0.0 introduced a significant change to the package structure, aligning Azure-Kusto-Go with all other Kusto SDKs structure.
+# Version 1.0.0-preview Released (BREAKING CHANGES)
+Version 1.0.0-preview introduced a significant change to the package structure, aligning Azure-Kusto-Go with all other Kusto SDKs structure.
 The original package, `github.com/Azure/azure-kusto-go` is no longer published.
 Instead, there are two new packages:
 - `github.com/Azure/azure-kusto-go/azkustodata` - for query and management commands.
 - `github.com/Azure/azure-kusto-go/azkustoingest` - for interacting with the ingesting data.
 
-For more information, see the [migration guide](MIGRATION.md).
+For more information, see the [migration guide](MIGRATION.md) and [changelog](CHANGELOG.md)
 
 
 ## Intro
