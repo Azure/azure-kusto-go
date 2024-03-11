@@ -59,7 +59,9 @@ func (d *iterativeDataset) getNextFrame() *EveryFrame {
 
 	select {
 	case err := <-d.errorChannel:
-		d.reportError(err)
+		if err != nil {
+			d.reportError(err)
+		}
 		break
 	case <-d.Context().Done():
 		d.reportError(errors.ES(d.Op(), errors.KInternal, "context cancelled"))
@@ -83,13 +85,17 @@ func (d *iterativeDataset) Tables() <-chan query.TableResult {
 }
 
 func (d *iterativeDataset) Close() error {
-	close(d.results)
 	// try to close the error channel, but don't block if it's full
+	// If it's already closed, return
 	select {
-	case <-d.errorChannel:
+	case e := <-d.errorChannel:
+		if e == nil {
+			return nil
+		}
 	default:
 	}
 	close(d.errorChannel)
+	close(d.results)
 
 	return d.reader.Close()
 }
