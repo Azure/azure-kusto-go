@@ -1,7 +1,13 @@
-go 1.19
+go 1.22
 
 use (
-	./azkustodata
-	./azkustoingest
-	./quickstart
+	azkustodata
+	azkustoingest
+	quickstart
+)
+
+replace (
+	github.com/Azure/azure-kusto-go/azkustodata v1.0.0-preview => ./azkustodata
+	github.com/Azure/azure-kusto-go/azkustoingest v1.0.0-preview => ./azkustoingest
+	github.com/Azure/azure-kusto-go/quickstart v1.0.0-preview => ./quickstart
 )

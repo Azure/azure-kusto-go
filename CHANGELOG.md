@@ -4,15 +4,17 @@ All notable changes to this project will be documented in this file.
 
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
-## [1.0.0]
+## [1.0.0-preview]
 
 ### Added
+- [BREAKING] The minimal go version is now 1.22
 - [BREAKING] [MAJOR] Split the main module into two packages:
     - azkustodata - contains querying, management APIs.
     - azkustoingest - contains ingestion in all its forms.
 - [BREAKING] [MAJOR] New API for querying, see MIGRATION.md for more details.
 - [BREAKING] [MAJOR] Constructing ingest clients is now done using a KustoConnectionStringBuilder, and not a client struct.
-- [BREAKING] [MAJOR] Changes in the kusto type system
+- [BREAKING] [MAJOR] Changes in the kusto type system:
+    - Kusto values will now return a pointer when they are nullable. This applies to all types except for string.
     - Decimal values are now represented as `decimal.Decimal` instead of `string`. This is to maintain efficiency and ease of use.
 - In addition, passing a default database and table for ingestion is not necessary anymore, and can be done using Options.
    ```go

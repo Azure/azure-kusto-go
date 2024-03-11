@@ -51,10 +51,10 @@ jobs:
         # Details on CodeQL's query packs refer to : https://docs.github.com/en/code-security/code-scanning/automatically-scanning-your-code-for-vulnerabilities-and-errors/configuring-code-scanning#using-queries-in-ql-packs
         # queries: security-extended,security-and-quality
 
-    - name: Set up Go 1.19
+    - name: Set up Go 1.22
       uses: actions/setup-go@v3
       with:
-        go-version: '^1.19.0'
+        go-version: '^1.22.0'
     # Autobuild attempts to build any compiled languages  (C/C++, C#, or Java).
     # If this step fails, then you should remove it and run the build manually (see below)
     - name: Autobuild

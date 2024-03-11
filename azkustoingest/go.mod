@@ -1,6 +1,6 @@
 module github.com/Azure/azure-kusto-go/azkustoingest
 
-go 1.19
+go 1.22
 
 require (
 	github.com/Azure/azure-kusto-go/azkustodata v1.0.0-preview
