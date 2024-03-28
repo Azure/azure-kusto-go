@@ -398,7 +398,7 @@ func (m *Manager) fetchRetry(ctx context.Context) error {
 		if err != nil {
 			attempts++
 			if attempts > retryCount {
-				return fmt.Errorf("failed to fetch ingestion resources")
+				return fmt.Errorf("failed to fetch ingestion resources: %w", err)
 			}
 			time.Sleep(10 * time.Second)
 			continue
