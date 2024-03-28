@@ -2,8 +2,9 @@ package resources
 
 import (
 	"context"
-	v1 "github.com/Azure/azure-kusto-go/azkustodata/query/v1"
 	"testing"
+
+	v1 "github.com/Azure/azure-kusto-go/azkustodata/query/v1"
 
 	"github.com/stretchr/testify/assert"
 
@@ -19,24 +20,8 @@ func TestParse(t *testing.T) {
 		url            string
 		err            bool
 		wantAccount    string
-		wantObjectType string
 		wantObjectName string
 	}{
-		{
-			desc: "account is missing, but has leading dot",
-			url:  "https://.queue.core.windows.net/objectname",
-			err:  true,
-		},
-		{
-			desc: "account is missing",
-			url:  "https://queue.core.windows.net/objectname",
-			err:  true,
-		},
-		{
-			desc: "invalid object type",
-			url:  "https://account.invalid.core.windows.net/objectname",
-			err:  true,
-		},
 		{
 			desc: "no object name provided",
 			url:  "https://account.invalid.core.windows.net/",
@@ -50,22 +35,19 @@ func TestParse(t *testing.T) {
 		{
 			desc:           "success",
 			url:            "https://account.table.core.windows.net/objectname",
-			wantAccount:    "account",
-			wantObjectType: "table",
+			wantAccount:    "account.table.core.windows.net",
 			wantObjectName: "objectname",
 		},
 		{
 			desc:           "success non-public",
 			url:            "https://account.table.kusto.chinacloudapi.cn/objectname",
-			wantAccount:    "account",
-			wantObjectType: "table",
+			wantAccount:    "account.table.kusto.chinacloudapi.cn",
 			wantObjectName: "objectname",
 		},
 		{
 			desc:           "success dns zone",
-			url:            "https://account.zone1.blob.storage.azure.net/objectname",
-			wantAccount:    "account.zone1",
-			wantObjectType: "blob",
+			url:            "https://account.z01.blob.storage.azure.net/objectname",
+			wantAccount:    "account.z01.blob.storage.azure.net",
 			wantObjectName: "objectname",
 		},
 	}
@@ -84,7 +66,6 @@ func TestParse(t *testing.T) {
 			assert.NoError(t, err)
 
 			assert.Equal(t, test.wantAccount, got.Account())
-			assert.Equal(t, test.wantObjectType, got.ObjectType())
 			assert.Equal(t, test.wantObjectName, got.ObjectName())
 			assert.Equal(t, test.url, got.String())
 		})
@@ -204,7 +185,7 @@ func TestResources(t *testing.T) {
 				[]value.Values{
 					{
 						value.NewString("TempStorage"),
-						value.NewString("https://.blob.core.windows.net/storageroot"),
+						value.NewString("https://.blob.core.windows.net/"),
 					},
 				},
 				false,
