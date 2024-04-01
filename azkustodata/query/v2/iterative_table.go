@@ -73,10 +73,12 @@ func NewIterativeTable(dataset query.BaseDataset, th TableHeader) (query.Iterati
 
 func parseColumns(th TableHeader, columns []query.Column, op errors.Op) *errors.Error {
 	for i, c := range th.Columns() {
-		columns[i] = query.NewColumn(i, c.ColumnName, types.Column(c.ColumnType))
-		if !columns[i].Type().Valid() {
+		normal := types.NormalizeColumn(c.ColumnType)
+		if normal == "" {
 			return errors.ES(op, errors.KClientArgs, "column[%d] if of type %q, which is not valid", i, c.ColumnType)
 		}
+
+		columns[i] = query.NewColumn(i, c.ColumnName, normal)
 	}
 	return nil
 }

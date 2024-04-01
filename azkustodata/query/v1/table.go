@@ -31,10 +31,12 @@ func NewTable(d query.BaseDataset, dt *RawTable, index *TableIndexRow) (query.Ta
 	columns := make([]query.Column, len(dt.Columns))
 
 	for i, c := range dt.Columns {
-		columns[i] = query.NewColumn(i, c.ColumnName, types.Column(c.ColumnType))
-		if !columns[i].Type().Valid() {
+		normal := types.NormalizeColumn(c.ColumnType)
+		if normal == "" {
 			return nil, errors.ES(op, errors.KClientArgs, "column[%d] if of type %q, which is not valid", i, c.ColumnType)
 		}
+
+		columns[i] = query.NewColumn(i, c.ColumnName, normal)
 	}
 
 	baseTable := query.NewBaseTable(d, ordinal, id, name, kind, columns)
