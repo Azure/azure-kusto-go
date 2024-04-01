@@ -74,11 +74,21 @@ func (d *iterativeDataset) getNextFrame() *EveryFrame {
 }
 
 func (d *iterativeDataset) reportError(err error) {
-	d.results <- query.TableResultError(err)
+	select {
+	case <-d.errorChannel:
+		return
+	case d.results <- query.TableResultError(err):
+		return
+	}
 }
 
 func (d *iterativeDataset) sendTable(tb query.IterativeTable) {
-	d.results <- query.TableResultSuccess(tb)
+	select {
+	case <-d.errorChannel:
+		return
+	case d.results <- query.TableResultSuccess(tb):
+		return
+	}
 }
 
 func (d *iterativeDataset) Tables() <-chan query.TableResult {
@@ -96,17 +106,14 @@ func (d *iterativeDataset) Close() error {
 	default:
 	}
 	close(d.errorChannel)
-	// wait for the results channel to close
-	if _, ok := <-d.results; ok {
-		for range d.results {
-		}
-	}
 
 	return nil
 }
 
 func (d *iterativeDataset) ToDataset() (query.Dataset, error) {
 	tables := make([]query.Table, 0, len(d.results))
+
+	defer d.Close()
 
 	for tb := range d.Tables() {
 		if tb.Err() != nil {

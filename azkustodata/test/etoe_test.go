@@ -31,8 +31,6 @@ type queryFunc func(ctx context.Context, db string, query azkustodata.Statement,
 
 type mgmtFunc func(ctx context.Context, db string, query azkustodata.Statement, options ...azkustodata.QueryOption) (v1.Dataset, error)
 
-// TODO: tests for iterative query
-
 type queryJsonFunc func(ctx context.Context, db string, query azkustodata.Statement, options ...azkustodata.QueryOption) (string, error)
 type DynamicTypeVariations struct {
 	PlainValue value.Dynamic
@@ -424,10 +422,6 @@ func TestQueries(t *testing.T) {
 				} else {
 					assert.Equal(t, "PrimaryResult", results[0].Kind())
 					assert.Equal(t, "QueryProperties", results[1].Kind())
-					if len(results) == 2 {
-						// breakpoint
-						fmt.Println("breakpoint")
-					}
 					assert.Equal(t, "QueryCompletionInformation", results[2].Kind())
 				}
 			}
