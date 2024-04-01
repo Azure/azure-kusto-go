@@ -13,6 +13,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ### Fixed
 - Fixed a panic when using the xByY methods on a null value.
 - Fixed race in closing the client.
+- Fixed special float values not being parsed correctly.
 
 ## [1.0.0-preview]
 

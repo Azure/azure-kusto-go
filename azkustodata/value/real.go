@@ -4,6 +4,7 @@ import (
 	"encoding/json"
 	"github.com/Azure/azure-kusto-go/azkustodata/types"
 	"reflect"
+	"strconv"
 )
 
 // Real represents a Kusto real type.  Real implements Kusto.
@@ -36,6 +37,12 @@ func (r *Real) Unmarshal(i interface{}) error {
 		}
 	case float64:
 		myFloat = v
+	case string:
+		var err error
+		myFloat, err = strconv.ParseFloat(v, 64)
+		if err != nil {
+			return parseError(r, i, err)
+		}
 	default:
 		return convertError(r, i)
 	}
