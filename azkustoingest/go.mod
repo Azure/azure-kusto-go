@@ -3,7 +3,7 @@ module github.com/Azure/azure-kusto-go/azkustoingest
 go 1.22
 
 require (
-	github.com/Azure/azure-kusto-go/azkustodata v1.0.0-preview
+	github.com/Azure/azure-kusto-go/azkustodata v1.0.0-preview-2
 	github.com/Azure/azure-pipeline-go v0.2.3
 	github.com/Azure/azure-sdk-for-go v68.0.0+incompatible
 	github.com/Azure/azure-sdk-for-go/sdk/azcore v1.10.0
