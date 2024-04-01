@@ -39,6 +39,7 @@ func NewIterativeDataset(ctx context.Context, r io.ReadCloser, capacity int) (qu
 
 	br, err := prepareReadBuffer(d.reader)
 	if err != nil {
+		d.reader.Close()
 		return nil, err
 	}
 

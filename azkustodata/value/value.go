@@ -58,9 +58,6 @@ func (p *pointerValue[T]) String() string {
 }
 
 func (p *pointerValue[T]) GetValue() interface{} {
-	if p.value == nil {
-		return (*T)(nil)
-	}
 	return p.value
 }
 
@@ -81,7 +78,7 @@ func parseError(expected interface{}, actual interface{}, err error) error {
 
 func (p *pointerValue[T]) Unmarshal(i interface{}) error {
 	if i == nil {
-		p.value = (*T)(nil)
+		p.value = nil
 		return nil
 	}
 
