@@ -19,7 +19,6 @@ import (
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 	"go.uber.org/goleak"
-	"math/rand"
 	"net/http"
 	"regexp"
 	"strings"
@@ -158,8 +157,6 @@ func TestQueries(t *testing.T) {
 		t.Log("Closed client")
 	})
 
-	allDataTypesTable := fmt.Sprintf("goe2e_all_data_types_%d_%d", time.Now().UnixNano(), rand.Int())
-	err = testshared.CreateAllDataTypesTable(t, client, allDataTypesTable)
 	require.NoError(t, err)
 
 	result, _ := getExpectedResult()
@@ -186,7 +183,7 @@ func TestQueries(t *testing.T) {
 	}{
 		{
 			desc:  "Query: Retrieve count of the number of rows that match",
-			stmt:  kql.New("").AddTable(allDataTypesTable).AddLiteral("| count"),
+			stmt:  kql.New(testshared.AllDataTypesTableInline).AddLiteral(" | take 5 | count"),
 			qcall: client.Query,
 			doer: func(row query.Row, update interface{}) error {
 				rec := testshared.CountResult{}
@@ -201,7 +198,7 @@ func TestQueries(t *testing.T) {
 				v := []testshared.CountResult{}
 				return &v
 			},
-			want: &[]testshared.CountResult{{Count: 1}},
+			want: &[]testshared.CountResult{{Count: 5}},
 		},
 		{
 			desc:  "Mgmt(regression github.com/Azure/azure-kusto-go/issues/11): make sure we can retrieve .show databases, but we do not check the results at this time",
@@ -235,7 +232,7 @@ func TestQueries(t *testing.T) {
 		},
 		{
 			desc:  "Mgmt(https://github.com/Azure/azure-kusto-go/issues/55): transformations on mgmt queries - multiple tables",
-			stmt:  kql.New(`.show databases | project A="1" | take 1;`).AddTable(allDataTypesTable).AddLiteral(" | project A=\"2\" | take 1"),
+			stmt:  kql.New(`.show databases | project A="1" | take 1;`).AddLiteral(" datatable(b: int) [3] | project A=\"2\" | take 1"),
 			mcall: client.Mgmt,
 			doer: func(row query.Row, update interface{}) error {
 				rec := MgmtProjectionResult{}
@@ -255,7 +252,7 @@ func TestQueries(t *testing.T) {
 		},
 		{
 			desc:  "Query: make sure we can convert all data types from a row",
-			stmt:  kql.New("").AddTable(allDataTypesTable),
+			stmt:  kql.New(testshared.AllDataTypesTableInline).AddLiteral(" | take 1"),
 			qcall: client.Query,
 			doer: func(row query.Row, update interface{}) error {
 				rec := AllDataType{}
@@ -321,7 +318,7 @@ func TestQueries(t *testing.T) {
 		},
 		{
 			desc: "Query: Use many options",
-			stmt: kql.New("").AddTable(allDataTypesTable).AddLiteral("| count"),
+			stmt: kql.New(testshared.AllDataTypesTableInline).AddLiteral(" | take 5 | count"),
 			options: []azkustodata.QueryOption{azkustodata.QueryNow(time.Now()), azkustodata.NoRequestTimeout(), azkustodata.NoTruncation(), azkustodata.RequestAppName("bd1e472c-a8e4-4c6e-859d-c86d72253197"),
 				azkustodata.RequestDescription("9bff424f-711d-48b8-9a6e-d3a618748334"), azkustodata.Application("aaa"), azkustodata.User("bbb"),
 				azkustodata.CustomQueryOption("additional", "additional")},
@@ -339,7 +336,7 @@ func TestQueries(t *testing.T) {
 				v := []testshared.CountResult{}
 				return &v
 			},
-			want: &[]testshared.CountResult{{Count: 1}},
+			want: &[]testshared.CountResult{{Count: 5}},
 		},
 	}
 
@@ -427,6 +424,10 @@ func TestQueries(t *testing.T) {
 				} else {
 					assert.Equal(t, "PrimaryResult", results[0].Kind())
 					assert.Equal(t, "QueryProperties", results[1].Kind())
+					if len(results) == 2 {
+						// breakpoint
+						fmt.Println("breakpoint")
+					}
 					assert.Equal(t, "QueryCompletionInformation", results[2].Kind())
 				}
 			}
@@ -672,8 +673,6 @@ func TestStatement(t *testing.T) {
 		t.Log("Closed client")
 	})
 
-	allDataTypesTable := fmt.Sprintf("goe2e_all_data_types_%d_%d", time.Now().UnixNano(), rand.Int())
-	require.NoError(t, testshared.CreateAllDataTypesTable(t, client, allDataTypesTable))
 	dt, err := time.Parse(time.RFC3339Nano, "2020-03-04T14:05:01.3109965Z")
 	require.NoError(t, err)
 	ts, err := time.ParseDuration("1h23m45.6789s")
@@ -705,9 +704,8 @@ func TestStatement(t *testing.T) {
 	}{
 		{
 			desc: "Complex query with Builder Builder",
-			stmt: kql.New("").
-				AddDatabase(testConfig.Database).AddLiteral(".").
-				AddTable(allDataTypesTable).AddLiteral(" | where ").
+			stmt: kql.New(testshared.AllDataTypesTableInline).
+				AddLiteral(" | take 1 | where ").
 				AddColumn("vnum").AddLiteral(" == ").AddInt(1).AddLiteral(" and ").
 				AddColumn("vdec").AddLiteral(" == ").AddDecimal(decimal.RequireFromString("2.00000000000001")).AddLiteral(" and ").
 				AddColumn("vdate").AddLiteral(" == ").AddDateTime(dt).AddLiteral(" and ").
@@ -753,8 +751,8 @@ func TestStatement(t *testing.T) {
 		},
 		{
 			desc: "Complex query with Builder Builder and parameters",
-			stmt: kql.New("").
-				AddLiteral("table(tableName)").
+			stmt: kql.New(testshared.AllDataTypesTableInline).
+				AddLiteral(" | take 1").
 				AddLiteral(" | where vnum == num").
 				AddLiteral(" and vdec == dec").
 				AddLiteral(" and vdate == dt").
@@ -766,7 +764,6 @@ func TestStatement(t *testing.T) {
 				AddLiteral(" and vlong == lg").
 				AddLiteral(" and vguid == guid"),
 			options: []azkustodata.QueryOption{azkustodata.QueryParameters(kql.NewParameters().
-				AddString("tableName", allDataTypesTable).
 				AddInt("num", 1).
 				AddDecimal("dec", decimal.RequireFromString("2.00000000000001")).
 				AddDateTime("dt", dt).

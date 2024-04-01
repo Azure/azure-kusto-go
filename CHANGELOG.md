@@ -7,11 +7,12 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ## [1.0.0-preview-2]
 ### Changed
 - [BREAKING] The Dynamic type now returns a []byte of json, it's up to the user to marshall it to the desired type. It can also be null.
+- E2E tests now avoid creating tables when possible.
 ### Added
 - Methods for getting a guid value (were missing).
 ### Fixed
 - Fixed a panic when using the xByY methods on a null value.
-
+- Fixed race in closing the client.
 
 ## [1.0.0-preview]
 
