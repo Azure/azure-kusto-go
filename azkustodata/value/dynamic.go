@@ -9,14 +9,25 @@ import (
 
 // Dynamic represents a Kusto dynamic type.  Dynamic implements Kusto.
 type Dynamic struct {
-	pointerValue[[]byte]
+	Value []byte
 }
 
 // NewDynamic creates a new Dynamic.
-func NewDynamic(v []byte) *Dynamic { return &Dynamic{newPointerValue[[]byte](&v)} }
+func NewDynamic(v []byte) *Dynamic { return &Dynamic{v} }
 
 // NewNullDynamic creates a new null Dynamic.
-func NewNullDynamic() *Dynamic { return &Dynamic{newPointerValue[[]byte](nil)} }
+func NewNullDynamic() *Dynamic { return &Dynamic{nil} }
+
+func (d *Dynamic) GetValue() interface{} {
+	return d.Value
+}
+
+func (d *Dynamic) String() string {
+	if d.Value == nil {
+		return ""
+	}
+	return string(d.Value)
+}
 
 func DynamicFromInterface(v interface{}) *Dynamic {
 	marshal, err := json.Marshal(v)
@@ -33,17 +44,16 @@ func (*Dynamic) isKustoVal() {}
 // If []byte or string, must be a JSON representation of a value.
 func (d *Dynamic) Unmarshal(i interface{}) error {
 	if i == nil {
-		d.value = nil
+		d.Value = nil
 		return nil
 	}
 
 	switch v := i.(type) {
 	case []byte:
-		d.value = &v
+		d.Value = v
 		return nil
 	case string:
-		bytes := []byte(v)
-		d.value = &bytes
+		d.Value = []byte(v)
 		return nil
 	}
 
@@ -52,7 +62,7 @@ func (d *Dynamic) Unmarshal(i interface{}) error {
 		return parseError(d, i, err)
 	}
 
-	d.value = &b
+	d.Value = b
 	return nil
 }
 
@@ -63,7 +73,7 @@ func (d *Dynamic) Convert(v reflect.Value) error {
 		t = t.Elem()
 	}
 
-	if d.value == nil {
+	if d.Value == nil {
 		return nil
 	}
 
@@ -73,15 +83,15 @@ func (d *Dynamic) Convert(v reflect.Value) error {
 		valueToSet = reflect.ValueOf(*d)
 	case t.ConvertibleTo(reflect.TypeOf([]byte{})):
 		if t.Kind() == reflect.String {
-			s := string(*d.value)
+			s := string(d.Value)
 			valueToSet = reflect.ValueOf(s)
 		} else {
-			valueToSet = reflect.ValueOf(*d.value)
+			valueToSet = reflect.ValueOf(d.Value)
 		}
 	case t.Kind() == reflect.Slice || t.Kind() == reflect.Map:
 
 		ptr := reflect.New(t)
-		if err := json.Unmarshal([]byte(*d.value), ptr.Interface()); err != nil {
+		if err := json.Unmarshal([]byte(d.Value), ptr.Interface()); err != nil {
 			return fmt.Errorf("Error occurred while trying to unmarshal Dynamic into a %s: %s", t.Kind(), err)
 		}
 
@@ -89,7 +99,7 @@ func (d *Dynamic) Convert(v reflect.Value) error {
 	case t.Kind() == reflect.Struct:
 		structPtr := reflect.New(t)
 
-		if err := json.Unmarshal([]byte(*d.value), structPtr.Interface()); err != nil {
+		if err := json.Unmarshal([]byte(d.Value), structPtr.Interface()); err != nil {
 			return fmt.Errorf("Could not unmarshal type dynamic into receiver: %s", err)
 		}
 

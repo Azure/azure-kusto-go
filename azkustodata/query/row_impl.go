@@ -5,6 +5,7 @@ import (
 	"github.com/Azure/azure-kusto-go/azkustodata/errors"
 	"github.com/Azure/azure-kusto-go/azkustodata/types"
 	"github.com/Azure/azure-kusto-go/azkustodata/value"
+	"github.com/google/uuid"
 	"github.com/shopspring/decimal"
 	"reflect"
 	"strings"
@@ -162,8 +163,8 @@ func (r *row) StringByIndex(i int) (string, error) {
 	return byIndex(r, types.String, i, "")
 }
 
-func (r *row) DynamicByIndex(i int) (interface{}, error) {
-	return byIndex[interface{}](r, types.Dynamic, i, nil)
+func (r *row) DynamicByIndex(i int) ([]byte, error) {
+	return byIndex[[]byte](r, types.Dynamic, i, nil)
 }
 
 func (r *row) DateTimeByIndex(i int) (*time.Time, error) {
@@ -172,6 +173,10 @@ func (r *row) DateTimeByIndex(i int) (*time.Time, error) {
 
 func (r *row) TimespanByIndex(i int) (*time.Duration, error) {
 	return byIndex(r, types.Timespan, i, (*time.Duration)(nil))
+}
+
+func (r *row) GuidByIndex(i int) (*uuid.UUID, error) {
+	return byIndex(r, types.GUID, i, (*uuid.UUID)(nil))
 }
 
 func (r *row) BoolByName(name string) (*bool, error) {
@@ -198,8 +203,8 @@ func (r *row) StringByName(name string) (string, error) {
 	return byName(r, types.String, name, "")
 }
 
-func (r *row) DynamicByName(name string) (interface{}, error) {
-	return byName[interface{}](r, types.Dynamic, name, nil)
+func (r *row) DynamicByName(name string) ([]byte, error) {
+	return byName[[]byte](r, types.Dynamic, name, nil)
 }
 
 func (r *row) DateTimeByName(name string) (*time.Time, error) {
@@ -208,6 +213,10 @@ func (r *row) DateTimeByName(name string) (*time.Time, error) {
 
 func (r *row) TimespanByName(name string) (*time.Duration, error) {
 	return byName(r, types.Timespan, name, (*time.Duration)(nil))
+}
+
+func (r *row) GuidByName(name string) (*uuid.UUID, error) {
+	return byName(r, types.GUID, name, (*uuid.UUID)(nil))
 }
 
 // ToStructs converts a table, a non-iterative dataset or a slice of rows into a slice of structs.

@@ -24,7 +24,7 @@ func QuoteValue(v value.Kusto) string {
 	case types.Timespan:
 		val = FormatTimespan(*val.(*time.Duration))
 	case types.Dynamic:
-		val = string(*val.(*[]byte))
+		val = string(val.([]byte))
 	case types.Bool:
 		val = *val.(*bool)
 	case types.Int:

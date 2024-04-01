@@ -2,6 +2,7 @@ package query
 
 import (
 	"github.com/Azure/azure-kusto-go/azkustodata/value"
+	"github.com/google/uuid"
 	"github.com/shopspring/decimal"
 	"time"
 )
@@ -39,9 +40,10 @@ type Row interface {
 	RealByIndex(i int) (*float64, error)
 	DecimalByIndex(i int) (*decimal.Decimal, error)
 	StringByIndex(i int) (string, error)
-	DynamicByIndex(i int) (interface{}, error)
+	DynamicByIndex(i int) ([]byte, error)
 	DateTimeByIndex(i int) (*time.Time, error)
 	TimespanByIndex(i int) (*time.Duration, error)
+	GuidByIndex(i int) (*uuid.UUID, error)
 
 	BoolByName(name string) (*bool, error)
 	IntByName(name string) (*int32, error)
@@ -49,7 +51,8 @@ type Row interface {
 	RealByName(name string) (*float64, error)
 	DecimalByName(name string) (*decimal.Decimal, error)
 	StringByName(name string) (string, error)
-	DynamicByName(name string) (interface{}, error)
+	DynamicByName(name string) ([]byte, error)
 	DateTimeByName(name string) (*time.Time, error)
 	TimespanByName(name string) (*time.Duration, error)
+	GuidByName(name string) (*uuid.UUID, error)
 }

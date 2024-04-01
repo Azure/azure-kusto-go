@@ -2,6 +2,7 @@ package etoe
 
 import (
 	"context"
+	"encoding/json"
 	"fmt"
 	"github.com/Azure/azure-kusto-go/azkustodata"
 	"github.com/Azure/azure-kusto-go/azkustodata/errors"
@@ -47,15 +48,28 @@ type MgmtProjectionResult struct {
 
 type AllDataType struct {
 	Vnum  int32                  `kusto:"vnum"`
-	Vdec  value.Decimal          `kusto:"vdec"`
+	Vdec  decimal.Decimal        `kusto:"vdec"`
 	Vdate time.Time              `kusto:"vdate"`
-	Vspan value.Timespan         `kusto:"vspan"`
+	Vspan time.Duration          `kusto:"vspan"`
 	Vobj  map[string]interface{} `kusto:"vobj"`
 	Vb    bool                   `kusto:"vb"`
 	Vreal float64                `kusto:"vreal"`
 	Vstr  string                 `kusto:"vstr"`
 	Vlong int64                  `kusto:"vlong"`
-	Vguid value.GUID             `kusto:"vguid"`
+	Vguid uuid.UUID              `kusto:"vguid"`
+}
+
+type AllDataTypeKustoValues struct {
+	Vnum  value.Int      `kusto:"vnum"`
+	Vdec  value.Decimal  `kusto:"vdec"`
+	Vdate value.DateTime `kusto:"vdate"`
+	Vspan value.Timespan `kusto:"vspan"`
+	Vobj  value.Dynamic  `kusto:"vobj"`
+	Vb    value.Bool     `kusto:"vb"`
+	Vreal value.Real     `kusto:"vreal"`
+	Vstr  value.String   `kusto:"vstr"`
+	Vlong value.Long     `kusto:"vlong"`
+	Vguid value.GUID     `kusto:"vguid"`
 }
 
 func isASCII(s string) bool {
@@ -148,6 +162,7 @@ func TestQueries(t *testing.T) {
 	err = testshared.CreateAllDataTypesTable(t, client, allDataTypesTable)
 	require.NoError(t, err)
 
+	result, _ := getExpectedResult()
 	tests := []struct {
 		// desc is a description of a test.
 		desc string
@@ -266,7 +281,7 @@ func TestQueries(t *testing.T) {
 				ad := []AllDataType{}
 				return &ad
 			},
-			want: &[]AllDataType{getExpectedResult()},
+			want: &[]AllDataType{result},
 		},
 		{
 			desc:  "Query: make sure Dynamic data type variations can be parsed",
@@ -449,35 +464,191 @@ func TestIterativeQuery(t *testing.T) {
 		t.Log("Closed client")
 	})
 
-	allDataTypesTable := fmt.Sprintf("goe2e_v2_all_data_types_%d_%d", time.Now().UnixNano(), rand.Int())
-	err = testshared.CreateAllDataTypesTable(t, client, allDataTypesTable)
+	dataset, err := client.IterativeQuery(context.Background(), testConfig.Database, kql.New(testshared.AllDataTypesTableInline))
 	require.NoError(t, err)
-
-	err = testshared.CreateAllDataTypesNullTable(t, client, allDataTypesTable+"_null")
-	require.NoError(t, err)
-
-	dataset, err := client.IterativeQuery(context.Background(), testConfig.Database, kql.New("").AddTable(allDataTypesTable).AddLiteral(";").AddTable(allDataTypesTable+"_null"))
 	defer dataset.Close()
 
-	require.NoError(t, err)
+	res, resValues := getExpectedResult()
 
-	res := getExpectedResult()
+	tableResult := <-dataset.Tables()
+	require.NoError(t, tableResult.Err())
+	require.NotNil(t, tableResult.Table())
 
-	for tableResult := range dataset.Tables() {
-		require.NoError(t, tableResult.Err())
+	tb := tableResult.Table()
 
-		tb := tableResult.Table()
-		if tb.Name() == allDataTypesTable {
-			structs, errs := query.ToStructs[AllDataType](tb)
+	rowNum := 0
+
+	for rowResult := range tb.Rows() {
+		require.NoError(t, rowResult.Err())
+		require.NotNil(t, rowResult.Row())
+
+		row := rowResult.Row()
+		if rowNum == 0 {
+			structs, errs := query.ToStructs[AllDataType](row)
 			require.Nil(t, errs)
 			require.Equal(t, []AllDataType{res}, structs)
-		}
-		if tb.Name() == allDataTypesTable+"_null" {
-			structs, errs := query.ToStructs[AllDataType](tb)
+		} else if rowNum == 1 {
+			structs, errs := query.ToStructs[AllDataTypeKustoValues](row)
+			require.Nil(t, errs)
+			require.Equal(t, []AllDataTypeKustoValues{resValues}, structs)
+		} else if rowNum == 2 {
+			verifyResByValues(t, row, res)
+		} else if rowNum == 3 { // null values
+			structs, errs := query.ToStructs[AllDataType](row)
 			require.Nil(t, errs)
 			require.Equal(t, []AllDataType{{}}, structs)
+		} else if rowNum == 4 { // null values
+			structs, errs := query.ToStructs[AllDataTypeKustoValues](row)
+			require.Nil(t, errs)
+			require.Equal(t, []AllDataTypeKustoValues{{}}, structs)
+		} else if rowNum == 5 { // null values
+			verifyNullsByValues(t, row)
+		} else {
+			require.Fail(t, "unexpected row number")
 		}
+
+		rowNum++
 	}
+}
+
+func verifyResByValues(t *testing.T, row query.Row, res AllDataType) {
+	vnum, err := row.IntByName("vnum")
+	require.NoError(t, err)
+	vdec, err := row.DecimalByName("vdec")
+	require.NoError(t, err)
+	vdate, err := row.DateTimeByName("vdate")
+	require.NoError(t, err)
+	vspan, err := row.TimespanByName("vspan")
+	require.NoError(t, err)
+	vobjBytes, err := row.DynamicByName("vobj")
+	require.NoError(t, err)
+	vobj := map[string]interface{}{}
+	err = json.Unmarshal(vobjBytes, &vobj)
+	require.NoError(t, err)
+
+	vb, err := row.BoolByName("vb")
+	require.NoError(t, err)
+	vreal, err := row.RealByName("vreal")
+	require.NoError(t, err)
+	vstr, err := row.StringByName("vstr")
+	require.NoError(t, err)
+	vlong, err := row.LongByName("vlong")
+	require.NoError(t, err)
+	vguid, err := row.GuidByName("vguid")
+	require.NoError(t, err)
+
+	assert.Equal(t, res.Vnum, *vnum)
+	assert.Equal(t, res.Vdec, *vdec)
+	assert.Equal(t, res.Vdate, *vdate)
+	assert.Equal(t, res.Vspan, *vspan)
+	assert.Equal(t, res.Vobj, vobj)
+	assert.Equal(t, res.Vb, *vb)
+	assert.Equal(t, res.Vreal, *vreal)
+	assert.Equal(t, res.Vstr, vstr)
+	assert.Equal(t, res.Vlong, *vlong)
+	assert.Equal(t, res.Vguid, *vguid)
+
+	vnum, err = row.IntByIndex(0)
+	require.NoError(t, err)
+	vdec, err = row.DecimalByIndex(1)
+	require.NoError(t, err)
+	vdate, err = row.DateTimeByIndex(2)
+	require.NoError(t, err)
+	vspan, err = row.TimespanByIndex(3)
+	require.NoError(t, err)
+	vobjBytes, err = row.DynamicByIndex(4)
+	require.NoError(t, err)
+	vobj = map[string]interface{}{}
+	err = json.Unmarshal(vobjBytes, &vobj)
+	require.NoError(t, err)
+	vb, err = row.BoolByIndex(5)
+	require.NoError(t, err)
+	vreal, err = row.RealByIndex(6)
+	require.NoError(t, err)
+	vstr, err = row.StringByIndex(7)
+	require.NoError(t, err)
+	vlong, err = row.LongByIndex(8)
+	require.NoError(t, err)
+	vguid, err = row.GuidByIndex(9)
+	require.NoError(t, err)
+
+	assert.Equal(t, res.Vnum, *vnum)
+	assert.Equal(t, res.Vdec, *vdec)
+	assert.Equal(t, res.Vdate, *vdate)
+	assert.Equal(t, res.Vspan, *vspan)
+	assert.Equal(t, res.Vobj, vobj)
+	assert.Equal(t, res.Vb, *vb)
+	assert.Equal(t, res.Vreal, *vreal)
+	assert.Equal(t, res.Vstr, vstr)
+	assert.Equal(t, res.Vlong, *vlong)
+	assert.Equal(t, res.Vguid, *vguid)
+}
+
+func verifyNullsByValues(t *testing.T, row query.Row) {
+	vnum, err := row.IntByName("vnum")
+	require.NoError(t, err)
+	vdec, err := row.DecimalByName("vdec")
+	require.NoError(t, err)
+	vdate, err := row.DateTimeByName("vdate")
+	require.NoError(t, err)
+	vspan, err := row.TimespanByName("vspan")
+	require.NoError(t, err)
+	vobjBytes, err := row.DynamicByName("vobj")
+	require.NoError(t, err)
+
+	vb, err := row.BoolByName("vb")
+	require.NoError(t, err)
+	vreal, err := row.RealByName("vreal")
+	require.NoError(t, err)
+	vstr, err := row.StringByName("vstr")
+	require.NoError(t, err)
+	vlong, err := row.LongByName("vlong")
+	require.NoError(t, err)
+	vguid, err := row.GuidByName("vguid")
+	require.NoError(t, err)
+
+	assert.Equal(t, (*int32)(nil), vnum)
+	assert.Equal(t, (*decimal.Decimal)(nil), vdec)
+	assert.Equal(t, (*time.Time)(nil), vdate)
+	assert.Equal(t, (*time.Duration)(nil), vspan)
+	assert.Equal(t, ([]byte)(nil), vobjBytes)
+	assert.Equal(t, (*bool)(nil), vb)
+	assert.Equal(t, (*float64)(nil), vreal)
+	assert.Equal(t, "", vstr)
+	assert.Equal(t, (*int64)(nil), vlong)
+	assert.Equal(t, (*uuid.UUID)(nil), vguid)
+
+	vnum, err = row.IntByIndex(0)
+	require.NoError(t, err)
+	vdec, err = row.DecimalByIndex(1)
+	require.NoError(t, err)
+	vdate, err = row.DateTimeByIndex(2)
+	require.NoError(t, err)
+	vspan, err = row.TimespanByIndex(3)
+	require.NoError(t, err)
+	vobjBytes, err = row.DynamicByIndex(4)
+	require.NoError(t, err)
+	vb, err = row.BoolByIndex(5)
+	require.NoError(t, err)
+	vreal, err = row.RealByIndex(6)
+	require.NoError(t, err)
+	vstr, err = row.StringByIndex(7)
+	require.NoError(t, err)
+	vlong, err = row.LongByIndex(8)
+	require.NoError(t, err)
+	vguid, err = row.GuidByIndex(9)
+	require.NoError(t, err)
+
+	assert.Equal(t, (*int32)(nil), vnum)
+	assert.Equal(t, (*decimal.Decimal)(nil), vdec)
+	assert.Equal(t, (*time.Time)(nil), vdate)
+	assert.Equal(t, (*time.Duration)(nil), vspan)
+	assert.Equal(t, ([]byte)(nil), vobjBytes)
+	assert.Equal(t, (*bool)(nil), vb)
+	assert.Equal(t, (*float64)(nil), vreal)
+	assert.Equal(t, "", vstr)
+	assert.Equal(t, (*int64)(nil), vlong)
+	assert.Equal(t, (*uuid.UUID)(nil), vguid)
 }
 
 func TestStatement(t *testing.T) {
@@ -509,6 +680,7 @@ func TestStatement(t *testing.T) {
 	require.NoError(t, err)
 	guid, err := uuid.Parse("74be27de-1e4e-49d9-b579-fe0b331d3642")
 	require.NoError(t, err)
+	result, _ := getExpectedResult()
 	tests := []struct {
 		// desc is a description of a test.
 		desc string
@@ -577,7 +749,7 @@ func TestStatement(t *testing.T) {
 				return &ad
 			},
 			failFlag: false,
-			want:     &[]AllDataType{getExpectedResult()},
+			want:     &[]AllDataType{result},
 		},
 		{
 			desc: "Complex query with Builder Builder and parameters",
@@ -632,7 +804,7 @@ func TestStatement(t *testing.T) {
 				return &ad
 			},
 			failFlag: false,
-			want:     &[]AllDataType{getExpectedResult()},
+			want:     &[]AllDataType{result},
 		},
 		{
 			desc: "Complex query with Builder Builder - Fail due to wrong table name (escaped)",
@@ -756,7 +928,7 @@ func TestNoRedirects(t *testing.T) {
 	}
 }
 
-func getExpectedResult() AllDataType {
+func getExpectedResult() (AllDataType, AllDataTypeKustoValues) {
 	t, err := time.Parse(time.RFC3339Nano, "2020-03-04T14:05:01.3109965Z")
 	if err != nil {
 		panic(err)
@@ -770,11 +942,11 @@ func getExpectedResult() AllDataType {
 		panic(err)
 	}
 
-	return AllDataType{
+	res := AllDataType{
 		Vnum:  1,
-		Vdec:  *value.NewDecimal(decimal.RequireFromString("2.00000000000001")),
+		Vdec:  decimal.RequireFromString("2.00000000000001"),
 		Vdate: t,
-		Vspan: *value.NewTimespan(d),
+		Vspan: d,
 		Vobj: map[string]interface{}{
 			"moshe": "value",
 		},
@@ -782,7 +954,19 @@ func getExpectedResult() AllDataType {
 		Vreal: 0.01,
 		Vstr:  "asdf",
 		Vlong: 9223372036854775807,
-		Vguid: *value.NewGUID(g),
+		Vguid: g,
+	}
+	return res, AllDataTypeKustoValues{
+		Vnum:  *value.NewInt(res.Vnum),
+		Vdec:  *value.NewDecimal(res.Vdec),
+		Vdate: *value.NewDateTime(res.Vdate),
+		Vspan: *value.NewTimespan(res.Vspan),
+		Vobj:  *value.NewDynamic([]byte(`{"moshe":"value"}`)),
+		Vb:    *value.NewBool(res.Vb),
+		Vreal: *value.NewReal(res.Vreal),
+		Vstr:  *value.NewString(res.Vstr),
+		Vlong: *value.NewLong(res.Vlong),
+		Vguid: *value.NewGUID(res.Vguid),
 	}
 }
 
