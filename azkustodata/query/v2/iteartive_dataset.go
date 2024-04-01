@@ -53,12 +53,19 @@ func NewIterativeDataset(ctx context.Context, r io.ReadCloser, capacity int) (qu
 
 	return d, nil
 }
+func (d *iterativeDataset) closeInternal() {
+	close(d.results)
+	d.reader.Close()
+}
 
 func (d *iterativeDataset) getNextFrame() *EveryFrame {
 	var f *EveryFrame = nil
 
 	select {
-	case err := <-d.errorChannel:
+	case err, ok := <-d.errorChannel:
+		if !ok {
+			break
+		}
 		if err != nil {
 			d.reportError(err)
 		}
@@ -66,7 +73,10 @@ func (d *iterativeDataset) getNextFrame() *EveryFrame {
 	case <-d.Context().Done():
 		d.reportError(errors.ES(d.Op(), errors.KInternal, "context cancelled"))
 		break
-	case fc := <-d.frames:
+	case fc, ok := <-d.frames:
+		if !ok {
+			break
+		}
 		f = fc
 	}
 	return f
@@ -95,9 +105,13 @@ func (d *iterativeDataset) Close() error {
 	default:
 	}
 	close(d.errorChannel)
-	close(d.results)
+	// wait for the results channel to close
+	if _, ok := <-d.results; ok {
+		for range d.results {
+		}
+	}
 
-	return d.reader.Close()
+	return nil
 }
 
 func (d *iterativeDataset) ToDataset() (query.Dataset, error) {
@@ -127,10 +141,11 @@ func decodeTables(d *iterativeDataset) {
 	var queryProperties query.IterativeTable
 
 	defer func() {
-		_ = d.Close()
 		if currentTable != nil {
 			currentTable.finishTable([]OneApiError{})
 		}
+		d.closeInternal()
+		_ = d.Close()
 	}()
 
 	for {
