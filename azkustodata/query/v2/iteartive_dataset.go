@@ -2,9 +2,10 @@ package v2
 
 import (
 	"context"
+	"io"
+
 	"github.com/Azure/azure-kusto-go/azkustodata/errors"
 	"github.com/Azure/azure-kusto-go/azkustodata/query"
-	"io"
 )
 
 // DefaultFrameCapacity is the default capacity of the channel that receives frames from the Kusto service. Lower capacity means less memory usage, but might cause the channel to block if the frames are not consumed fast enough.
@@ -28,10 +29,10 @@ type iterativeDataset struct {
 	results chan query.TableResult
 }
 
-func NewIterativeDataset(ctx context.Context, r io.ReadCloser, capacity int) (query.IterativeDataset, error) {
+func NewIterativeDataset(ctx context.Context, res query.Response, capacity int) (query.IterativeDataset, error) {
 	d := &iterativeDataset{
-		BaseDataset:  query.NewBaseDataset(ctx, errors.OpQuery, PrimaryResultTableKind),
-		reader:       r,
+		BaseDataset:  query.NewBaseDataset(ctx, errors.OpQuery, PrimaryResultTableKind, res.ResponseHeaders),
+		reader:       res.Reader,
 		frames:       make(chan *EveryFrame, capacity),
 		errorChannel: make(chan error, 1),
 		results:      make(chan query.TableResult, 1),

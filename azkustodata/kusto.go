@@ -2,15 +2,15 @@ package azkustodata
 
 import (
 	"context"
-	"github.com/Azure/azure-kusto-go/azkustodata/kql"
-	"github.com/Azure/azure-kusto-go/azkustodata/query"
-	v1 "github.com/Azure/azure-kusto-go/azkustodata/query/v1"
-	queryv2 "github.com/Azure/azure-kusto-go/azkustodata/query/v2"
 	"io"
 	"net/http"
 	"time"
 
 	"github.com/Azure/azure-kusto-go/azkustodata/errors"
+	"github.com/Azure/azure-kusto-go/azkustodata/kql"
+	"github.com/Azure/azure-kusto-go/azkustodata/query"
+	v1 "github.com/Azure/azure-kusto-go/azkustodata/query/v1"
+	queryv2 "github.com/Azure/azure-kusto-go/azkustodata/query/v2"
 )
 
 type Statement = *kql.Builder
@@ -18,7 +18,7 @@ type Statement = *kql.Builder
 // queryer provides for getting a stream of Kusto frames. Exists to allow fake Kusto streams in tests.
 type queryer interface {
 	io.Closer
-	rawQuery(ctx context.Context, callType callType, db string, query Statement, options *queryOptions) (io.ReadCloser, error)
+	rawQuery(ctx context.Context, callType callType, db string, query Statement, options *queryOptions) (query.Response, error)
 }
 
 // Authorization provides the TokenProvider needed to acquire the auth token.
@@ -126,7 +126,7 @@ func (c *Client) Mgmt(ctx context.Context, db string, kqlQuery Statement, option
 		return nil, err
 	}
 
-	return v1.NewDatasetFromReader(ctx, opQuery, res)
+	return v1.NewDatasetFromResponse(ctx, opQuery, res)
 }
 
 func (c *Client) Query(ctx context.Context, db string, kqlQuery Statement, options ...QueryOption) (query.Dataset, error) {
@@ -156,24 +156,24 @@ func (c *Client) IterativeQuery(ctx context.Context, db string, kqlQuery Stateme
 	return queryv2.NewIterativeDataset(ctx, res, capacity)
 }
 
-func (c *Client) rawV2(ctx context.Context, db string, kqlQuery Statement, options []QueryOption) (*queryOptions, io.ReadCloser, error) {
+func (c *Client) rawV2(ctx context.Context, db string, kqlQuery Statement, options []QueryOption) (*queryOptions, query.Response, error) {
 	ctx, cancel := contextSetup(ctx)
 	opQuery := errors.OpQuery
 	opts, err := setQueryOptions(ctx, opQuery, kqlQuery, queryCall, options...)
 	if err != nil {
-		return nil, nil, err
+		return nil, query.Response{}, err
 	}
 
 	conn, err := c.getConn(queryCall, connOptions{queryOptions: opts})
 	if err != nil {
-		return nil, nil, err
+		return nil, query.Response{}, err
 	}
 
 	res, err := conn.rawQuery(ctx, queryCall, db, kqlQuery, opts)
 
 	if err != nil {
 		cancel()
-		return nil, nil, err
+		return nil, query.Response{}, err
 	}
 	return opts, res, nil
 }
@@ -184,7 +184,7 @@ func (c *Client) QueryToJson(ctx context.Context, db string, query Statement, op
 		return "", err
 	}
 
-	all, err := io.ReadAll(res)
+	all, err := io.ReadAll(res.Reader)
 	if err != nil {
 		return "", err
 	}

@@ -16,10 +16,12 @@ import (
 	"sync/atomic"
 	"unicode"
 
+	"github.com/google/uuid"
+
 	"github.com/Azure/azure-kusto-go/azkustodata/errors"
 	"github.com/Azure/azure-kusto-go/azkustodata/internal/response"
+	"github.com/Azure/azure-kusto-go/azkustodata/query"
 	truestedEndpoints "github.com/Azure/azure-kusto-go/azkustodata/trusted_endpoints"
-	"github.com/google/uuid"
 )
 
 var bufferPool = sync.Pool{
@@ -82,13 +84,16 @@ type connOptions struct {
 	queryOptions *queryOptions
 }
 
-func (c *Conn) rawQuery(ctx context.Context, callType callType, db string, query Statement, options *queryOptions) (io.ReadCloser, error) {
-	_, _, _, body, e := c.doRequest(ctx, int(callType), db, query, *options.requestProperties)
+func (c *Conn) rawQuery(ctx context.Context, callType callType, db string, q Statement, options *queryOptions) (query.Response, error) {
+	_, _, responseHeaders, body, e := c.doRequest(ctx, int(callType), db, q, *options.requestProperties)
 	if e != nil {
-		return nil, e
+		return query.Response{}, e
 	}
 
-	return body, nil
+	return query.Response{
+		Reader:          body,
+		ResponseHeaders: responseHeaders,
+	}, nil
 }
 
 const (

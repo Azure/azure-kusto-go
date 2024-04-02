@@ -2,12 +2,20 @@ package azkustodata
 
 import (
 	"context"
-	"github.com/Azure/azure-kusto-go/azkustodata/kql"
-	queryv2 "github.com/Azure/azure-kusto-go/azkustodata/query/v2"
 	"io"
 	"strings"
 	"testing"
+
+	"github.com/Azure/azure-kusto-go/azkustodata/kql"
+	"github.com/Azure/azure-kusto-go/azkustodata/query"
+	queryv2 "github.com/Azure/azure-kusto-go/azkustodata/query/v2"
 )
+
+func responseFromReader(reader io.Reader) query.Response {
+	return query.Response{
+		Reader: io.NopCloser(reader),
+	}
+}
 
 func getData(k int) (string, context.Context) {
 	kcsb := NewConnectionStringBuilder("https://help.kusto.windows.net/").WithAzCli()
@@ -32,7 +40,7 @@ func benchmarkIterative(b *testing.B, k int) {
 	b.ResetTimer()
 
 	for k := 0; k < b.N; k++ {
-		dataset, err := queryv2.NewIterativeDataset(ctx, io.NopCloser(strings.NewReader(res)), 100)
+		dataset, err := queryv2.NewIterativeDataset(ctx, responseFromReader(strings.NewReader(res)), 100)
 		if err != nil {
 			panic(err)
 		}
@@ -70,7 +78,7 @@ func benchmarkFull(b *testing.B, k int) {
 	b.ResetTimer()
 
 	for k := 0; k < b.N; k++ {
-		dataset, err := queryv2.NewIterativeDataset(ctx, io.NopCloser(strings.NewReader(res)), 5)
+		dataset, err := queryv2.NewIterativeDataset(ctx, responseFromReader(strings.NewReader(res)), 5)
 		if err != nil {
 			panic(err)
 		}

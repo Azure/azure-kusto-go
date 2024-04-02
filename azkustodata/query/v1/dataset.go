@@ -2,11 +2,12 @@ package v1
 
 import (
 	"context"
+	"time"
+
+	"github.com/google/uuid"
+
 	"github.com/Azure/azure-kusto-go/azkustodata/errors"
 	"github.com/Azure/azure-kusto-go/azkustodata/query"
-	"github.com/google/uuid"
-	"io"
-	"time"
 )
 
 type TableIndexRow struct {
@@ -52,19 +53,19 @@ type dataset struct {
 	info    []QueryProperties
 }
 
-func NewDatasetFromReader(ctx context.Context, op errors.Op, reader io.ReadCloser) (Dataset, error) {
-	defer reader.Close()
-	v1, err := decodeV1(reader)
+func NewDatasetFromResponse(ctx context.Context, op errors.Op, res query.Response) (Dataset, error) {
+	defer res.Reader.Close()
+	v1, err := decodeV1(res.Reader)
 	if err != nil {
 		return nil, err
 	}
 
-	return NewDataset(ctx, op, *v1)
+	return NewDataset(ctx, op, *v1, res)
 }
 
-func NewDataset(ctx context.Context, op errors.Op, v1 V1) (Dataset, error) {
+func NewDataset(ctx context.Context, op errors.Op, v1 V1, res query.Response) (Dataset, error) {
 	d := &dataset{
-		BaseDataset: query.NewBaseDataset(ctx, op, PrimaryResultKind),
+		BaseDataset: query.NewBaseDataset(ctx, op, PrimaryResultKind, res.ResponseHeaders),
 	}
 
 	if len(v1.Tables) == 0 {

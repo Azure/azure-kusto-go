@@ -2,12 +2,13 @@ package azkustoingest
 
 import (
 	"context"
+	"net/http"
+
 	"github.com/Azure/azure-kusto-go/azkustodata"
 	"github.com/Azure/azure-kusto-go/azkustodata/errors"
 	"github.com/Azure/azure-kusto-go/azkustodata/query"
 	"github.com/Azure/azure-kusto-go/azkustodata/query/v1"
 	"github.com/Azure/azure-kusto-go/azkustodata/types"
-	"net/http"
 )
 
 type mockClient struct {
@@ -43,15 +44,15 @@ func (m mockClient) Endpoint() string {
 	return m.endpoint
 }
 
-func (m mockClient) Mgmt(ctx context.Context, db string, query azkustodata.Statement, options ...azkustodata.QueryOption) (v1.Dataset, error) {
+func (m mockClient) Mgmt(ctx context.Context, db string, q azkustodata.Statement, options ...azkustodata.QueryOption) (v1.Dataset, error) {
 	if m.onMgmt != nil {
-		rows, err := m.onMgmt(ctx, db, query, options...)
+		rows, err := m.onMgmt(ctx, db, q, options...)
 		if err != nil || rows != nil {
 			return rows, err
 		}
 	}
 
-	if query.String() == ".get kusto identity token" {
+	if q.String() == ".get kusto identity token" {
 		return v1.NewDataset(ctx, errors.OpMgmt, v1.V1{
 			Tables: []v1.RawTable{
 				{
@@ -69,7 +70,7 @@ func (m mockClient) Mgmt(ctx context.Context, db string, query azkustodata.State
 						},
 					},
 				},
-			}})
+			}}, query.Response{})
 	}
 
 	return v1.NewDataset(ctx, errors.OpMgmt, v1.V1{
@@ -88,7 +89,7 @@ func (m mockClient) Mgmt(ctx context.Context, db string, query azkustodata.State
 				},
 				Rows: []v1.RawRow{},
 			},
-		}})
+		}}, query.Response{})
 
 }
 

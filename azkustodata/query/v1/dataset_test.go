@@ -3,27 +3,35 @@ package v1
 import (
 	"context"
 	_ "embed"
-	"github.com/Azure/azure-kusto-go/azkustodata/errors"
-	"github.com/Azure/azure-kusto-go/azkustodata/query"
-	"github.com/google/uuid"
-	"github.com/stretchr/testify/assert"
 	"io"
 	"strings"
 	"testing"
 	"time"
+
+	"github.com/google/uuid"
+	"github.com/stretchr/testify/assert"
+
+	"github.com/Azure/azure-kusto-go/azkustodata/errors"
+	"github.com/Azure/azure-kusto-go/azkustodata/query"
 )
 
 type firstTable struct {
 	A int32 `kusto:"a"`
 }
 
+func responseFromReader(reader io.Reader) query.Response {
+	return query.Response{
+		Reader: io.NopCloser(reader),
+	}
+}
+
 func TestDatasetSuccess(t *testing.T) {
 	t.Parallel()
 
-	reader := io.NopCloser(strings.NewReader(successFile))
+	reader := strings.NewReader(successFile)
 	ctx := context.Background()
 	op := errors.OpQuery
-	ds, err := NewDatasetFromReader(ctx, op, reader)
+	ds, err := NewDatasetFromResponse(ctx, op, responseFromReader(reader))
 	assert.NoError(t, err)
 
 	assert.NotNil(t, ds)
@@ -107,10 +115,10 @@ func TestDatasetSuccess(t *testing.T) {
 func TestDatasetPartialErrors(t *testing.T) {
 	t.Parallel()
 
-	reader := io.NopCloser(strings.NewReader(partialErrorFile))
+	reader := strings.NewReader(partialErrorFile)
 	ctx := context.Background()
 	op := errors.OpQuery
-	ds, err := NewDatasetFromReader(ctx, op, reader)
+	ds, err := NewDatasetFromResponse(ctx, op, responseFromReader(reader))
 	assert.Nil(t, ds)
 	assert.ErrorContains(t, err, "Query execution has exceeded the allowed limits")
 }
