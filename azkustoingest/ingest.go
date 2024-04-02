@@ -33,6 +33,8 @@ type Ingestion struct {
 
 	withoutEndpointCorrection    bool
 	customIngestConnectionString *azkustodata.ConnectionStringBuilder
+	applicationForTracing        string
+	clientVersionForTracing      string
 }
 
 // New is a constructor for Ingestion.
@@ -44,6 +46,9 @@ func New(kcsb *azkustodata.ConnectionStringBuilder, options ...Option) (*Ingesti
 		newKcsb.DataSource = addIngestPrefix(newKcsb.DataSource)
 		kcsb = &newKcsb
 	}
+
+	i.applicationForTracing = kcsb.ApplicationForTracing
+	i.clientVersionForTracing = kcsb.ClientVersionForTracing
 
 	client, err := azkustodata.New(kcsb)
 	if err != nil {
@@ -63,7 +68,7 @@ func newFromClient(client QueryClient, i *Ingestion) (*Ingestion, error) {
 	i.client = client
 	i.mgr = mgr
 
-	fs, err := queued.New(i.db, i.table, mgr, client.HttpClient(), queued.WithStaticBuffer(i.bufferSize, i.maxBuffers))
+	fs, err := queued.New(i.db, i.table, mgr, client.HttpClient(), i.applicationForTracing, i.clientVersionForTracing, queued.WithStaticBuffer(i.bufferSize, i.maxBuffers))
 	if err != nil {
 		mgr.Close()
 		client.Close()
