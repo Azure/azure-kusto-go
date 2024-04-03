@@ -12,6 +12,7 @@ require (
 	github.com/cenkalti/backoff/v4 v4.2.1
 	github.com/gofrs/uuid v4.4.0+incompatible
 	github.com/google/uuid v1.3.1
+	github.com/klauspost/compress v1.17.7
 	github.com/kylelemons/godebug v1.1.0
 	github.com/samber/lo v1.38.1
 	github.com/shopspring/decimal v1.3.1
