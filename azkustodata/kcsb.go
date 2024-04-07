@@ -33,7 +33,7 @@ type ConnectionStringBuilder struct {
 	ClientOptions                    *azcore.ClientOptions
 	ApplicationForTracing            string
 	UserForTracing                   string
-	ClientVersionForTracing          string
+	clientVersionForTracing          string
 	TokenCredential                  azcore.TokenCredential
 }
 
@@ -488,5 +488,9 @@ func (kcsb *ConnectionStringBuilder) SetConnectorDetails(name, version, appName,
 	app, user := setConnectorDetails(name, version, appName, appVersion, sendUser, overrideUser, additionalFields...)
 	kcsb.ApplicationForTracing = app
 	kcsb.UserForTracing = user
-	kcsb.ClientVersionForTracing = defaultTracingValues().clientVersionForTracing
+	kcsb.clientVersionForTracing = defaultTracingValues().clientVersionForTracing
+}
+
+func (kcsb *ConnectionStringBuilder) ClientVersionForTracing() string {
+	return kcsb.clientVersionForTracing
 }

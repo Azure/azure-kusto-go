@@ -48,7 +48,7 @@ func New(kcsb *azkustodata.ConnectionStringBuilder, options ...Option) (*Ingesti
 	}
 
 	i.applicationForTracing = kcsb.ApplicationForTracing
-	i.clientVersionForTracing = kcsb.ClientVersionForTracing
+	i.clientVersionForTracing = kcsb.ClientVersionForTracing()
 
 	client, err := azkustodata.New(kcsb)
 	if err != nil {
