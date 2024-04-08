@@ -825,7 +825,7 @@ func TestMultipleClusters(t *testing.T) { //ok
 		t.Log("Closed client")
 	})
 
-	skcsb := azkustodata.NewConnectionStringBuilder(testConfig.SecondaryEndpoint).WithAadAppKey(testConfig.ClientID, testConfig.ClientSecret, testConfig.TenantID)
+	skcsb := azkustodata.NewConnectionStringBuilder(testConfig.SecondaryEndpoint).WithDefaultAzureCredential()
 
 	secondaryClient, err := azkustodata.New(skcsb)
 	if err != nil {
