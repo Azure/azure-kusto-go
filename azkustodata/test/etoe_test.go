@@ -77,11 +77,18 @@ func TestAuth(t *testing.T) {
 			},
 		},
 	}
-	defaultCred, err := azidentity.NewDefaultAzureCredential(&azidentity.DefaultAzureCredentialOptions{
-		ClientOptions: azcore.ClientOptions{
-			Transport: &transporter,
-		},
-	})
+	var defaultCred azcore.TokenCredential
+	var err error
+
+	if testConfig.ClientSecret != "" {
+		defaultCred, err = azidentity.NewDefaultAzureCredential(&azidentity.DefaultAzureCredentialOptions{
+			ClientOptions: azcore.ClientOptions{
+				Transport: &transporter,
+			},
+		})
+	} else {
+		defaultCred, err = azidentity.NewAzureCLICredential(&azidentity.AzureCLICredentialOptions{})
+	}
 	require.NoError(t, err)
 	credential, err := azidentity.NewChainedTokenCredential([]azcore.TokenCredential{
 		defaultCred,
@@ -116,7 +123,7 @@ func TestAuth(t *testing.T) {
 			}(client)
 
 			res, err := client.Query(context.Background(), testConfig.Database, kql.New("print 1"))
-			assert.NoError(t, err)
+			require.NoError(t, err)
 			rows := res.Tables()[0].Rows()
 			assert.Equal(t, "1\n", rows[0].String())
 		})

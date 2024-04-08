@@ -87,7 +87,7 @@ func init() {
 	}
 
 	dmEndpoint := strings.Replace(testConfig.Endpoint, "://", "://ingest-", 1)
-	if testConfig.ClientID == "" {
+	if testConfig.ClientID == "" || testConfig.ClientSecret == "" || testConfig.TenantID == "" {
 		testConfig.kcsb = azkustodata.NewConnectionStringBuilder(testConfig.Endpoint).WithAzCli()
 		testConfig.dmKscb = azkustodata.NewConnectionStringBuilder(dmEndpoint).WithAzCli()
 	} else {

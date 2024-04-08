@@ -824,8 +824,13 @@ func TestMultipleClusters(t *testing.T) { //ok
 		require.NoError(t, client.Close())
 		t.Log("Closed client")
 	})
+	var skcsb *azkustodata.ConnectionStringBuilder
 
-	skcsb := azkustodata.NewConnectionStringBuilder(testConfig.SecondaryEndpoint).WithAadAppKey(testConfig.ClientID, testConfig.ClientSecret, testConfig.TenantID)
+	if testConfig.ClientID == "" || testConfig.ClientSecret == "" || testConfig.TenantID == "" {
+		skcsb = azkustodata.NewConnectionStringBuilder(testConfig.SecondaryEndpoint).WithAzCli()
+	} else {
+		skcsb = azkustodata.NewConnectionStringBuilder(testConfig.SecondaryEndpoint).WithAadAppKey(testConfig.ClientID, testConfig.ClientSecret, testConfig.TenantID)
+	}
 
 	secondaryClient, err := azkustodata.New(skcsb)
 	if err != nil {
