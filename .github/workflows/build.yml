@@ -9,10 +9,19 @@ jobs:
   build:
     name: Build
     runs-on: ubuntu-latest
+    environment: build
     permissions:
       checks: write
       pull-requests: write
+      id-token: write
+      contents: read
     steps:
+      - name: Azure login
+        uses: azure/login@v2
+        with:
+          client-id: ${{ secrets.APP_ID }}
+          tenant-id: ${{ secrets.AUTH_ID }}
+          subscription-id: ${{ secrets.AZURE_SUBSCRIPTION_ID }}
       - name: Check out code into the Go module directory
         uses: actions/checkout@v2
 
