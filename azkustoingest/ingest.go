@@ -46,9 +46,9 @@ func New(kcsb *azkustodata.ConnectionStringBuilder, options ...Option) (*Ingesti
 		newKcsb.DataSource = addIngestPrefix(newKcsb.DataSource)
 		kcsb = &newKcsb
 	}
-
-	i.applicationForTracing = kcsb.ApplicationForTracing
-	i.clientVersionForTracing = kcsb.ClientVersionForTracing()
+	clientDetails := azkustodata.NewClientDetails(kcsb.ApplicationForTracing, kcsb.UserForTracing)
+	i.applicationForTracing = clientDetails.ApplicationForTracing()
+	i.clientVersionForTracing = clientDetails.ClientVersionForTracing()
 
 	client, err := azkustodata.New(kcsb)
 	if err != nil {
