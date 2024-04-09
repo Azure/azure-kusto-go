@@ -37,6 +37,9 @@ type Ingestion struct {
 
 	bufferSize int
 	maxBuffers int
+
+	applicationForTracing   string
+	clientVersionForTracing string
 }
 
 // Option is an optional argument to New().
@@ -63,12 +66,14 @@ func New(client QueryClient, db, table string, options ...Option) (*Ingestion, e
 		db:     db,
 		table:  table,
 	}
+	i.applicationForTracing = client.ClientDetails().ApplicationForTracing()
+	i.clientVersionForTracing = client.ClientDetails().ClientVersionForTracing()
 
 	for _, option := range options {
 		option(i)
 	}
 
-	fs, err := queued.New(db, table, mgr, client.HttpClient(), queued.WithStaticBuffer(i.bufferSize, i.maxBuffers))
+	fs, err := queued.New(db, table, mgr, client.HttpClient(), i.applicationForTracing, i.clientVersionForTracing, queued.WithStaticBuffer(i.bufferSize, i.maxBuffers))
 	if err != nil {
 		return nil, err
 	}

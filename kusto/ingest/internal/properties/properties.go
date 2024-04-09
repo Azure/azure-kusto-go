@@ -273,6 +273,10 @@ type Ingestion struct {
 	Additional Additional `json:"AdditionalProperties"`
 	// TableEntryRef points to the staus table entry used to report the status of this ingestion.
 	TableEntryRef StatusTableDescription `json:"IngestionStatusInTable,omitempty"`
+	// ApplicationForTracing is the application name that is used for tracing.
+	ApplicationForTracing string `json:",omitempty"`
+	// ClientVersionForTracing is the client version that is used for tracing.
+	ClientVersionForTracing string `json:",omitempty"`
 }
 
 // Additional is additional properites.
