@@ -111,11 +111,19 @@ func TestAuth(t *testing.T) {
 			},
 		},
 	}
-	defaultCred, err := azidentity.NewDefaultAzureCredential(&azidentity.DefaultAzureCredentialOptions{
-		ClientOptions: azcore.ClientOptions{
-			Transport: &transporter,
-		},
-	})
+	var defaultCred azcore.TokenCredential
+	var err error
+
+	if testConfig.ClientSecret != "" {
+		defaultCred, err = azidentity.NewDefaultAzureCredential(&azidentity.DefaultAzureCredentialOptions{
+			ClientOptions: azcore.ClientOptions{
+				Transport: &transporter,
+			},
+		})
+	} else {
+		defaultCred, err = azidentity.NewAzureCLICredential(&azidentity.AzureCLICredentialOptions{})
+	}
+
 	require.NoError(t, err)
 	credential, err := azidentity.NewChainedTokenCredential([]azcore.TokenCredential{
 		defaultCred,
@@ -1664,8 +1672,13 @@ func TestMultipleClusters(t *testing.T) { //ok
 		t.Log("Closed client")
 	})
 
-	skcsb := kusto.NewConnectionStringBuilder(testConfig.SecondaryEndpoint).WithAadAppKey(testConfig.ClientID, testConfig.ClientSecret, testConfig.TenantID)
+	var skcsb *kusto.ConnectionStringBuilder
 
+	if testConfig.ClientID == "" || testConfig.ClientSecret == "" || testConfig.TenantID == "" {
+		skcsb = kusto.NewConnectionStringBuilder(testConfig.SecondaryEndpoint).WithAzCli()
+	} else {
+		skcsb = kusto.NewConnectionStringBuilder(testConfig.SecondaryEndpoint).WithAadAppKey(testConfig.ClientID, testConfig.ClientSecret, testConfig.TenantID)
+	}
 	secondaryClient, err := kusto.New(skcsb)
 	if err != nil {
 		panic(err)
