@@ -33,7 +33,7 @@ func NewTable(d query.BaseDataset, dt *RawTable, index *TableIndexRow) (query.Ta
 	for i, c := range dt.Columns {
 		normal := types.NormalizeColumn(c.ColumnType)
 		if normal == "" {
-			return nil, errors.ES(op, errors.KClientArgs, "column[%d] if of type %q, which is not valid", i, c.ColumnType)
+			return nil, errors.ES(op, errors.KClientArgs, "column[%d] is of type %q, which is not valid", i, c.ColumnType)
 		}
 
 		columns[i] = query.NewColumn(i, c.ColumnName, normal)
