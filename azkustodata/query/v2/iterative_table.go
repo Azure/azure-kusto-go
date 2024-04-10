@@ -75,7 +75,7 @@ func parseColumns(th TableHeader, columns []query.Column, op errors.Op) *errors.
 	for i, c := range th.Columns() {
 		normal := types.NormalizeColumn(c.ColumnType)
 		if normal == "" {
-			return errors.ES(op, errors.KClientArgs, "column[%d] if of type %q, which is not valid", i, c.ColumnType)
+			return errors.ES(op, errors.KClientArgs, "column[%d] is of type %q, which is not valid", i, c.ColumnType)
 		}
 
 		columns[i] = query.NewColumn(i, c.ColumnName, normal)
