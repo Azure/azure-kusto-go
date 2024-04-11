@@ -3,6 +3,7 @@ module github.com/Azure/azure-kusto-go/azkustoingest
 go 1.22
 
 require (
+	github.com/Azure/azure-kusto-go/azkustodata v1.0.0-preview-2
 	github.com/Azure/azure-pipeline-go v0.2.3
 	github.com/Azure/azure-sdk-for-go v68.0.0+incompatible
 	github.com/Azure/azure-sdk-for-go/sdk/azcore v1.10.0
@@ -17,7 +18,6 @@ require (
 )
 
 require (
-	github.com/Azure/azure-kusto-go/azkustodata v1.0.0-preview.0.20240401192622-adfe309460fa // indirect
 	github.com/Azure/azure-sdk-for-go/sdk/azidentity v1.5.1 // indirect
 	github.com/Azure/azure-sdk-for-go/sdk/internal v1.5.2 // indirect
 	github.com/Azure/go-autorest v14.2.0+incompatible // indirect
