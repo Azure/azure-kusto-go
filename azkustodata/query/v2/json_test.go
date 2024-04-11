@@ -13,6 +13,9 @@ import (
 //go:embed testData/validFrames.json
 var validFrames string
 
+//go:embed testData/aliases.json
+var aliases string
+
 //go:embed testData/partialError.json
 var partialErrors string
 

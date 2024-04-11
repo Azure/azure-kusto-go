@@ -7,9 +7,8 @@ do discovery on table columns, if trying to do some type of dynamic discovery.
 
 # Column
 
-Column represents a Column type. A user should never try to implemenet these. Instead they should use
-the constants defined in this package, such as types.Bool, types.DateTime, ...  Any other value that these
-will not pass the Column.Valid() method and will be rejected by the API.
+Column represents a Column type. A user should never try to implement these. Instead they should use
+the constants defined in this package, such as types.Bool, types.DateTime.
 */
 package types
 
@@ -17,9 +16,14 @@ package types
 // For more information, please see: https://docs.microsoft.com/en-us/azure/kusto/query/scalar-data-types/
 type Column string
 
-// Valid returns true if the Column is a valid value.
-func (c Column) Valid() bool {
-	return valid[c]
+// NormalizeColumn checks if the column is a valid column type and returns the normalized column type.
+// If the column is not valid, it returns an empty string.
+func NormalizeColumn(c string) Column {
+	if mapped, ok := mappedNames[c]; ok {
+		return mapped
+	}
+
+	return ""
 }
 
 // These constants represent the value type stored in a Column.
@@ -46,15 +50,31 @@ const (
 	Decimal Column = "decimal" // We have NOT written a conversion
 )
 
-var valid = map[Column]bool{
-	Bool:     true,
-	DateTime: true,
-	Dynamic:  true,
-	GUID:     true,
-	Int:      true,
-	Long:     true,
-	Real:     true,
-	String:   true,
-	Timespan: true,
-	Decimal:  true,
+var mappedNames = map[string]Column{
+	string(Bool): Bool,
+	"boolean":    Bool,
+
+	string(DateTime): DateTime,
+	"date":           DateTime,
+
+	string(Dynamic): Dynamic,
+
+	string(GUID): GUID,
+	"uuid":       GUID,
+	"uniqueid":   GUID,
+
+	string(Int): Int,
+	"int32":     Int,
+
+	string(Long): Long,
+	"int64":      Long,
+
+	string(Real): Real,
+	"double":     Real,
+
+	string(String):   String,
+	string(Timespan): Timespan,
+	"time":           Timespan,
+
+	string(Decimal): Decimal,
 }

@@ -5,6 +5,7 @@ import (
 	"github.com/Azure/azure-kusto-go/azkustodata/query"
 	"github.com/Azure/azure-kusto-go/azkustodata/types"
 	"github.com/Azure/azure-kusto-go/azkustodata/value"
+	"strings"
 )
 
 func NewTable(d query.BaseDataset, dt *RawTable, index *TableIndexRow) (query.Table, error) {
@@ -31,10 +32,16 @@ func NewTable(d query.BaseDataset, dt *RawTable, index *TableIndexRow) (query.Ta
 	columns := make([]query.Column, len(dt.Columns))
 
 	for i, c := range dt.Columns {
-		columns[i] = query.NewColumn(i, c.ColumnName, types.Column(c.ColumnType))
-		if !columns[i].Type().Valid() {
-			return nil, errors.ES(op, errors.KClientArgs, "column[%d] if of type %q, which is not valid", i, c.ColumnType)
+		// ColumnType should always be available, but in rare cases there are still commands that don't provide it.
+		if c.ColumnType == "" {
+			c.ColumnType = strings.ToLower(c.DataType)
 		}
+		normal := types.NormalizeColumn(c.ColumnType)
+		if normal == "" {
+			return nil, errors.ES(op, errors.KClientArgs, "column[%d] is of type %q, which is not valid", i, c.ColumnType)
+		}
+
+		columns[i] = query.NewColumn(i, c.ColumnName, normal)
 	}
 
 	baseTable := query.NewBaseTable(d, ordinal, id, name, kind, columns)

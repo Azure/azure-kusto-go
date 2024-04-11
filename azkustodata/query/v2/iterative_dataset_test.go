@@ -66,144 +66,153 @@ func TestStreamingDataSet_DecodeTables_Skip(t *testing.T) {
 
 func TestStreamingDataSet_DecodeTables_GetRows(t *testing.T) {
 	t.Parallel()
-	reader := strings.NewReader(validFrames)
-	d, err := NewIterativeDataset(context.Background(), io.NopCloser(reader), DefaultFrameCapacity)
-	assert.NoError(t, err)
-	ts, err := value.TimespanFromString("01:23:45.6789000")
-	assert.NoError(t, err)
-	u, err := uuid.Parse("123e27de-1e4e-49d9-b579-fe0b331d3642")
-	assert.NoError(t, err)
+	for _, tt := range []struct {
+		name   string
+		reader io.Reader
+	}{{name: "validFrames", reader: strings.NewReader(validFrames)},
+		{name: "aliases", reader: strings.NewReader(aliases)},
+	} {
+		t.Run(tt.name, func(t *testing.T) {
+			reader := tt.reader
+			d, err := NewIterativeDataset(context.Background(), io.NopCloser(reader), DefaultFrameCapacity)
+			assert.NoError(t, err)
+			ts, err := value.TimespanFromString("01:23:45.6789000")
+			assert.NoError(t, err)
+			u, err := uuid.Parse("123e27de-1e4e-49d9-b579-fe0b331d3642")
+			assert.NoError(t, err)
 
-	tables := []struct {
-		rows    []query.Row
-		id      int64
-		name    string
-		kind    string
-		columns []query.Column
-	}{
+			tables := []struct {
+				rows    []query.Row
+				id      int64
+				name    string
+				kind    string
+				columns []query.Column
+			}{
 
-		{
+				{
 
-			id:   0,
-			name: "@ExtendedProperties",
-			kind: "QueryProperties",
-			columns: []query.Column{
-				query.NewColumn(0, "TableId", "int"),
-				query.NewColumn(1, "Key", "string"),
-				query.NewColumn(2, "Value", "dynamic"),
-			},
-			rows: []query.Row{
-				query.NewRowFromParts(nil, nil, 0, value.Values{
-					value.NewInt(1),
-					value.NewString("Visualization"),
-					value.NewDynamic([]byte("{\"Visualization\":null,\"Title\":null,\"XColumn\":null,\"Series\":null,\"YColumns\":null,\"AnomalyColumns\":null,\"XTitle\":null,\"YTitle\":null,\"XAxis\":null,\"YAxis\":null,\"Legend\":null,\"YSplit\":null,\"Accumulate\":false,\"IsQuerySorted\":false,\"Kind\":null,\"Ymin\":\"NaN\",\"Ymax\":\"NaN\",\"Xmin\":null,\"Xmax\":null}")),
-				}),
-			},
-		},
-		{
+					id:   0,
+					name: "@ExtendedProperties",
+					kind: "QueryProperties",
+					columns: []query.Column{
+						query.NewColumn(0, "TableId", "int"),
+						query.NewColumn(1, "Key", "string"),
+						query.NewColumn(2, "Value", "dynamic"),
+					},
+					rows: []query.Row{
+						query.NewRowFromParts(nil, nil, 0, value.Values{
+							value.NewInt(1),
+							value.NewString("Visualization"),
+							value.NewDynamic([]byte("{\"Visualization\":null,\"Title\":null,\"XColumn\":null,\"Series\":null,\"YColumns\":null,\"AnomalyColumns\":null,\"XTitle\":null,\"YTitle\":null,\"XAxis\":null,\"YAxis\":null,\"Legend\":null,\"YSplit\":null,\"Accumulate\":false,\"IsQuerySorted\":false,\"Kind\":null,\"Ymin\":\"NaN\",\"Ymax\":\"NaN\",\"Xmin\":null,\"Xmax\":null}")),
+						}),
+					},
+				},
+				{
 
-			id:   1,
-			name: "AllDataTypes",
-			kind: "PrimaryResult",
-			columns: []query.Column{
-				query.NewColumn(0, "vnum", "int"),
-				query.NewColumn(1, "vdec", "decimal"),
-				query.NewColumn(2, "vdate", "datetime"),
-				query.NewColumn(3, "vspan", "timespan"),
-				query.NewColumn(4, "vobj", "dynamic"),
-				query.NewColumn(5, "vb", "bool"),
-				query.NewColumn(6, "vreal", "real"),
-				query.NewColumn(7, "vstr", "string"),
-				query.NewColumn(8, "vlong", "long"),
-				query.NewColumn(9, "vguid", "guid"),
-			},
-			rows: []query.Row{
-				query.NewRowFromParts(nil, nil, 0, value.Values{
-					value.NewInt(1),
-					value.DecimalFromString("2.00000000000001"),
-					value.NewDateTime(time.Date(2020, 3, 4, 14, 5, 1, 310996500, time.UTC)),
-					ts,
-					value.NewDynamic([]byte("{\"moshe\":\"value\"}")),
-					value.NewBool(true),
-					value.NewReal(0.01),
-					value.NewString("asdf"),
-					value.NewLong(9223372036854775807),
-					value.NewGUID(u),
-				})},
-		},
-		{
+					id:   1,
+					name: "AllDataTypes",
+					kind: "PrimaryResult",
+					columns: []query.Column{
+						query.NewColumn(0, "vnum", "int"),
+						query.NewColumn(1, "vdec", "decimal"),
+						query.NewColumn(2, "vdate", "datetime"),
+						query.NewColumn(3, "vspan", "timespan"),
+						query.NewColumn(4, "vobj", "dynamic"),
+						query.NewColumn(5, "vb", "bool"),
+						query.NewColumn(6, "vreal", "real"),
+						query.NewColumn(7, "vstr", "string"),
+						query.NewColumn(8, "vlong", "long"),
+						query.NewColumn(9, "vguid", "guid"),
+					},
+					rows: []query.Row{
+						query.NewRowFromParts(nil, nil, 0, value.Values{
+							value.NewInt(1),
+							value.DecimalFromString("2.00000000000001"),
+							value.NewDateTime(time.Date(2020, 3, 4, 14, 5, 1, 310996500, time.UTC)),
+							ts,
+							value.NewDynamic([]byte("{\"moshe\":\"value\"}")),
+							value.NewBool(true),
+							value.NewReal(0.01),
+							value.NewString("asdf"),
+							value.NewLong(9223372036854775807),
+							value.NewGUID(u),
+						})},
+				},
+				{
 
-			id:   2,
-			name: "QueryCompletionInformation",
-			kind: "QueryCompletionInformation",
-			columns: []query.Column{
-				query.NewColumn(0, "Timestamp", "datetime"),
-				query.NewColumn(1, "ClientRequestId", "string"),
-				query.NewColumn(2, "ActivityId", "guid"),
-				query.NewColumn(3, "SubActivityId", "guid"),
-				query.NewColumn(4, "ParentActivityId", "guid"),
-				query.NewColumn(5, "Level", "int"),
-				query.NewColumn(6, "LevelName", "string"),
-				query.NewColumn(7, "StatusCode", "int"),
-				query.NewColumn(8, "StatusCodeName", "string"),
-				query.NewColumn(9, "EventType", "int"),
-				query.NewColumn(10, "EventTypeName", "string"),
-				query.NewColumn(11, "Payload", "string"),
-			},
-			rows: []query.Row{
-				query.NewRowFromParts(nil, nil, 0, value.Values{
-					value.NewDateTime(time.Date(2023, 11, 26, 13, 34, 17, 73147800, time.UTC)),
-					value.NewString("blab6"),
-					value.NewGUID(u),
-					value.NewGUID(u),
-					value.NewGUID(u),
-					value.NewInt(4),
-					value.NewString("Info"),
-					value.NewInt(0),
-					value.NewString("S_OK (0)"),
-					value.NewInt(4),
-					value.NewString("QueryInfo"),
-					value.NewString("{\"Count\":1,\"Text\":\"Query completed successfully\"}"),
-				}),
-				query.NewRowFromParts(nil, nil, 1, value.Values{
-					value.NewDateTime(time.Date(2023, 11, 26, 13, 34, 17, 73147800, time.UTC)),
-					value.NewString("blab6"),
-					value.NewGUID(u),
-					value.NewGUID(u),
-					value.NewGUID(u),
-					value.NewInt(4),
-					value.NewString("Info"),
-					value.NewInt(0),
-					value.NewString("S_OK (0)"),
-					value.NewInt(5),
-					value.NewString("WorkloadGroup"),
-					value.NewString("{\"Count\":1,\"Text\":\"default\"}"),
-				}),
-			},
-		},
-	}
-
-	for tableResult := range d.Tables() {
-		assert.NoError(t, tableResult.Err())
-		if tableResult.Table() != nil {
-			tb := tableResult.Table()
-			expectedTable := tables[tb.Index()]
-			assert.Equal(t, expectedTable.id, tb.Index())
-			assert.Equal(t, expectedTable.name, tb.Name())
-			assert.Equal(t, expectedTable.kind, tb.Kind())
-			assert.Equal(t, expectedTable.columns, tb.Columns())
-
-			i := 0
-			for rowResult := range tb.Rows() {
-				assert.NoError(t, rowResult.Err())
-				rows := expectedTable.rows
-				expectedRow := rows[i]
-				for j, val := range rowResult.Row().Values() {
-					assert.Equal(t, expectedRow.Values()[j], val)
-				}
-				i++
+					id:   2,
+					name: "QueryCompletionInformation",
+					kind: "QueryCompletionInformation",
+					columns: []query.Column{
+						query.NewColumn(0, "Timestamp", "datetime"),
+						query.NewColumn(1, "ClientRequestId", "string"),
+						query.NewColumn(2, "ActivityId", "guid"),
+						query.NewColumn(3, "SubActivityId", "guid"),
+						query.NewColumn(4, "ParentActivityId", "guid"),
+						query.NewColumn(5, "Level", "int"),
+						query.NewColumn(6, "LevelName", "string"),
+						query.NewColumn(7, "StatusCode", "int"),
+						query.NewColumn(8, "StatusCodeName", "string"),
+						query.NewColumn(9, "EventType", "int"),
+						query.NewColumn(10, "EventTypeName", "string"),
+						query.NewColumn(11, "Payload", "string"),
+					},
+					rows: []query.Row{
+						query.NewRowFromParts(nil, nil, 0, value.Values{
+							value.NewDateTime(time.Date(2023, 11, 26, 13, 34, 17, 73147800, time.UTC)),
+							value.NewString("blab6"),
+							value.NewGUID(u),
+							value.NewGUID(u),
+							value.NewGUID(u),
+							value.NewInt(4),
+							value.NewString("Info"),
+							value.NewInt(0),
+							value.NewString("S_OK (0)"),
+							value.NewInt(4),
+							value.NewString("QueryInfo"),
+							value.NewString("{\"Count\":1,\"Text\":\"Query completed successfully\"}"),
+						}),
+						query.NewRowFromParts(nil, nil, 1, value.Values{
+							value.NewDateTime(time.Date(2023, 11, 26, 13, 34, 17, 73147800, time.UTC)),
+							value.NewString("blab6"),
+							value.NewGUID(u),
+							value.NewGUID(u),
+							value.NewGUID(u),
+							value.NewInt(4),
+							value.NewString("Info"),
+							value.NewInt(0),
+							value.NewString("S_OK (0)"),
+							value.NewInt(5),
+							value.NewString("WorkloadGroup"),
+							value.NewString("{\"Count\":1,\"Text\":\"default\"}"),
+						}),
+					},
+				},
 			}
-		}
+
+			for tableResult := range d.Tables() {
+				assert.NoError(t, tableResult.Err())
+				if tableResult.Table() != nil {
+					tb := tableResult.Table()
+					expectedTable := tables[tb.Index()]
+					assert.Equal(t, expectedTable.id, tb.Index())
+					assert.Equal(t, expectedTable.name, tb.Name())
+					assert.Equal(t, expectedTable.kind, tb.Kind())
+					assert.Equal(t, expectedTable.columns, tb.Columns())
+
+					i := 0
+					for rowResult := range tb.Rows() {
+						assert.NoError(t, rowResult.Err())
+						rows := expectedTable.rows
+						expectedRow := rows[i]
+						for j, val := range rowResult.Row().Values() {
+							assert.Equal(t, expectedRow.Values()[j], val)
+						}
+						i++
+					}
+				}
+			}
+		})
 	}
 }
 
@@ -245,6 +254,11 @@ func TestStreamingDataSet_MultiplePrimaryTables(t *testing.T) {
 			}
 		}
 	}
+}
+
+func TestStreamingDataSet_TableAliases(t *testing.T) {
+	t.Parallel()
+
 }
 
 func TestStreamingDataSet_DecodeTables_WithInvalidDataSetHeader(t *testing.T) {

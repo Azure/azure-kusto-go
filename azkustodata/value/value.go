@@ -58,9 +58,6 @@ func (p *pointerValue[T]) String() string {
 }
 
 func (p *pointerValue[T]) GetValue() interface{} {
-	if p.value == nil {
-		return nil
-	}
 	return p.value
 }
 

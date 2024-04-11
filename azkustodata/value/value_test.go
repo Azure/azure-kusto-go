@@ -366,6 +366,41 @@ func TestReal(t *testing.T) {
 			i:    json.Number("23.2"),
 			want: *NewReal(23.2),
 		},
+		{
+			desc: "value is float string",
+			i:    "23.22",
+			want: *NewReal(23.22),
+		},
+		{
+			desc: "value is NaN string",
+			i:    "NaN",
+			want: *NewReal(math.NaN()),
+		},
+		{
+			desc: "value is +Inf string",
+			i:    "Infinity",
+			want: *NewReal(math.Inf(1)),
+		},
+		{
+			desc: "value is -Inf string",
+			i:    "-Infinity",
+			want: *NewReal(math.Inf(-1)),
+		},
+		{
+			desc: "value is +Inf",
+			i:    math.Inf(1),
+			want: *NewReal(math.Inf(1)),
+		},
+		{
+			desc: "value is -Inf",
+			i:    math.Inf(-1),
+			want: *NewReal(math.Inf(-1)),
+		},
+		{
+			desc: "value is NaN",
+			i:    math.NaN(),
+			want: *NewReal(math.NaN()),
+		},
 	}
 
 	for _, test := range tests {
@@ -382,7 +417,12 @@ func TestReal(t *testing.T) {
 
 			assert.NoError(t, err)
 
-			assert.EqualValues(t, test.want, got)
+			if test.want.value != nil && math.IsNaN(*test.want.value) {
+				assert.True(t, math.IsNaN(*got.value))
+			} else {
+				assert.EqualValues(t, test.want, got)
+			}
+
 		})
 	}
 }
