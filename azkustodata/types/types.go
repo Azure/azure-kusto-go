@@ -63,8 +63,12 @@ var mappedNames = map[string]Column{
 	"uuid":       GUID,
 	"uniqueid":   GUID,
 
-	string(Int):  Int,
+	string(Int): Int,
+	"int32":     Int,
+
 	string(Long): Long,
+	"int64":      Long,
+
 	string(Real): Real,
 	"double":     Real,
 

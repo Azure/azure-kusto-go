@@ -12,6 +12,9 @@ import (
 //go:embed testData/success.json
 var successFile string
 
+//go:embed testData/dataTypeOnly.json
+var dataTypeOnlyFile string
+
 //go:embed testData/partialError.json
 var partialErrorFile string
 
