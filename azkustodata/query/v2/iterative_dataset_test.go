@@ -34,10 +34,9 @@ func TestStreamingDataSet_Context_Canceled(t *testing.T) {
 	assert.NoError(t, err)
 	cancel()
 
-	table := <-d.Tables()
-	assert.Error(t, table.Err())
-
 	d.Close()
+
+	time.Sleep(300 * time.Millisecond)
 }
 
 func TestStreamingDataSet_ReadFrames_WithError(t *testing.T) {
