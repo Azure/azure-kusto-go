@@ -5,8 +5,6 @@ import (
 	"github.com/Azure/azure-kusto-go/azkustodata/errors"
 	"github.com/Azure/azure-kusto-go/azkustodata/query"
 	"io"
-	"sync/atomic"
-	"time"
 )
 
 // DefaultFrameCapacity is the default capacity of the channel that receives frames from the Kusto service. Lower capacity means less memory usage, but might cause the channel to block if the frames are not consumed fast enough.
@@ -28,13 +26,13 @@ type iterativeDataset struct {
 	reader io.ReadCloser
 	// frames is a channel that receives all the frames from the data set as they are parsed.
 	frames chan *EveryFrame
-	// errorValue is an atomic value that stores the first error that occurs during the decoding of the frames.
-	errorValue atomic.Value
 	// results is a channel that sends the parsed results as they are decoded.
 	results chan query.TableResult
 
 	fragmentCapacity int
 	rowCapacity      int
+
+	readFramesDone bool
 }
 
 func NewIterativeDataset(ctx context.Context, r io.ReadCloser, capacity int, rowCapacity int, fragmentCapacity int) (query.IterativeDataset, error) {
@@ -49,19 +47,27 @@ func NewIterativeDataset(ctx context.Context, r io.ReadCloser, capacity int, row
 
 	br, err := prepareReadBuffer(d.reader)
 	if err != nil {
-		err := d.reader.Close()
-		if err != nil {
-			return nil, err
+		closeErr := d.reader.Close()
+		if closeErr != nil {
+			return nil, errors.TryCombinedError(err, closeErr)
 		}
 
 		return nil, err
 	}
 
 	go func() {
-		defer d.reader.Close()
+		defer func() {
+			err := d.reader.Close()
+			if err != nil {
+				d.reportError(err)
+			}
+
+			d.readFramesDone = true
+		}()
+
 		err := readFramesIterative(br, d.frames)
 		if err != nil {
-			d.errorValue.Store(err)
+			d.reportError(err)
 		}
 	}()
 
@@ -81,31 +87,31 @@ func (d *iterativeDataset) getNextFrame() *EveryFrame {
 		case fc := <-d.frames:
 			f = fc
 			return f
-		case <-time.After(10 * time.Millisecond):
-			val := d.errorValue.Load()
-			if val != nil {
-				d.reportError(val.(error))
-				return nil
-			}
 		}
-
 	}
 }
 
 func (d *iterativeDataset) reportError(err error) {
-	select {
-	case d.results <- query.TableResultError(err):
-		return
+	for {
+		select {
+		case d.results <- query.TableResultError(err):
+			return
+		case <-d.Context().Done():
+			return
+		default:
+			if d.readFramesDone {
+				// If the dataset is closed, we don't want to block the goroutine that is sending the results.
+				return
+			}
+		}
 	}
 }
 
 func (d *iterativeDataset) sendTable(tb query.IterativeTable) {
-	if d.errorValue.Load() != nil {
-		return
-	}
-
 	select {
 	case d.results <- query.TableResultSuccess(tb):
+		return
+	case <-d.Context().Done():
 		return
 	}
 }
