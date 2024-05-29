@@ -166,6 +166,14 @@ func (c *Client) IterativeQuery(ctx context.Context, db string, kqlQuery Stateme
 	return queryv2.NewIterativeDataset(ctx, res, frameCapacity, rowCapacity, fragmentCapacity)
 }
 
+func (c *Client) RawV2(ctx context.Context, db string, kqlQuery Statement, options []QueryOption) (io.ReadCloser, error) {
+
+	_, res, err := c.rawV2(ctx, db, kqlQuery, options)
+
+	return res, err
+
+}
+
 func (c *Client) rawV2(ctx context.Context, db string, kqlQuery Statement, options []QueryOption) (*queryOptions, io.ReadCloser, error) {
 	ctx, cancel := contextSetup(ctx)
 	opQuery := errors.OpQuery
