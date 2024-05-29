@@ -63,7 +63,7 @@ func NewIterativeDataset(ctx context.Context, r io.ReadCloser, capacity int, row
 				d.reportError(err)
 			}
 
-			d.readFramesDone = true
+			d.Close()
 		}()
 
 		err := readFramesIterative(br, d.frames)
@@ -125,6 +125,7 @@ func (d *iterativeDataset) Tables() <-chan query.TableResult {
 }
 
 func (d *iterativeDataset) Close() error {
+	d.readFramesDone = true
 	return nil
 }
 
