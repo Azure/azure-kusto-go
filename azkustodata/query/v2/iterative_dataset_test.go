@@ -22,6 +22,10 @@ type table2 struct {
 	B int
 }
 
+func defaultDataset(reader io.Reader) (query.IterativeDataset, error) {
+	return defaultDataset(reader)
+}
+
 func TestStreamingDataSet_ReadFrames_WithError(t *testing.T) {
 	t.Parallel()
 	reader := strings.NewReader("invalid")
@@ -42,7 +46,7 @@ func TestStreamingDataSet_DecodeTables_WithInvalidFrame(t *testing.T) {
 	t.Parallel()
 	reader := strings.NewReader(`[{"FrameType": "InvalidFrameType"}
 ]`)
-	d, err := NewIterativeDataset(context.Background(), io.NopCloser(reader), DefaultFrameCapacity)
+	d, err := defaultDataset(reader)
 	assert.NoError(t, err)
 
 	tableResult := <-d.Tables()
@@ -55,7 +59,7 @@ func TestStreamingDataSet_DecodeTables_WithInvalidFrame(t *testing.T) {
 func TestStreamingDataSet_DecodeTables_Skip(t *testing.T) {
 	t.Parallel()
 	reader := strings.NewReader(validFrames)
-	d, err := NewIterativeDataset(context.Background(), io.NopCloser(reader), DefaultFrameCapacity)
+	d, err := defaultDataset(reader)
 	assert.NoError(t, err)
 
 	for tableResult := range d.Tables() {
@@ -74,7 +78,7 @@ func TestStreamingDataSet_DecodeTables_GetRows(t *testing.T) {
 	} {
 		t.Run(tt.name, func(t *testing.T) {
 			reader := tt.reader
-			d, err := NewIterativeDataset(context.Background(), io.NopCloser(reader), DefaultFrameCapacity)
+			d, err := defaultDataset(reader)
 			assert.NoError(t, err)
 			ts, err := value.TimespanFromString("01:23:45.6789000")
 			assert.NoError(t, err)
@@ -219,7 +223,7 @@ func TestStreamingDataSet_DecodeTables_GetRows(t *testing.T) {
 func TestStreamingDataSet_MultiplePrimaryTables(t *testing.T) {
 	t.Parallel()
 	reader := strings.NewReader(twoTables)
-	d, err := NewIterativeDataset(context.Background(), io.NopCloser(reader), DefaultFrameCapacity)
+	d, err := defaultDataset(reader)
 	assert.NoError(t, err)
 
 	table1Expected := []table1{
@@ -265,7 +269,7 @@ func TestStreamingDataSet_DecodeTables_WithInvalidDataSetHeader(t *testing.T) {
 	t.Parallel()
 	reader := strings.NewReader(`[{"FrameType": "DataSetHeader", "Version": "V1"}
 ]`)
-	d, err := NewIterativeDataset(context.Background(), io.NopCloser(reader), DefaultFrameCapacity)
+	d, err := defaultDataset(reader)
 	assert.NoError(t, err)
 
 	tableResult := <-d.Tables()
@@ -277,7 +281,7 @@ func TestStreamingDataSet_DecodeTables_WithInvalidTableFragment(t *testing.T) {
 	t.Parallel()
 	reader := strings.NewReader(`[{"FrameType": "TableFragment", "TableId": 1}
 ]`)
-	d, err := NewIterativeDataset(context.Background(), io.NopCloser(reader), DefaultFrameCapacity)
+	d, err := defaultDataset(reader)
 	assert.NoError(t, err)
 
 	tableResult := <-d.Tables()
@@ -289,7 +293,7 @@ func TestStreamingDataSet_DecodeTables_WithInvalidTableCompletion(t *testing.T) 
 	t.Parallel()
 	reader := strings.NewReader(`[{"FrameType": "TableCompletion", "TableId": 1}
 ]`)
-	d, err := NewIterativeDataset(context.Background(), io.NopCloser(reader), DefaultFrameCapacity)
+	d, err := defaultDataset(reader)
 	assert.NoError(t, err)
 
 	tableResult := <-d.Tables()
@@ -301,7 +305,7 @@ func TestStreamingDataSet_DecodeTables_StreamingTable_WithInvalidColumnType(t *t
 	t.Parallel()
 	reader := strings.NewReader(`[{"FrameType": "TableHeader", "TableId": 1, "TableName": "TestTable", "TableKind": "PrimaryResult", "Columns": [{"ColumnName": "TestColumn", "ColumnType": "invalid"}]}
 ]`)
-	d, err := NewIterativeDataset(context.Background(), io.NopCloser(reader), DefaultFrameCapacity)
+	d, err := defaultDataset(reader)
 	assert.NoError(t, err)
 
 	tableResult := <-d.Tables()
@@ -313,7 +317,7 @@ func TestStreamingDataSet_DecodeTables_DataTable_WithInvalidColumnType(t *testin
 	t.Parallel()
 	reader := strings.NewReader(`[{"FrameType": "DataTable", "TableId": 1, "TableName": "TestTable", "TableKind": "QueryCompletionInformation", "Columns": [{"ColumnName": "TestColumn", "ColumnType": "invalid"}], "Rows": [["TestValue"]]}
 ]`)
-	d, err := NewIterativeDataset(context.Background(), io.NopCloser(reader), DefaultFrameCapacity)
+	d, err := defaultDataset(reader)
 	assert.NoError(t, err)
 
 	tableResult := <-d.Tables()
@@ -324,7 +328,7 @@ func TestStreamingDataSet_DecodeTables_DataTable_WithInvalidColumnType(t *testin
 func TestStreamingDataSet_PartialErrors_Streaming(t *testing.T) {
 	t.Parallel()
 	reader := strings.NewReader(partialErrors)
-	d, err := NewIterativeDataset(context.Background(), io.NopCloser(reader), DefaultFrameCapacity)
+	d, err := defaultDataset(reader)
 	assert.NoError(t, err)
 
 	for result := range d.Tables() {
@@ -341,7 +345,7 @@ func TestStreamingDataSet_PartialErrors_Streaming(t *testing.T) {
 func TestStreamingDataSet_PartialErrors_GetAll(t *testing.T) {
 	t.Parallel()
 	reader := strings.NewReader(partialErrors)
-	d, err := NewIterativeDataset(context.Background(), io.NopCloser(reader), DefaultFrameCapacity)
+	d, err := defaultDataset(reader)
 	assert.NoError(t, err)
 	_, err = d.ToDataset()
 	assert.ErrorContains(t, err, "LimitsExceeded")
@@ -350,7 +354,7 @@ func TestStreamingDataSet_PartialErrors_GetAll(t *testing.T) {
 func TestStreamingDataSet_FullError(t *testing.T) {
 	t.Parallel()
 	reader := strings.NewReader(errorText)
-	d, err := NewIterativeDataset(context.Background(), io.NopCloser(reader), DefaultFrameCapacity)
+	d, err := defaultDataset(reader)
 	assert.ErrorContains(t, err, "Bad request")
 	assert.Nil(t, d)
 }
