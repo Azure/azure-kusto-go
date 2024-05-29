@@ -1,6 +1,7 @@
 package v2
 
 import (
+	"context"
 	"github.com/Azure/azure-kusto-go/azkustodata/errors"
 	"github.com/Azure/azure-kusto-go/azkustodata/query"
 	"github.com/Azure/azure-kusto-go/azkustodata/types"
@@ -18,6 +19,7 @@ type iterativeTable struct {
 	rows     chan query.RowResult
 	rowCount int
 	skip     bool
+	ctx      context.Context
 }
 
 func (t *iterativeTable) addRawRows(rows RawRows) {
@@ -55,6 +57,7 @@ func NewIterativeTable(dataset *iterativeDataset, th TableHeader) (query.Iterati
 	}
 
 	t := &iterativeTable{
+		ctx:       dataset.Context(),
 		BaseTable: baseTable,
 		rawRows:   make(chan RawRows, dataset.fragmentCapacity),
 		rows:      make(chan query.RowResult, dataset.rowCapacity),
@@ -96,10 +99,28 @@ func parseRow(r []interface{}, t query.BaseTable, index int) (query.Row, *errors
 func (t *iterativeTable) finishTable(errors []OneApiError) {
 	if errors != nil {
 		for _, e := range errors {
-			t.rows <- query.RowResultError(&e)
+			t.tryInsertValue(nil, &e)
 		}
 	}
 	close(t.rawRows)
+}
+
+func (t *iterativeTable) tryInsertValue(row query.Row, err error) {
+	if err != nil {
+		select {
+		case t.rows <- query.RowResultError(err):
+			break
+		case <-t.ctx.Done():
+			break
+		}
+	} else {
+		select {
+		case t.rows <- query.RowResultSuccess(row):
+			break
+		case <-t.ctx.Done():
+			break
+		}
+	}
 }
 
 const skipError = "skipping row"
@@ -108,14 +129,14 @@ func (t *iterativeTable) readRows() {
 	for rows := range t.rawRows {
 		for _, r := range rows {
 			if t.Skip() {
-				t.rows <- query.RowResultError(errors.ES(t.Op(), errors.KInternal, skipError))
+				t.tryInsertValue(nil, errors.ES(t.Op(), errors.KInternal, skipError))
 			} else {
 				row, err := parseRow(r, t, t.RowCount())
 				if err != nil {
-					t.rows <- query.RowResultError(err)
+					t.tryInsertValue(nil, err)
 					continue
 				}
-				t.rows <- query.RowResultSuccess(row)
+				t.tryInsertValue(row, nil)
 			}
 			t.rowCount++
 		}

@@ -26,15 +26,26 @@ func defaultDataset(reader io.Reader) (query.IterativeDataset, error) {
 	return NewIterativeDataset(context.Background(), io.NopCloser(reader), DefaultFrameCapacity, DefaultRowCapacity, DefaultFragmentCapacity)
 }
 
+func TestStreamingDataSet_Context_Canceled(t *testing.T) {
+	t.Parallel()
+	ctx, cancel := context.WithCancel(context.Background())
+	reader := strings.NewReader(validFrames)
+	d, err := NewIterativeDataset(ctx, io.NopCloser(reader), 1, 1, 1)
+	assert.NoError(t, err)
+	cancel()
+
+	table := <-d.Tables()
+	assert.Error(t, table.Err())
+}
+
 func TestStreamingDataSet_ReadFrames_WithError(t *testing.T) {
 	t.Parallel()
 	reader := strings.NewReader("invalid")
 	d := &iterativeDataset{
-		BaseDataset:  query.NewBaseDataset(context.Background(), errors.OpQuery, PrimaryResultTableKind),
-		reader:       io.NopCloser(reader),
-		frames:       make(chan *EveryFrame, DefaultFrameCapacity),
-		errorChannel: make(chan error, 1),
-		results:      make(chan query.TableResult, 1),
+		BaseDataset: query.NewBaseDataset(context.Background(), errors.OpQuery, PrimaryResultTableKind),
+		reader:      io.NopCloser(reader),
+		frames:      make(chan *EveryFrame, DefaultFrameCapacity),
+		results:     make(chan query.TableResult, 1),
 	}
 
 	br, err := prepareReadBuffer(d.reader)

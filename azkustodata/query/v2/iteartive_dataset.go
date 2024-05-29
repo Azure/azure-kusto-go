@@ -5,6 +5,8 @@ import (
 	"github.com/Azure/azure-kusto-go/azkustodata/errors"
 	"github.com/Azure/azure-kusto-go/azkustodata/query"
 	"io"
+	"sync/atomic"
+	"time"
 )
 
 // DefaultFrameCapacity is the default capacity of the channel that receives frames from the Kusto service. Lower capacity means less memory usage, but might cause the channel to block if the frames are not consumed fast enough.
@@ -26,8 +28,8 @@ type iterativeDataset struct {
 	reader io.ReadCloser
 	// frames is a channel that receives all the frames from the data set as they are parsed.
 	frames chan *EveryFrame
-	// errorChannel is a channel to report errors during the parsing of frames
-	errorChannel chan error
+	// errorValue is an atomic value that stores the first error that occurs during the decoding of the frames.
+	errorValue atomic.Value
 	// results is a channel that sends the parsed results as they are decoded.
 	results chan query.TableResult
 
@@ -40,7 +42,6 @@ func NewIterativeDataset(ctx context.Context, r io.ReadCloser, capacity int, row
 		BaseDataset:      query.NewBaseDataset(ctx, errors.OpQuery, PrimaryResultTableKind),
 		reader:           r,
 		frames:           make(chan *EveryFrame, capacity),
-		errorChannel:     make(chan error, 1),
 		results:          make(chan query.TableResult, 1),
 		fragmentCapacity: fragmentCapacity,
 		rowCapacity:      rowCapacity,
@@ -48,7 +49,11 @@ func NewIterativeDataset(ctx context.Context, r io.ReadCloser, capacity int, row
 
 	br, err := prepareReadBuffer(d.reader)
 	if err != nil {
-		d.reader.Close()
+		err := d.reader.Close()
+		if err != nil {
+			return nil, err
+		}
+
 		return nil, err
 	}
 
@@ -56,7 +61,7 @@ func NewIterativeDataset(ctx context.Context, r io.ReadCloser, capacity int, row
 		defer d.reader.Close()
 		err := readFramesIterative(br, d.frames)
 		if err != nil {
-			d.errorChannel <- err
+			d.errorValue.Store(err)
 		}
 	}()
 
@@ -68,34 +73,38 @@ func NewIterativeDataset(ctx context.Context, r io.ReadCloser, capacity int, row
 func (d *iterativeDataset) getNextFrame() *EveryFrame {
 	var f *EveryFrame = nil
 
-	select {
-	case err := <-d.errorChannel:
-		if err != nil {
-			d.reportError(err)
+	for {
+		select {
+		case <-d.Context().Done():
+			d.reportError(errors.ES(d.Op(), errors.KInternal, "context cancelled"))
+			return nil
+		case fc := <-d.frames:
+			f = fc
+			return f
+		case <-time.After(10 * time.Millisecond):
+			val := d.errorValue.Load()
+			if val != nil {
+				d.reportError(val.(error))
+				return nil
+			}
 		}
-		break
-	case <-d.Context().Done():
-		d.reportError(errors.ES(d.Op(), errors.KInternal, "context cancelled"))
-		break
-	case fc := <-d.frames:
-		f = fc
+
 	}
-	return f
 }
 
 func (d *iterativeDataset) reportError(err error) {
 	select {
-	case <-d.errorChannel:
-		return
 	case d.results <- query.TableResultError(err):
 		return
 	}
 }
 
 func (d *iterativeDataset) sendTable(tb query.IterativeTable) {
-	select {
-	case <-d.errorChannel:
+	if d.errorValue.Load() != nil {
 		return
+	}
+
+	select {
 	case d.results <- query.TableResultSuccess(tb):
 		return
 	}
@@ -106,24 +115,11 @@ func (d *iterativeDataset) Tables() <-chan query.TableResult {
 }
 
 func (d *iterativeDataset) Close() error {
-	// try to close the error channel, but don't block if it's full
-	// If it's already closed, return
-	select {
-	case e := <-d.errorChannel:
-		if e == nil {
-			return nil
-		}
-	default:
-	}
-	close(d.errorChannel)
-
 	return nil
 }
 
 func (d *iterativeDataset) ToDataset() (query.Dataset, error) {
 	tables := make([]query.Table, 0, len(d.results))
-
-	defer d.Close()
 
 	for tb := range d.Tables() {
 		if tb.Err() != nil {
@@ -153,7 +149,6 @@ func decodeTables(d *iterativeDataset) {
 			currentTable.finishTable([]OneApiError{})
 		}
 		close(d.results)
-		_ = d.Close()
 	}()
 
 	for {
