@@ -7,6 +7,7 @@ import (
 	"github.com/Azure/azure-kusto-go/azkustodata/types"
 	"github.com/Azure/azure-kusto-go/azkustodata/value"
 	"sync"
+	"time"
 )
 
 // iterativeTable represents a table that is streamed from the service.
@@ -99,50 +100,71 @@ func parseRow(r []interface{}, t query.BaseTable, index int) (query.Row, *errors
 func (t *iterativeTable) finishTable(errors []OneApiError) {
 	if errors != nil {
 		for _, e := range errors {
-			t.tryInsertValue(nil, &e)
+			t.tryReportError(&e)
 		}
 	}
 	close(t.rawRows)
 }
 
-func (t *iterativeTable) tryInsertValue(row query.Row, err error) {
-	if err != nil {
-		select {
-		case t.rows <- query.RowResultError(err):
-			break
-		case <-t.ctx.Done():
-			break
-		}
-	} else {
-		select {
-		case t.rows <- query.RowResultSuccess(row):
-			break
-		case <-t.ctx.Done():
-			break
-		}
+func (t *iterativeTable) reportRow(row query.Row) bool {
+	select {
+	case t.rows <- query.RowResultSuccess(row):
+		return true
+	case <-t.ctx.Done():
+		return false
+	}
+}
+
+func (t *iterativeTable) reportError(err error) bool {
+	select {
+	case t.rows <- query.RowResultError(err):
+		return true
+	case <-t.ctx.Done():
+		return false
+	}
+}
+
+func (t *iterativeTable) tryReportError(err error) bool {
+	ticker := time.NewTicker(100)
+	defer ticker.Stop()
+
+	select {
+	case t.rows <- query.RowResultError(err):
+		return true
+	case <-t.ctx.Done():
+		return false
+	case <-ticker.C:
+		return false
 	}
 }
 
 const skipError = "skipping row"
 
 func (t *iterativeTable) readRows() {
+	defer close(t.rows)
+
 	for rows := range t.rawRows {
 		for _, r := range rows {
 			if t.Skip() {
-				t.tryInsertValue(nil, errors.ES(t.Op(), errors.KInternal, skipError))
+				if !t.reportError(errors.ES(t.Op(), errors.KInternal, skipError)) {
+					return
+				}
 			} else {
 				row, err := parseRow(r, t, t.RowCount())
 				if err != nil {
-					t.tryInsertValue(nil, err)
+					if !t.tryReportError(err) {
+						return
+					}
 					continue
 				}
-				t.tryInsertValue(row, nil)
+				if !t.reportRow(row) {
+					return
+				}
 			}
 			t.rowCount++
 		}
 	}
 
-	close(t.rows)
 }
 func (t *iterativeTable) Rows() <-chan query.RowResult {
 	return t.rows

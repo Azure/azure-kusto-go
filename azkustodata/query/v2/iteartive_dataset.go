@@ -5,6 +5,7 @@ import (
 	"github.com/Azure/azure-kusto-go/azkustodata/errors"
 	"github.com/Azure/azure-kusto-go/azkustodata/query"
 	"io"
+	"time"
 )
 
 // DefaultFrameCapacity is the default capacity of the channel that receives frames from the Kusto service. Lower capacity means less memory usage, but might cause the channel to block if the frames are not consumed fast enough.
@@ -92,13 +93,16 @@ func (d *iterativeDataset) getNextFrame() *EveryFrame {
 }
 
 func (d *iterativeDataset) reportError(err error) {
+	ticker := time.NewTicker(100)
+	defer ticker.Stop()
+
 	for {
 		select {
 		case d.results <- query.TableResultError(err):
 			return
 		case <-d.Context().Done():
 			return
-		default:
+		case <-ticker.C:
 			if d.readFramesDone {
 				// If the dataset is closed, we don't want to block the goroutine that is sending the results.
 				return
