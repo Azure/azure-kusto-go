@@ -8,7 +8,11 @@ import (
 )
 
 // DefaultFrameCapacity is the default capacity of the channel that receives frames from the Kusto service. Lower capacity means less memory usage, but might cause the channel to block if the frames are not consumed fast enough.
-const DefaultFrameCapacity = 100
+const DefaultFrameCapacity = 10
+
+const DefaultRowCapacity = 1000
+
+const DefaultFragmentCapacity = 1
 
 const version = "v2.0"
 const PrimaryResultTableKind = "PrimaryResult"
@@ -26,15 +30,19 @@ type iterativeDataset struct {
 	errorChannel chan error
 	// results is a channel that sends the parsed results as they are decoded.
 	results chan query.TableResult
+
+	fragmentCapacity int
+	rowCapacity      int
 }
 
-func NewIterativeDataset(ctx context.Context, r io.ReadCloser, capacity int) (query.IterativeDataset, error) {
+func NewIterativeDataset(ctx context.Context, r io.ReadCloser, capacity int, rowCapacity int, fragmentCapacity int) (query.IterativeDataset, error) {
 	d := &iterativeDataset{
-		BaseDataset:  query.NewBaseDataset(ctx, errors.OpQuery, PrimaryResultTableKind),
-		reader:       r,
-		frames:       make(chan *EveryFrame, capacity),
-		errorChannel: make(chan error, 1),
-		results:      make(chan query.TableResult, 1),
+		BaseDataset:      query.NewBaseDataset(ctx, errors.OpQuery, PrimaryResultTableKind),
+		reader:           r,
+		frames:           make(chan *EveryFrame, capacity),
+		results:          make(chan query.TableResult, 1),
+		fragmentCapacity: fragmentCapacity,
+		rowCapacity:      rowCapacity,
 	}
 
 	br, err := prepareReadBuffer(d.reader)

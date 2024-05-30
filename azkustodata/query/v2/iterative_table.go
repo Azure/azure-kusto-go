@@ -48,7 +48,7 @@ func (t *iterativeTable) setSkip(skip bool) {
 	t.skip = skip
 }
 
-func newIterativeTable(dataset query.BaseDataset, th TableHeader, rowsSize int) (query.IterativeTable, error) {
+func NewIterativeTable(dataset *iterativeDataset, th TableHeader) (query.IterativeTable, error) {
 	baseTable, err := newBaseTable(dataset, th)
 	if err != nil {
 		return nil, err
@@ -58,17 +58,13 @@ func newIterativeTable(dataset query.BaseDataset, th TableHeader, rowsSize int) 
 		BaseTable: baseTable,
 		rawRows:   make(chan RawRows, rowsSize),
 		rows:      make(chan query.RowResult, rowsSize),
+		rawRows:   make(chan RawRows, dataset.fragmentCapacity),
+		rows:      make(chan query.RowResult, dataset.rowCapacity),
 	}
 
 	go t.readRows()
 
 	return t, nil
-}
-
-const defaultRowsSize = 100
-
-func NewIterativeTable(dataset query.BaseDataset, th TableHeader) (query.IterativeTable, error) {
-	return newIterativeTable(dataset, th, defaultRowsSize)
 }
 
 func parseColumns(th TableHeader, columns []query.Column, op errors.Op) *errors.Error {
