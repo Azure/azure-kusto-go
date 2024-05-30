@@ -26,6 +26,19 @@ func defaultDataset(reader io.Reader) (query.IterativeDataset, error) {
 	return NewIterativeDataset(context.Background(), io.NopCloser(reader), DefaultFrameCapacity, DefaultRowCapacity, DefaultFragmentCapacity)
 }
 
+func TestStreamingDataSet_Context_Canceled(t *testing.T) {
+	t.Parallel()
+	ctx, cancel := context.WithCancel(context.Background())
+	reader := strings.NewReader(validFrames)
+	d, err := NewIterativeDataset(ctx, io.NopCloser(reader), 1, 1, 1)
+	assert.NoError(t, err)
+	cancel()
+
+	d.Close()
+
+	time.Sleep(300 * time.Millisecond)
+}
+
 func TestStreamingDataSet_ReadFrames_WithError(t *testing.T) {
 	t.Parallel()
 	reader := strings.NewReader("invalid")
