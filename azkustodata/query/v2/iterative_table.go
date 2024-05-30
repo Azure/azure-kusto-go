@@ -1,11 +1,13 @@
 package v2
 
 import (
+	"context"
 	"github.com/Azure/azure-kusto-go/azkustodata/errors"
 	"github.com/Azure/azure-kusto-go/azkustodata/query"
 	"github.com/Azure/azure-kusto-go/azkustodata/types"
 	"github.com/Azure/azure-kusto-go/azkustodata/value"
 	"sync"
+	"time"
 )
 
 // iterativeTable represents a table that is streamed from the service.
@@ -18,6 +20,7 @@ type iterativeTable struct {
 	rows     chan query.RowResult
 	rowCount int
 	skip     bool
+	ctx      context.Context
 }
 
 func (t *iterativeTable) addRawRows(rows RawRows) {
@@ -55,6 +58,7 @@ func NewIterativeTable(dataset *iterativeDataset, th TableHeader) (query.Iterati
 	}
 
 	t := &iterativeTable{
+		ctx:       dataset.Context(),
 		BaseTable: baseTable,
 		rawRows:   make(chan RawRows, dataset.fragmentCapacity),
 		rows:      make(chan query.RowResult, dataset.rowCapacity),
@@ -96,32 +100,71 @@ func parseRow(r []interface{}, t query.BaseTable, index int) (query.Row, *errors
 func (t *iterativeTable) finishTable(errors []OneApiError) {
 	if errors != nil {
 		for _, e := range errors {
-			t.rows <- query.RowResultError(&e)
+			t.tryReportError(&e)
 		}
 	}
 	close(t.rawRows)
 }
 
+func (t *iterativeTable) reportRow(row query.Row) bool {
+	select {
+	case t.rows <- query.RowResultSuccess(row):
+		return true
+	case <-t.ctx.Done():
+		return false
+	}
+}
+
+func (t *iterativeTable) reportError(err error) bool {
+	select {
+	case t.rows <- query.RowResultError(err):
+		return true
+	case <-t.ctx.Done():
+		return false
+	}
+}
+
+func (t *iterativeTable) tryReportError(err error) bool {
+	ticker := time.NewTicker(100)
+	defer ticker.Stop()
+
+	select {
+	case t.rows <- query.RowResultError(err):
+		return true
+	case <-t.ctx.Done():
+		return false
+	case <-ticker.C:
+		return false
+	}
+}
+
 const skipError = "skipping row"
 
 func (t *iterativeTable) readRows() {
+	defer close(t.rows)
+
 	for rows := range t.rawRows {
 		for _, r := range rows {
 			if t.Skip() {
-				t.rows <- query.RowResultError(errors.ES(t.Op(), errors.KInternal, skipError))
+				if !t.reportError(errors.ES(t.Op(), errors.KInternal, skipError)) {
+					return
+				}
 			} else {
 				row, err := parseRow(r, t, t.RowCount())
 				if err != nil {
-					t.rows <- query.RowResultError(err)
+					if !t.tryReportError(err) {
+						return
+					}
 					continue
 				}
-				t.rows <- query.RowResultSuccess(row)
+				if !t.reportRow(row) {
+					return
+				}
 			}
 			t.rowCount++
 		}
 	}
 
-	close(t.rows)
 }
 func (t *iterativeTable) Rows() <-chan query.RowResult {
 	return t.rows

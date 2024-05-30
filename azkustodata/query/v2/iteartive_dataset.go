@@ -5,6 +5,8 @@ import (
 	"github.com/Azure/azure-kusto-go/azkustodata/errors"
 	"github.com/Azure/azure-kusto-go/azkustodata/query"
 	"io"
+	"sync/atomic"
+	"time"
 )
 
 // DefaultFrameCapacity is the default capacity of the channel that receives frames from the Kusto service. Lower capacity means less memory usage, but might cause the channel to block if the frames are not consumed fast enough.
@@ -26,13 +28,13 @@ type iterativeDataset struct {
 	reader io.ReadCloser
 	// frames is a channel that receives all the frames from the data set as they are parsed.
 	frames chan *EveryFrame
-	// errorChannel is a channel to report errors during the parsing of frames
-	errorChannel chan error
 	// results is a channel that sends the parsed results as they are decoded.
 	results chan query.TableResult
 
 	fragmentCapacity int
 	rowCapacity      int
+
+	stop atomic.Bool
 }
 
 func NewIterativeDataset(ctx context.Context, r io.ReadCloser, capacity int, rowCapacity int, fragmentCapacity int) (query.IterativeDataset, error) {
@@ -47,16 +49,29 @@ func NewIterativeDataset(ctx context.Context, r io.ReadCloser, capacity int, row
 
 	br, err := prepareReadBuffer(d.reader)
 	if err != nil {
-		d.reader.Close()
+		closeErr := d.reader.Close()
+		if closeErr != nil {
+			return nil, errors.TryCombinedError(err, closeErr)
+		}
+
 		return nil, err
 	}
 
 	go func() {
-		defer d.reader.Close()
 		err := readFramesIterative(br, d.frames)
-		if err != nil {
-			d.errorChannel <- err
+
+		err2 := d.reader.Close()
+		if err2 != nil {
+			err = errors.TryCombinedError(err, err2)
 		}
+
+		if err != nil {
+			d.reportError(err)
+			d.Close()
+		}
+
+		// If we got here, it means that the reader was closed and we are done reading frames.
+		// We don't close the other channels since the user might still be loading.
 	}()
 
 	go decodeTables(d)
@@ -67,36 +82,53 @@ func NewIterativeDataset(ctx context.Context, r io.ReadCloser, capacity int, row
 func (d *iterativeDataset) getNextFrame() *EveryFrame {
 	var f *EveryFrame = nil
 
-	select {
-	case err := <-d.errorChannel:
-		if err != nil {
-			d.reportError(err)
+	for {
+		select {
+		case <-d.Context().Done():
+			d.reportError(errors.ES(d.Op(), errors.KInternal, "context cancelled"))
+			return nil
+		case fc := <-d.frames:
+			f = fc
+			return f
 		}
-		break
-	case <-d.Context().Done():
-		d.reportError(errors.ES(d.Op(), errors.KInternal, "context cancelled"))
-		break
-	case fc := <-d.frames:
-		f = fc
 	}
-	return f
 }
 
 func (d *iterativeDataset) reportError(err error) {
-	select {
-	case <-d.errorChannel:
-		return
-	case d.results <- query.TableResultError(err):
-		return
+	ticker := time.NewTicker(100)
+	defer ticker.Stop()
+
+	for {
+		select {
+		case d.results <- query.TableResultError(err):
+			return
+		case <-d.Context().Done():
+			return
+		case <-ticker.C:
+			if d.stop.Load() {
+				// If the dataset is closed, we don't want to block the goroutine that is sending the results.
+				return
+			}
+		}
 	}
 }
 
 func (d *iterativeDataset) sendTable(tb query.IterativeTable) {
-	select {
-	case <-d.errorChannel:
-		return
-	case d.results <- query.TableResultSuccess(tb):
-		return
+	ticker := time.NewTicker(100)
+	defer ticker.Stop()
+
+	for {
+		select {
+		case d.results <- query.TableResultSuccess(tb):
+			return
+		case <-d.Context().Done():
+			return
+		case <-ticker.C:
+			if d.stop.Load() {
+				// If the dataset is closed, we don't want to block the goroutine that is sending the results.
+				return
+			}
+		}
 	}
 }
 
@@ -105,24 +137,12 @@ func (d *iterativeDataset) Tables() <-chan query.TableResult {
 }
 
 func (d *iterativeDataset) Close() error {
-	// try to close the error channel, but don't block if it's full
-	// If it's already closed, return
-	select {
-	case e := <-d.errorChannel:
-		if e == nil {
-			return nil
-		}
-	default:
-	}
-	close(d.errorChannel)
-
+	d.stop.Store(true)
 	return nil
 }
 
 func (d *iterativeDataset) ToDataset() (query.Dataset, error) {
 	tables := make([]query.Table, 0, len(d.results))
-
-	defer d.Close()
 
 	for tb := range d.Tables() {
 		if tb.Err() != nil {
@@ -152,7 +172,6 @@ func decodeTables(d *iterativeDataset) {
 			currentTable.finishTable([]OneApiError{})
 		}
 		close(d.results)
-		_ = d.Close()
 	}()
 
 	for {
