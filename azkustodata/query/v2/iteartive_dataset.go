@@ -43,6 +43,7 @@ func NewIterativeDataset(ctx context.Context, r io.ReadCloser, capacity int, row
 		results:          make(chan query.TableResult, 1),
 		fragmentCapacity: fragmentCapacity,
 		rowCapacity:      rowCapacity,
+		errorChannel: 	  make(chan error, 1),
 	}
 
 	br, err := prepareReadBuffer(d.reader)
