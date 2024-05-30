@@ -5,6 +5,7 @@ import (
 	"github.com/Azure/azure-kusto-go/azkustodata/errors"
 	"github.com/Azure/azure-kusto-go/azkustodata/query"
 	"io"
+	"sync/atomic"
 	"time"
 )
 
@@ -33,7 +34,7 @@ type iterativeDataset struct {
 	fragmentCapacity int
 	rowCapacity      int
 
-	readFramesDone bool
+	readFramesDone atomic.Bool
 }
 
 func NewIterativeDataset(ctx context.Context, r io.ReadCloser, capacity int, rowCapacity int, fragmentCapacity int) (query.IterativeDataset, error) {
@@ -103,7 +104,7 @@ func (d *iterativeDataset) reportError(err error) {
 		case <-d.Context().Done():
 			return
 		case <-ticker.C:
-			if d.readFramesDone {
+			if d.readFramesDone.Load() {
 				// If the dataset is closed, we don't want to block the goroutine that is sending the results.
 				return
 			}
@@ -125,7 +126,7 @@ func (d *iterativeDataset) Tables() <-chan query.TableResult {
 }
 
 func (d *iterativeDataset) Close() error {
-	d.readFramesDone = true
+	d.readFramesDone.Store(true)
 	return nil
 }
 
