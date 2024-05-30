@@ -34,7 +34,7 @@ type iterativeDataset struct {
 	fragmentCapacity int
 	rowCapacity      int
 
-	readFramesDone atomic.Bool
+	stop atomic.Bool
 }
 
 func NewIterativeDataset(ctx context.Context, r io.ReadCloser, capacity int, rowCapacity int, fragmentCapacity int) (query.IterativeDataset, error) {
@@ -58,19 +58,20 @@ func NewIterativeDataset(ctx context.Context, r io.ReadCloser, capacity int, row
 	}
 
 	go func() {
-		defer func() {
-			err := d.reader.Close()
-			if err != nil {
-				d.reportError(err)
-			}
-
-			d.Close()
-		}()
-
 		err := readFramesIterative(br, d.frames)
+
+		err2 := d.reader.Close()
+		if err2 != nil {
+			err = errors.TryCombinedError(err, err2)
+		}
+
 		if err != nil {
 			d.reportError(err)
+			d.Close()
 		}
+
+		// If we got here, it means that the reader was closed and we are done reading frames.
+		// We don't close the other channels since the user might still be loading.
 	}()
 
 	go decodeTables(d)
@@ -104,7 +105,7 @@ func (d *iterativeDataset) reportError(err error) {
 		case <-d.Context().Done():
 			return
 		case <-ticker.C:
-			if d.readFramesDone.Load() {
+			if d.stop.Load() {
 				// If the dataset is closed, we don't want to block the goroutine that is sending the results.
 				return
 			}
@@ -123,7 +124,7 @@ func (d *iterativeDataset) sendTable(tb query.IterativeTable) {
 		case <-d.Context().Done():
 			return
 		case <-ticker.C:
-			if d.readFramesDone.Load() {
+			if d.stop.Load() {
 				// If the dataset is closed, we don't want to block the goroutine that is sending the results.
 				return
 			}
@@ -136,7 +137,7 @@ func (d *iterativeDataset) Tables() <-chan query.TableResult {
 }
 
 func (d *iterativeDataset) Close() error {
-	d.readFramesDone.Store(true)
+	d.stop.Store(true)
 	return nil
 }
 
