@@ -56,8 +56,6 @@ func NewIterativeTable(dataset *iterativeDataset, th TableHeader) (query.Iterati
 
 	t := &iterativeTable{
 		BaseTable: baseTable,
-		rawRows:   make(chan RawRows, rowsSize),
-		rows:      make(chan query.RowResult, rowsSize),
 		rawRows:   make(chan RawRows, dataset.fragmentCapacity),
 		rows:      make(chan query.RowResult, dataset.rowCapacity),
 	}
