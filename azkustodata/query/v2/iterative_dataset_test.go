@@ -77,7 +77,7 @@ func TestStreamingDataSet_DecodeTables_GetRows(t *testing.T) {
 	} {
 		t.Run(tt.name, func(t *testing.T) {
 			reader := tt.reader
-			d, err := NewIterativeDataset(context.Background(), io.NopCloser(reader), DefaultFrameCapacity)
+			d, err := defaultDataset(reader)
 			assert.NoError(t, err)
 			ts, err := value.TimespanFromString("01:23:45.6789000")
 			assert.NoError(t, err)
