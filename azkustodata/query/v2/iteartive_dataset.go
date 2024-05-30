@@ -113,11 +113,21 @@ func (d *iterativeDataset) reportError(err error) {
 }
 
 func (d *iterativeDataset) sendTable(tb query.IterativeTable) {
-	select {
-	case d.results <- query.TableResultSuccess(tb):
-		return
-	case <-d.Context().Done():
-		return
+	ticker := time.NewTicker(100)
+	defer ticker.Stop()
+
+	for {
+		select {
+		case d.results <- query.TableResultSuccess(tb):
+			return
+		case <-d.Context().Done():
+			return
+		case <-ticker.C:
+			if d.readFramesDone.Load() {
+				// If the dataset is closed, we don't want to block the goroutine that is sending the results.
+				return
+			}
+		}
 	}
 }
 
