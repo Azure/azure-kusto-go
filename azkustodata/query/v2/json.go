@@ -8,16 +8,30 @@ import (
 	"io"
 )
 
-// this file contains the decoding of v2 frames, including parsing the format and converting the frames.
+type frameReader struct {
+	reader bufio.Reader
+	line   []byte
+}
 
-// prepareReadBuffer checks for errors and returns a decoder
-func prepareReadBuffer(r io.Reader) (io.Reader, error) {
-	br := bufio.NewReader(r)
-	peek, err := br.Peek(1)
+func newFrameReader(r io.Reader) (*frameReader, error) {
+	br, err := prepareReadBuffer(r)
 	if err != nil {
 		return nil, err
 	}
-	if peek[0] != '[' {
+	return &frameReader{reader: *br}, nil
+}
+
+func prepareReadBuffer(r io.Reader) (*bufio.Reader, error) {
+	br := bufio.NewReader(r)
+	first, err := br.Peek(1)
+	if err != nil {
+		return nil, err
+	}
+	if len(first) == 0 {
+		return nil, errors.ES(errors.OpUnknown, errors.KInternal, "No data")
+	}
+
+	if first[0] != '[' {
 		all, err := io.ReadAll(br)
 		if err != nil {
 			return nil, err
@@ -25,61 +39,133 @@ func prepareReadBuffer(r io.Reader) (io.Reader, error) {
 		return nil, errors.ES(errors.OpUnknown, errors.KInternal, "Got error: %v", string(all))
 	}
 	return br, nil
-
 }
 
-// readFramesIterative reads frames from a reader and sends them to a channel as they are read.
-func readFramesIterative(reader io.Reader, ch chan<- *EveryFrame) error {
-	defer close(ch)
+func (fr *frameReader) advance() error {
+	line, err := fr.reader.ReadBytes('\n')
+	if err != nil {
+		return err
+	}
+	if len(line) == 0 {
+		return errors.ES(errors.OpUnknown, errors.KInternal, "No data")
+	}
 
-	// Crazily enough, json.Decoder always puts THE ENTIRE READER IN MEMORY
-	// So we have to manually split the reader into lines and decode each line with a new decoder
+	if line[0] == ']' {
+		return io.EOF
+	}
 
-	scanner := bufio.NewScanner(reader)
-	buf := make([]byte, 0, 1024*1024)
-	scanner.Buffer(buf, 64*1024*1024)
-	for scanner.Scan() {
-		line := scanner.Bytes()
+	fr.line = line
 
-		line, err := handleKustoJson(line)
-		if err != nil {
-			if err == io.EOF {
-				return nil
-			}
-			return err
-		}
+	return nil
+}
 
-		dec := json.NewDecoder(bytes.NewReader(line))
-		dec.UseNumber()
+func (fr *frameReader) frameType() (string, error) {
+	//"FrameType":"DataSetHeader"
 
-		frame := EveryFrame{}
-		err = dec.Decode(&frame)
+	// find :
+	colon := bytes.IndexByte(fr.line, ':')
 
-		if err != nil {
-			if err == io.EOF {
-				return nil
-			}
-			return err
-		}
+	if colon == -1 {
+		return "", errors.ES(errors.OpUnknown, errors.KInternal, "Missing colon in frame")
+	}
 
-		ch <- &frame
+	// find "
+	quote := bytes.IndexByte(fr.line[colon+2:], '"')
+	if quote == -1 {
+		return "", errors.ES(errors.OpUnknown, errors.KInternal, "Missing quote in frame")
+	}
+
+	return string(fr.line[colon+2 : colon+2+quote]), nil
+}
+
+func assertToken(dec *json.Decoder, expected json.Token) error {
+	t, err := dec.Token()
+	if err != nil {
+		return err
+	}
+	if t != expected {
+		return errors.ES(errors.OpUnknown, errors.KInternal, "Expected %v, got %v", expected, t)
+	}
+	return nil
+}
+
+func assertStringProperty(dec *json.Decoder, name string, value json.Token) error {
+	if err := assertToken(dec, json.Token(name)); err != nil {
+		return err
+	}
+	if err := assertToken(dec, value); err != nil {
+		return err
+	}
+	return nil
+}
+
+func (fr *frameReader) validateDataSetHeader() error {
+	dec := json.NewDecoder(bytes.NewReader(fr.line))
+	if err := assertToken(dec, json.Delim('{')); err != nil {
+		return err
+	}
+
+	if err := assertStringProperty(dec, "FrameType", json.Token(DataSetHeaderFrameType)); err != nil {
+		return err
+	}
+
+	if err := assertStringProperty(dec, "IsProgressive", json.Token(false)); err != nil {
+		return err
+	}
+
+	if err := assertStringProperty(dec, "Version", json.Token("v2.0")); err != nil {
+		return err
+	}
+
+	if err := assertStringProperty(dec, "IsFragmented", json.Token(true)); err != nil {
+		return err
+	}
+
+	if err := assertStringProperty(dec, "ErrorReportingPlacement", json.Token("EndOfTable")); err != nil {
+		return err
 	}
 
 	return nil
 }
 
-func handleKustoJson(line []byte) ([]byte, error) {
-	if len(line) == 0 {
-		return nil, errors.ES(errors.OpUnknown, errors.KInternal, "Unexpected empty line when reading json")
-	}
+// read a DataTable frame
+func (fr *frameReader) readDataTable() (DataTable, error) {
+	var dt DataTable
+	err := json.Unmarshal(fr.line, &dt)
+	return dt, err
+}
 
-	if line[0] == ']' {
-		return nil, io.EOF
-	}
+// read a TableHeader frame
+func (fr *frameReader) readTableHeader() (TableHeader, error) {
+	var th TableHeader
+	err := json.Unmarshal(fr.line, &th)
+	return th, err
+}
 
-	if line[0] != '[' && line[0] != ',' {
-		return nil, errors.ES(errors.OpUnknown, errors.KInternal, "Unexpected prefix when reading json: %v", string(line))
-	}
+// read a TableFragment frame
+func (fr *frameReader) readTableFragment() (TableFragment, error) {
+	var tf TableFragment
+	err := json.Unmarshal(fr.line, &tf)
+	return tf, err
+}
 
-	return line[1:], nil
+// read a TableCompletion frame
+func (fr *frameReader) readTableCompletion() (TableCompletion, error) {
+	var tc TableCompletion
+	err := json.Unmarshal(fr.line, &tc)
+	return tc, err
+}
+
+// read a DataSetCompletion frame
+func (fr *frameReader) readDataSetCompletion() (DataSetCompletion, error) {
+	var dc DataSetCompletion
+	err := json.Unmarshal(fr.line, &dc)
+	return dc, err
+}
+
+// read a TableProgress frame
+func (fr *frameReader) readTableProgress() (TableProgress, error) {
+	var tp TableProgress
+	err := json.Unmarshal(fr.line, &tp)
+	return tp, err
 }

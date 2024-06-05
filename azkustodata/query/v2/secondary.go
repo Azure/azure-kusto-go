@@ -1,8 +1,8 @@
 package v2
 
 import (
-	"github.com/Azure/azure-kusto-go/azkustodata/errors"
-	"github.com/Azure/azure-kusto-go/azkustodata/query"
+	"bytes"
+	"encoding/json"
 	"github.com/google/uuid"
 	"time"
 )
@@ -35,18 +35,76 @@ type QueryCompletionInformation struct {
 const QueryPropertiesKind = "QueryProperties"
 const QueryCompletionInformationKind = "QueryCompletionInformation"
 
-func AsQueryProperties(table query.BaseTable) ([]QueryProperties, error) {
-	if table.Kind() != QueryPropertiesKind {
-		return nil, errors.ES(errors.OpQuery, errors.KWrongTableKind, "expected QueryProperties table, got %s", table.Kind())
+func unmarhsalRow(b []byte, onField func(field int, t json.Token)) error {
+	decoder := json.NewDecoder(bytes.NewReader(b))
+	for {
+		t, err := decoder.Token()
+		if err != nil {
+			return err
+		}
+
+		// end of outer array
+		if t != json.Delim('[') {
+			break
+		}
+
+		field := 0
+
+		for ; decoder.More(); field++ {
+			t, err = decoder.Token()
+			if err != nil {
+				return err
+			}
+
+			onField(field, t)
+		}
 	}
 
-	return query.ToStructs[QueryProperties](table)
+	return nil
 }
 
-func AsQueryCompletionInformation(table query.BaseTable) ([]QueryCompletionInformation, error) {
-	if table.Kind() != QueryCompletionInformationKind {
-		return nil, errors.ES(errors.OpQuery, errors.KWrongTableKind, "expected QueryCompletionInformation table, got %s", table.Kind())
-	}
+// UnmarshalJSON implements the json.Unmarshaler interface for QueryProperties.
+func (q *QueryProperties) UnmarshalJSON(b []byte) error {
+	return unmarhsalRow(b, func(field int, t json.Token) {
+		switch field {
+		case 0:
+			q.TableId = int(t.(float64))
+		case 1:
+			q.Key = t.(string)
+		case 2:
+			q.Value = t.(map[string]interface{})
+		}
+	})
+}
 
-	return query.ToStructs[QueryCompletionInformation](table)
+// UnmarshalJSON implements the json.Unmarshaler interface for QueryCompletionInformation.
+func (q *QueryCompletionInformation) UnmarshalJSON(b []byte) error {
+	return unmarhsalRow(b, func(field int, t json.Token) {
+		switch field {
+		case 0:
+			q.Timestamp, _ = time.Parse(time.RFC3339Nano, t.(string))
+		case 1:
+			q.ClientRequestId = t.(string)
+		case 2:
+			q.ActivityId = uuid.MustParse(t.(string))
+		case 3:
+			q.SubActivityId = uuid.MustParse(t.(string))
+		case 4:
+			q.ParentActivityId = uuid.MustParse(t.(string))
+		case 5:
+			q.Level = int(t.(float64))
+		case 6:
+			q.LevelName = t.(string)
+		case 7:
+			q.StatusCode = int(t.(float64))
+		case 8:
+			q.StatusCodeName = t.(string)
+		case 9:
+			q.EventType = int(t.(float64))
+		case 10:
+			q.EventTypeName = t.(string)
+		case 11:
+			q.Payload = t.(string)
+		}
+	})
 }
