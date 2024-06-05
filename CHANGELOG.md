@@ -4,6 +4,13 @@ All notable changes to this project will be documented in this file.
 
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
+## [1.0.0-preview-3] - 2024-06-05
+### Added 
+- Row and fragment capacity options to iterative dataset creation.
+- Added RawV2 method for manual parsing.
+### Changed
+- Changed frame defaults to be more reasonable
+
 ## [1.0.0-preview-2] - 2024-04-01
 ### Changed
 - [BREAKING] The Dynamic type now returns a []byte of json, it's up to the user to marshall it to the desired type. It can also be null.
