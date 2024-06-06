@@ -8,6 +8,63 @@ import (
 	"io"
 )
 
+func unmarhsalRow(
+	buffer []byte,
+	decoder *json.Decoder,
+	onField func(field int, t json.Token) error) error {
+	for {
+		t, err := decoder.Token()
+		if err != nil {
+			return err
+		}
+
+		// end of outer array
+		if t != json.Delim('[') {
+			break
+		}
+
+		field := 0
+
+		for ; decoder.More(); field++ {
+
+			t, err = decoder.Token()
+			if err != nil {
+				return err
+			}
+
+			// If it's a nested object, just make it into a byte array
+			if t == json.Delim('[') || t == json.Delim('{') {
+				initialOffset := decoder.InputOffset() - 1
+				for decoder.More() {
+					_, err := decoder.Token()
+					if err != nil {
+						return err
+					}
+				}
+				_, err := decoder.Token()
+				if err != nil {
+					return err
+				}
+
+				finalOffset := decoder.InputOffset()
+
+				err = onField(field, json.Token(buffer[initialOffset:finalOffset]))
+				if err != nil {
+					return err
+				}
+				continue
+			}
+
+			err := onField(field, t)
+			if err != nil {
+				return err
+			}
+		}
+	}
+
+	return nil
+}
+
 type frameReader struct {
 	reader bufio.Reader
 	line   []byte
@@ -54,7 +111,7 @@ func (fr *frameReader) advance() error {
 		return io.EOF
 	}
 
-	fr.line = line
+	fr.line = line[1:]
 
 	return nil
 }
@@ -105,7 +162,7 @@ func (fr *frameReader) validateDataSetHeader() error {
 		return err
 	}
 
-	if err := assertStringProperty(dec, "FrameType", json.Token(DataSetHeaderFrameType)); err != nil {
+	if err := assertStringProperty(dec, "FrameType", json.Token(string(DataSetHeaderFrameType))); err != nil {
 		return err
 	}
 
@@ -128,44 +185,19 @@ func (fr *frameReader) validateDataSetHeader() error {
 	return nil
 }
 
-// read a DataTable frame
-func (fr *frameReader) readDataTable() (DataTable, error) {
-	var dt DataTable
-	err := json.Unmarshal(fr.line, &dt)
-	return dt, err
+func (fr *frameReader) unmarshal(i interface{}) error {
+	dec := json.NewDecoder(bytes.NewReader(fr.line))
+	return dec.Decode(i)
 }
 
-// read a TableHeader frame
-func (fr *frameReader) readTableHeader() (TableHeader, error) {
-	var th TableHeader
-	err := json.Unmarshal(fr.line, &th)
-	return th, err
+func (fr *frameReader) readQueryProperties() (QueryPropertiesDataTable, error) {
+	tb := QueryPropertiesDataTable{}
+	err := fr.unmarshal(&tb)
+	return tb, err
 }
 
-// read a TableFragment frame
-func (fr *frameReader) readTableFragment() (TableFragment, error) {
-	var tf TableFragment
-	err := json.Unmarshal(fr.line, &tf)
-	return tf, err
-}
-
-// read a TableCompletion frame
-func (fr *frameReader) readTableCompletion() (TableCompletion, error) {
-	var tc TableCompletion
-	err := json.Unmarshal(fr.line, &tc)
-	return tc, err
-}
-
-// read a DataSetCompletion frame
-func (fr *frameReader) readDataSetCompletion() (DataSetCompletion, error) {
-	var dc DataSetCompletion
-	err := json.Unmarshal(fr.line, &dc)
-	return dc, err
-}
-
-// read a TableProgress frame
-func (fr *frameReader) readTableProgress() (TableProgress, error) {
-	var tp TableProgress
-	err := json.Unmarshal(fr.line, &tp)
-	return tp, err
+func (fr *frameReader) readQueryCompletionInformation() (QueryCompletionInformationDataTable, error) {
+	tb := QueryCompletionInformationDataTable{}
+	err := fr.unmarshal(&tb)
+	return tb, err
 }

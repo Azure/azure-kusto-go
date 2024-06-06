@@ -1,9 +1,10 @@
 package v2
 
 import (
+	"bytes"
 	"encoding/json"
+	"github.com/Azure/azure-kusto-go/azkustodata/types"
 	"github.com/Azure/azure-kusto-go/azkustodata/value"
-	"strings"
 )
 
 type FrameColumn struct {
@@ -13,9 +14,91 @@ type FrameColumn struct {
 
 type FrameType string
 
-type KustoTable struct {
+// UnmarshalJSON implements the json.Unmarshaler interface for QueryProperties.
+func (q *ColumnsAndRows) UnmarshalJSON(b []byte) error {
+	decoder := json.NewDecoder(bytes.NewReader(b))
+	decoder.UseNumber()
+
+	cols := make([]FrameColumn, 0)
+
+	err := decoder.Decode(&cols)
+	if err != nil {
+		return err
+	}
+
+	err = assertToken(decoder, json.Token("Rows"))
+	if err != nil {
+		return err
+	}
+
+	rows, err := readRows(b, decoder, cols)
+	if err != nil {
+		return err
+	}
+
+	q.Columns = cols
+	q.Rows = rows
+	return nil
+}
+
+func (t *TableFragment) UnmarshalJSON(b []byte) error {
+	decoder := json.NewDecoder(bytes.NewReader(b))
+	decoder.UseNumber()
+
+	for {
+		tok, err := decoder.Token()
+		if err != nil {
+			return err
+		}
+		if tok == json.Token("Rows") {
+			break
+		}
+	}
+
+	rows, err := readRows(b, decoder, t.Columns)
+	if err != nil {
+		return err
+	}
+
+	t.Rows = rows
+	return nil
+}
+
+func readRows(b []byte, decoder *json.Decoder, cols []FrameColumn) ([]value.Values, error) {
+	var rows []value.Values
+
+	err := assertToken(decoder, json.Delim('['))
+	if err != nil {
+		return nil, err
+	}
+
+	for decoder.More() {
+		row := make(value.Values, 0, len(cols))
+		err := unmarhsalRow(b, decoder, func(field int, t json.Token) error {
+			col := types.NormalizeColumn(cols[field].ColumnType)
+			kusto := value.Default(col)
+			err := kusto.Unmarshal(t)
+			if err != nil {
+				return err
+			}
+			row = append(row, kusto)
+			return nil
+		})
+		if err != nil {
+			return nil, err
+		}
+		rows = append(rows, row)
+	}
+
+	if err := assertToken(decoder, json.Delim(']')); err != nil {
+		return nil, err
+	}
+	return rows, nil
+}
+
+type ColumnsAndRows struct {
 	Columns []FrameColumn
-	Rows    value.Values
+	Rows    []value.Values
 }
 
 const (
@@ -28,23 +111,6 @@ const (
 	TableProgressFrameType     FrameType = "TableProgress"
 )
 
-func (a *Animal) UnmarshalJSON(b []byte) error {
-	var s string
-	if err := json.Unmarshal(b, &s); err != nil {
-		return err
-	}
-	switch strings.ToLower(s) {
-	default:
-		*a = Unknown
-	case "gopher":
-		*a = Gopher
-	case "zebra":
-		*a = Zebra
-	}
-
-	return nil
-}
-
 type DataSetHeader struct {
 	IsProgressive           bool
 	Version                 string
@@ -56,8 +122,7 @@ type DataTable struct {
 	TableId   int
 	TableKind string
 	TableName string
-	Columns   []FrameColumn
-	Rows      KustoTable
+	Columns   ColumnsAndRows
 }
 
 type QueryPropertiesDataTable struct {
@@ -82,9 +147,8 @@ type TableHeader struct {
 }
 
 type TableFragment struct {
-	TableFragmentType string
-	TableId           int
-	Rows              value.Values
+	Columns []FrameColumn
+	Rows    []value.Values
 }
 
 type TableCompletion struct {

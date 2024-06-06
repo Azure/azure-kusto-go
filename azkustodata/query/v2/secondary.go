@@ -35,51 +35,31 @@ type QueryCompletionInformation struct {
 const QueryPropertiesKind = "QueryProperties"
 const QueryCompletionInformationKind = "QueryCompletionInformation"
 
-func unmarhsalRow(b []byte, onField func(field int, t json.Token)) error {
-	decoder := json.NewDecoder(bytes.NewReader(b))
-	for {
-		t, err := decoder.Token()
-		if err != nil {
-			return err
-		}
-
-		// end of outer array
-		if t != json.Delim('[') {
-			break
-		}
-
-		field := 0
-
-		for ; decoder.More(); field++ {
-			t, err = decoder.Token()
-			if err != nil {
-				return err
-			}
-
-			onField(field, t)
-		}
-	}
-
-	return nil
-}
-
 // UnmarshalJSON implements the json.Unmarshaler interface for QueryProperties.
 func (q *QueryProperties) UnmarshalJSON(b []byte) error {
-	return unmarhsalRow(b, func(field int, t json.Token) {
+	d := json.NewDecoder(bytes.NewReader(b))
+	return unmarhsalRow(b, d, func(field int, t json.Token) error {
 		switch field {
 		case 0:
 			q.TableId = int(t.(float64))
 		case 1:
 			q.Key = t.(string)
 		case 2:
-			q.Value = t.(map[string]interface{})
+			m := map[string]interface{}{}
+			err := json.Unmarshal([]byte(t.(string)), &m)
+			if err != nil {
+				return err
+			}
+			q.Value = m
 		}
+		return nil
 	})
 }
 
 // UnmarshalJSON implements the json.Unmarshaler interface for QueryCompletionInformation.
 func (q *QueryCompletionInformation) UnmarshalJSON(b []byte) error {
-	return unmarhsalRow(b, func(field int, t json.Token) {
+	d := json.NewDecoder(bytes.NewReader(b))
+	return unmarhsalRow(b, d, func(field int, t json.Token) error {
 		switch field {
 		case 0:
 			q.Timestamp, _ = time.Parse(time.RFC3339Nano, t.(string))
@@ -106,5 +86,6 @@ func (q *QueryCompletionInformation) UnmarshalJSON(b []byte) error {
 		case 11:
 			q.Payload = t.(string)
 		}
+		return nil
 	})
 }
