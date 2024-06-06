@@ -3,8 +3,8 @@ package v2
 import (
 	"bufio"
 	"bytes"
-	"encoding/json"
 	"github.com/Azure/azure-kusto-go/azkustodata/errors"
+	"github.com/goccy/go-json"
 	"io"
 )
 
