@@ -2,9 +2,9 @@ package v2
 
 import (
 	"bytes"
-	"encoding/json"
 	"github.com/Azure/azure-kusto-go/azkustodata/types"
 	"github.com/Azure/azure-kusto-go/azkustodata/value"
+	"github.com/goccy/go-json"
 )
 
 type FrameColumn struct {

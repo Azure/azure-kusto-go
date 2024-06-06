@@ -26,7 +26,7 @@ var twoTables string
 var errorText string
 
 func TestDecodeValidFrames(t *testing.T) {
-	for i := 0; i < 1000; i++ {
+	for i := 0; i < 10000; i++ {
 		reader := bytes.NewReader([]byte(validFrames))
 		f, err := newFrameReader(reader)
 		if err != nil {
