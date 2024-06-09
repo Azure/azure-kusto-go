@@ -222,13 +222,17 @@ func (d *iterativeDataset) Tables() <-chan query.TableResult {
 func (d *iterativeDataset) Close() error {
 	// try to write to the error channel
 	select {
+	case err := <-d.errorChannel:
+		if err != nil {
+			return err
+		}
+		break
 	case d.errorChannel <- nil:
 		break
 	default:
 		break
 	}
 
-	close(d.errorChannel)
 	return nil
 }
 
@@ -264,7 +268,6 @@ func decodeTables(d *iterativeDataset) {
 			currentTable.finishTable([]OneApiError{})
 		}
 		close(d.results)
-		_ = d.Close()
 	}()
 
 	for {
