@@ -203,7 +203,8 @@ func readRows(b []byte, decoder *json.Decoder, cols []query.Column) ([]query.Row
 			return nil, err
 		}
 
-		query.NewRowFromParts(cols, func(name string) query.Column { return columnsByName[name] }, i, values)
+		row := query.NewRowFromParts(cols, func(name string) query.Column { return columnsByName[name] }, i, values)
+		rows = append(rows, row)
 	}
 
 	if err := assertToken(decoder, json.Delim(']')); err != nil {

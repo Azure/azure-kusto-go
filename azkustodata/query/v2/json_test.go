@@ -1,7 +1,14 @@
 package v2
 
 import (
+	"bytes"
 	_ "embed"
+	"github.com/Azure/azure-kusto-go/azkustodata/query"
+	"github.com/google/uuid"
+	"github.com/shopspring/decimal"
+	"github.com/stretchr/testify/require"
+	"testing"
+	"time"
 )
 
 //go:embed testData/validFrames.json
@@ -19,13 +26,11 @@ var twoTables string
 //go:embed testData/error.txt
 var errorText string
 
-/*func TestDecodeValidFrames(t *testing.T) {
-	a := testing.AllocsPerRun(10000, func() {
+func TestDecodeValidFrames(t *testing.T) {
+	for i := 0; i < 10000; i++ {
 		reader := bytes.NewReader([]byte(validFrames))
 		f, err := newFrameReader(reader)
-		if err != nil {
-			return
-		}
+		require.NoError(t, err)
 
 		require.NotNil(t, f)
 
@@ -35,15 +40,18 @@ var errorText string
 
 		require.NoError(t, f.advance())
 
-		properties, err := f.readQueryProperties()
+		propertiesTable, err := f.readQueryProperties()
 		require.NoError(t, err)
 
-		require.Equal(t, 0, properties.TableId)
-		require.Equal(t, "QueryProperties", properties.TableKind)
-		require.Equal(t, "@ExtendedProperties", properties.TableName)
-		require.Equal(t, int32(1), *properties.Rows[0][0].GetValue().(*int32))
-		require.Equal(t, "Visualization", properties.Rows[0][1].GetValue().(string))
-		require.Equal(t, "{\"Visualization\":null,\"Title\":null,\"XColumn\":null,\"Series\":null,\"YColumns\":null,\"AnomalyColumns\":null,\"XTitle\":null,\"YTitle\":null,\"XAxis\":null,\"YAxis\":null,\"Legend\":null,\"YSplit\":null,\"Accumulate\":false,\"IsQuerySorted\":false,\"Kind\":null,\"Ymin\":\"NaN\",\"Ymax\":\"NaN\",\"Xmin\":null,\"Xmax\":null}", string(properties.Rows[0][2].GetValue().([]byte)))
+		properties, err := query.ToStructs[QueryProperties](propertiesTable.Rows)
+		require.NoError(t, err)
+
+		require.Equal(t, 0, propertiesTable.TableId)
+		require.Equal(t, "QueryProperties", propertiesTable.TableKind)
+		require.Equal(t, "@ExtendedProperties", propertiesTable.TableName)
+		require.Equal(t, 1, properties[0].TableId)
+		require.Equal(t, "Visualization", properties[0].Key)
+		require.Equal(t, map[string]interface{}{"Accumulate": false, "AnomalyColumns": interface{}(nil), "IsQuerySorted": false, "Kind": interface{}(nil), "Legend": interface{}(nil), "Series": interface{}(nil), "Title": interface{}(nil), "Visualization": interface{}(nil), "XAxis": interface{}(nil), "XColumn": interface{}(nil), "XTitle": interface{}(nil), "Xmax": interface{}(nil), "Xmin": interface{}(nil), "YAxis": interface{}(nil), "YColumns": interface{}(nil), "YSplit": interface{}(nil), "YTitle": interface{}(nil), "Ymax": "NaN", "Ymin": "NaN"}, properties[0].Value)
 
 		require.NoError(t, f.advance())
 
@@ -53,53 +61,69 @@ var errorText string
 		require.Equal(t, "PrimaryResult", tableHeader.TableKind)
 		require.Equal(t, "AllDataTypes", tableHeader.TableName)
 		require.Equal(t, 10, len(tableHeader.Columns))
-		require.Equal(t, "vnum", tableHeader.Columns[0].ColumnName)
-		require.Equal(t, "int", tableHeader.Columns[0].ColumnType)
-		require.Equal(t, "vdec", tableHeader.Columns[1].ColumnName)
-		require.Equal(t, "decimal", tableHeader.Columns[1].ColumnType)
-		require.Equal(t, "vdate", tableHeader.Columns[2].ColumnName)
-		require.Equal(t, "datetime", tableHeader.Columns[2].ColumnType)
-		require.Equal(t, "vspan", tableHeader.Columns[3].ColumnName)
-		require.Equal(t, "timespan", tableHeader.Columns[3].ColumnType)
-		require.Equal(t, "vobj", tableHeader.Columns[4].ColumnName)
-		require.Equal(t, "dynamic", tableHeader.Columns[4].ColumnType)
-		require.Equal(t, "vb", tableHeader.Columns[5].ColumnName)
-		require.Equal(t, "bool", tableHeader.Columns[5].ColumnType)
-		require.Equal(t, "vreal", tableHeader.Columns[6].ColumnName)
-		require.Equal(t, "real", tableHeader.Columns[6].ColumnType)
-		require.Equal(t, "vstr", tableHeader.Columns[7].ColumnName)
-		require.Equal(t, "string", tableHeader.Columns[7].ColumnType)
-		require.Equal(t, "vlong", tableHeader.Columns[8].ColumnName)
-		require.Equal(t, "long", tableHeader.Columns[8].ColumnType)
-		require.Equal(t, "vguid", tableHeader.Columns[9].ColumnName)
-		require.Equal(t, "guid", tableHeader.Columns[9].ColumnType)
+		require.Equal(t, "vnum", tableHeader.Columns[0].Name())
+		require.Equal(t, "int", tableHeader.Columns[0].Type())
+		require.Equal(t, "vdec", tableHeader.Columns[1].Name())
+		require.Equal(t, "decimal", tableHeader.Columns[1].Type())
+		require.Equal(t, "vdate", tableHeader.Columns[2].Name())
+		require.Equal(t, "datetime", tableHeader.Columns[2].Type())
+		require.Equal(t, "vspan", tableHeader.Columns[3].Name())
+		require.Equal(t, "timespan", tableHeader.Columns[3].Type())
+		require.Equal(t, "vobj", tableHeader.Columns[4].Name())
+		require.Equal(t, "dynamic", tableHeader.Columns[4].Type())
+		require.Equal(t, "vb", tableHeader.Columns[5].Name())
+		require.Equal(t, "bool", tableHeader.Columns[5].Type())
+		require.Equal(t, "vreal", tableHeader.Columns[6].Name())
+		require.Equal(t, "real", tableHeader.Columns[6].Type())
+		require.Equal(t, "vstr", tableHeader.Columns[7].Name())
+		require.Equal(t, "string", tableHeader.Columns[7].Type())
+		require.Equal(t, "vlong", tableHeader.Columns[8].Name())
+		require.Equal(t, "long", tableHeader.Columns[8].Type())
+		require.Equal(t, "vguid", tableHeader.Columns[9].Name())
+		require.Equal(t, "guid", tableHeader.Columns[9].Type())
 
 		require.NoError(t, f.advance())
 
 		tableFragment := TableFragment{Columns: tableHeader.Columns}
 		require.NoError(t, f.unmarshal(&tableFragment))
 
-		require.Equal(t, int32(1), *tableFragment.Rows[0][0].GetValue().(*int32))
-		require.Equal(t, decimal.RequireFromString("2.00000000000001"), *tableFragment.Rows[0][1].GetValue().(*decimal.Decimal))
-		require.Equal(t, "2020-03-04T14:05:01.3109965Z", tableFragment.Rows[0][2].GetValue().(*time.Time).Format(time.RFC3339Nano))
-		require.Equal(t, "1h23m45.6789s", tableFragment.Rows[0][3].GetValue().(*time.Duration).String())
-		require.Equal(t, []byte("{\"moshe\":\"value\"}"), tableFragment.Rows[0][4].GetValue().([]byte))
-		require.Equal(t, true, *tableFragment.Rows[0][5].GetValue().(*bool))
-		require.Equal(t, 0.01, *tableFragment.Rows[0][6].GetValue().(*float64))
-		require.Equal(t, "asdf", tableFragment.Rows[0][7].GetValue().(string))
-		require.Equal(t, int64(9223372036854775807), *tableFragment.Rows[0][8].GetValue().(*int64))
-		require.Equal(t, "123e27de-1e4e-49d9-b579-fe0b331d3642", tableFragment.Rows[0][9].GetValue().(*uuid.UUID).String())
+		type AllDataType struct {
+			Vnum  *int32                 `kusto:"vnum"`
+			Vdec  *decimal.Decimal       `kusto:"vdec"`
+			Vdate *time.Time             `kusto:"vdate"`
+			Vspan *time.Duration         `kusto:"vspan"`
+			Vobj  map[string]interface{} `kusto:"vobj"`
+			Vb    *bool                  `kusto:"vb"`
+			Vreal *float64               `kusto:"vreal"`
+			Vstr  string                 `kusto:"vstr"`
+			Vlong *int64                 `kusto:"vlong"`
+			Vguid *uuid.UUID             `kusto:"vguid"`
+		}
 
-		require.Equal(t, (*int32)(nil), tableFragment.Rows[1][0].GetValue())
-		require.Equal(t, (*decimal.Decimal)(nil), tableFragment.Rows[1][1].GetValue())
-		require.Equal(t, (*time.Time)(nil), tableFragment.Rows[1][2].GetValue())
-		require.Equal(t, (*time.Duration)(nil), tableFragment.Rows[1][3].GetValue())
-		require.Equal(t, ([]byte)(nil), tableFragment.Rows[1][4].GetValue())
-		require.Equal(t, (*bool)(nil), tableFragment.Rows[1][5].GetValue())
-		require.Equal(t, (*float64)(nil), tableFragment.Rows[1][6].GetValue())
-		require.Equal(t, "", tableFragment.Rows[1][7].GetValue().(string))
-		require.Equal(t, (*int64)(nil), tableFragment.Rows[1][8].GetValue())
-		require.Equal(t, (*uuid.UUID)(nil), tableFragment.Rows[1][9].GetValue())
+		data, err := query.ToStructs[AllDataType](tableFragment.Rows)
+		require.NoError(t, err)
+
+		require.Equal(t, int32(1), *data[0].Vnum)
+		require.Equal(t, decimal.RequireFromString("2.00000000000001"), *data[0].Vdec)
+		require.Equal(t, "2020-03-04T14:05:01.3109965Z", data[0].Vdate.Format(time.RFC3339Nano))
+		require.Equal(t, "1h23m45.6789s", data[0].Vspan.String())
+		require.Equal(t, map[string]interface{}{"moshe": "value"}, data[0].Vobj)
+		require.Equal(t, true, *data[0].Vb)
+		require.Equal(t, 0.01, *data[0].Vreal)
+		require.Equal(t, "asdf", data[0].Vstr)
+		require.Equal(t, int64(9223372036854775807), *data[0].Vlong)
+		require.Equal(t, "123e27de-1e4e-49d9-b579-fe0b331d3642", data[0].Vguid.String())
+
+		require.Equal(t, (*int32)(nil), data[1].Vnum)
+		require.Equal(t, (*decimal.Decimal)(nil), data[1].Vdec)
+		require.Equal(t, (*time.Time)(nil), data[1].Vdate)
+		require.Equal(t, (*time.Duration)(nil), data[1].Vspan)
+		require.Equal(t, (map[string]interface{})(nil), data[1].Vobj)
+		require.Equal(t, (*bool)(nil), data[1].Vb)
+		require.Equal(t, (*float64)(nil), data[1].Vreal)
+		require.Equal(t, "", data[1].Vstr)
+		require.Equal(t, (*int64)(nil), data[1].Vlong)
+		require.Equal(t, (*uuid.UUID)(nil), data[1].Vguid)
 
 		require.NoError(t, f.advance())
 
@@ -110,39 +134,42 @@ var errorText string
 
 		require.NoError(t, f.advance())
 
-		queryCompletionInformation, err := f.readQueryCompletionInformation()
+		queryCompletionInformationTable, err := f.readQueryCompletionInformation()
 
 		require.NoError(t, err)
 
-		require.Equal(t, "QueryCompletionInformation", queryCompletionInformation.TableKind)
-		require.Equal(t, "QueryCompletionInformation", queryCompletionInformation.TableName)
-		require.Equal(t, 2, queryCompletionInformation.TableId)
-		require.Equal(t, 2, len(queryCompletionInformation.Rows))
-		require.Equal(t, "2023-11-26T13:34:17.0731478Z", queryCompletionInformation.Rows[0][0].GetValue().(*time.Time).Format(time.RFC3339Nano))
-		require.Equal(t, "blab6", queryCompletionInformation.Rows[0][1].GetValue().(string))
-		require.Equal(t, "123e27de-1e4e-49d9-b579-fe0b331d3642", queryCompletionInformation.Rows[0][2].GetValue().(*uuid.UUID).String())
-		require.Equal(t, "123e27de-1e4e-49d9-b579-fe0b331d3642", queryCompletionInformation.Rows[0][3].GetValue().(*uuid.UUID).String())
-		require.Equal(t, "123e27de-1e4e-49d9-b579-fe0b331d3642", queryCompletionInformation.Rows[0][4].GetValue().(*uuid.UUID).String())
-		require.Equal(t, int32(4), *queryCompletionInformation.Rows[0][5].GetValue().(*int32))
-		require.Equal(t, "Info", queryCompletionInformation.Rows[0][6].GetValue().(string))
-		require.Equal(t, int32(0), *queryCompletionInformation.Rows[0][7].GetValue().(*int32))
-		require.Equal(t, "S_OK (0)", queryCompletionInformation.Rows[0][8].GetValue().(string))
-		require.Equal(t, int32(4), *queryCompletionInformation.Rows[0][9].GetValue().(*int32))
-		require.Equal(t, "QueryInfo", queryCompletionInformation.Rows[0][10].GetValue().(string))
-		require.Equal(t, "{\"Count\":1,\"Text\":\"Query completed successfully\"}", queryCompletionInformation.Rows[0][11].GetValue().(string))
+		queryCompletionInformation, err := query.ToStructs[QueryCompletionInformation](queryCompletionInformationTable.Rows)
+		require.NoError(t, err)
 
-		require.Equal(t, "2023-11-26T13:34:17.0731478Z", queryCompletionInformation.Rows[1][0].GetValue().(*time.Time).Format(time.RFC3339Nano))
-		require.Equal(t, "blab6", queryCompletionInformation.Rows[1][1].GetValue().(string))
-		require.Equal(t, "123e27de-1e4e-49d9-b579-fe0b331d3642", queryCompletionInformation.Rows[1][2].GetValue().(*uuid.UUID).String())
-		require.Equal(t, "123e27de-1e4e-49d9-b579-fe0b331d3642", queryCompletionInformation.Rows[1][3].GetValue().(*uuid.UUID).String())
-		require.Equal(t, "123e27de-1e4e-49d9-b579-fe0b331d3642", queryCompletionInformation.Rows[1][4].GetValue().(*uuid.UUID).String())
-		require.Equal(t, int32(4), *queryCompletionInformation.Rows[1][5].GetValue().(*int32))
-		require.Equal(t, "Info", queryCompletionInformation.Rows[1][6].GetValue().(string))
-		require.Equal(t, int32(0), *queryCompletionInformation.Rows[1][7].GetValue().(*int32))
-		require.Equal(t, "S_OK (0)", queryCompletionInformation.Rows[1][8].GetValue().(string))
-		require.Equal(t, int32(5), *queryCompletionInformation.Rows[1][9].GetValue().(*int32))
-		require.Equal(t, "WorkloadGroup", queryCompletionInformation.Rows[1][10].GetValue().(string))
-		require.Equal(t, "{\"Count\":1,\"Text\":\"default\"}", queryCompletionInformation.Rows[1][11].GetValue().(string))
+		require.Equal(t, "QueryCompletionInformation", queryCompletionInformationTable.TableKind)
+		require.Equal(t, "QueryCompletionInformation", queryCompletionInformationTable.TableName)
+		require.Equal(t, 2, queryCompletionInformationTable.TableId)
+		require.Equal(t, 2, len(queryCompletionInformationTable.Rows))
+		require.Equal(t, "2023-11-26T13:34:17.0731478Z", queryCompletionInformation[0].Timestamp.Format(time.RFC3339Nano))
+		require.Equal(t, "blab6", queryCompletionInformation[0].ClientRequestId)
+		require.Equal(t, "123e27de-1e4e-49d9-b579-fe0b331d3642", queryCompletionInformation[0].ActivityId.String())
+		require.Equal(t, "123e27de-1e4e-49d9-b579-fe0b331d3642", queryCompletionInformation[0].SubActivityId.String())
+		require.Equal(t, "123e27de-1e4e-49d9-b579-fe0b331d3642", queryCompletionInformation[0].ParentActivityId.String())
+		require.Equal(t, 4, queryCompletionInformation[0].Level)
+		require.Equal(t, "Info", queryCompletionInformation[0].LevelName)
+		require.Equal(t, 0, queryCompletionInformation[0].StatusCode)
+		require.Equal(t, "S_OK (0)", queryCompletionInformation[0].StatusCodeName)
+		require.Equal(t, 4, queryCompletionInformation[0].EventType)
+		require.Equal(t, "QueryInfo", queryCompletionInformation[0].EventTypeName)
+		require.Equal(t, "{\"Count\":1,\"Text\":\"Query completed successfully\"}", queryCompletionInformation[0].Payload)
+
+		require.Equal(t, "2023-11-26T13:34:17.0731478Z", queryCompletionInformation[1].Timestamp.Format(time.RFC3339Nano))
+		require.Equal(t, "blab6", queryCompletionInformation[1].ClientRequestId)
+		require.Equal(t, "123e27de-1e4e-49d9-b579-fe0b331d3642", queryCompletionInformation[1].ActivityId.String())
+		require.Equal(t, "123e27de-1e4e-49d9-b579-fe0b331d3642", queryCompletionInformation[1].SubActivityId.String())
+		require.Equal(t, "123e27de-1e4e-49d9-b579-fe0b331d3642", queryCompletionInformation[1].ParentActivityId.String())
+		require.Equal(t, 4, queryCompletionInformation[1].Level)
+		require.Equal(t, "Info", queryCompletionInformation[1].LevelName)
+		require.Equal(t, 0, queryCompletionInformation[1].StatusCode)
+		require.Equal(t, "S_OK (0)", queryCompletionInformation[1].StatusCodeName)
+		require.Equal(t, 5, queryCompletionInformation[1].EventType)
+		require.Equal(t, "WorkloadGroup", queryCompletionInformation[1].EventTypeName)
+		require.Equal(t, "{\"Count\":1,\"Text\":\"default\"}", queryCompletionInformation[1].Payload)
 
 		require.NoError(t, f.advance())
 		dataSetCompletion := DataSetCompletion{}
@@ -150,8 +177,5 @@ var errorText string
 
 		require.Equal(t, false, dataSetCompletion.HasErrors)
 		require.Equal(t, false, dataSetCompletion.Cancelled)
-	})
-
-	println(int64(a))
+	}
 }
-*/
