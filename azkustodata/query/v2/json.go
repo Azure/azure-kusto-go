@@ -116,7 +116,7 @@ func (fr *frameReader) advance() error {
 	return nil
 }
 
-func (fr *frameReader) frameType() (string, error) {
+func (fr *frameReader) frameType() (FrameType, error) {
 	//"FrameType":"DataSetHeader"
 
 	// find :
@@ -132,7 +132,7 @@ func (fr *frameReader) frameType() (string, error) {
 		return "", errors.ES(errors.OpUnknown, errors.KInternal, "Missing quote in frame")
 	}
 
-	return string(fr.line[colon+2 : colon+2+quote]), nil
+	return FrameType(fr.line[colon+2 : colon+2+quote]), nil
 }
 
 func assertToken(dec *json.Decoder, expected json.Token) error {
@@ -154,6 +154,38 @@ func assertStringProperty(dec *json.Decoder, name string, value json.Token) erro
 		return err
 	}
 	return nil
+}
+
+func getStringProperty(dec *json.Decoder, name string) (string, error) {
+	if err := assertToken(dec, json.Token(name)); err != nil {
+		return "", err
+	}
+	t, err := dec.Token()
+	if err != nil {
+		return "", err
+	}
+	if s, ok := t.(string); ok {
+		return s, nil
+	}
+	return "", errors.ES(errors.OpUnknown, errors.KInternal, "Expected string, got %v", t)
+}
+
+func getIntProperty(dec *json.Decoder, name string) (int, error) {
+	if err := assertToken(dec, json.Token(name)); err != nil {
+		return 0, err
+	}
+	t, err := dec.Token()
+	if err != nil {
+		return 0, err
+	}
+	if s, ok := t.(json.Number); ok {
+		i, err := s.Int64()
+		if err != nil {
+			return 0, err
+		}
+		return int(i), nil
+	}
+	return 0, errors.ES(errors.OpUnknown, errors.KInternal, "Expected string, got %v", t)
 }
 
 func (fr *frameReader) validateDataSetHeader() error {
@@ -190,14 +222,14 @@ func (fr *frameReader) unmarshal(i interface{}) error {
 	return dec.Decode(i)
 }
 
-func (fr *frameReader) readQueryProperties() (QueryPropertiesDataTable, error) {
-	tb := QueryPropertiesDataTable{}
+func (fr *frameReader) readQueryProperties() (DataTable, error) {
+	tb := DataTable{}
 	err := fr.unmarshal(&tb)
 	return tb, err
 }
 
-func (fr *frameReader) readQueryCompletionInformation() (QueryCompletionInformationDataTable, error) {
-	tb := QueryCompletionInformationDataTable{}
+func (fr *frameReader) readQueryCompletionInformation() (DataTable, error) {
+	tb := DataTable{}
 	err := fr.unmarshal(&tb)
 	return tb, err
 }

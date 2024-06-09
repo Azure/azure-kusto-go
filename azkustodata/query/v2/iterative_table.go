@@ -3,8 +3,6 @@ package v2
 import (
 	"github.com/Azure/azure-kusto-go/azkustodata/errors"
 	"github.com/Azure/azure-kusto-go/azkustodata/query"
-	"github.com/Azure/azure-kusto-go/azkustodata/types"
-	"github.com/Azure/azure-kusto-go/azkustodata/value"
 	"sync"
 )
 
@@ -14,13 +12,13 @@ import (
 type iterativeTable struct {
 	query.BaseTable
 	lock     sync.RWMutex
-	rawRows  chan RawRows
+	rawRows  chan []query.Row
 	rows     chan query.RowResult
 	rowCount int
 	skip     bool
 }
 
-func (t *iterativeTable) addRawRows(rows RawRows) {
+func (t *iterativeTable) addRawRows(rows []query.Row) {
 	t.rawRows <- rows
 }
 
@@ -49,48 +47,20 @@ func (t *iterativeTable) setSkip(skip bool) {
 }
 
 func NewIterativeTable(dataset *iterativeDataset, th TableHeader) (query.IterativeTable, error) {
-	baseTable, err := newBaseTable(dataset, th)
+	baseTable, err := newBaseTableFromHeader(dataset, th)
 	if err != nil {
 		return nil, err
 	}
 
 	t := &iterativeTable{
 		BaseTable: baseTable,
-		rawRows:   make(chan RawRows, dataset.fragmentCapacity),
+		rawRows:   make(chan []query.Row, dataset.fragmentCapacity),
 		rows:      make(chan query.RowResult, dataset.rowCapacity),
 	}
 
 	go t.readRows()
 
 	return t, nil
-}
-
-func parseColumns(th TableHeader, columns []query.Column, op errors.Op) *errors.Error {
-	for i, c := range th.Columns() {
-		normal := types.NormalizeColumn(c.ColumnType)
-		if normal == "" {
-			return errors.ES(op, errors.KClientArgs, "column[%d] is of type %q, which is not valid", i, c.ColumnType)
-		}
-
-		columns[i] = query.NewColumn(i, c.ColumnName, normal)
-	}
-	return nil
-}
-
-func parseRow(r []interface{}, t query.BaseTable, index int) (query.Row, *errors.Error) {
-	values := make(value.Values, len(r))
-	columns := t.Columns()
-	for j, v := range r {
-		parsed := value.Default(columns[j].Type())
-		err := parsed.Unmarshal(v)
-
-		if err != nil {
-			return nil, errors.ES(t.Op(), errors.KInternal, "unable to unmarshal column %s into A %s value: %s", columns[j].Name(), columns[j].Type(), err)
-		}
-		values[j] = parsed
-	}
-	row := query.NewRow(t, index, values)
-	return row, nil
 }
 
 func (t *iterativeTable) finishTable(errors []OneApiError) {
@@ -106,15 +76,10 @@ const skipError = "skipping row"
 
 func (t *iterativeTable) readRows() {
 	for rows := range t.rawRows {
-		for _, r := range rows {
+		for _, row := range rows {
 			if t.Skip() {
 				t.rows <- query.RowResultError(errors.ES(t.Op(), errors.KInternal, skipError))
 			} else {
-				row, err := parseRow(r, t, t.RowCount())
-				if err != nil {
-					t.rows <- query.RowResultError(err)
-					continue
-				}
 				t.rows <- query.RowResultSuccess(row)
 			}
 			t.rowCount++

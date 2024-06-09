@@ -1,8 +1,8 @@
 package v2
 
 import (
-	"bytes"
-	"github.com/goccy/go-json"
+	"github.com/Azure/azure-kusto-go/azkustodata/errors"
+	"github.com/Azure/azure-kusto-go/azkustodata/query"
 	"github.com/google/uuid"
 	"time"
 )
@@ -35,57 +35,18 @@ type QueryCompletionInformation struct {
 const QueryPropertiesKind = "QueryProperties"
 const QueryCompletionInformationKind = "QueryCompletionInformation"
 
-// UnmarshalJSON implements the json.Unmarshaler interface for QueryProperties.
-func (q *QueryProperties) UnmarshalJSON(b []byte) error {
-	d := json.NewDecoder(bytes.NewReader(b))
-	return unmarhsalRow(b, d, func(field int, t json.Token) error {
-		switch field {
-		case 0:
-			q.TableId = int(t.(float64))
-		case 1:
-			q.Key = t.(string)
-		case 2:
-			m := map[string]interface{}{}
-			err := json.Unmarshal([]byte(t.(string)), &m)
-			if err != nil {
-				return err
-			}
-			q.Value = m
-		}
-		return nil
-	})
+func AsQueryProperties(table query.BaseTable) ([]QueryProperties, error) {
+	if table.Kind() != QueryPropertiesKind {
+		return nil, errors.ES(errors.OpQuery, errors.KWrongTableKind, "expected QueryProperties table, got %s", table.Kind())
+	}
+
+	return query.ToStructs[QueryProperties](table)
 }
 
-// UnmarshalJSON implements the json.Unmarshaler interface for QueryCompletionInformation.
-func (q *QueryCompletionInformation) UnmarshalJSON(b []byte) error {
-	d := json.NewDecoder(bytes.NewReader(b))
-	return unmarhsalRow(b, d, func(field int, t json.Token) error {
-		switch field {
-		case 0:
-			q.Timestamp, _ = time.Parse(time.RFC3339Nano, t.(string))
-		case 1:
-			q.ClientRequestId = t.(string)
-		case 2:
-			q.ActivityId = uuid.MustParse(t.(string))
-		case 3:
-			q.SubActivityId = uuid.MustParse(t.(string))
-		case 4:
-			q.ParentActivityId = uuid.MustParse(t.(string))
-		case 5:
-			q.Level = int(t.(float64))
-		case 6:
-			q.LevelName = t.(string)
-		case 7:
-			q.StatusCode = int(t.(float64))
-		case 8:
-			q.StatusCodeName = t.(string)
-		case 9:
-			q.EventType = int(t.(float64))
-		case 10:
-			q.EventTypeName = t.(string)
-		case 11:
-			q.Payload = t.(string)
-		}
-		return nil
-	})
+func AsQueryCompletionInformation(table query.BaseTable) ([]QueryCompletionInformation, error) {
+	if table.Kind() != QueryCompletionInformationKind {
+		return nil, errors.ES(errors.OpQuery, errors.KWrongTableKind, "expected QueryCompletionInformation table, got %s", table.Kind())
+	}
+
+	return query.ToStructs[QueryCompletionInformation](table)
 }

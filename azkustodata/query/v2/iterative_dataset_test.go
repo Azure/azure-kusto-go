@@ -32,7 +32,7 @@ func TestStreamingDataSet_ReadFrames_WithError(t *testing.T) {
 	d := &iterativeDataset{
 		BaseDataset: query.NewBaseDataset(context.Background(), errors.OpQuery, PrimaryResultTableKind),
 		reader:      io.NopCloser(reader),
-		frames:      make(chan *EveryFrame, DefaultFrameCapacity),
+		frames:      make(chan interface{}, DefaultFrameCapacity),
 		results:     make(chan query.TableResult, 1),
 	}
 
@@ -302,7 +302,7 @@ func TestStreamingDataSet_DecodeTables_WithInvalidTableCompletion(t *testing.T) 
 
 func TestStreamingDataSet_DecodeTables_StreamingTable_WithInvalidColumnType(t *testing.T) {
 	t.Parallel()
-	reader := strings.NewReader(`[{"FrameType": "TableHeader", "TableId": 1, "TableName": "TestTable", "TableKind": "PrimaryResult", "Columns": [{"ColumnName": "TestColumn", "ColumnType": "invalid"}]}
+	reader := strings.NewReader(`[{"FrameType": "TableHeader", "TableId": 1, "TableName": "TestTable", "TableKind": "PrimaryResult", "ColumnsJson": [{"ColumnName": "TestColumn", "ColumnType": "invalid"}]}
 ]`)
 	d, err := defaultDataset(reader)
 	assert.NoError(t, err)
@@ -314,7 +314,7 @@ func TestStreamingDataSet_DecodeTables_StreamingTable_WithInvalidColumnType(t *t
 
 func TestStreamingDataSet_DecodeTables_DataTable_WithInvalidColumnType(t *testing.T) {
 	t.Parallel()
-	reader := strings.NewReader(`[{"FrameType": "DataTable", "TableId": 1, "TableName": "TestTable", "TableKind": "QueryCompletionInformation", "Columns": [{"ColumnName": "TestColumn", "ColumnType": "invalid"}], "Rows": [["TestValue"]]}
+	reader := strings.NewReader(`[{"FrameType": "DataTable", "TableId": 1, "TableName": "TestTable", "TableKind": "QueryCompletionInformation", "ColumnsJson": [{"ColumnName": "TestColumn", "ColumnType": "invalid"}], "Rows": [["TestValue"]]}
 ]`)
 	d, err := defaultDataset(reader)
 	assert.NoError(t, err)
