@@ -41,7 +41,8 @@ func TestDecodeValidFrames(t *testing.T) {
 
 		require.NoError(t, f.advance())
 
-		propertiesTable, err := f.readQueryProperties()
+		propertiesTable := DataTable{}
+		require.NoError(t, f.unmarshal(&propertiesTable))
 		require.NoError(t, err)
 
 		properties, err := query.ToStructs[QueryProperties](propertiesTable.Rows)
@@ -135,7 +136,8 @@ func TestDecodeValidFrames(t *testing.T) {
 
 		require.NoError(t, f.advance())
 
-		queryCompletionInformationTable, err := f.readQueryCompletionInformation()
+		queryCompletionInformationTable := DataTable{}
+		require.NoError(t, f.unmarshal(&queryCompletionInformationTable))
 
 		require.NoError(t, err)
 
