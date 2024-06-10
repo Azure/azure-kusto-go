@@ -73,6 +73,24 @@ func (t *iterativeTable) finishTable(errs []OneApiError) {
 	close(t.rawRows)
 }
 
+func (t *iterativeTable) reportRow(row query.Row) bool {
+	select {
+	case t.rows <- query.RowResultSuccess(row):
+		return true
+	case <-t.ctx.Done():
+		return false
+	}
+}
+
+func (t *iterativeTable) reportError(err error) bool {
+	select {
+	case t.rows <- query.RowResultError(err):
+		return true
+	case <-t.ctx.Done():
+		return false
+	}
+}
+
 const skipError = "skipping row"
 
 func (t *iterativeTable) readRows() {

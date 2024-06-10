@@ -82,7 +82,16 @@ func readDataSet(r *frameReader, frames chan interface{}) error {
 		return err
 	}
 
-	properties, err := r.readQueryProperties()
+	frameType, err := r.peekFrameType()
+	if err != nil {
+		return err
+	}
+	if frameType != DataTableFrameType {
+		return errors.ES(errors.OpQuery, errors.KInternal, "expected DataTable frame, got %s", frameType)
+	}
+
+	properties := DataTable{}
+	err = r.unmarshal(&properties)
 	if err != nil {
 		return err
 	}
@@ -94,13 +103,14 @@ func readDataSet(r *frameReader, frames chan interface{}) error {
 			return err
 		}
 
-		frameType, err := r.frameType()
+		frameType, err := r.peekFrameType()
 		if err != nil {
 			return err
 		}
 
 		if frameType == DataTableFrameType {
-			queryCompletion, err := r.readQueryCompletionInformation()
+			queryCompletion := DataTable{}
+			err = r.unmarshal(&queryCompletion)
 			if err != nil {
 				return err
 			}
@@ -129,6 +139,14 @@ func readDataSet(r *frameReader, frames chan interface{}) error {
 	err = r.advance()
 	if err != nil {
 		return err
+	}
+
+	frameType, err = r.peekFrameType()
+	if err != nil {
+		return err
+	}
+	if frameType != DataSetCompletionFrameType {
+		return errors.ES(errors.OpQuery, errors.KInternal, "expected DataSetCompletion frame, got %s", frameType)
 	}
 
 	err = readDataSetCompletion(r)
@@ -175,7 +193,7 @@ func readPrimaryTable(r *frameReader, frames chan interface{}) error {
 		if err != nil {
 			return err
 		}
-		frameType, err := r.frameType()
+		frameType, err := r.peekFrameType()
 		if err != nil {
 			return err
 		}
@@ -314,11 +332,11 @@ func decodeTables(d *iterativeDataset) {
 }
 
 func handleDataTable(d *iterativeDataset, queryProperties *query.IterativeTable, dt DataTable) bool {
-	if dt.TableKind == PrimaryResultTableKind {
+	if dt.Header.TableKind == PrimaryResultTableKind {
 		d.reportError(errors.ES(d.Op(), errors.KInternal, "received a DataTable frame for a primary result table"))
 		return false
 	}
-	switch dt.TableKind {
+	switch dt.Header.TableKind {
 	case QueryPropertiesKind:
 		// When we get this, we want to store it and not send it to the user immediately.
 		// We will wait until after the primary results (when we get the QueryCompletionInformation table) and then send it.
@@ -341,7 +359,7 @@ func handleDataTable(d *iterativeDataset, queryProperties *query.IterativeTable,
 		d.sendTable(iterativeWrapper{res})
 
 	default:
-		d.reportError(errors.ES(d.Op(), errors.KInternal, "unknown secondary table - %s %s", dt.TableName, dt.TableKind))
+		d.reportError(errors.ES(d.Op(), errors.KInternal, "unknown secondary table - %s %s", dt.Header.TableName, dt.Header.TableKind))
 	}
 
 	return true

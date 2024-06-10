@@ -15,7 +15,7 @@ func newBaseTableFromHeader(dataset query.BaseDataset, th TableHeader) (query.Ba
 }
 
 func newTable(dataset query.BaseDataset, dt DataTable) (query.Table, error) {
-	base, err := newBaseTable(dataset, dt.TableId, dt.TableName, dt.TableKind, dt.Columns)
+	base, err := newBaseTable(dataset, dt.Header.TableId, dt.Header.TableName, dt.Header.TableKind, dt.Header.Columns)
 	if err != nil {
 		return nil, err
 	}
