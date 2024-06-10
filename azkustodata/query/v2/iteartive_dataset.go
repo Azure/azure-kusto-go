@@ -47,12 +47,17 @@ func NewIterativeDataset(ctx context.Context, r io.ReadCloser, capacity int, row
 		cancel:           cancel,
 	}
 
+	reader, err := newFrameReader(r)
+	if err != nil {
+		return nil, err
+	}
+
 	go decodeTables(d)
 
 	go func() {
 		defer close(d.frames)
 		defer d.reader.Close()
-		err := readDataSet(r, d.frames)
+		err := readDataSet(reader, d.frames)
 		if err != nil {
 			d.frames <- err
 		}
@@ -61,12 +66,8 @@ func NewIterativeDataset(ctx context.Context, r io.ReadCloser, capacity int, row
 	return d, nil
 }
 
-func readDataSet(reader io.Reader, frames chan interface{}) error {
-	r, err := newFrameReader(reader)
-	if err != nil {
-		return err
-	}
-	err = r.advance()
+func readDataSet(r *frameReader, frames chan interface{}) error {
+	err := r.advance()
 	if err != nil {
 		return err
 	}

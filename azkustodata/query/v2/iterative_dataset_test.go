@@ -368,11 +368,10 @@ func TestStreamingDataSet_PartialErrors_GetAll(t *testing.T) {
 	assert.ErrorContains(t, err, "LimitsExceeded")
 }
 
-/*func TestStreamingDataSet_FullError(t *testing.T) {
+func TestStreamingDataSet_FullError(t *testing.T) {
 	t.Parallel()
 	reader := strings.NewReader(errorText)
 	d, err := defaultDataset(reader)
 	assert.ErrorContains(t, err, "Bad request")
 	assert.Nil(t, d)
 }
-*/
