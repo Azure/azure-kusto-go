@@ -375,3 +375,12 @@ func TestStreamingDataSet_FullError(t *testing.T) {
 	assert.ErrorContains(t, err, "Bad request")
 	assert.Nil(t, d)
 }
+
+func TestStreamingDataSet_Context_Canceled(t *testing.T) {
+	t.Parallel()
+	ctx, cancel := context.WithCancel(context.Background())
+	reader := strings.NewReader(validFrames)
+	_, err := NewIterativeDataset(ctx, io.NopCloser(reader), 1, 1, 1)
+	assert.NoError(t, err)
+	cancel()
+}
