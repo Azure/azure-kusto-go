@@ -65,13 +65,16 @@ func (q *DataTable) UnmarshalJSON(b []byte) error {
 	}
 
 	cols, err := decodeColumns(decoder)
+	if err != nil {
+		return err
+	}
 
 	err = assertToken(decoder, json.Token("Rows"))
 	if err != nil {
 		return err
 	}
 
-	rows, err := readRows(b, decoder, cols)
+	rows, err := readRows(b, decoder, cols, 0)
 	if err != nil {
 		return err
 	}
@@ -166,7 +169,7 @@ func (t *TableFragment) UnmarshalJSON(b []byte) error {
 		}
 	}
 
-	rows, err := readRows(b, decoder, t.Columns)
+	rows, err := readRows(b, decoder, t.Columns, t.PreviousIndex)
 	if err != nil {
 		return err
 	}
@@ -175,7 +178,25 @@ func (t *TableFragment) UnmarshalJSON(b []byte) error {
 	return nil
 }
 
-func readRows(b []byte, decoder *json.Decoder, cols []query.Column) ([]query.Row, error) {
+func (t *iterativeTable) reportRow(row query.Row) bool {
+	select {
+	case t.rows <- query.RowResultSuccess(row):
+		return true
+	case <-t.ctx.Done():
+		return false
+	}
+}
+
+func (t *iterativeTable) reportError(err error) bool {
+	select {
+	case t.rows <- query.RowResultError(err):
+		return true
+	case <-t.ctx.Done():
+		return false
+	}
+}
+
+func readRows(b []byte, decoder *json.Decoder, cols []query.Column, startIndex int) ([]query.Row, error) {
 	var rows = make([]query.Row, 0, 1000)
 
 	columnsByName := make(map[string]query.Column, len(cols))
@@ -188,7 +209,7 @@ func readRows(b []byte, decoder *json.Decoder, cols []query.Column) ([]query.Row
 		return nil, err
 	}
 
-	for i := 0; decoder.More(); i++ {
+	for i := startIndex; decoder.More(); i++ {
 		values := make([]value.Kusto, 0, len(cols))
 		err := unmarhsalRow(b, decoder, func(field int, t json.Token) error {
 			kusto := value.Default(cols[field].Type())
@@ -246,8 +267,9 @@ type TableHeader struct {
 }
 
 type TableFragment struct {
-	Columns []query.Column
-	Rows    []query.Row
+	Columns       []query.Column
+	Rows          []query.Row
+	PreviousIndex int
 }
 
 type TableCompletion struct {

@@ -31,10 +31,12 @@ type iterativeDataset struct {
 
 	fragmentCapacity int
 	rowCapacity      int
-	errorChannel     chan error
+	cancel           context.CancelFunc
 }
 
 func NewIterativeDataset(ctx context.Context, r io.ReadCloser, capacity int, rowCapacity int, fragmentCapacity int) (query.IterativeDataset, error) {
+	ctx, cancel := context.WithCancel(ctx)
+
 	d := &iterativeDataset{
 		BaseDataset:      query.NewBaseDataset(ctx, errors.OpQuery, PrimaryResultTableKind),
 		reader:           r,
@@ -42,21 +44,17 @@ func NewIterativeDataset(ctx context.Context, r io.ReadCloser, capacity int, row
 		fragmentCapacity: fragmentCapacity,
 		rowCapacity:      rowCapacity,
 		frames:           make(chan interface{}, capacity),
-		errorChannel:     make(chan error, 1),
+		cancel:           cancel,
 	}
 
 	go decodeTables(d)
 
 	go func() {
 		defer close(d.frames)
+		defer d.reader.Close()
 		err := readDataSet(r, d.frames)
 		if err != nil {
-			select {
-			case d.errorChannel <- err:
-				break
-			default:
-				break
-			}
+			d.frames <- err
 		}
 	}()
 
@@ -65,6 +63,9 @@ func NewIterativeDataset(ctx context.Context, r io.ReadCloser, capacity int, row
 
 func readDataSet(reader io.Reader, frames chan interface{}) error {
 	r, err := newFrameReader(reader)
+	if err != nil {
+		return err
+	}
 	err = r.advance()
 	if err != nil {
 		return err
@@ -113,6 +114,14 @@ func readDataSet(reader io.Reader, frames chan interface{}) error {
 			continue
 		}
 
+		if frameType == DataSetCompletionFrameType {
+			err = readDataSetCompletion(r)
+			if err != nil {
+				return err
+			}
+			return nil
+		}
+
 		return errors.ES(errors.OpQuery, errors.KInternal, "unexpected frame type %s", frameType)
 	}
 
@@ -121,16 +130,32 @@ func readDataSet(reader io.Reader, frames chan interface{}) error {
 		return err
 	}
 
+	err = readDataSetCompletion(r)
+	if err != nil {
+		return err
+	}
+
+	return nil
+}
+
+func readDataSetCompletion(r *frameReader) error {
 	completion := DataSetCompletion{}
-	err = r.unmarshal(&completion)
+	err := r.unmarshal(&completion)
 	if err != nil {
 		return err
 	}
 	if completion.HasErrors {
-		return errors.ES(errors.OpQuery, errors.KInternal, "query completion has errors")
+		return combineOneApiErrors(completion.OneApiErrors)
 	}
-
 	return nil
+}
+
+func combineOneApiErrors(errs []OneApiError) error {
+	c := errors.NewCombinedError()
+	for _, e := range errs {
+		c.AddError(&e)
+	}
+	return c.Unwrap()
 }
 
 func readPrimaryTable(r *frameReader, frames chan interface{}) error {
@@ -141,6 +166,8 @@ func readPrimaryTable(r *frameReader, frames chan interface{}) error {
 	}
 
 	frames <- header
+
+	i := 0
 
 	for {
 		err = r.advance()
@@ -153,11 +180,12 @@ func readPrimaryTable(r *frameReader, frames chan interface{}) error {
 		}
 
 		if frameType == TableFragmentFrameType {
-			fragment := TableFragment{Columns: header.Columns}
+			fragment := TableFragment{Columns: header.Columns, PreviousIndex: i}
 			err = r.unmarshal(&fragment)
 			if err != nil {
 				return err
 			}
+			i += len(fragment.Rows)
 			frames <- fragment
 			continue
 		}
@@ -176,39 +204,17 @@ func readPrimaryTable(r *frameReader, frames chan interface{}) error {
 	return nil
 }
 
-func (d *iterativeDataset) getNextFrame() interface{} {
-	select {
-	case err := <-d.errorChannel:
-		if err != nil {
-			d.tryReportError(err)
-		}
-		break
-	case <-d.Context().Done():
-		d.tryReportError(errors.ES(d.Op(), errors.KInternal, "context cancelled"))
-		break
-	case fc := <-d.frames:
-		return fc
-	}
-
-	return nil
-}
-
 func (d *iterativeDataset) reportError(err error) {
-	d.results <- query.TableResultError(err)
-}
-
-func (d *iterativeDataset) tryReportError(err error) {
 	select {
 	case d.results <- query.TableResultError(err):
 		return
-	default:
-		return
+	case <-d.Context().Done():
 	}
 }
 
 func (d *iterativeDataset) sendTable(tb query.IterativeTable) {
 	select {
-	case <-d.errorChannel:
+	case <-d.Context().Done():
 		return
 	case d.results <- query.TableResultSuccess(tb):
 		return
@@ -220,19 +226,7 @@ func (d *iterativeDataset) Tables() <-chan query.TableResult {
 }
 
 func (d *iterativeDataset) Close() error {
-	// try to write to the error channel
-	select {
-	case err := <-d.errorChannel:
-		if err != nil {
-			return err
-		}
-		break
-	case d.errorChannel <- nil:
-		break
-	default:
-		break
-	}
-
+	d.cancel()
 	return nil
 }
 
@@ -263,17 +257,33 @@ func decodeTables(d *iterativeDataset) {
 	var currentTable *iterativeTable
 	var queryProperties query.IterativeTable
 
+	var finalError error
+	var f interface{}
+
 	defer func() {
-		if currentTable != nil {
+		if finalError != nil {
+			d.reportError(finalError)
+		} else if currentTable != nil {
 			currentTable.finishTable([]OneApiError{})
 		}
+
 		close(d.results)
 	}()
 
-	for {
-		f := d.getNextFrame()
+	stop := false
 
-		if f == nil {
+	for {
+		select {
+		case <-d.Context().Done():
+			finalError = errors.ES(op, errors.KInternal, "context done")
+			stop = true
+		case f = <-d.frames:
+			if f == nil {
+				stop = true
+			}
+		}
+
+		if stop {
 			break
 		}
 
@@ -293,8 +303,11 @@ func decodeTables(d *iterativeDataset) {
 			if !handleTableCompletion(d, &currentTable, tableCompletion) {
 				return
 			}
+		} else if err, ok := f.(error); ok {
+			finalError = err
 		} else {
-			d.reportError(errors.ES(op, errors.KInternal, "unknown frame type"))
+			finalError = errors.ES(op, errors.KInternal, "unknown frame type")
+			return
 		}
 	}
 }

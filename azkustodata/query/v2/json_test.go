@@ -4,6 +4,7 @@ import (
 	"bytes"
 	_ "embed"
 	"github.com/Azure/azure-kusto-go/azkustodata/query"
+	"github.com/Azure/azure-kusto-go/azkustodata/types"
 	"github.com/google/uuid"
 	"github.com/shopspring/decimal"
 	"github.com/stretchr/testify/require"
@@ -62,25 +63,25 @@ func TestDecodeValidFrames(t *testing.T) {
 		require.Equal(t, "AllDataTypes", tableHeader.TableName)
 		require.Equal(t, 10, len(tableHeader.Columns))
 		require.Equal(t, "vnum", tableHeader.Columns[0].Name())
-		require.Equal(t, "int", tableHeader.Columns[0].Type())
+		require.Equal(t, types.Column("int"), tableHeader.Columns[0].Type())
 		require.Equal(t, "vdec", tableHeader.Columns[1].Name())
-		require.Equal(t, "decimal", tableHeader.Columns[1].Type())
+		require.Equal(t, types.Column("decimal"), tableHeader.Columns[1].Type())
 		require.Equal(t, "vdate", tableHeader.Columns[2].Name())
-		require.Equal(t, "datetime", tableHeader.Columns[2].Type())
+		require.Equal(t, types.Column("datetime"), tableHeader.Columns[2].Type())
 		require.Equal(t, "vspan", tableHeader.Columns[3].Name())
-		require.Equal(t, "timespan", tableHeader.Columns[3].Type())
+		require.Equal(t, types.Column("timespan"), tableHeader.Columns[3].Type())
 		require.Equal(t, "vobj", tableHeader.Columns[4].Name())
-		require.Equal(t, "dynamic", tableHeader.Columns[4].Type())
+		require.Equal(t, types.Column("dynamic"), tableHeader.Columns[4].Type())
 		require.Equal(t, "vb", tableHeader.Columns[5].Name())
-		require.Equal(t, "bool", tableHeader.Columns[5].Type())
+		require.Equal(t, types.Column("bool"), tableHeader.Columns[5].Type())
 		require.Equal(t, "vreal", tableHeader.Columns[6].Name())
-		require.Equal(t, "real", tableHeader.Columns[6].Type())
+		require.Equal(t, types.Column("real"), tableHeader.Columns[6].Type())
 		require.Equal(t, "vstr", tableHeader.Columns[7].Name())
-		require.Equal(t, "string", tableHeader.Columns[7].Type())
+		require.Equal(t, types.Column("string"), tableHeader.Columns[7].Type())
 		require.Equal(t, "vlong", tableHeader.Columns[8].Name())
-		require.Equal(t, "long", tableHeader.Columns[8].Type())
+		require.Equal(t, types.Column("long"), tableHeader.Columns[8].Type())
 		require.Equal(t, "vguid", tableHeader.Columns[9].Name())
-		require.Equal(t, "guid", tableHeader.Columns[9].Type())
+		require.Equal(t, types.Column("guid"), tableHeader.Columns[9].Type())
 
 		require.NoError(t, f.advance())
 
