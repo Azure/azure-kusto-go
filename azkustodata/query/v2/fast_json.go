@@ -9,29 +9,23 @@ import (
 	"github.com/goccy/go-json"
 )
 
+// UnmarshalJSON implements the json.Unmarshaler interface for TableFragment.
+// See decodeTableFragment for further explanation.
 func (t *TableFragment) UnmarshalJSON(b []byte) error {
 	decoder := json.NewDecoder(bytes.NewReader(b))
 	decoder.UseNumber()
 
-	for {
-		tok, err := decoder.Token()
-		if err != nil {
-			return err
-		}
-		if tok == json.Token("Rows") {
-			break
-		}
-	}
-
-	rows, err := decodeRows(b, decoder, t.Columns, t.PreviousIndex)
+	rows, err := decodeTableFragment(b, decoder, t.Columns, t.PreviousIndex)
 	if err != nil {
 		return err
 	}
-
 	t.Rows = rows
+
 	return nil
 }
 
+// UnmarshalJSON implements the json.Unmarshaler interface for DataTable.
+// A DataTable is "just" a TableHeader and TableFragment, so we can reuse the existing functions.
 func (q *DataTable) UnmarshalJSON(b []byte) error {
 	decoder := json.NewDecoder(bytes.NewReader(b))
 	decoder.UseNumber()
@@ -41,32 +35,31 @@ func (q *DataTable) UnmarshalJSON(b []byte) error {
 		return err
 	}
 
-	err = assertToken(decoder, json.Token("Rows"))
+	rows, err := decodeTableFragment(b, decoder, q.Header.Columns, 0)
 	if err != nil {
 		return err
 	}
-
-	rows, err := decodeRows(b, decoder, q.Header.Columns, 0)
-	if err != nil {
-		return err
-	}
-
 	q.Rows = rows
+
 	return nil
 }
 
+// UnmarshalJSON implements the json.Unmarshaler interface for DataSetHeader.
+// We need to decode this manually to set the correct Columns, in order to save on allocations later on.
 func (t *TableHeader) UnmarshalJSON(b []byte) error {
 	decoder := json.NewDecoder(bytes.NewReader(b))
 	decoder.UseNumber()
 
-	err2 := decodeHeader(decoder, t, TableHeaderFrameType)
-	if err2 != nil {
-		return err2
+	err := decodeHeader(decoder, t, TableHeaderFrameType)
+	if err != nil {
+		return err
 	}
 
 	return nil
 }
 
+// decodeHeader decodes the header of a table, which is the same for TableHeader and DataTable.
+// It assumes the order of the properties in the JSON is fixed.
 func decodeHeader(decoder *json.Decoder, t *TableHeader, frameType FrameType) error {
 	err := assertToken(decoder, json.Delim('{'))
 	if err != nil {
@@ -103,6 +96,25 @@ func decodeHeader(decoder *json.Decoder, t *TableHeader, frameType FrameType) er
 		return err
 	}
 	return nil
+}
+
+func decodeTableFragment(b []byte, decoder *json.Decoder, columns []query.Column, previousIndex int) ([]query.Row, error) {
+	for {
+		tok, err := decoder.Token()
+		if err != nil {
+			return nil, err
+		}
+		if tok == json.Token("Rows") {
+			break
+		}
+	}
+
+	rows, err := decodeRows(b, decoder, columns, previousIndex)
+	if err != nil {
+		return nil, err
+	}
+
+	return rows, nil
 }
 
 func decodeColumns(decoder *json.Decoder) ([]query.Column, error) {
