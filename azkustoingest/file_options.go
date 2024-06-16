@@ -229,8 +229,7 @@ func InferFormatFromFileName(fName string) DataFormat {
 // IngestionMapping provides runtime mapping of the data being imported to the fields in the table.
 // "ref" will be JSON encoded, so it can be any type that can be JSON marshalled. If you pass a string
 // or []byte, it will be interpreted as already being JSON encoded.
-// mappingKind can only be: CSV, JSON, AVRO, Parquet or ORC, but it will be automatically converted from other types.
-// The mappingKind parameter will also automatically set the FileFormat option.
+// The format parameter will automatically set the FileOption.Format option.
 func IngestionMapping(mapping interface{}, format DataFormat) FileOption {
 	return option{
 		run: func(p *properties.All) error {
