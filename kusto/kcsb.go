@@ -156,8 +156,8 @@ func (kcsb *ConnectionStringBuilder) resetConnectionString() {
 	kcsb.ApplicationKey = ""
 	kcsb.AuthorityId = ""
 	kcsb.ApplicationCertificatePath = ""
-	kcsb.ApplicationCertificateBytes = []byte{}
-	kcsb.ApplicationCertificatePassword = []byte{}
+	kcsb.ApplicationCertificateBytes = nil
+	kcsb.ApplicationCertificatePassword = nil
 	kcsb.SendCertificateChain = false
 	kcsb.ApplicationToken = ""
 	kcsb.AzCli = false

@@ -52,7 +52,6 @@ func GenerateConnectionString(clusterUrl string, authenticationMode Authenticati
 func createApplicationCertificateConnectionString(kcs *kusto.ConnectionStringBuilder) *kusto.ConnectionStringBuilder {
 	var appId = os.Getenv("APP_ID")
 	var cert = os.Getenv("PUBLIC_CERT_FILE_PATH")
-	var thumbprint = os.Getenv("CERT_THUMBPRINT")
 	var appTenant = os.Getenv("APP_TENANT")
-	return kcs.WithAppCertificate(appId, cert, thumbprint, true, appTenant)
+	return kcs.WithAppCertificatePath(appId, cert, nil, true, appTenant)
 }
