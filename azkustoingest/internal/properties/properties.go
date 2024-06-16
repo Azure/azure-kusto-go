@@ -160,7 +160,7 @@ func (d DataFormat) MarshalJSON() ([]byte, error) {
 	return []byte(fmt.Sprintf("%q", d.String())), nil
 }
 
-// MappingKind returns true if a dataformat can be used as a MappingKind.
+// MappingKind returns the mapping kind associated with this DataFormat```
 func (d DataFormat) MappingKind() DataFormat {
 	if int(d) < len(dfDescriptions) {
 		return dfDescriptions[d].mappingKind
