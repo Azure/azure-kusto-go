@@ -209,7 +209,7 @@ func TestFileFormatAndMapping(t *testing.T) {
 			expectedMappingType: JSON,
 		},
 		{
-			desc:                "Test multijson with before",
+			desc:                "Test multijson with with FileFormat set before",
 			options:             []FileOption{FileFormat(MultiJSON), IngestionMapping("mapping", MultiJSON)},
 			source:              FromFile,
 			expectedFormat:      MultiJSON,
