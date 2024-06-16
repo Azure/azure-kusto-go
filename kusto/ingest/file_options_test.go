@@ -203,6 +203,27 @@ func TestFileFormatAndMapping(t *testing.T) {
 				"format and ingestion mapping type must match (hint: using ingestion mapping sets the format automatically)",
 			).SetNoRetry(),
 		},
+		{
+			desc:                "Test multijson with default",
+			options:             []FileOption{IngestionMapping("mapping", MultiJSON)},
+			source:              FromFile,
+			expectedFormat:      MultiJSON,
+			expectedMappingType: JSON,
+		},
+		{
+			desc:                "Test multijson with before",
+			options:             []FileOption{FileFormat(MultiJSON), IngestionMapping("mapping", MultiJSON)},
+			source:              FromFile,
+			expectedFormat:      MultiJSON,
+			expectedMappingType: JSON,
+		},
+		{
+			desc:                "Test multijson with after",
+			options:             []FileOption{IngestionMapping("mapping", JSON), FileFormat(MultiJSON)},
+			source:              FromFile,
+			expectedFormat:      MultiJSON,
+			expectedMappingType: JSON,
+		},
 	}
 
 	client := kusto.NewMockClient()
