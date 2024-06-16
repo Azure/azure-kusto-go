@@ -274,9 +274,8 @@ func IngestionMapping(mapping interface{}, format DataFormat) FileOption {
 }
 
 // IngestionMappingRef provides the name of a pre-created mapping for the data being imported to the fields in the table.
-// mappingKind can only be: CSV, JSON, AVRO, Parquet or ORC, but it will be automatically converted from other types.
-// For more details, see: https://docs.microsoft.com/en-us/azure/kusto/management/create-ingestion-mapping-command
-// The mappingKind parameter will also automatically set the FileFormat option.
+// For more details, see: https://docs.microsoft.com/azure/kusto/management/create-ingestion-mapping-command
+// The formatparameter will also automatically set the FileOption.Format option.
 func IngestionMappingRef(refName string, format DataFormat) FileOption {
 	return option{
 		run: func(p *properties.All) error {
