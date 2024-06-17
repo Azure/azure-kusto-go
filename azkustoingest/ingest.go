@@ -100,7 +100,7 @@ func (i *Ingestion) prepForIngestion(ctx context.Context, options []FileOption, 
 		props.Ingestion.Additional.Format = CSV
 	}
 
-	if props.Ingestion.Additional.IngestionMappingType != DFUnknown && props.Ingestion.Additional.Format != props.Ingestion.Additional.IngestionMappingType {
+	if props.Ingestion.Additional.IngestionMappingType != DFUnknown && props.Ingestion.Additional.Format.MappingKind() != props.Ingestion.Additional.IngestionMappingType {
 		return nil, properties.All{}, errors.ES(
 			errors.OpUnknown,
 			errors.KClientArgs,
