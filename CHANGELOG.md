@@ -5,21 +5,20 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
-## [0.15.2] - 2024-04-01
+## [0.15.3] - 2024-06-17
+### Fixed
+- Fixed Mapping Kind not working correctly with certain formats.
 
+## [0.15.2] - 2024-04-01
 ### Fixed
 
 - Fix storage URI parsing for hostname with more than 5 parts.
 - Keep original error when refreshing ingestion resources fails.
 
 ## [0.15.1] - 2024-03-04
-
 ### Changed
-
 - Binary data formats are no longer compressed, as it is inefficient.
-
 ### Fixed
-
 - Type aliases for int32 now work correctly when converting.
 
 
