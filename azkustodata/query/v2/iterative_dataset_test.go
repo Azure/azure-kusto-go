@@ -2,7 +2,6 @@ package v2
 
 import (
 	"context"
-	"github.com/Azure/azure-kusto-go/azkustodata/errors"
 	"github.com/Azure/azure-kusto-go/azkustodata/query"
 	"github.com/Azure/azure-kusto-go/azkustodata/value"
 	"github.com/google/uuid"
@@ -29,16 +28,9 @@ func defaultDataset(reader io.Reader) (query.IterativeDataset, error) {
 func TestStreamingDataSet_ReadFrames_WithError(t *testing.T) {
 	t.Parallel()
 	reader := strings.NewReader("invalid")
-	d := &iterativeDataset{
-		BaseDataset: query.NewBaseDataset(context.Background(), errors.OpQuery, PrimaryResultTableKind),
-		reader:      io.NopCloser(reader),
-		frames:      make(chan interface{}, DefaultFrameCapacity),
-		results:     make(chan query.TableResult, 1),
-	}
-
-	br, err := prepareReadBuffer(d.reader)
+	dataset, err := defaultDataset(reader)
 	require.ErrorContains(t, err, "invalid")
-	require.Nil(t, br)
+	require.Nil(t, dataset)
 }
 
 func TestStreamingDataSet_DecodeTables_WithInvalidFrame(t *testing.T) {
