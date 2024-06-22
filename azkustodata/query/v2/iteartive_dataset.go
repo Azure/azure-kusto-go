@@ -1,9 +1,11 @@
 package v2
 
 import (
+	"bytes"
 	"context"
 	"github.com/Azure/azure-kusto-go/azkustodata/errors"
 	"github.com/Azure/azure-kusto-go/azkustodata/query"
+	"github.com/goccy/go-json"
 	"io"
 )
 
@@ -22,111 +24,130 @@ const PrimaryResultTableKind = "PrimaryResult"
 type iterativeDataset struct {
 	query.BaseDataset
 
-	// reader is an io.ReadCloser used to read the data from the Kusto service.
-	reader io.ReadCloser
 	// results is a channel that sends the parsed results as they are decoded.
 	results chan query.TableResult
-
-	frames chan interface{}
 
 	fragmentCapacity int
 	rowCapacity      int
 	cancel           context.CancelFunc
+	currentTable     *iterativeTable
+	queryProperties  query.IterativeTable
+	jsonData         chan interface{}
 }
 
 func NewIterativeDataset(ctx context.Context, r io.ReadCloser, capacity int, rowCapacity int, fragmentCapacity int) (query.IterativeDataset, error) {
+
 	ctx, cancel := context.WithCancel(ctx)
 
 	d := &iterativeDataset{
 		BaseDataset:      query.NewBaseDataset(ctx, errors.OpQuery, PrimaryResultTableKind),
-		reader:           r,
-		results:          make(chan query.TableResult, 1),
+		results:          make(chan query.TableResult, fragmentCapacity),
 		fragmentCapacity: fragmentCapacity,
 		rowCapacity:      rowCapacity,
-		frames:           make(chan interface{}, capacity),
 		cancel:           cancel,
+		currentTable:     nil,
+		queryProperties:  nil,
+		jsonData:         make(chan interface{}, capacity),
 	}
-
-	reader, err := newFrameReader(r)
+	reader, err := newFrameReader(r, ctx)
 	if err != nil {
+		cancel()
+		r.Close()
 		return nil, err
 	}
 
-	go decodeTables(d)
+	go readRoutine(reader, d)
 
-	go func() {
-		defer close(d.frames)
-		defer d.reader.Close()
-		err := readDataSet(reader, d.frames)
-		if err != nil {
-			d.frames <- err
-		}
-	}()
+	go parseRoutine(d, reader, cancel)()
 
 	return d, nil
 }
 
-func readDataSet(r *frameReader, frames chan interface{}) error {
-	err := r.advance()
-	if err != nil {
-		return err
-	}
-
-	err = r.validateDataSetHeader()
-	if err != nil {
-		return err
-	}
-
-	err = r.advance()
-	if err != nil {
-		return err
-	}
-
-	frameType, err := r.peekFrameType()
-	if err != nil {
-		return err
-	}
-	if frameType != DataTableFrameType {
-		return errors.ES(errors.OpQuery, errors.KInternal, "expected DataTable frame, got %s", frameType)
-	}
-
-	properties := DataTable{}
-	err = r.unmarshal(&properties)
-	if err != nil {
-		return err
-	}
-	frames <- properties
-
-	for {
-		err = r.advance()
-		if err != nil {
-			return err
-		}
-
-		frameType, err := r.peekFrameType()
-		if err != nil {
-			return err
-		}
-
-		if frameType == DataTableFrameType {
-			queryCompletion := DataTable{}
-			err = r.unmarshal(&queryCompletion)
+func readRoutine(reader *frameReader, d *iterativeDataset) {
+	func() {
+		for {
+			err := reader.advance()
 			if err != nil {
+				if err != io.EOF {
+					d.jsonData <- err
+				}
+				close(d.jsonData)
+				return
+			} else {
+				d.jsonData <- reader.line
+			}
+		}
+	}()
+}
+
+func parseRoutine(d *iterativeDataset, reader *frameReader, cancel context.CancelFunc) func() {
+	return func() {
+		if err := readDataSet(d); err != nil {
+			select {
+			case d.results <- query.TableResultError(err):
+			case <-d.Context().Done():
+			}
+		} else {
+			if d.currentTable != nil {
+				d.currentTable.finishTable([]OneApiError{})
+			}
+		}
+
+		if err := reader.Close(); err != nil {
+			// best effort to send the error
+			select {
+			case d.results <- query.TableResultError(err):
+			case <-d.Context().Done():
+			default:
+			}
+		}
+
+		close(d.results)
+		cancel()
+	}
+}
+
+func readDataSet(d *iterativeDataset) error {
+
+	var err error
+
+	if header, _, err := nextFrame(d); err == nil {
+		if err = validateDataSetHeader(header); err != nil {
+			return err
+		}
+	} else {
+		return err
+	}
+
+	if decoder, frameType, err := nextFrame(d); err == nil {
+		if frameType != DataTableFrameType {
+			return errors.ES(errors.OpQuery, errors.KInternal, "expected DataTable frame, got %s", frameType)
+		}
+
+		if err = handleDataTable(d, decoder); err != nil {
+			return err
+		}
+	} else {
+		return err
+	}
+
+	for decoder, frameType, err := nextFrame(d); err == nil; decoder, frameType, err = nextFrame(d) {
+		if frameType == DataTableFrameType {
+			if err = handleDataTable(d, decoder); err != nil {
 				return err
 			}
-			frames <- queryCompletion
-			break
+			continue
 		}
 
 		if frameType == TableHeaderFrameType {
-			if err = readPrimaryTable(r, frames); err != nil {
+			if err = readPrimaryTable(d, decoder); err != nil {
 				return err
 			}
 			continue
 		}
 
 		if frameType == DataSetCompletionFrameType {
-			err = readDataSetCompletion(r)
+			err = readDataSetCompletion(decoder)
 			if err != nil {
 				return err
 			}
@@ -136,30 +157,32 @@ func readDataSet(r *frameReader, frames chan interface{}) error {
 		return errors.ES(errors.OpQuery, errors.KInternal, "unexpected frame type %s", frameType)
 	}
 
-	err = r.advance()
-	if err != nil {
-		return err
-	}
-
-	frameType, err = r.peekFrameType()
-	if err != nil {
-		return err
-	}
-	if frameType != DataSetCompletionFrameType {
-		return errors.ES(errors.OpQuery, errors.KInternal, "expected DataSetCompletion frame, got %s", frameType)
-	}
-
-	err = readDataSetCompletion(r)
-	if err != nil {
-		return err
-	}
-
-	return nil
+	return err
 }
 
-func readDataSetCompletion(r *frameReader) error {
+func nextFrame(d *iterativeDataset) (*json.Decoder, FrameType, error) {
+	var line []byte
+	select {
+	case <-d.Context().Done():
+		return nil, "", errors.ES(errors.OpQuery, errors.KInternal, "context cancelled")
+	case val := <-d.jsonData:
+		if err, ok := val.(error); ok {
+			return nil, "", err
+		}
+		line = val.([]byte)
+	}
+
+	frameType, err := peekFrameType(line)
+	if err != nil {
+		return nil, "", err
+	}
+
+	return json.NewDecoder(bytes.NewReader(line)), frameType, nil
+}
+
+func readDataSetCompletion(dec *json.Decoder) error {
 	completion := DataSetCompletion{}
-	err := r.unmarshal(&completion)
+	err := dec.Decode(&completion)
 	if err != nil {
 		return err
 	}
@@ -177,42 +200,45 @@ func combineOneApiErrors(errs []OneApiError) error {
 	return c.Unwrap()
 }
 
-func readPrimaryTable(r *frameReader, frames chan interface{}) error {
+func readPrimaryTable(d *iterativeDataset, dec *json.Decoder) error {
 	header := TableHeader{}
-	err := r.unmarshal(&header)
+	err := dec.Decode(&header)
 	if err != nil {
 		return err
 	}
 
-	frames <- header
+	if err := handleTableHeader(d, header); err != nil {
+		return err
+	}
 
-	i := 0
-
-	for {
-		err = r.advance()
+	for i := 0; ; {
+		dec, frameType, err := nextFrame(d)
 		if err != nil {
 			return err
 		}
-		frameType, err := r.peekFrameType()
-		if err != nil {
-			return err
-		}
-
 		if frameType == TableFragmentFrameType {
 			fragment := TableFragment{Columns: header.Columns, PreviousIndex: i}
-			err = r.unmarshal(&fragment)
+			err = dec.Decode(&fragment)
 			if err != nil {
 				return err
 			}
 			i += len(fragment.Rows)
-			frames <- fragment
+			if err = handleTableFragment(d, fragment); err != nil {
+				return err
+			}
 			continue
 		}
 
 		if frameType == TableCompletionFrameType {
 			completion := TableCompletion{}
-			err = r.unmarshal(&completion)
-			frames <- completion
+			err = dec.Decode(&completion)
+			if err != nil {
+				return err
+			}
+
+			if err = handleTableCompletion(d, completion); err != nil {
+				return err
+			}
 
 			break
 		}
@@ -221,14 +247,6 @@ func readPrimaryTable(r *frameReader, frames chan interface{}) error {
 	}
 
 	return nil
-}
-
-func (d *iterativeDataset) reportError(err error) {
-	select {
-	case d.results <- query.TableResultError(err):
-		return
-	case <-d.Context().Done():
-	}
 }
 
 func (d *iterativeDataset) sendTable(tb query.IterativeTable) {
@@ -269,72 +287,14 @@ func (d *iterativeDataset) ToDataset() (query.Dataset, error) {
 	return query.NewDataset(d, tables), nil
 }
 
-// decodeTables decodes the frames from the frames channel and sends the results to the results channel.
-func decodeTables(d *iterativeDataset) {
-	op := d.Op()
-
-	var currentTable *iterativeTable
-	var queryProperties query.IterativeTable
-
-	var finalError error
-	var f interface{}
-
-	defer func() {
-		if finalError != nil {
-			d.reportError(finalError)
-		} else if currentTable != nil {
-			currentTable.finishTable([]OneApiError{})
-		}
-
-		close(d.results)
-	}()
-
-	stop := false
-
-	for {
-		select {
-		case <-d.Context().Done():
-			finalError = errors.ES(op, errors.KInternal, "context done")
-			stop = true
-		case f = <-d.frames:
-			if f == nil {
-				stop = true
-			}
-		}
-
-		if stop {
-			break
-		}
-
-		if dataTable, ok := f.(DataTable); ok {
-			if !handleDataTable(d, &queryProperties, dataTable) {
-				return
-			}
-		} else if tableHeader, ok := f.(TableHeader); ok {
-			if !handleTableHeader(d, &currentTable, tableHeader) {
-				return
-			}
-		} else if tableFragment, ok := f.(TableFragment); ok {
-			if !handleTableFragment(d, currentTable, tableFragment) {
-				return
-			}
-		} else if tableCompletion, ok := f.(TableCompletion); ok {
-			if !handleTableCompletion(d, &currentTable, tableCompletion) {
-				return
-			}
-		} else if err, ok := f.(error); ok {
-			finalError = err
-		} else {
-			finalError = errors.ES(op, errors.KInternal, "unknown frame type")
-			return
-		}
+func handleDataTable(d *iterativeDataset, dec *json.Decoder) error {
+	var dt DataTable
+	if err := dec.Decode(&dt); err != nil {
+		return err
 	}
-}
 
-func handleDataTable(d *iterativeDataset, queryProperties *query.IterativeTable, dt DataTable) bool {
 	if dt.Header.TableKind == PrimaryResultTableKind {
-		d.reportError(errors.ES(d.Op(), errors.KInternal, "received a DataTable frame for a primary result table"))
-		return false
+		return errors.ES(d.Op(), errors.KInternal, "received a DataTable frame for a primary result table")
 	}
 	switch dt.Header.TableKind {
 	case QueryPropertiesKind:
@@ -342,76 +302,66 @@ func handleDataTable(d *iterativeDataset, queryProperties *query.IterativeTable,
 		// We will wait until after the primary results (when we get the QueryCompletionInformation table) and then send it.
 		res, err := newTable(d, dt)
 		if err != nil {
-			d.reportError(err)
-			return false
+			return err
 		}
-		*queryProperties = iterativeWrapper{res}
+		d.queryProperties = iterativeWrapper{res}
 	case QueryCompletionInformationKind:
-		if *queryProperties != nil {
-			d.sendTable(*queryProperties)
+		if d.queryProperties != nil {
+			d.sendTable(d.queryProperties)
 		}
 
 		res, err := newTable(d, dt)
 		if err != nil {
-			d.reportError(err)
-			return false
+			return err
 		}
 		d.sendTable(iterativeWrapper{res})
 
 	default:
-		d.reportError(errors.ES(d.Op(), errors.KInternal, "unknown secondary table - %s %s", dt.Header.TableName, dt.Header.TableKind))
+		return errors.ES(d.Op(), errors.KInternal, "unknown secondary table - %s %s", dt.Header.TableName, dt.Header.TableKind)
 	}
 
-	return true
+	return nil
 }
 
-func handleTableCompletion(d *iterativeDataset, tablePtr **iterativeTable, tc TableCompletion) bool {
-	if *tablePtr == nil {
-		err := errors.ES(d.Op(), errors.KInternal, "received a TableCompletion frame while no streaming table was open")
-		d.reportError(err)
-		return false
+func handleTableCompletion(d *iterativeDataset, tc TableCompletion) error {
+	if d.currentTable == nil {
+		return errors.ES(d.Op(), errors.KInternal, "received a TableCompletion frame while no streaming table was open")
 	}
-	if int((*tablePtr).Index()) != tc.TableId {
-		err := errors.ES(d.Op(), errors.KInternal, "received a TableCompletion frame for table %d while table %d was open", tc.TableId, int((*tablePtr).Index()))
-		d.reportError(err)
+	if int(d.currentTable.Index()) != tc.TableId {
+		return errors.ES(d.Op(), errors.KInternal, "received a TableCompletion frame for table %d while table %d was open", tc.TableId, int((d.currentTable).Index()))
 	}
 
-	(*tablePtr).finishTable(tc.OneApiErrors)
+	d.currentTable.finishTable(tc.OneApiErrors)
 
-	*tablePtr = nil
+	d.currentTable = nil
 
-	return true
+	return nil
 }
 
-func handleTableFragment(d *iterativeDataset, table *iterativeTable, tf TableFragment) bool {
-	if table == nil {
-		err := errors.ES(d.Op(), errors.KInternal, "received a TableFragment frame while no streaming table was open")
-		d.reportError(err)
-		return false
+func handleTableFragment(d *iterativeDataset, tf TableFragment) error {
+	if d.currentTable == nil {
+		return errors.ES(d.Op(), errors.KInternal, "received a TableFragment frame while no streaming table was open")
 	}
 
-	table.addRawRows(tf.Rows)
+	d.currentTable.addRawRows(tf.Rows)
 
-	return true
+	return nil
 }
 
-func handleTableHeader(d *iterativeDataset, table **iterativeTable, th TableHeader) bool {
-	if *table != nil {
-		err := errors.ES(d.Op(), errors.KInternal, "received a TableHeader frame while a streaming table was still open")
-		d.reportError(err)
-		return false
+func handleTableHeader(d *iterativeDataset, th TableHeader) error {
+	if d.currentTable != nil {
+		return errors.ES(d.Op(), errors.KInternal, "received a TableHeader frame while a streaming table was still open")
 	}
 
 	// Read the table header, set it as the current table, and send it to the user (so they can start reading rows)
 
 	t, err := NewIterativeTable(d, th)
 	if err != nil {
-		d.reportError(err)
-		return false
+		return err
 	}
 
-	*table = t.(*iterativeTable)
-	d.sendTable(*table)
+	d.currentTable = t.(*iterativeTable)
+	d.sendTable(d.currentTable)
 
-	return true
+	return nil
 }

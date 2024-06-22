@@ -240,3 +240,31 @@ func decodeRow(
 
 	return nil
 }
+
+func validateDataSetHeader(dec *json.Decoder) error {
+	if err := assertToken(dec, json.Delim('{')); err != nil {
+		return err
+	}
+
+	if err := assertStringProperty(dec, "FrameType", json.Token(string(DataSetHeaderFrameType))); err != nil {
+		return err
+	}
+
+	if err := assertStringProperty(dec, "IsProgressive", json.Token(false)); err != nil {
+		return err
+	}
+
+	if err := assertStringProperty(dec, "Version", json.Token("v2.0")); err != nil {
+		return err
+	}
+
+	if err := assertStringProperty(dec, "IsFragmented", json.Token(true)); err != nil {
+		return err
+	}
+
+	if err := assertStringProperty(dec, "ErrorReportingPlacement", json.Token("EndOfTable")); err != nil {
+		return err
+	}
+
+	return nil
+}
