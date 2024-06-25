@@ -35,19 +35,18 @@ type iterativeDataset struct {
 	jsonData         chan interface{}
 }
 
-func NewIterativeDataset(ctx context.Context, r io.ReadCloser, capacity int, rowCapacity int, fragmentCapacity int) (query.IterativeDataset, error) {
+func NewIterativeDataset(ctx context.Context, r io.ReadCloser, ioCapacity int, rowCapacity int, fragmentCapacity int) (query.IterativeDataset, error) {
 
 	ctx, cancel := context.WithCancel(ctx)
 
 	d := &iterativeDataset{
-		BaseDataset:      query.NewBaseDataset(ctx, errors.OpQuery, PrimaryResultTableKind),
-		results:          make(chan query.TableResult, fragmentCapacity),
-		fragmentCapacity: fragmentCapacity,
-		rowCapacity:      rowCapacity,
-		cancel:           cancel,
-		currentTable:     nil,
-		queryProperties:  nil,
-		jsonData:         make(chan interface{}, capacity),
+		BaseDataset:     query.NewBaseDataset(ctx, errors.OpQuery, PrimaryResultTableKind),
+		results:         make(chan query.TableResult, fragmentCapacity),
+		rowCapacity:     rowCapacity,
+		cancel:          cancel,
+		currentTable:    nil,
+		queryProperties: nil,
+		jsonData:        make(chan interface{}, ioCapacity),
 	}
 	reader, err := newFrameReader(r, ctx)
 	if err != nil {
@@ -56,55 +55,52 @@ func NewIterativeDataset(ctx context.Context, r io.ReadCloser, capacity int, row
 		return nil, err
 	}
 
+	go parseRoutine(d, reader, cancel)
 	go readRoutine(reader, d)
-
-	go parseRoutine(d, reader, cancel)()
 
 	return d, nil
 }
 
 func readRoutine(reader *frameReader, d *iterativeDataset) {
-	func() {
-		for {
-			err := reader.advance()
-			if err != nil {
-				if err != io.EOF {
-					d.jsonData <- err
+	defer close(d.jsonData)
+	for {
+		err := reader.advance()
+		if err != nil {
+			if err != io.EOF {
+				select {
+				case d.jsonData <- err:
+				case <-d.Context().Done():
 				}
-				close(d.jsonData)
+			}
+			return
+		} else {
+			select {
+			case d.jsonData <- reader.line:
+			case <-d.Context().Done():
 				return
-			} else {
-				d.jsonData <- reader.line
 			}
 		}
-	}()
+	}
 }
 
-func parseRoutine(d *iterativeDataset, reader *frameReader, cancel context.CancelFunc) func() {
-	return func() {
-		if err := readDataSet(d); err != nil {
-			select {
-			case d.results <- query.TableResultError(err):
-			case <-d.Context().Done():
-			}
-		} else {
-			if d.currentTable != nil {
-				d.currentTable.finishTable([]OneApiError{})
-			}
-		}
+func parseRoutine(d *iterativeDataset, reader *frameReader, cancel context.CancelFunc) {
 
-		if err := reader.Close(); err != nil {
-			// best effort to send the error
-			select {
-			case d.results <- query.TableResultError(err):
-			case <-d.Context().Done():
-			default:
-			}
+	err := readDataSet(d)
+	if err != nil {
+		select {
+		case d.results <- query.TableResultError(err):
+		case <-d.Context().Done():
 		}
-
-		close(d.results)
 		cancel()
 	}
+
+	if d.currentTable != nil {
+		d.currentTable.finishTable([]OneApiError{}, err)
+	}
+
+	cancel()
+	reader.Close()
+	close(d.results)
 }
 
 func readDataSet(d *iterativeDataset) error {
@@ -331,7 +327,7 @@ func handleTableCompletion(d *iterativeDataset, tc TableCompletion) error {
 		return errors.ES(d.Op(), errors.KInternal, "received a TableCompletion frame for table %d while table %d was open", tc.TableId, int((d.currentTable).Index()))
 	}
 
-	d.currentTable.finishTable(tc.OneApiErrors)
+	d.currentTable.finishTable(tc.OneApiErrors, nil)
 
 	d.currentTable = nil
 
