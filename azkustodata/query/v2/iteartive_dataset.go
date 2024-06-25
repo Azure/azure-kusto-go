@@ -121,7 +121,7 @@ func readDataSet(d *iterativeDataset) error {
 
 	if decoder, frameType, err := nextFrame(d); err == nil {
 		if frameType != DataTableFrameType {
-			return errors.ES(errors.OpQuery, errors.KInternal, "expected DataTable frame, got %s", frameType)
+			return errors.ES(errors.OpQuery, errors.KInternal, "unexpected frame type %s, expected DataTable", frameType)
 		}
 
 		if err = handleDataTable(d, decoder); err != nil {
@@ -154,7 +154,7 @@ func readDataSet(d *iterativeDataset) error {
 			return nil
 		}
 
-		return errors.ES(errors.OpQuery, errors.KInternal, "unexpected frame type %s", frameType)
+		return errors.ES(errors.OpQuery, errors.KInternal, "unexpected frame type %s, expected DataTable, TableHeader, or DataSetCompletion", frameType)
 	}
 
 	return err
@@ -243,7 +243,7 @@ func readPrimaryTable(d *iterativeDataset, dec *json.Decoder) error {
 			break
 		}
 
-		return errors.ES(errors.OpQuery, errors.KInternal, "unexpected frame type %s", frameType)
+		return errors.ES(errors.OpQuery, errors.KInternal, "unexpected frame type %s, expected TableFragment or TableCompletion", frameType)
 	}
 
 	return nil
