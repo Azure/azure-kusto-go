@@ -188,54 +188,72 @@ func decodeRow(
 	buffer []byte,
 	decoder *json.Decoder,
 	onField func(field int, t json.Token) error) error {
-	for {
-		t, err := decoder.Token()
+	t, err := decoder.Token()
+	if err != nil {
+		return err
+	}
+
+	if t != json.Delim('[') {
+		return errors.ES(errors.OpTableAccess, errors.KInternal, "expected start of row, got %s", t)
+	}
+
+	field := 0
+
+	for ; decoder.More(); field++ {
+		t, err = decoder.Token()
 		if err != nil {
 			return err
 		}
 
-		// end of outer array
-		if t != json.Delim('[') {
-			break
-		}
-
-		field := 0
-
-		for ; decoder.More(); field++ {
-
-			t, err = decoder.Token()
-			if err != nil {
-				return err
-			}
-
-			// If it's a nested object, just make it into a byte array
-			if t == json.Delim('[') || t == json.Delim('{') {
-				initialOffset := decoder.InputOffset() - 1
+		// If it's a nested object, just make it into a byte array
+		if t == json.Delim('[') || t == json.Delim('{') {
+			nest := 1
+			initialOffset := decoder.InputOffset() - 1
+			for {
 				for decoder.More() {
-					_, err := decoder.Token()
+					t, err := decoder.Token()
 					if err != nil {
 						return err
 					}
+					if t == json.Delim('[') || t == json.Delim('{') {
+						nest++
+					}
 				}
-				_, err := decoder.Token()
+				t, err := decoder.Token()
 				if err != nil {
 					return err
 				}
-
-				finalOffset := decoder.InputOffset()
-
-				err = onField(field, json.Token(buffer[initialOffset:finalOffset]))
-				if err != nil {
-					return err
+				if t == json.Delim(']') || t == json.Delim('}') {
+					nest--
 				}
-				continue
+				if nest == 0 {
+					break
+				}
 			}
 
-			err := onField(field, t)
+			finalOffset := decoder.InputOffset()
+
+			err = onField(field, json.Token(buffer[initialOffset:finalOffset]))
 			if err != nil {
 				return err
 			}
+			continue
 		}
+
+		err := onField(field, t)
+		if err != nil {
+			return err
+		}
+	}
+
+	t, err = decoder.Token()
+	if err != nil {
+		return err
+	}
+
+	// end of inner array
+	if t != json.Delim(']') {
+		return errors.ES(errors.OpTableAccess, errors.KInternal, "expected end of row, got %s", t)
 	}
 
 	return nil
