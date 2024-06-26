@@ -16,7 +16,6 @@ const DefaultRowCapacity = 1000
 
 const DefaultFragmentCapacity = 1
 
-const version = "v2.0"
 const PrimaryResultTableKind = "PrimaryResult"
 
 // iterativeDataset contains the main logic of parsing a v2 dataset.
@@ -55,13 +54,14 @@ func NewIterativeDataset(ctx context.Context, r io.ReadCloser, ioCapacity int, r
 		return nil, err
 	}
 
-	go parseRoutine(d, reader, cancel)
+	go parseRoutine(d, cancel)
 	go readRoutine(reader, d)
 
 	return d, nil
 }
 
 func readRoutine(reader *frameReader, d *iterativeDataset) {
+	defer reader.Close()
 	defer close(d.jsonData)
 	for {
 		err := reader.advance()
@@ -83,7 +83,7 @@ func readRoutine(reader *frameReader, d *iterativeDataset) {
 	}
 }
 
-func parseRoutine(d *iterativeDataset, reader *frameReader, cancel context.CancelFunc) {
+func parseRoutine(d *iterativeDataset, cancel context.CancelFunc) {
 
 	err := readDataSet(d)
 	if err != nil {
@@ -99,7 +99,6 @@ func parseRoutine(d *iterativeDataset, reader *frameReader, cancel context.Cance
 	}
 
 	cancel()
-	reader.Close()
 	close(d.results)
 }
 
