@@ -12,12 +12,11 @@ import (
 	"time"
 )
 
-func getData(k int) (string, context.Context) {
+func getData(k int) string {
 	// cache files in bench/test/{k}.json
-	ctx := context.Background()
 
-	if bytes, err := os.ReadFile("g:\\bench\\" + strconv.Itoa(k) + ".json"); err == nil {
-		return string(bytes), ctx
+	if bytes, err := os.ReadFile("d:\\bench\\" + strconv.Itoa(k) + ".json"); err == nil {
+		return string(bytes)
 	}
 
 	kcsb := NewConnectionStringBuilder("https://help.kusto.windows.net/").WithAzCli()
@@ -30,17 +29,17 @@ func getData(k int) (string, context.Context) {
 		panic(err)
 	}
 
-	err = os.WriteFile("g:\\bench\\"+strconv.Itoa(k)+".json", []byte(res), 0644)
+	err = os.WriteFile("d:\\bench\\"+strconv.Itoa(k)+".json", []byte(res), 0644)
 	if err != nil {
-		return "", nil
+		return ""
 	}
 
-	return res, ctx
+	return res
 
 }
 
 func benchmarkIterative(b *testing.B, k int, frameCapacity int, rowCapacity int, fragmentCapacity int) {
-	res, ctx := getData(k)
+	res := getData(k)
 	b.ReportAllocs()
 	b.ResetTimer()
 
@@ -56,6 +55,7 @@ func benchmarkIterative(b *testing.B, k int, frameCapacity int, rowCapacity int,
 	*/
 	for u := 0; u < b.N; u++ {
 		for i := 0; i < factor; i++ {
+			ctx := context.Background()
 			dataset, err := queryv2.NewIterativeDataset(ctx, io.NopCloser(strings.NewReader(res)), frameCapacity, rowCapacity, fragmentCapacity)
 
 			time.Sleep(5 * time.Second)
@@ -87,41 +87,6 @@ func benchmarkIterative(b *testing.B, k int, frameCapacity int, rowCapacity int,
 					//results.WriteString(fmt.Sprintf("%d:%d,", c, *id))
 					c++
 				}
-			}
-		}
-	}
-}
-func benchmarkFull(b *testing.B, k int) {
-	res, ctx := getData(k)
-	b.ReportAllocs()
-	b.ResetTimer()
-
-	for k := 0; k < b.N; k++ {
-		dataset, err := queryv2.NewIterativeDataset(ctx, io.NopCloser(strings.NewReader(res)), queryv2.DefaultFrameCapacity, queryv2.DefaultRowCapacity, queryv2.DefaultFragmentCapacity)
-		if err != nil {
-			panic(err)
-		}
-
-		full, err := dataset.ToDataset()
-		if err != nil {
-			panic(err)
-		}
-
-		for _, table := range full.Tables() {
-			if !table.IsPrimaryResult() {
-				break
-			}
-
-			c := int32(0)
-			for _, res := range table.Rows() {
-				id, err := res.IntByName("EventId")
-				if err != nil {
-					panic(err)
-				}
-				if id == nil || *id == 0 {
-					panic("invalid id")
-				}
-				c++
 			}
 		}
 	}
