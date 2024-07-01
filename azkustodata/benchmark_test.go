@@ -9,7 +9,6 @@ import (
 	"strconv"
 	"strings"
 	"testing"
-	"time"
 )
 
 func getData(k int) (string, context.Context) {
@@ -58,7 +57,6 @@ func benchmarkIterative(b *testing.B, k int, frameCapacity int, rowCapacity int,
 		for i := 0; i < factor; i++ {
 			dataset, err := queryv2.NewIterativeDataset(ctx, io.NopCloser(strings.NewReader(res)), frameCapacity, rowCapacity, fragmentCapacity)
 
-			time.Sleep(3 * time.Second)
 			if err != nil {
 				panic(err)
 			}

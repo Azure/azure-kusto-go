@@ -122,11 +122,9 @@ func decodeTableFragment(b []byte, decoder *json.Decoder, columns []query.Column
 
 // decodeColumns decodes the columns of a table from the JSON.
 // Columns is an array of the form [ { "ColumnName": "name", "ColumnType": "type" }, ... ]
-// We manually decode it for a few reasons:
 // 1. We need to set the ColumnIndex, which is not present in the JSON
 // 2. We need to normalize the column type - in rare cases, kusto has type aliases like "date" instead of "datetime", and we need to normalize them
 // 3. We need to validate the column type - if it's not a valid type, we should return an error
-// 4. Avoiding allocations by not using reflection when it's not needed
 func decodeColumns(decoder *json.Decoder) ([]query.Column, error) {
 	cols := make([]query.Column, 0)
 
@@ -139,33 +137,13 @@ func decodeColumns(decoder *json.Decoder) ([]query.Column, error) {
 		col := FrameColumn{
 			ColumnIndex: i,
 		}
-		err = assertToken(decoder, json.Delim('{'))
-		if err != nil {
-			return nil, err
-		}
-
-		col.ColumnName, err = getStringProperty(decoder, "ColumnName")
-		if err != nil {
-			return nil, err
-		}
-
-		col.ColumnType, err = getStringProperty(decoder, "ColumnType")
-		if err != nil {
-			return nil, err
-		}
-
+		decoder.Decode(&col)
 		// Normalize the column type - error is an empty string
 		col.ColumnType = string(types.NormalizeColumn(col.ColumnType))
 		if col.ColumnType == "" {
 			return nil, errors.ES(errors.OpTableAccess, errors.KClientArgs, "column[%d] is of type %s, which is not valid", i, col.ColumnType)
 		}
-
 		cols = append(cols, col)
-
-		err = assertToken(decoder, json.Delim('}'))
-		if err != nil {
-			return nil, err
-		}
 	}
 
 	if err := assertToken(decoder, json.Delim(']')); err != nil {

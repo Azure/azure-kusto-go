@@ -10,7 +10,7 @@ import (
 )
 
 // DefaultIoCapacity is the default capacity of the channel that receives frames from the Kusto service. Lower capacity means less memory usage, but might cause the channel to block if the frames are not consumed fast enough.
-const DefaultIoCapacity = 10
+const DefaultIoCapacity = 1
 
 const DefaultRowCapacity = 1000
 
