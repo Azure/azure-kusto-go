@@ -189,6 +189,9 @@ func nextFrame(d *iterativeDataset) (*json.Decoder, FrameType, error) {
 	case <-d.Context().Done():
 		return nil, "", errors.ES(errors.OpQuery, errors.KInternal, "context cancelled")
 	case val := <-d.jsonData:
+		if val == nil {
+			return nil, "", errors.ES(errors.OpQuery, errors.KInternal, "nil value received from channel")
+		}
 		if err, ok := val.(error); ok {
 			return nil, "", err
 		}
