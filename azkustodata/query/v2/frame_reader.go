@@ -66,21 +66,30 @@ func (fr *frameReader) advance() ([]byte, error) {
 		return nil, err
 	}
 
-	// An empty line is unexpected - the end of the response should be signalled by a ']' character.
-	if len(line) == 0 {
-		return nil, errors.ES(errors.OpUnknown, errors.KInternal, "No data")
+	// If the first character is ']', then we have reached the end of the response.
+	if len(line) > 0 && line[0] == ']' {
+		return nil, io.EOF
 	}
 
-	// If the first character is ']', then we have reached the end of the response.
-	if line[0] == ']' {
-		return nil, io.EOF
+	// Trim newline
+	line = line[:len(line)-1]
+
+	if len(line) > 0 && line[len(line)-1] == '\r' {
+		line = line[:len(line)-1]
+	}
+
+	if len(line) < 2 {
+		return nil, errors.ES(errors.OpUnknown, errors.KInternal, "Got EOF while reading frame")
 	}
 
 	// We skip the first byte of the line, as it is a comma, or the start of the array.
 	if line[0] != '[' && line[0] != ',' {
-		return nil, errors.ES(errors.OpUnknown, errors.KInternal, "Expected comma or start array, got %v", line[0])
+		return nil, errors.ES(errors.OpUnknown, errors.KInternal, "Expected comma or start array, got '%c'", line[0])
 	}
-	return line[1:], nil
+
+	line = line[1:]
+
+	return line, nil
 }
 
 // Close closes the underlying reader.

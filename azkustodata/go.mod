@@ -4,11 +4,14 @@ go 1.22
 
 require (
 	github.com/Azure/azure-sdk-for-go/sdk/azcore v1.12.0
-	github.com/Azure/azure-sdk-for-go/sdk/azidentity v1.6.0
+	github.com/Azure/azure-sdk-for-go/sdk/azidentity v1.7.0
+	// This is a faster drop-in replacement for encoding/json.
+	// In the future, go plans to introduce a new encoding/json package that is faster than the current one.
+	// We will switch to that when it is available.
 	github.com/goccy/go-json v0.10.3
 	github.com/google/uuid v1.6.0
 	github.com/kylelemons/godebug v1.1.0
-	github.com/samber/lo v1.39.0
+	github.com/samber/lo v1.44.0
 	github.com/shopspring/decimal v1.4.0
 	github.com/stretchr/testify v1.9.0
 	github.com/tj/assert v0.0.3
