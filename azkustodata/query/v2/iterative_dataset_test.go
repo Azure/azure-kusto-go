@@ -22,7 +22,7 @@ type table2 struct {
 }
 
 func defaultDataset(reader io.Reader) (query.IterativeDataset, error) {
-	return NewIterativeDataset(context.Background(), io.NopCloser(reader), DefaultFrameCapacity, DefaultRowCapacity, DefaultFragmentCapacity)
+	return NewIterativeDataset(context.Background(), io.NopCloser(reader), DefaultIoCapacity, DefaultRowCapacity, DefaultTableCapacity)
 }
 
 func TestStreamingDataSet_ReadFrames_WithError(t *testing.T) {

@@ -382,9 +382,9 @@ func (c *CombinedError) Unwrap() error {
 	return c
 }
 
-func CombineErrors(errors ...error) error {
+func CombineErrors(errs ...error) error {
 	combined := NewCombinedError()
-	for _, err := range errors {
+	for _, err := range errs {
 		combined.AddError(err)
 	}
 	return combined.Unwrap()

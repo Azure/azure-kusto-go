@@ -98,7 +98,10 @@ func decodeHeader(decoder *json.Decoder, t *TableHeader, frameType FrameType) er
 	return nil
 }
 
+// decodeTableFragment decodes the common part of a TableFragment and DataTable - the rows.
 func decodeTableFragment(b []byte, decoder *json.Decoder, columns []query.Column, previousIndex int) ([]query.Row, error) {
+
+	// IsSkipped properties until we reach the Rows property (guaranteed to be the last one)
 	for {
 		tok, err := decoder.Token()
 		if err != nil {
@@ -117,6 +120,13 @@ func decodeTableFragment(b []byte, decoder *json.Decoder, columns []query.Column
 	return rows, nil
 }
 
+// decodeColumns decodes the columns of a table from the JSON.
+// Columns is an array of the form [ { "ColumnName": "name", "ColumnType": "type" }, ... ]
+// We manually decode it for a few reasons:
+// 1. We need to set the ColumnIndex, which is not present in the JSON
+// 2. We need to normalize the column type - in rare cases, kusto has type aliases like "date" instead of "datetime", and we need to normalize them
+// 3. We need to validate the column type - if it's not a valid type, we should return an error
+// 4. Avoiding allocations by not using reflection when it's not needed
 func decodeColumns(decoder *json.Decoder) ([]query.Column, error) {
 	cols := make([]query.Column, 0)
 
@@ -126,16 +136,30 @@ func decodeColumns(decoder *json.Decoder) ([]query.Column, error) {
 	}
 
 	for i := 0; decoder.More(); i++ {
-		col := FrameColumn{}
+		col := FrameColumn{
+			ColumnIndex: i,
+		}
 		err := decoder.Decode(&col)
 		if err != nil {
 			return nil, err
 		}
-		col.ColumnIndex = i
+
+		col.ColumnName, err = getStringProperty(decoder, "ColumnName")
+		if err != nil {
+			return nil, err
+		}
+
+		col.ColumnType, err = getStringProperty(decoder, "ColumnType")
+		if err != nil {
+			return nil, err
+		}
+
+		// Normalize the column type - error is an empty string
 		col.ColumnType = string(types.NormalizeColumn(col.ColumnType))
 		if col.ColumnType == "" {
 			return nil, errors.ES(errors.OpTableAccess, errors.KClientArgs, "column[%d] is of type %s, which is not valid", i, col.ColumnType)
 		}
+
 		cols = append(cols, col)
 	}
 
@@ -146,8 +170,15 @@ func decodeColumns(decoder *json.Decoder) ([]query.Column, error) {
 	return cols, nil
 }
 
+// decodeRows decodes the rows of a table from the JSON.
+// Rows is an array of the form [ [value1, value2, ...], ... ]
+// In V2 Fragmented, it's guaranteed that no errors will appear in the middle of the array, only at the end of the table.
+// This function:
+// 1. Creates a cached map of column names to columns for faster lookup
+// 2. Decodes the rows into a slice of query.Rows
 func decodeRows(b []byte, decoder *json.Decoder, cols []query.Column, startIndex int) ([]query.Row, error) {
-	var rows = make([]query.Row, 0, 1000)
+	const RowArrayAllocSize = 10
+	var rows = make([]query.Row, 0, RowArrayAllocSize)
 
 	columnsByName := make(map[string]query.Column, len(cols))
 	for _, c := range cols {
@@ -160,21 +191,12 @@ func decodeRows(b []byte, decoder *json.Decoder, cols []query.Column, startIndex
 	}
 
 	for i := startIndex; decoder.More(); i++ {
-		values := make([]value.Kusto, 0, len(cols))
-		err := decodeRow(b, decoder, func(field int, t json.Token) error {
-			kusto := value.Default(cols[field].Type())
-			err := kusto.Unmarshal(t)
-			if err != nil {
-				return err
-			}
-			values = append(values, kusto)
-			return nil
-		})
+		rowValues, err := decodeRow(b, decoder, cols)
 		if err != nil {
 			return nil, err
 		}
 
-		row := query.NewRowFromParts(cols, func(name string) query.Column { return columnsByName[name] }, i, values)
+		row := query.NewRowFromParts(cols, func(name string) query.Column { return columnsByName[name] }, i, rowValues)
 		rows = append(rows, row)
 	}
 
@@ -184,82 +206,104 @@ func decodeRows(b []byte, decoder *json.Decoder, cols []query.Column, startIndex
 	return rows, nil
 }
 
+// decodeRow decodes a single row from the JSON.
+// A row is an array of values of the types from kusto, as indicated by the columns.
+// For dynamic values, they can appear as nested arrays or objects, so we need to handle them.
+// Otherwise, we just unmarshal the value into the correct type.
 func decodeRow(
 	buffer []byte,
 	decoder *json.Decoder,
-	onField func(field int, t json.Token) error) error {
-	t, err := decoder.Token()
+	cols []query.Column) (value.Values, error) {
+
+	err := assertToken(decoder, json.Delim('['))
 	if err != nil {
-		return err
+		return nil, err
 	}
 
-	if t != json.Delim('[') {
-		return errors.ES(errors.OpTableAccess, errors.KInternal, "expected start of row, got %s", t)
-	}
+	values := make([]value.Kusto, 0, len(cols))
 
 	field := 0
 
 	for ; decoder.More(); field++ {
-		t, err = decoder.Token()
+		t, err := decoder.Token()
 		if err != nil {
-			return err
+			return nil, err
 		}
 
-		// If it's a nested object, just make it into a byte array
+		// Handle nested values
 		if t == json.Delim('[') || t == json.Delim('{') {
-			nest := 1
-			initialOffset := decoder.InputOffset() - 1
-			for {
-				for decoder.More() {
-					t, err := decoder.Token()
-					if err != nil {
-						return err
-					}
-					if t == json.Delim('[') || t == json.Delim('{') {
-						nest++
-					}
-				}
-				t, err := decoder.Token()
-				if err != nil {
-					return err
-				}
-				if t == json.Delim(']') || t == json.Delim('}') {
-					nest--
-				}
-				if nest == 0 {
-					break
-				}
-			}
-
-			finalOffset := decoder.InputOffset()
-
-			err = onField(field, json.Token(buffer[initialOffset:finalOffset]))
+			t, err = decodeNestedValue(decoder, buffer)
 			if err != nil {
-				return err
+				return nil, err
 			}
-			continue
 		}
 
-		err := onField(field, t)
+		// Create a new value of the correct type
+		kustoValue := value.Default(cols[field].Type())
+
+		// Unmarshal the value
+		err = kustoValue.Unmarshal(t)
 		if err != nil {
-			return err
+			return nil, err
 		}
+
+		values = append(values, kustoValue)
 	}
 
-	t, err = decoder.Token()
+	err = assertToken(decoder, json.Delim(']'))
 	if err != nil {
-		return err
+		return nil, err
 	}
 
-	// end of inner array
-	if t != json.Delim(']') {
-		return errors.ES(errors.OpTableAccess, errors.KInternal, "expected end of row, got %s", t)
-	}
-
-	return nil
+	return values, nil
 }
 
+// decodeNestedValue decodes a nested value from the JSON into a byte array inside a json.Token.
+// How it works:
+// 1. We need the original buffer to be able to extract the nested value from the offsets.
+// 2. We get the starting offset of the nested value.
+// 3. We get the next tokens, we ignore all of them unless they start a new nested value.
+// 4. If we find a nested value, we increase the nesting level, and decrease it when we find the closing token.
+// 5. At the end, we're guaranteed to be at the end of original the nested value.
+// 6. We get the final offset of the nested value.
+// 7. We return a json.Token that points to the entire byte range of the nested value.
+func decodeNestedValue(decoder *json.Decoder, buffer []byte) (json.Token, error) {
+	nest := 1
+	initialOffset := decoder.InputOffset() - 1
+	for {
+		for decoder.More() {
+			t, err := decoder.Token()
+			if err != nil {
+				return nil, err
+			}
+			if t == json.Delim('[') || t == json.Delim('{') {
+				nest++
+			}
+		}
+		t, err := decoder.Token()
+		if err != nil {
+			return nil, err
+		}
+		if t == json.Delim(']') || t == json.Delim('}') {
+			nest--
+		}
+		if nest == 0 {
+			break
+		}
+	}
+
+	finalOffset := decoder.InputOffset()
+
+	return json.Token(buffer[initialOffset:finalOffset]), nil
+}
+
+// validateDataSetHeader makes sure the dataset header is valid for V2 Fragmented Query.
 func validateDataSetHeader(dec *json.Decoder) error {
+	const HeaderVersion = "v2.0"
+	const NotProgressive = false
+	const IsFragmented = true
+	const ErrorReportingEndOfTable = "EndOfTable"
+
 	if err := assertToken(dec, json.Delim('{')); err != nil {
 		return err
 	}
@@ -268,19 +312,19 @@ func validateDataSetHeader(dec *json.Decoder) error {
 		return err
 	}
 
-	if err := assertStringProperty(dec, "IsProgressive", json.Token(false)); err != nil {
+	if err := assertStringProperty(dec, "IsProgressive", json.Token(NotProgressive)); err != nil {
 		return err
 	}
 
-	if err := assertStringProperty(dec, "Version", json.Token("v2.0")); err != nil {
+	if err := assertStringProperty(dec, "Version", json.Token(HeaderVersion)); err != nil {
 		return err
 	}
 
-	if err := assertStringProperty(dec, "IsFragmented", json.Token(true)); err != nil {
+	if err := assertStringProperty(dec, "IsFragmented", json.Token(IsFragmented)); err != nil {
 		return err
 	}
 
-	if err := assertStringProperty(dec, "ErrorReportingPlacement", json.Token("EndOfTable")); err != nil {
+	if err := assertStringProperty(dec, "ErrorReportingPlacement", json.Token(ErrorReportingEndOfTable)); err != nil {
 		return err
 	}
 

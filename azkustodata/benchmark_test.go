@@ -58,7 +58,7 @@ func benchmarkIterative(b *testing.B, k int, frameCapacity int, rowCapacity int,
 		for i := 0; i < factor; i++ {
 			dataset, err := queryv2.NewIterativeDataset(ctx, io.NopCloser(strings.NewReader(res)), frameCapacity, rowCapacity, fragmentCapacity)
 
-			time.Sleep(5 * time.Second)
+			time.Sleep(3 * time.Second)
 			if err != nil {
 				panic(err)
 			}
@@ -97,7 +97,7 @@ func benchmarkFull(b *testing.B, k int) {
 	b.ResetTimer()
 
 	for k := 0; k < b.N; k++ {
-		dataset, err := queryv2.NewIterativeDataset(ctx, io.NopCloser(strings.NewReader(res)), queryv2.DefaultFrameCapacity, queryv2.DefaultRowCapacity, queryv2.DefaultFragmentCapacity)
+		dataset, err := queryv2.NewIterativeDataset(ctx, io.NopCloser(strings.NewReader(res)), queryv2.DefaultIoCapacity, queryv2.DefaultRowCapacity, queryv2.DefaultTableCapacity)
 		if err != nil {
 			panic(err)
 		}
@@ -131,11 +131,11 @@ func benchmarkFull(b *testing.B, k int) {
 
 /*
 	func BenchmarkIterative1(b *testing.B) {
-		benchmarkIterative(b, 1, queryv2.DefaultFrameCapacity, queryv2.DefaultFragmentCapacity, queryv2.DefaultRowCapacity)
+		benchmarkIterative(b, 1, queryv2.DefaultIoCapacity, queryv2.DefaultTableCapacity, queryv2.DefaultRowCapacity)
 	}
 
 	func BenchmarkIterative10(b *testing.B) {
-		benchmarkIterative(b, 10, queryv2.DefaultFrameCapacity, queryv2.DefaultFragmentCapacity, queryv2.DefaultRowCapacity)
+		benchmarkIterative(b, 10, queryv2.DefaultIoCapacity, queryv2.DefaultTableCapacity, queryv2.DefaultRowCapacity)
 	}
 */
 func BenchmarkIterative100(b *testing.B) {
@@ -144,7 +144,7 @@ func BenchmarkIterative100(b *testing.B) {
 
 /*
 	func BenchmarkIterative1000(b *testing.B) {
-		benchmarkIterative(b, 1000, 0, queryv2.DefaultFragmentCapacity, queryv2.DefaultRowCapacity)
+		benchmarkIterative(b, 1000, 0, queryv2.DefaultTableCapacity, queryv2.DefaultRowCapacity)
 	}
 */
 func BenchmarkIterative10000(b *testing.B) {
@@ -157,11 +157,11 @@ func BenchmarkIterative118132(b *testing.B) {
 
 /*
 	func BenchmarkIterative1000000(b *testing.B) {
-		benchmarkIterative(b, 1000000, queryv2.DefaultFrameCapacity, queryv2.DefaultFragmentCapacity, queryv2.DefaultRowCapacity)
+		benchmarkIterative(b, 1000000, queryv2.DefaultIoCapacity, queryv2.DefaultTableCapacity, queryv2.DefaultRowCapacity)
 	}
 
 	func BenchmarkIterative10000000(b *testing.B) {
-		benchmarkIterative(b, 10000000, queryv2.DefaultFrameCapacity, queryv2.DefaultFragmentCapacity, queryv2.DefaultRowCapacity)
+		benchmarkIterative(b, 10000000, queryv2.DefaultIoCapacity, queryv2.DefaultTableCapacity, queryv2.DefaultRowCapacity)
 	}
 */
 func BenchmarkIterativeNoBuffer100(b *testing.B) {
@@ -214,11 +214,11 @@ func BenchmarkIterativeBigBuffer118132(b *testing.B) {
 }
 
 /*func BenchmarkIterativeBigBuffer1000000(b *testing.B) {
-	benchmarkIterative(b, 1000000, queryv2.DefaultFrameCapacity*100, queryv2.DefaultFragmentCapacity*100, queryv2.DefaultRowCapacity*100)
+	benchmarkIterative(b, 1000000, queryv2.DefaultIoCapacity*100, queryv2.DefaultTableCapacity*100, queryv2.DefaultRowCapacity*100)
 }
 */
 /*func BenchmarkIterativeBigBuffer10000000(b *testing.B) {
-	benchmarkIterative(b, 10000000, queryv2.DefaultFrameCapacity*100, queryv2.DefaultFragmentCapacity*100, queryv2.DefaultRowCapacity*100)
+	benchmarkIterative(b, 10000000, queryv2.DefaultIoCapacity*100, queryv2.DefaultTableCapacity*100, queryv2.DefaultRowCapacity*100)
 }
 */
 /*func BenchmarkFull1(b *testing.B)       { benchmarkFull(b, 1) }

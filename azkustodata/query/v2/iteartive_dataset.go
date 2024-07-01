@@ -9,12 +9,12 @@ import (
 	"io"
 )
 
-// DefaultFrameCapacity is the default capacity of the channel that receives frames from the Kusto service. Lower capacity means less memory usage, but might cause the channel to block if the frames are not consumed fast enough.
-const DefaultFrameCapacity = 10
+// DefaultIoCapacity is the default capacity of the channel that receives frames from the Kusto service. Lower capacity means less memory usage, but might cause the channel to block if the frames are not consumed fast enough.
+const DefaultIoCapacity = 10
 
 const DefaultRowCapacity = 1000
 
-const DefaultFragmentCapacity = 1
+const DefaultTableCapacity = 1
 
 const PrimaryResultTableKind = "PrimaryResult"
 
@@ -26,27 +26,42 @@ type iterativeDataset struct {
 	// results is a channel that sends the parsed results as they are decoded.
 	results chan query.TableResult
 
-	fragmentCapacity int
-	rowCapacity      int
-	cancel           context.CancelFunc
-	currentTable     *iterativeTable
-	queryProperties  query.IterativeTable
-	jsonData         chan interface{}
+	// rowCapacity is the amount of rows to buffer per table.
+	rowCapacity int
+
+	// cancel is a function to cancel the reading of the dataset, and is called when the dataset is closed.
+	cancel context.CancelFunc
+
+	// currentTable is the table that is currently being read, as it can contain multiple fragments.
+	currentTable *iterativeTable
+
+	// queryProperties is a table that contains the query properties, and is sent after the primary results.
+	queryProperties query.IterativeTable
+
+	// jsonData is a channel that receives the raw JSON data from the Kusto service.
+	jsonData chan interface{}
 }
 
-func NewIterativeDataset(ctx context.Context, r io.ReadCloser, ioCapacity int, rowCapacity int, fragmentCapacity int) (query.IterativeDataset, error) {
+// NewIterativeDataset creates a new IterativeDataset from a ReadCloser.
+// ioCapacity is the amount of buffered rows to keep in memory.
+// tableCapacity is the amount of tables to buffer.
+// rowCapacity is the amount of rows to buffer per table.
+func NewIterativeDataset(ctx context.Context, r io.ReadCloser, ioCapacity int, rowCapacity int, tableCapacity int) (query.IterativeDataset, error) {
 
 	ctx, cancel := context.WithCancel(ctx)
 
 	d := &iterativeDataset{
 		BaseDataset:     query.NewBaseDataset(ctx, errors.OpQuery, PrimaryResultTableKind),
-		results:         make(chan query.TableResult, fragmentCapacity),
+		results:         make(chan query.TableResult, tableCapacity),
 		rowCapacity:     rowCapacity,
 		cancel:          cancel,
 		currentTable:    nil,
 		queryProperties: nil,
 		jsonData:        make(chan interface{}, ioCapacity),
 	}
+
+	// This ctor will fail if we get a non-json response
+	// In this case, we want to return it immediately
 	reader, err := newFrameReader(r, ctx)
 	if err != nil {
 		cancel()
@@ -54,20 +69,25 @@ func NewIterativeDataset(ctx context.Context, r io.ReadCloser, ioCapacity int, r
 		return nil, err
 	}
 
+	// Spin up two goroutines - one to parse the dataset, and one to read the frames.
 	go parseRoutine(d, cancel)
 	go readRoutine(reader, d)
 
 	return d, nil
 }
 
+// readRoutine reads the frames from the Kusto service and sends them to the buffered channel.
+// This is so we could keep up if the IO is faster than the consumption of the frames.
 func readRoutine(reader *frameReader, d *iterativeDataset) {
 	defer reader.Close()
 	defer close(d.jsonData)
+
 	for {
-		err := reader.advance()
+		line, err := reader.advance()
 		if err != nil {
 			if err != io.EOF {
 				select {
+				// When we send data, we always make sure that the context isn't cancelled, so we don't block forever.
 				case d.jsonData <- err:
 				case <-d.Context().Done():
 				}
@@ -75,7 +95,7 @@ func readRoutine(reader *frameReader, d *iterativeDataset) {
 			return
 		} else {
 			select {
-			case d.jsonData <- reader.line:
+			case d.jsonData <- line:
 			case <-d.Context().Done():
 				return
 			}
@@ -83,6 +103,7 @@ func readRoutine(reader *frameReader, d *iterativeDataset) {
 	}
 }
 
+// parseRoutine reads the frames from the buffered channel and parses them.
 func parseRoutine(d *iterativeDataset, cancel context.CancelFunc) {
 
 	err := readDataSet(d)
@@ -106,6 +127,7 @@ func readDataSet(d *iterativeDataset) error {
 
 	var err error
 
+	// The first frame should be a DataSetHeader. We don't need to save it - just validate it.
 	if header, _, err := nextFrame(d); err == nil {
 		if err = validateDataSetHeader(header); err != nil {
 			return err
@@ -114,6 +136,8 @@ func readDataSet(d *iterativeDataset) error {
 		return err
 	}
 
+	// Next up, we expect the QueryProperties table, which is a DataTable.
+	// We save it and send it after the primary results.
 	if decoder, frameType, err := nextFrame(d); err == nil {
 		if frameType != DataTableFrameType {
 			return errors.ES(errors.OpQuery, errors.KInternal, "unexpected frame type %s, expected DataTable", frameType)
@@ -126,6 +150,10 @@ func readDataSet(d *iterativeDataset) error {
 		return err
 	}
 
+	// We then iterate over the primary tables.
+	// If we get a TableHeader, we read the table.
+	// If we get a DataTable, it means we have reached QueryCompletionInformation
+	// If we get a DataSetCompletion, we are done.
 	for decoder, frameType, err := nextFrame(d); err == nil; decoder, frameType, err = nextFrame(d) {
 		if frameType == DataTableFrameType {
 			if err = handleDataTable(d, decoder); err != nil {
@@ -155,6 +183,8 @@ func readDataSet(d *iterativeDataset) error {
 	return err
 }
 
+// nextFrame reads the next frame from the buffered channel.
+// It doesn't parse the frame yet, but peeks the frame type to determine how to handle it.
 func nextFrame(d *iterativeDataset) (*json.Decoder, FrameType, error) {
 	var line []byte
 	select {
@@ -175,6 +205,7 @@ func nextFrame(d *iterativeDataset) (*json.Decoder, FrameType, error) {
 	return json.NewDecoder(bytes.NewReader(line)), frameType, nil
 }
 
+// readDataSetCompletion reads the DataSetCompletion frame, and returns any errors it might contain.
 func readDataSetCompletion(dec *json.Decoder) error {
 	completion := DataSetCompletion{}
 	err := dec.Decode(&completion)
@@ -187,6 +218,7 @@ func readDataSetCompletion(dec *json.Decoder) error {
 	return nil
 }
 
+// combineOneApiErrors combines multiple OneApiErrors into a single error, de-duping them if needed.
 func combineOneApiErrors(errs []OneApiError) error {
 	c := errors.NewCombinedError()
 	for _, e := range errs {
@@ -195,6 +227,11 @@ func combineOneApiErrors(errs []OneApiError) error {
 	return c.Unwrap()
 }
 
+// readPrimaryTable reads a primary table from the dataset.
+// A primary table consists of:
+// - A TableHeader - describes the structure of the table and its columns.
+// - A series of TableFragment - contains the rows of the table.
+// - A TableCompletion - signals the end of the table, and contains any errors that might have occurred.
 func readPrimaryTable(d *iterativeDataset, dec *json.Decoder) error {
 	header := TableHeader{}
 	err := dec.Decode(&header)
@@ -244,44 +281,8 @@ func readPrimaryTable(d *iterativeDataset, dec *json.Decoder) error {
 	return nil
 }
 
-func (d *iterativeDataset) sendTable(tb query.IterativeTable) {
-	select {
-	case <-d.Context().Done():
-		return
-	case d.results <- query.TableResultSuccess(tb):
-		return
-	}
-}
-
-func (d *iterativeDataset) Tables() <-chan query.TableResult {
-	return d.results
-}
-
-func (d *iterativeDataset) Close() error {
-	d.cancel()
-	return nil
-}
-
-func (d *iterativeDataset) ToDataset() (query.Dataset, error) {
-	tables := make([]query.Table, 0, len(d.results))
-
-	defer d.Close()
-
-	for tb := range d.Tables() {
-		if tb.Err() != nil {
-			return nil, tb.Err()
-		}
-
-		table, err := tb.Table().ToTable()
-		if err != nil {
-			return nil, err
-		}
-		tables = append(tables, table)
-	}
-
-	return query.NewDataset(d, tables), nil
-}
-
+// handleDataTable reads a DataTable frame from the dataset, which aren't iterative.
+// In Fragmented V2, these are only the metadata tables - QueryProperties and QueryCompletionInformation.
 func handleDataTable(d *iterativeDataset, dec *json.Decoder) error {
 	var dt DataTable
 	if err := dec.Decode(&dt); err != nil {
@@ -359,4 +360,46 @@ func handleTableHeader(d *iterativeDataset, th TableHeader) error {
 	d.sendTable(d.currentTable)
 
 	return nil
+}
+
+// sendTable sends a table to results channel for the user, or cancels if the context is done.
+func (d *iterativeDataset) sendTable(tb query.IterativeTable) {
+	select {
+	case <-d.Context().Done():
+		return
+	case d.results <- query.TableResultSuccess(tb):
+		return
+	}
+}
+
+// Tables returns a channel that sends the tables as they are parsed.
+func (d *iterativeDataset) Tables() <-chan query.TableResult {
+	return d.results
+}
+
+// Close closes the dataset, cancelling the context and closing the results channel.
+func (d *iterativeDataset) Close() error {
+	d.cancel()
+	return nil
+}
+
+// ToDataset reads the entire iterative dataset, converting it to a regular dataset.
+func (d *iterativeDataset) ToDataset() (query.Dataset, error) {
+	tables := make([]query.Table, 0, len(d.results))
+
+	defer d.Close()
+
+	for tb := range d.Tables() {
+		if tb.Err() != nil {
+			return nil, tb.Err()
+		}
+
+		table, err := tb.Table().ToTable()
+		if err != nil {
+			return nil, err
+		}
+		tables = append(tables, table)
+	}
+
+	return query.NewDataset(d, tables), nil
 }

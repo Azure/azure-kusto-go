@@ -13,16 +13,23 @@ import (
 // The rows are received from the service via the rawRows channel, and are parsed and sent to the rows channel.
 type iterativeTable struct {
 	query.BaseTable
-	rows            chan query.RowResult
-	rowCount        atomic.Uint32
-	skip            atomic.Bool
-	ctx             context.Context
+	// a channel of rows and errors, exposed to the user
+	rows chan query.RowResult
+	// the number of rows in the table, updated as rows are received
+	rowCount atomic.Uint32
+	// a flag indicating that the table should be skipped to the end
+	skip atomic.Bool
+	// a context for the table
+	ctx context.Context
+	// a flag indicating that the skip error has been reported
 	reportSkipError sync.Once
 }
 
+// addRawRows is called by the dataset to add rows to the table.
+// It will add the rows to the table, unless the table is already skipped.
 func (t *iterativeTable) addRawRows(rows []query.Row) {
 	for _, row := range rows {
-		if t.Skip() {
+		if t.IsSkipped() {
 			t.reportSkipError.Do(func() {
 				t.reportError(errors.ES(t.Op(), errors.KInternal, skipError))
 			})
@@ -36,6 +43,7 @@ func (t *iterativeTable) addRawRows(rows []query.Row) {
 	}
 }
 
+// RowCount returns the current number of rows in the table.
 func (t *iterativeTable) RowCount() int {
 	return int(t.rowCount.Load())
 }
@@ -44,7 +52,8 @@ func (t *iterativeTable) setRowCount(rowCount int) {
 	t.rowCount.Store(uint32(rowCount))
 }
 
-func (t *iterativeTable) Skip() bool {
+// IsSkipped returns true if the table has been skipped to the end.
+func (t *iterativeTable) IsSkipped() bool {
 	return t.skip.Load()
 }
 
@@ -96,10 +105,12 @@ func (t *iterativeTable) reportError(err error) bool {
 
 const skipError = "skipping row"
 
+// Rows returns a channel of rows and errors.
 func (t *iterativeTable) Rows() <-chan query.RowResult {
 	return t.rows
 }
 
+// SkipToEnd skips the table to the end, returning any errors that occurred.
 func (t *iterativeTable) SkipToEnd() []error {
 	t.setSkip(true)
 
@@ -113,8 +124,9 @@ func (t *iterativeTable) SkipToEnd() []error {
 	return errs
 }
 
+// ToTable reads the entire table, converting it from an iterative table to a regular table.
 func (t *iterativeTable) ToTable() (query.Table, error) {
-	if t.Skip() {
+	if t.IsSkipped() {
 		return nil, errors.ES(t.Op(), errors.KInternal, "table is already skipped to the end")
 	}
 

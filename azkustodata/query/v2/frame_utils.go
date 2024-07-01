@@ -6,6 +6,8 @@ import (
 )
 
 // peekFrameType reads the line directly, so it can be used to determine the frame type without parsing the entire frame.
+// We do it by parsing the first json property, which is the frame type.
+// We look for a : and then the value between two quotes.
 func peekFrameType(line []byte) (FrameType, error) {
 	colon := bytes.IndexByte(line, ':')
 
