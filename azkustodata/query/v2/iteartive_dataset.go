@@ -65,7 +65,6 @@ func NewIterativeDataset(ctx context.Context, r io.ReadCloser, ioCapacity int, r
 	reader, err := newFrameReader(r, ctx)
 	if err != nil {
 		cancel()
-		r.Close()
 		return nil, err
 	}
 
@@ -79,7 +78,6 @@ func NewIterativeDataset(ctx context.Context, r io.ReadCloser, ioCapacity int, r
 // readRoutine reads the frames from the Kusto service and sends them to the buffered channel.
 // This is so we could keep up if the IO is faster than the consumption of the frames.
 func readRoutine(reader *frameReader, d *iterativeDataset) {
-	defer reader.Close()
 	defer close(d.jsonData)
 
 	for {

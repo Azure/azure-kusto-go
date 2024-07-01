@@ -91,8 +91,3 @@ func (fr *frameReader) advance() ([]byte, error) {
 
 	return line, nil
 }
-
-// Close closes the underlying reader.
-func (fr *frameReader) Close() error {
-	return fr.orig.Close()
-}
