@@ -76,9 +76,9 @@ func (fr *frameReader) advance() ([]byte, error) {
 		return nil, io.EOF
 	}
 
-	// We skip the first byte of the line, as it is a comma.
-	if line[0] != ',' {
-		return nil, errors.ES(errors.OpUnknown, errors.KInternal, "Expected comma, got %v", line[0])
+	// We skip the first byte of the line, as it is a comma, or the start of the array.
+	if line[0] != '[' && line[0] != ',' {
+		return nil, errors.ES(errors.OpUnknown, errors.KInternal, "Expected comma or start array, got %v", line[0])
 	}
 	return line[1:], nil
 }

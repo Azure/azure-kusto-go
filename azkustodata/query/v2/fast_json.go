@@ -139,7 +139,7 @@ func decodeColumns(decoder *json.Decoder) ([]query.Column, error) {
 		col := FrameColumn{
 			ColumnIndex: i,
 		}
-		err := decoder.Decode(&col)
+		err = assertToken(decoder, json.Delim('{'))
 		if err != nil {
 			return nil, err
 		}
@@ -161,6 +161,11 @@ func decodeColumns(decoder *json.Decoder) ([]query.Column, error) {
 		}
 
 		cols = append(cols, col)
+
+		err = assertToken(decoder, json.Delim('}'))
+		if err != nil {
+			return nil, err
+		}
 	}
 
 	if err := assertToken(decoder, json.Delim(']')); err != nil {
