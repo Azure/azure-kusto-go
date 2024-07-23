@@ -6,6 +6,13 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 ## [Unreleased]
+
+### Changed
+- the `WithApplicationCertificate` on `KustoConnectionStringBuilder` was removed as it was ambiguous and not implemented correctly. Instead there are two new methods:
+  - `WithAppCertificatePath` - Receives the path to the certificate file.
+  - `WithAppCertificateBytes` - Receives the certificate bytes in-memory.  
+  Both methods accept an optional password for the certificate.
+
 ### Fixed
 - Fixed Mapping Kind not working correctly with certain formats.
 
