@@ -11,6 +11,11 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - V2FragmentCapacity was renamed to V2TableCapacity to better reflect its purpose.
 - Better defaults for buffer sizes.
 
+- the `WithApplicationCertificate` on `KustoConnectionStringBuilder` was removed as it was ambiguous and not implemented correctly. Instead there are two new methods:
+  - `WithAppCertificatePath` - Receives the path to the certificate file.
+  - `WithAppCertificateBytes` - Receives the certificate bytes in-memory.  
+  Both methods accept an optional password for the certificate.
+
 ### Fixed
 - Fixed Mapping Kind not working correctly with certain formats.
 - Fixed plenty of sync issues.
