@@ -132,6 +132,42 @@ func TestWitAadUserTokenErr(t *testing.T) {
 
 }
 
+func TestWithUserManagedIdentity(t *testing.T) {
+	managedIdentityClientID := "00000000-0000-0000-0000-000000000000"
+	managedIdentityResourceID := "/subscriptions/00000000-0000-0000-0000-000000000000/resourceGroups/testResourceGroup/providers/Microsoft.ManagedIdentity/userAssignedIdentities/testIdentity"
+
+	tests := []struct {
+		name             string
+		kcsb             ConnectionStringBuilder
+		providedClientID bool
+	}{
+		{
+			name: "test_usermanagedidentity_clientid",
+			kcsb: ConnectionStringBuilder{
+				DataSource:             "endpoint",
+				ManagedServiceIdentity: managedIdentityClientID,
+				MsiAuthentication:      true,
+			},
+			providedClientID: true,
+		},
+		{
+			name: "test_usermanagedidentity_resourceid",
+			kcsb: ConnectionStringBuilder{
+				DataSource:             "endpoint",
+				ManagedServiceIdentity: managedIdentityResourceID,
+				MsiAuthentication:      true,
+			},
+			providedClientID: false,
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			assert.True(t, tt.kcsb.isUUID(managedIdentityClientID))
+		})
+	}
+}
+
 func TestGetTokenProviderHappy(t *testing.T) {
 	tests := []struct {
 		name    string
@@ -169,7 +205,15 @@ func TestGetTokenProviderHappy(t *testing.T) {
 			name: "test_tokenprovider_managedsi",
 			kcsb: ConnectionStringBuilder{
 				DataSource:             "https://endpoint/test_tokenprovider_managedsi",
-				ManagedServiceIdentity: "managedid",
+				ManagedServiceIdentity: "00000000-0000-0000-0000-000000000000",
+				MsiAuthentication:      true,
+				ClientOptions:          &azcore.ClientOptions{},
+			},
+		}, {
+			name: "test_tokenprovider_managedui_resourceID",
+			kcsb: ConnectionStringBuilder{
+				DataSource:             "https://endpoint/test_tokenprovider_managedui_resourceID",
+				ManagedServiceIdentity: "/subscriptions/00000000-0000-0000-0000-000000000000/resourceGroups/testResourceGroup/providers/Microsoft.ManagedIdentity/userAssignedIdentities/testIdentity",
 				MsiAuthentication:      true,
 				ClientOptions:          &azcore.ClientOptions{},
 			},
@@ -212,5 +256,4 @@ func TestGetTokenProviderHappy(t *testing.T) {
 			assert.NotNil(t, got)
 		})
 	}
-
 }
