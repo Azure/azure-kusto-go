@@ -2,15 +2,18 @@
 
 All notable changes to this project will be documented in this file.
 
-The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
-and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
+The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/), and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
-## [0.16.0]
+## [0.16.1] - 2024-07-30
+### Added
+- Added new valid endpoints for the Kusto service.
+
+## [0.16.0] - 2024-07-23
 ### Changed
-- the `WithApplicationCertificate` on `KustoConnectionStringBuilder` was removed as it was ambiguous and not implemented correctly. Instead there are two new methods:
+- The `WithApplicationCertificate` on `KustoConnectionStringBuilder` was removed as it was ambiguous and not implemented correctly. Instead, there are two new methods:
   - `WithAppCertificatePath` - Receives the path to the certificate file.
-  - `WithAppCertificateBytes` - Receives the certificate bytes in-memory.  
-  Both methods accept an optional password for the certificate.
+  - `WithAppCertificateBytes` - Receives the certificate bytes in-memory.
+    Both methods accept an optional password for the certificate.
 
 ## [0.15.3] - 2024-06-17
 ### Fixed
@@ -18,7 +21,6 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [0.15.2] - 2024-04-01
 ### Fixed
-
 - Fix storage URI parsing for hostname with more than 5 parts.
 - Keep original error when refreshing ingestion resources fails.
 
@@ -28,13 +30,9 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ### Fixed
 - Type aliases for int32 now work correctly when converting.
 
-
-
 ## [0.15.0] - 2023-12-04
-
 ### Changed (BREAKING)
-
-- Queries are no longer progressive by default. 
+- Queries are no longer progressive by default.
 - `ResultsProgressiveDisable()` has been removed.
 - Use `ResultsProgressiveEnabled()` to enable progressive queries.
 
@@ -43,233 +41,164 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - New package ingest/ingestoptions now contains Compression properties (in the future will hold DataFormat)
 
 ### Fixed
-
-- String quoting in default value of query parameters
+- String quoting in default value of query parameters.
 
 ## [0.14.2] - 2023-11-08
-
 ### Fixed
-
--  Size used for RawDataSize taken from gzip reader was of the gzip size and not the original reader size 
+- Size used for RawDataSize taken from gzip reader was of the gzip size and not the original reader size.
 
 ## [0.14.1] - 2023-09-27
-
 ### Added
-- Support new playfab domain
-
+- Support new playfab domain.
 
 ### Fixed
-
-- Fixed deadlock when having high number of concurrent queries
-- Fixed wrong endpoint error not triggering
+- Fixed deadlock when having high number of concurrent queries.
+- Fixed wrong endpoint error not triggering.
 
 ## [0.14.0] - 2023-08-10
-
 ### Added
-
 - Support streaming for blob, for Managed client as well.
-- Support more urls for kusto, including http and port.
+- Support more URLs for Kusto, including HTTP and port.
 
 ### Fixed
+- Fixed wrong context deadline setting.
+- Fixed accepting empty URL.
 
-* Fixed wrong context deadline setting
-* Fixed accepting empty url.
-
-  
 ## [0.13.1] - 2023-05-24
-
 ### Changed
-
-- Modified `once.go` to reset `sync.Once` instance when an error occurs
+- Modified `once.go` to reset `sync.Once` instance when an error occurs.
 
 ## [0.13.0] - 2023-05-09
-
 ### Added
-
 - `ServerTimeout` Query Option
-    - The timeout to the server will be set to the value of this option, or to none if `RequestNoTimeout` is set to
-      true.
-    - If it is not provided, the timeout will be set by the context (the old behaviour).
-    - If a context timeout is not provided, it will fall back to a default value by the type of request.
-- Support for `IgnoreFirstRecord` ingestion option
+  - The timeout to the server will be set to the value of this option, or to none if `RequestNoTimeout` is set to true.
+  - If it is not provided, the timeout will be set by the context (the old behavior).
+  - If a context timeout is not provided, it will fall back to a default value by the type of request.
+- Support for `IgnoreFirstRecord` ingestion option.
 
 ### Changed
-
-- `MgmtOption` is deprecated. From now on both `Query` and `Mgmt` accept `QueryOption`, `MgmtOption` will remain as an
-  alias until the next version.
+- `MgmtOption` is deprecated. From now on both `Query` and `Mgmt` accept `QueryOption`, `MgmtOption` will remain as an alias until the next version.
 
 ### Fixed
-
 - `AttachPolicyClientOptions` method fixed by @JorTurFer
 
 ### Removed
-
 - `AllowWrite` has been a no-op for a while. It is now finally removed.
 
-### Security
-
 ## [0.12.1] - 2023-05-01
-
 ### Fixed
-
-* Fixed parsing of errors in queries
+- Fixed parsing of errors in queries.
 
 ## [0.12.0] - 2023-05-01
-
 ### Added
-
-* Added kql.Builder struct for safe building of KQL statements from variables without use of 'Unsafe' mode.
-    * Simpler handling of query parameters using kql.Parameters struct.
-    * All of the docs and examples have been updated to use it
-    * [DEPRECATED] The old query builder
-* Added Quickstart app
-* TokenCredential support for authentication.
+- Added kql.Builder struct for safe building of KQL statements from variables without use of 'Unsafe' mode.
+  - Simpler handling of query parameters using kql.Parameters struct.
+  - All of the docs and examples have been updated to use it.
+  - [DEPRECATED] The old query builder.
+- Added Quickstart app.
+- TokenCredential support for authentication.
 
 ### Security
-
-* No redirects are allowed by default.
+- No redirects are allowed by default.
 
 ### Fixed
-
-* Replace non-ascii characters in headers to be in line with the service.
-* DefaultCredential now uses the same HTTP client as the rest of the SDK.
+- Replace non-ASCII characters in headers to be in line with the service.
+- DefaultCredential now uses the same HTTP client as the rest of the SDK.
 
 ## [0.11.3] - 2023-03-20
-
 ### Added
-
-* Support for new trident url
+- Support for new trident URL.
 
 ## [0.11.2] - 2023-03-14
-
 ### Fixed
-
-* Fixed Queue Uri not being correct for different clouds
+- Fixed Queue URI not being correct for different clouds.
 
 ## [0.11.1] - 2023-03-01
-
 ### Changed
-
-* Bumped azblob to 1.0.0
+- Bumped azblob to 1.0.0.
 
 ### Fixed
-
-* Fixed Storage Uri not being correct for different clouds
+- Fixed Storage URI not being correct for different clouds.
 
 ### Security
-
-* Bump golang.org/x/net from 0.4.0 to 0.7.0
+- Bump golang.org/x/net from 0.4.0 to 0.7.0.
 
 ## [0.11.0] - 2023-02-14
-
 ### Changed
-
-- [BREAKING] Add validation for trusted endpoints by @ohadbitt
-- Send http headers under the new unified format
+- [BREAKING] Add validation for trusted endpoints by @ohadbitt.
+- Send HTTP headers under the new unified format.
 
 ### Fixed
-
-- Internal Refactoring
+- Internal refactoring.
 
 ## [0.10.2] - 2022-12-26
-
 ### Fixed
-
-- Issue with managed identity parameters
+- Issue with managed identity parameters.
 
 ## [0.10.1] - 2022-12-14
-
 ### Fixed
-
-- Issue with queued ingestion to other clouds
+- Issue with queued ingestion to other clouds.
 
 ## [0.10.0] - 2022-12-11
-
 ### Changed
-
-- [BREAKING] The minimal go version is now 1.19
+- [BREAKING] The minimal Go version is now 1.19.
 - [BREAKING] Moving to a connection-string based approach to creating and authenticating clients.
 
 ### Added
-
 - Implicit cloud detection.
-- All of our operations now share the same HTTP client inside the kusto client object.
+- All of our operations now share the same HTTP client inside the Kusto client object.
 
 ### Fixed
-
 - Various goroutine leaks.
 - Fetching ingestion resources is now done more consistently.
 - Removed the header caching mechanism from streaming ingestion.
 
 ## [0.9.2] - 2022-12-01
-
 ### Fixed
-
-- Default values for parameters not parsing correctly
-- Goroutine leak when streaming ingestion fails
-- Leaks in tests
--
+- Default values for parameters not parsing correctly.
+- Goroutine leak when streaming ingestion fails.
+- Leaks in tests.
 
 ## [0.9.1] - 2022-11-20
-
 ### Changed
-
-- Setting a mapping now implies the ingestion format
+- Setting a mapping now implies the ingestion format.
 
 ### Fixed
-
-- Possible context race
-- Json parsing errors now display the failed json string
+- Possible context race.
+- JSON parsing errors now display the failed JSON string.
 
 ## [0.9.0] - 2022-11-09
-
 ### Changed
-
 - Deprecate AllowWrite - now it is the default like in other SDKs.
 - Remove mutex from query client. Now queries can run in parallel, achieving much better performance.
 
 ### Fixed
-
-- Column.Type assignment. Was using string, now using types. by @jesseward
-- Lint and test fixes
+- Column.Type assignment. Was using string, now using types. by @jesseward.
+- Lint and test fixes.
 
 ## [0.8.1] - 2022-09-21
-
 ### Added
-
-- `Application` and `User` as `ClientRequestProperties` to set the `x-ms-app` and `x-ms-user` headers, and the matching
-  fields in `.show queries`.
+- `Application` and `User` as `ClientRequestProperties` to set the `x-ms-app` and `x-ms-user` headers, and the matching fields in `.show queries`.
 
 ## [0.8.0] - 2022-09-05
-
 ### Added
-
-- All missing client request properties, and the ability to use custom ones using `CustomQueryOption`
-- The option to not parse the response when querying, but to receive the json directly - `QueryToJson`
+- All missing client request properties, and the ability to use custom ones using `CustomQueryOption`.
+- The option to not parse the response when querying, but to receive the JSON directly - `QueryToJson`.
 
 ### Changed
-
-- Various lint fixes and code improvements
+- Various lint fixes and code improvements.
 
 ## [0.7.0] - 2022-05-08
-
 ### Added
-
-- Make clients closeable
-- Support port in http host
-- Retry mechanism for throttled requests
-- Custom http options for all clients
+- Make clients closeable.
+- Support port in HTTP host.
+- Retry mechanism for throttled requests.
+- Custom HTTP options for all clients.
 
 ## [0.6.0] - 2022-04-12
-
 ### Deprecated
-
-* `Ingestion.Stream` has been deprecated in favor of dedicated streaming clients - `ingest.Streaming`
-  and `ingest.Managed`.
-* `RowIterator.Next` and `RowIterator.Do` are now deprecated and replaced by `RowIterator.NextRowOrError`
-  and `RowIterator.DoOnRowOrError`.
+- `Ingestion.Stream` has been deprecated in favor of dedicated streaming clients - `ingest.Streaming` and `ingest.Managed`.
+- `RowIterator.Next` and `RowIterator.Do` are now deprecated and replaced by `RowIterator.NextRowOrError` and `RowIterator.DoOnRowOrError`.
 
 ### Fixed
-
-* RowIterator.Next and RowIterator.Do will return the first error they encounter, including in-line errors or partials
-  successes and finish.
+- `RowIterator.Next` and `RowIterator.Do` will return the first error they encounter, including in-line errors or partial successes and finish.
