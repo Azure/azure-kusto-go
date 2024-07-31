@@ -9,6 +9,7 @@ import (
 	kustoErrors "github.com/Azure/azure-kusto-go/azkustodata/errors"
 	"github.com/Azure/azure-sdk-for-go/sdk/azcore"
 	"github.com/Azure/azure-sdk-for-go/sdk/azidentity"
+	"github.com/google/uuid"
 )
 
 type ConnectionStringBuilder struct {
@@ -256,11 +257,11 @@ func (kcsb *ConnectionStringBuilder) WithAzCli() *ConnectionStringBuilder {
 
 // WithUserManagedIdentity Creates a Kusto Connection string builder that will authenticate with AAD application, using
 // an application token obtained from a Microsoft Service Identity endpoint using user assigned id.
-func (kcsb *ConnectionStringBuilder) WithUserManagedIdentity(clientID string) *ConnectionStringBuilder {
+func (kcsb *ConnectionStringBuilder) WithUserManagedIdentity(clientIDorResourceID string) *ConnectionStringBuilder {
 	requireNonEmpty(dataSource, kcsb.DataSource)
 	kcsb.resetConnectionString()
 	kcsb.MsiAuthentication = true
-	kcsb.ManagedServiceIdentity = clientID
+	kcsb.ManagedServiceIdentity = clientIDorResourceID
 	return kcsb
 }
 
@@ -411,7 +412,14 @@ func (kcsb *ConnectionStringBuilder) newTokenProvider() (*TokenProvider, error) 
 		init = func(ci *CloudInfo, cliOpts *azcore.ClientOptions, appClientId string) (azcore.TokenCredential, error) {
 			opts := &azidentity.ManagedIdentityCredentialOptions{ClientOptions: *cliOpts}
 			if !isEmpty(kcsb.ManagedServiceIdentity) {
-				opts.ID = azidentity.ClientID(kcsb.ManagedServiceIdentity)
+				// determine if user has supplied a managed identity client id or resource id
+				if kcsb.isUUID(kcsb.ManagedServiceIdentity) {
+					// if it's a valid uuid, use it as a client id
+					opts.ID = azidentity.ClientID(kcsb.ManagedServiceIdentity)
+				} else {
+					// assume it's a resource id
+					opts.ID = azidentity.ResourceID(kcsb.ManagedServiceIdentity)
+				}
 			}
 
 			cred, err := azidentity.NewManagedIdentityCredential(opts)
@@ -516,4 +524,12 @@ func (kcsb *ConnectionStringBuilder) SetConnectorDetails(name, version, appName,
 	app, user := setConnectorDetails(name, version, appName, appVersion, sendUser, overrideUser, additionalFields...)
 	kcsb.ApplicationForTracing = app
 	kcsb.UserForTracing = user
+}
+
+func (kcsb *ConnectionStringBuilder) isUUID(potentialUUID string) bool {
+	_, err := uuid.Parse(potentialUUID)
+	if err == nil {
+		return true
+	}
+	return false
 }
