@@ -47,18 +47,6 @@ func TestStreamingDataSet_DecodeTables_WithInvalidFrame(t *testing.T) {
 	}
 }
 
-func TestStreamingDataSet_DecodeTables_Skip(t *testing.T) {
-	t.Parallel()
-	reader := strings.NewReader(validFrames)
-	d, err := defaultDataset(reader)
-	assert.NoError(t, err)
-
-	for tableResult := range d.Tables() {
-		require.NoError(t, tableResult.Err())
-		tableResult.Table().SkipToEnd()
-	}
-}
-
 func TestStreamingDataSet_DecodeTables_GetRows(t *testing.T) {
 	t.Parallel()
 	for _, tt := range []struct {

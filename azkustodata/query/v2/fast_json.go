@@ -101,7 +101,7 @@ func decodeHeader(decoder *json.Decoder, t *TableHeader, frameType FrameType) er
 // decodeTableFragment decodes the common part of a TableFragment and DataTable - the rows.
 func decodeTableFragment(b []byte, decoder *json.Decoder, columns []query.Column, previousIndex int) ([]query.Row, error) {
 
-	// IsSkipped properties until we reach the Rows property (guaranteed to be the last one)
+	// skip properties until we reach the Rows property (guaranteed to be the last one)
 	for {
 		tok, err := decoder.Token()
 		if err != nil {

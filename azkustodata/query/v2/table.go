@@ -57,7 +57,3 @@ func (f iterativeWrapper) Rows() <-chan query.RowResult {
 	}()
 	return ch
 }
-
-func (f iterativeWrapper) SkipToEnd() []error {
-	return nil
-}
