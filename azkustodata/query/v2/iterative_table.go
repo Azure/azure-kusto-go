@@ -111,6 +111,7 @@ func (t *iterativeTable) Rows() <-chan query.RowResult {
 }
 
 // SkipToEnd skips the table to the end, returning any errors that occurred.
+// todo REMOVE
 func (t *iterativeTable) SkipToEnd() []error {
 	t.setSkip(true)
 

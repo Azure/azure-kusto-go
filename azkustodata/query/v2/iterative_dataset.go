@@ -72,6 +72,8 @@ func NewIterativeDataset(ctx context.Context, r io.ReadCloser, ioCapacity int, r
 	go parseRoutine(d, cancel)
 	go readRoutine(reader, d)
 
+	//todo CLOSE READER
+
 	return d, nil
 }
 
@@ -85,17 +87,17 @@ func readRoutine(reader *frameReader, d *iterativeDataset) {
 		if err != nil {
 			if err != io.EOF {
 				select {
+				case <-d.Context().Done():
 				// When we send data, we always make sure that the context isn't cancelled, so we don't block forever.
 				case d.jsonData <- err:
-				case <-d.Context().Done():
 				}
 			}
 			return
 		} else {
 			select {
-			case d.jsonData <- line:
 			case <-d.Context().Done():
 				return
+			case d.jsonData <- line:
 			}
 		}
 	}
