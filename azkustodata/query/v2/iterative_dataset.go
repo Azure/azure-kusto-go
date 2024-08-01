@@ -72,17 +72,15 @@ func NewIterativeDataset(ctx context.Context, r io.ReadCloser, ioCapacity int, r
 	go parseRoutine(d, cancel)
 	go readRoutine(reader, d)
 
-	//todo CLOSE READER
-
 	return d, nil
 }
 
 // readRoutine reads the frames from the Kusto service and sends them to the buffered channel.
 // This is so we could keep up if the IO is faster than the consumption of the frames.
 func readRoutine(reader *frameReader, d *iterativeDataset) {
-	defer close(d.jsonData)
+	loop := true
 
-	for {
+	for loop {
 		line, err := reader.advance()
 		if err != nil {
 			if err != io.EOF {
@@ -92,15 +90,24 @@ func readRoutine(reader *frameReader, d *iterativeDataset) {
 				case d.jsonData <- err:
 				}
 			}
-			return
+			loop = false
 		} else {
 			select {
 			case <-d.Context().Done():
-				return
+				loop = false
 			case d.jsonData <- line:
 			}
 		}
 	}
+
+	if err := reader.close(); err != nil {
+		select {
+		case <-d.Context().Done():
+		case d.jsonData <- err:
+		}
+	}
+
+	close(d.jsonData)
 }
 
 // parseRoutine reads the frames from the buffered channel and parses them.
