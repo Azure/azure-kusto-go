@@ -148,9 +148,9 @@ func (c *Client) IterativeQuery(ctx context.Context, db string, kqlQuery Stateme
 		return nil, err
 	}
 
-	frameCapacity := queryv2.DefaultFrameCapacity
-	if opts.v2FrameCapacity != -1 {
-		frameCapacity = opts.v2FrameCapacity
+	frameCapacity := queryv2.DefaultIoCapacity
+	if opts.v2IoCapacity != -1 {
+		frameCapacity = opts.v2IoCapacity
 	}
 
 	rowCapacity := queryv2.DefaultRowCapacity
@@ -158,9 +158,9 @@ func (c *Client) IterativeQuery(ctx context.Context, db string, kqlQuery Stateme
 		rowCapacity = opts.v2RowCapacity
 	}
 
-	fragmentCapacity := queryv2.DefaultFragmentCapacity
-	if opts.v2FragmentCapacity != -1 {
-		fragmentCapacity = opts.v2FragmentCapacity
+	fragmentCapacity := queryv2.DefaultTableCapacity
+	if opts.v2TableCapacity != -1 {
+		fragmentCapacity = opts.v2TableCapacity
 	}
 
 	return queryv2.NewIterativeDataset(ctx, res, frameCapacity, rowCapacity, fragmentCapacity)
@@ -215,9 +215,9 @@ func setQueryOptions(ctx context.Context, op errors.Op, query Statement, queryTy
 		requestProperties: &requestProperties{
 			Options: map[string]interface{}{},
 		},
-		v2FrameCapacity:    -1,
-		v2RowCapacity:      -1,
-		v2FragmentCapacity: -1,
+		v2IoCapacity:    -1,
+		v2RowCapacity:   -1,
+		v2TableCapacity: -1,
 	}
 
 	for _, o := range options {

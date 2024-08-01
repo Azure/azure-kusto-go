@@ -1,3 +1,0 @@
-config.json
-*.csv
-!testdata/*.csv

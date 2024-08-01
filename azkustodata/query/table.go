@@ -23,7 +23,5 @@ type IterativeTable interface {
 	BaseTable
 	// Rows returns a channel that will be populated with rows as they are read.
 	Rows() <-chan RowResult
-	// SkipToEnd skips all remaining rows in the table.
-	SkipToEnd() []error
 	ToTable() (Table, error)
 }

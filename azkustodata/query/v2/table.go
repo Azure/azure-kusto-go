@@ -6,33 +6,21 @@ import (
 	"strconv"
 )
 
-func newBaseTable(dataset query.BaseDataset, th TableHeader) (query.BaseTable, error) {
-	columns := make([]query.Column, len(th.Columns()))
-	err := parseColumns(th, columns, dataset.Op())
-	if err != nil {
-		return nil, err
-	}
+func newBaseTable(dataset query.BaseDataset, id int, name string, kind string, columns []query.Column) (query.BaseTable, error) {
+	return query.NewBaseTable(dataset, int64(id), strconv.Itoa(id), name, kind, columns), nil
+}
 
-	return query.NewBaseTable(dataset, int64(th.TableId()), strconv.Itoa(th.TableId()), th.TableName(), th.TableKind(), columns), nil
+func newBaseTableFromHeader(dataset query.BaseDataset, th TableHeader) (query.BaseTable, error) {
+	return newBaseTable(dataset, th.TableId, th.TableName, th.TableKind, th.Columns)
 }
 
 func newTable(dataset query.BaseDataset, dt DataTable) (query.Table, error) {
-	base, err := newBaseTable(dataset, dt)
+	base, err := newBaseTable(dataset, dt.Header.TableId, dt.Header.TableName, dt.Header.TableKind, dt.Header.Columns)
 	if err != nil {
 		return nil, err
 	}
 
-	rows := make([]query.Row, 0, len(dt.Rows()))
-
-	for i, raw := range dt.Rows() {
-		r, err := parseRow(raw, base, i)
-		if err != nil {
-			return nil, err
-		}
-		rows = append(rows, r)
-	}
-
-	return query.NewTable(base, rows), nil
+	return query.NewTable(base, dt.Rows), nil
 }
 
 type iterativeWrapper struct {
@@ -68,8 +56,4 @@ func (f iterativeWrapper) Rows() <-chan query.RowResult {
 		}
 	}()
 	return ch
-}
-
-func (f iterativeWrapper) SkipToEnd() []error {
-	return nil
 }

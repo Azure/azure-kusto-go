@@ -1,8 +1,8 @@
 package value
 
 import (
-	"encoding/json"
 	"github.com/Azure/azure-kusto-go/azkustodata/types"
+	"github.com/goccy/go-json"
 	"reflect"
 	"strconv"
 )

@@ -216,5 +216,5 @@ func (m *Managed) newProp() properties.All {
 }
 
 func (m *Managed) Close() error {
-	return errors.TryCombinedError(m.queued.Close(), m.streaming.Close())
+	return errors.CombineErrors(m.queued.Close(), m.streaming.Close())
 }
