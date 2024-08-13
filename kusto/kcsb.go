@@ -367,7 +367,7 @@ func (kcsb *ConnectionStringBuilder) newTokenProvider() (*TokenProvider, error) 
 				authorityId = ci.FirstPartyAuthorityURL
 			}
 
-			opts := &azidentity.ClientSecretCredentialOptions{ClientOptions: *cliOpts}
+			opts := &azidentity.ClientSecretCredentialOptions{ClientOptions: *cliOpts, AdditionallyAllowedTenants: []string{"*"}}
 
 			cred, err := azidentity.NewClientSecretCredential(authorityId, appClientId, kcsb.ApplicationKey, opts)
 
