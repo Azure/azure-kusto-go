@@ -94,7 +94,7 @@ func TestWithAadUserPassAuthErr(t *testing.T) {
 
 }
 
-func TestWitAadUserToken(t *testing.T) {
+func TestWithAadUserToken(t *testing.T) {
 	want := ConnectionStringBuilder{
 		DataSource: "endpoint",
 		UserToken:  "token",
@@ -120,7 +120,7 @@ func TestWithWorkloadIdentity(t *testing.T) {
 	assert.EqualValues(t, want, *actual)
 }
 
-func TestWitAadUserTokenErr(t *testing.T) {
+func TestWithAadUserTokenErr(t *testing.T) {
 	defer func() {
 		if res := recover(); res == nil {
 			t.Errorf("Should have panic")
@@ -172,6 +172,22 @@ func TestGetTokenProviderHappy(t *testing.T) {
 				ManagedServiceIdentity: "managedid",
 				MsiAuthentication:      true,
 				ClientOptions:          &azcore.ClientOptions{},
+			},
+		}, {
+			name: "test_tokenprovider_managedui_clientId",
+			kcsb: ConnectionStringBuilder{
+				DataSource:                     "https://endpoint/test_tokenprovider_managedui_clientID",
+				ManagedServiceIdentityClientId: "00000000-0000-0000-0000-000000000000",
+				MsiAuthentication:              true,
+				ClientOptions:                  &azcore.ClientOptions{},
+			},
+		}, {
+			name: "test_tokenprovider_managedui_resourceId",
+			kcsb: ConnectionStringBuilder{
+				DataSource:                       "https://endpoint/test_tokenprovider_managedui_resourceID",
+				ManagedServiceIdentityResourceId: "/subscriptions/00000000-0000-0000-0000-000000000000/resourceGroups/testResourceGroup/providers/Microsoft.ManagedIdentity/userAssignedIdentities/testIdentity",
+				MsiAuthentication:                true,
+				ClientOptions:                    &azcore.ClientOptions{},
 			},
 		}, {
 			name: "test_tokenprovider_managedidauth2",

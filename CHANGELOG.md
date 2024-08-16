@@ -12,6 +12,9 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   - `WithAppCertificatePath` - Receives the path to the certificate file.
   - `WithAppCertificateBytes` - Receives the certificate bytes in-memory.  
   Both methods accept an optional password for the certificate.
+- `WithUserManagedIdentity` has been deprecated in favor of more specific functions:
+  - `WithUserAssignedIdentityClientId` - Receives the MSI client id
+  - `WithUserAssignedIdentityResourceId` - Receives the MSI resource id
 
 ### Fixed
 - Fixed Mapping Kind not working correctly with certain formats.

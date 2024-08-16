@@ -28,14 +28,17 @@ type ConnectionStringBuilder struct {
 	MsiAuthentication              bool
 	WorkloadAuthentication         bool
 	FederationTokenFilePath        string
-	ManagedServiceIdentity         string
-	InteractiveLogin               bool
-	RedirectURL                    string
-	DefaultAuth                    bool
-	ClientOptions                  *azcore.ClientOptions
-	ApplicationForTracing          string
-	UserForTracing                 string
-	TokenCredential                azcore.TokenCredential
+	// Deprecated: Use ManagedServiceIdentityClientId or ManagedServiceIdentityResourceId instead
+	ManagedServiceIdentity           string
+	ManagedServiceIdentityClientId   string
+	ManagedServiceIdentityResourceId string
+	InteractiveLogin                 bool
+	RedirectURL                      string
+	DefaultAuth                      bool
+	ClientOptions                    *azcore.ClientOptions
+	ApplicationForTracing            string
+	UserForTracing                   string
+	TokenCredential                  azcore.TokenCredential
 }
 
 const (
@@ -164,6 +167,8 @@ func (kcsb *ConnectionStringBuilder) resetConnectionString() {
 	kcsb.MsiAuthentication = false
 	kcsb.WorkloadAuthentication = false
 	kcsb.ManagedServiceIdentity = ""
+	kcsb.ManagedServiceIdentityClientId = ""
+	kcsb.ManagedServiceIdentityResourceId = ""
 	kcsb.InteractiveLogin = false
 	kcsb.RedirectURL = ""
 	kcsb.ClientOptions = nil
@@ -254,13 +259,30 @@ func (kcsb *ConnectionStringBuilder) WithAzCli() *ConnectionStringBuilder {
 	return kcsb
 }
 
+// Deprecated: use WithUserManagedIdentityClientId or WithUserManagedIdentityResourceId instead
 // WithUserManagedIdentity Creates a Kusto Connection string builder that will authenticate with AAD application, using
 // an application token obtained from a Microsoft Service Identity endpoint using user assigned id.
 func (kcsb *ConnectionStringBuilder) WithUserManagedIdentity(clientID string) *ConnectionStringBuilder {
+	return kcsb.WithUserAssignedIdentityClientId(clientID)
+}
+
+// WithUserAssignedIdentityClientId Creates a Kusto Connection string builder that will authenticate with AAD application, using
+// an application token obtained from a Microsoft Service Identity endpoint using user assigned id.
+func (kcsb *ConnectionStringBuilder) WithUserAssignedIdentityClientId(clientID string) *ConnectionStringBuilder {
 	requireNonEmpty(dataSource, kcsb.DataSource)
 	kcsb.resetConnectionString()
 	kcsb.MsiAuthentication = true
-	kcsb.ManagedServiceIdentity = clientID
+	kcsb.ManagedServiceIdentityClientId = clientID
+	return kcsb
+}
+
+// WithUserAssignedIdentityResourceId Creates a Kusto Connection string builder that will authenticate with AAD application, using
+// an application token obtained from a Microsoft Service Identity endpoint using an MSI's resourceID.
+func (kcsb *ConnectionStringBuilder) WithUserAssignedIdentityResourceId(resourceID string) *ConnectionStringBuilder {
+	requireNonEmpty(dataSource, kcsb.DataSource)
+	kcsb.resetConnectionString()
+	kcsb.MsiAuthentication = true
+	kcsb.ManagedServiceIdentityResourceId = resourceID
 	return kcsb
 }
 
@@ -410,8 +432,17 @@ func (kcsb *ConnectionStringBuilder) newTokenProvider() (*TokenProvider, error) 
 	case kcsb.MsiAuthentication:
 		init = func(ci *CloudInfo, cliOpts *azcore.ClientOptions, appClientId string) (azcore.TokenCredential, error) {
 			opts := &azidentity.ManagedIdentityCredentialOptions{ClientOptions: *cliOpts}
+			// legacy kcsb.ManagedServiceIdentity field takes precedence over
+			// new kcsb.ManagedServiceIdentityClientId field which takes precedence over
+			// new kcsb.ManagedServiceIdentityResourceId field
+			// if no client id is provided, the logic falls back to set up
+			// the system assigned identity
 			if !isEmpty(kcsb.ManagedServiceIdentity) {
 				opts.ID = azidentity.ClientID(kcsb.ManagedServiceIdentity)
+			} else if !isEmpty(kcsb.ManagedServiceIdentityClientId) {
+				opts.ID = azidentity.ClientID(kcsb.ManagedServiceIdentityClientId)
+			} else if !isEmpty(kcsb.ManagedServiceIdentityResourceId) {
+				opts.ID = azidentity.ResourceID(kcsb.ManagedServiceIdentityResourceId)
 			}
 
 			cred, err := azidentity.NewManagedIdentityCredential(opts)
