@@ -7,13 +7,21 @@ import (
 	"github.com/Azure/azure-kusto-go/azkustodata/types"
 	"github.com/Azure/azure-kusto-go/azkustodata/value"
 	"github.com/goccy/go-json"
+	"io"
 )
+
+func newDecoder(r io.Reader) *json.Decoder {
+	dec := json.NewDecoder(r)
+	// This option uses the json.Number type for all numbers, instead of float64.
+	// This allows us to parse numbers that are too large for a float64, like uint64 or decimal.
+	dec.UseNumber()
+	return dec
+}
 
 // UnmarshalJSON implements the json.Unmarshaler interface for TableFragment.
 // See decodeTableFragment for further explanation.
 func (t *TableFragment) UnmarshalJSON(b []byte) error {
-	decoder := json.NewDecoder(bytes.NewReader(b))
-	decoder.UseNumber()
+	decoder := newDecoder(bytes.NewReader(b))
 
 	rows, err := decodeTableFragment(b, decoder, t.Columns, t.PreviousIndex)
 	if err != nil {
@@ -27,8 +35,7 @@ func (t *TableFragment) UnmarshalJSON(b []byte) error {
 // UnmarshalJSON implements the json.Unmarshaler interface for DataTable.
 // A DataTable is "just" a TableHeader and TableFragment, so we can reuse the existing functions.
 func (q *DataTable) UnmarshalJSON(b []byte) error {
-	decoder := json.NewDecoder(bytes.NewReader(b))
-	decoder.UseNumber()
+	decoder := newDecoder(bytes.NewReader(b))
 
 	err := decodeHeader(decoder, &q.Header, DataTableFrameType)
 	if err != nil {
@@ -47,8 +54,7 @@ func (q *DataTable) UnmarshalJSON(b []byte) error {
 // UnmarshalJSON implements the json.Unmarshaler interface for DataSetHeader.
 // We need to decode this manually to set the correct Columns, in order to save on allocations later on.
 func (t *TableHeader) UnmarshalJSON(b []byte) error {
-	decoder := json.NewDecoder(bytes.NewReader(b))
-	decoder.UseNumber()
+	decoder := newDecoder(bytes.NewReader(b))
 
 	err := decodeHeader(decoder, t, TableHeaderFrameType)
 	if err != nil {

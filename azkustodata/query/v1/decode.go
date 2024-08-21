@@ -13,6 +13,14 @@ type RawRow struct {
 	Errors []string
 }
 
+func newDecoder(r io.Reader) *json.Decoder {
+	dec := json.NewDecoder(r)
+	// This option uses the json.Number type for all numbers, instead of float64.
+	// This allows us to parse numbers that are too large for a float64, like uint64 or decimal.
+	dec.UseNumber()
+	return dec
+}
+
 // UnmarshalJSON implements the json.Unmarshaler interface, to decode a RawRow from JSON.
 // It needs special handling, because the field may be a Row or a list of Errors.
 func (r *RawRow) UnmarshalJSON(data []byte) error {
@@ -24,8 +32,7 @@ func (r *RawRow) UnmarshalJSON(data []byte) error {
 	var err error
 
 	reader := bytes.NewReader(data)
-	dec := json.NewDecoder(reader)
-	dec.UseNumber()
+	dec := newDecoder(reader)
 
 	if err = dec.Decode(&row); err != nil {
 		_, err := reader.Seek(0, io.SeekStart)
@@ -77,8 +84,7 @@ func decodeV1(data io.ReadCloser) (*V1, error) {
 		return nil, errors.ES(errors.OpUnknown, errors.KInternal, "Got error: %v", string(all))
 	}
 
-	dec := json.NewDecoder(br)
-	dec.UseNumber()
+	dec := newDecoder(br)
 	err = dec.Decode(&v1)
 	if err != nil {
 		return nil, err
