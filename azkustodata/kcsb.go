@@ -183,8 +183,8 @@ func (kcsb *ConnectionStringBuilder) WithAadUserPassAuth(uname string, pswrd str
 	return kcsb
 }
 
-// WitAadUserToken Creates a Kusto Connection string builder that will authenticate with AAD user token
-func (kcsb *ConnectionStringBuilder) WitAadUserToken(usertoken string) *ConnectionStringBuilder {
+// WithAadUserToken Creates a Kusto Connection string builder that will authenticate with AAD user token
+func (kcsb *ConnectionStringBuilder) WithAadUserToken(usertoken string) *ConnectionStringBuilder {
 	requireNonEmpty(dataSource, kcsb.DataSource)
 	requireNonEmpty(userToken, usertoken)
 	kcsb.resetConnectionString()

@@ -100,7 +100,7 @@ func TestWitAadUserToken(t *testing.T) {
 		UserToken:  "token",
 	}
 
-	actual := NewConnectionStringBuilder("endpoint").WitAadUserToken("token")
+	actual := NewConnectionStringBuilder("endpoint").WithAadUserToken("token")
 	actual.ApplicationForTracing = ""
 	actual.UserForTracing = ""
 	assert.EqualValues(t, want, *actual)
@@ -128,7 +128,7 @@ func TestWitAadUserTokenErr(t *testing.T) {
 			t.Errorf("Wrong panic message: %s", res)
 		}
 	}()
-	NewConnectionStringBuilder("endpoint").WitAadUserToken("")
+	NewConnectionStringBuilder("endpoint").WithAadUserToken("")
 
 }
 
