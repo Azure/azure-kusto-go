@@ -19,6 +19,9 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ### Fixed
 - Fixed Mapping Kind not working correctly with certain formats.
 
+### Security
+- Updated azqueue to the latest version.
+
 ## [1.0.0-preview-3] - 2024-06-05
 ### Added 
 - Row and fragment capacity options to iterative dataset creation.

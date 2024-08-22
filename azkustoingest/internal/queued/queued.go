@@ -19,10 +19,9 @@ import (
 	"github.com/Azure/azure-kusto-go/azkustoingest/internal/properties"
 	"github.com/Azure/azure-kusto-go/azkustoingest/internal/resources"
 
-	"github.com/Azure/azure-pipeline-go/pipeline"
 	"github.com/Azure/azure-sdk-for-go/sdk/azcore"
 	"github.com/Azure/azure-sdk-for-go/sdk/storage/azblob"
-	"github.com/Azure/azure-storage-queue-go/azqueue"
+	"github.com/Azure/azure-sdk-for-go/sdk/storage/azqueue"
 	"github.com/google/uuid"
 )
 
@@ -274,8 +273,13 @@ func (i *Ingestion) Blob(ctx context.Context, from string, fileSize int64, props
 		if attempts >= StorageMaxRetryPolicy {
 			return errors.ES(errors.OpFileIngest, errors.KBlobstore, "max retry policy reached").SetNoRetry()
 		}
-		queueClient := i.upstreamQueue(queueUri)
-		if _, err := queueClient.Enqueue(ctx, j, 0, 0); err != nil {
+		queue, err := i.upstreamQueue(queueUri)
+		if err != nil {
+			i.mgr.ReportStorageResourceResult(queueUri.Account(), false)
+			continue
+		}
+
+		if _, err := queue.EnqueueMessage(ctx, j, nil); err != nil {
 			i.mgr.ReportStorageResourceResult(queueUri.Account(), false)
 			continue
 		} else {
@@ -320,27 +324,14 @@ func (i *Ingestion) upstreamContainer(resourceUri *resources.URI) (*azblob.Clien
 	return client, resourceUri.ObjectName(), nil
 }
 
-func (i *Ingestion) upstreamQueue(resourceUri *resources.URI) azqueue.MessagesURL {
+func (i *Ingestion) upstreamQueue(resourceUri *resources.URI) (*azqueue.QueueClient, error) {
 	queueUrl := resourceUri.URL()
-	service, _ := url.Parse(fmt.Sprintf("%s://%s?%s", queueUrl.Scheme, queueUrl.Host, resourceUri.SAS().Encode()))
+	serviceUrl := fmt.Sprintf("%s://%s?%s", queueUrl.Scheme, queueUrl.Host, resourceUri.SAS().Encode())
 
-	p := createPipeline(i.http)
-
-	return azqueue.NewServiceURL(*service, p).NewQueueURL(resourceUri.ObjectName()).NewMessagesURL()
-}
-
-func createPipeline(http *http.Client) pipeline.Pipeline {
-	// This is a lot of boilerplate, but all it does is setting the http client to be our own.
-	return pipeline.NewPipeline([]pipeline.Factory{pipeline.MethodFactoryMarker()}, pipeline.Options{
-		HTTPSender: pipeline.FactoryFunc(func(next pipeline.Policy, po *pipeline.PolicyOptions) pipeline.PolicyFunc {
-			return func(ctx context.Context, request pipeline.Request) (pipeline.Response, error) {
-				r, err := http.Do(request.WithContext(ctx))
-				if err != nil {
-					err = pipeline.NewError(err, "HTTP request failed")
-				}
-				return pipeline.NewHTTPResponse(r), err
-			}
-		}),
+	return azqueue.NewQueueClientWithNoCredential(serviceUrl, &azqueue.ClientOptions{
+		ClientOptions: azcore.ClientOptions{
+			Transport: i.http,
+		},
 	})
 }
 
