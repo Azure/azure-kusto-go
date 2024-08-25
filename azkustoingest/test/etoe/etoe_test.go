@@ -94,7 +94,7 @@ func TestFileIngestion(t *testing.T) { //ok
 
 	mockRows := createMockLogRows()
 
-	const blob = "https://adxingestiondemo.blob.core.windows.net/data/demo.json"
+	const blob = "https://kustoe2estorage.blob.core.windows.net/data/demo.json"
 	tests := []struct {
 		// desc describes the test.
 		desc string
