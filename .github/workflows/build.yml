@@ -84,6 +84,7 @@ jobs:
           TEST_DATABASE: ${{ secrets.TEST_DATABASE }}
           SECONDARY_ENGINE_CONNECTION_STRING: ${{ secrets.SECONDARY_ENGINE_CONNECTION_STRING }}
           SECONDARY_DATABASE: ${{ secrets.SECONDARY_DATABASE }}
+          BLOB_URI_FOR_TEST: ${{ secrets.BLOB_URI_FOR_TEST }}
           GOMAXPROCS: 200
 
       - name: Display tests data

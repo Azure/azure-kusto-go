@@ -150,49 +150,49 @@ func TestDynamicConverterNegative(t *testing.T) {
 			Desc:   "fail to convert to []string",
 			Value:  *value.NewDynamic([]byte(`["hello", "world`)),
 			Target: reflect.ValueOf(&[]string{}),
-			Error:  "Error occurred while trying to unmarshal Dynamic into a slice: unexpected end of JSON input",
+			Error:  "Error occurred while trying to unmarshal Dynamic into a slice",
 		},
 		{
 			Desc:   "fail to convert to []int64",
 			Value:  *value.NewDynamic([]byte(`[1,2,"3"]`)),
 			Target: reflect.ValueOf(&[]int64{}),
-			Error:  "Error occurred while trying to unmarshal Dynamic into a slice: json: cannot unmarshal string into Go value of type int64",
+			Error:  "Error occurred while trying to unmarshal Dynamic into a slice",
 		},
 		{
 			Desc:   "fail to convert to []struct",
 			Value:  *value.NewDynamic([]byte(`[{"name":"A","id":1},{"name":"B","id":2}`)),
 			Target: reflect.ValueOf(&[]TestStruct{}),
-			Error:  "Error occurred while trying to unmarshal Dynamic into a slice: unexpected end of JSON input",
+			Error:  "Error occurred while trying to unmarshal Dynamic into a slice",
 		},
 		{
 			Desc:   "convert to []map[string]interface{}",
 			Value:  *value.NewDynamic([]byte(`[{"name":"A","id":1},{"name":"B","id":2}`)),
 			Target: reflect.ValueOf(&[]map[string]interface{}{}),
-			Error:  "Error occurred while trying to unmarshal Dynamic into a slice: unexpected end of JSON input",
+			Error:  "Error occurred while trying to unmarshal Dynamic into a slice:",
 		},
 		{
 			Desc:   "convert to []map[string]struct",
 			Value:  *value.NewDynamic([]byte(`[{"group1":{"name":"A","id":1}},{"group2":{"name":"B","id":2}}`)),
 			Target: reflect.ValueOf(&[]map[string]TestStruct{}),
-			Error:  "Error occurred while trying to unmarshal Dynamic into a slice: unexpected end of JSON input",
+			Error:  "Error occurred while trying to unmarshal Dynamic into a slice:",
 		},
 		{
 			Desc:   "convert to struct",
 			Value:  *value.NewDynamic([]byte(`{"name":"A","id":1`)),
 			Target: reflect.ValueOf(&TestStruct{}),
-			Error:  "Could not unmarshal type dynamic into receiver: unexpected end of JSON input",
+			Error:  "Could not unmarshal type dynamic into receiver:",
 		},
 		{
 			Desc:   "convert to map[string]interface{}",
 			Value:  *value.NewDynamic([]byte(`{"named":"A","id":1`)),
 			Target: reflect.ValueOf(&map[string]interface{}{}),
-			Error:  "Error occurred while trying to unmarshal Dynamic into a map: unexpected end of JSON input",
+			Error:  "Error occurred while trying to unmarshal Dynamic into a map:",
 		},
 		{
 			Desc:   "convert to map[string]struct",
 			Value:  *value.NewDynamic([]byte(`{"group1":{"named":"A","id":1}`)),
 			Target: reflect.ValueOf(&map[string]TestStruct{}),
-			Error:  "Error occurred while trying to unmarshal Dynamic into a map: unexpected end of JSON input",
+			Error:  "Error occurred while trying to unmarshal Dynamic into a map:",
 		},
 	}
 
@@ -202,10 +202,10 @@ func TestDynamicConverterNegative(t *testing.T) {
 			t.Parallel()
 
 			err := tc.Value.Convert(tc.Target.Elem())
-			assert.EqualError(t, err, tc.Error)
+			assert.ErrorContains(t, err, tc.Error)
 
 			err = tc.Value.Convert(tc.Target)
-			assert.EqualError(t, err, tc.Error)
+			assert.ErrorContains(t, err, tc.Error)
 		})
 
 	}

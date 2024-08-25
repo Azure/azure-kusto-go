@@ -27,6 +27,9 @@ type Config struct {
 	ClientSecret string
 	// TenantID is the tenant on which the principal exists
 	TenantID string
+	// Blob is the blob to use for ingestion testing
+	Blob string
+
 	// Connection string builder to get a new kusto client
 	kcsb   *azkustodata.ConnectionStringBuilder
 	dmKscb *azkustodata.ConnectionStringBuilder
@@ -74,6 +77,7 @@ func init() {
 			ClientID:          os.Getenv("AZURE_CLIENT_ID"),
 			ClientSecret:      os.Getenv("AZURE_CLIENT_SECRET"),
 			TenantID:          os.Getenv("AZURE_TENANT_ID"),
+			Blob:              os.Getenv("BLOB_URI_FOR_TEST"),
 		}
 		if testConfig.Endpoint == "" {
 			fmt.Println("Skipping E2E Tests - No json config and no test environment")

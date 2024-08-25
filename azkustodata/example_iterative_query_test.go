@@ -75,10 +75,7 @@ func ExampleIterativeQuery() {
 		}
 	}
 
-	// 2. SkipToEnd() - skips all rows and closes the table
-	iterativeTable.SkipToEnd()
-
-	// 3. ToTable() - reads all rows into memory and returns an in-memory table.
+	// 2. ToTable() - reads all rows into memory and returns an in-memory table.
 	table, err := iterativeTable.ToTable()
 	rows := table.Rows()
 	for _, row := range rows {
