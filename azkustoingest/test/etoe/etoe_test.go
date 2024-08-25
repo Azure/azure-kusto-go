@@ -94,7 +94,8 @@ func TestFileIngestion(t *testing.T) { //ok
 
 	mockRows := createMockLogRows()
 
-	const blob = "https://kustoe2estorage.blob.core.windows.net/data/demo.json;managed_identity=system"
+	blob := testConfig.Blob
+
 	tests := []struct {
 		// desc describes the test.
 		desc string
@@ -423,6 +424,11 @@ func TestFileIngestion(t *testing.T) { //ok
 		test := test // capture
 		t.Run(test.desc, func(t *testing.T) {
 			t.Parallel()
+
+			if test.src == "" {
+				t.Skip("skipping test; src is empty")
+				return
+			}
 
 			ctx, cancel := context.WithCancel(context.Background())
 			defer cancel()
