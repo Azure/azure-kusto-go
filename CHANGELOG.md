@@ -4,12 +4,22 @@ All notable changes to this project will be documented in this file.
 
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
-## [1.0.0-preview-4] - 2024-06-05
+
+## [1.0.0-preview-5] - 2024-08-25
 ### Changed
+- Removed `Skip` option from `IterativeTable`, as the usecase for it was not clear.
+- `WithUserManagedIdentity` has been deprecated in favor of more specific functions:
+  - `WithUserAssignedIdentityClientId` - Receives the MSI client id
+  - `WithUserAssignedIdentityResourceId` - Receives the MSI resource id
 - V2FrameCapacity was renamed to V2IoCapacity to better reflect its purpose.
 - V2FragmentCapacity was renamed to V2TableCapacity to better reflect its purpose.
 - Better defaults for buffer sizes.
 
+### Fixed
+
+
+## [1.0.0-preview-4] - 2024-06-05
+### Changed
 - the `WithApplicationCertificate` on `KustoConnectionStringBuilder` was removed as it was ambiguous and not implemented correctly. Instead there are two new methods:
   - `WithAppCertificatePath` - Receives the path to the certificate file.
   - `WithAppCertificateBytes` - Receives the certificate bytes in-memory.  

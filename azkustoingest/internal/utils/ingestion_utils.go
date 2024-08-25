@@ -22,7 +22,7 @@ import (
 const EstimatedCompressionFactor = 11
 
 func FetchBlobSize(fPath string, ctx context.Context, client *http.Client) (size int64, err error) {
-	if !strings.Contains(fPath, ".blob.") || strings.Contains(fPath, "Managed_Identity=") || strings.Contains(fPath, "Token=") {
+	if !strings.Contains(fPath, ".blob.") || strings.Contains(strings.ToLower(fPath), "managed_identity=") || strings.Contains(strings.ToLower(fPath), "token=") {
 		return 0, nil
 	}
 
