@@ -94,6 +94,7 @@ func TestFileIngestion(t *testing.T) { //ok
 
 	mockRows := createMockLogRows()
 
+	const blob = "https://adxingestiondemo.blob.core.windows.net/data/demo.json;impersonate"
 	tests := []struct {
 		// desc describes the test.
 		desc string
@@ -121,7 +122,7 @@ func TestFileIngestion(t *testing.T) { //ok
 		{
 			desc:     "Ingest from blob with bad existing mapping",
 			ingestor: queuedIngestor,
-			src:      "https://adxingestiondemo.blob.core.windows.net/data/demo.json",
+			src:      blob,
 			options:  []azkustoingest.FileOption{azkustoingest.IngestionMappingRef("Logs_bad_mapping", azkustoingest.JSON)},
 			wantErr: azkustoingest.StatusFromMapForTests(map[string]interface{}{
 				"Status":        "Failed",
@@ -132,7 +133,7 @@ func TestFileIngestion(t *testing.T) { //ok
 		{
 			desc:     "Streaming ingest from blob",
 			ingestor: streamingIngestor,
-			src:      "https://adxingestiondemo.blob.core.windows.net/data/demo.json",
+			src:      blob,
 			options:  []azkustoingest.FileOption{azkustoingest.IngestionMappingRef("Logs_mapping", azkustoingest.JSON)},
 			stmt:     countStatement,
 			table:    streamingTable,
@@ -154,7 +155,7 @@ func TestFileIngestion(t *testing.T) { //ok
 		{
 			desc:     "Managed streaming ingest from blob",
 			ingestor: managedIngestor,
-			src:      "https://adxingestiondemo.blob.core.windows.net/data/demo.json",
+			src:      blob,
 			options:  []azkustoingest.FileOption{azkustoingest.IngestionMappingRef("Logs_mapping", azkustoingest.JSON)},
 			stmt:     countStatement,
 			table:    managedTable,
@@ -176,7 +177,7 @@ func TestFileIngestion(t *testing.T) { //ok
 		{
 			desc:     "Ingest from blob with existing mapping",
 			ingestor: queuedIngestor,
-			src:      "https://adxingestiondemo.blob.core.windows.net/data/demo.json",
+			src:      blob,
 			options:  []azkustoingest.FileOption{azkustoingest.IngestionMappingRef("Logs_mapping", azkustoingest.JSON)},
 			stmt:     countStatement,
 			table:    queuedTable,
@@ -220,7 +221,7 @@ func TestFileIngestion(t *testing.T) { //ok
 		{
 			desc:     "Ingest from blob with existing mapping managed",
 			ingestor: managedIngestor,
-			src:      "https://adxingestiondemo.blob.core.windows.net/data/demo.json",
+			src:      blob,
 			options:  []azkustoingest.FileOption{azkustoingest.IngestionMappingRef("Logs_mapping", azkustoingest.JSON)},
 			stmt:     countStatement,
 			table:    managedTable,
@@ -242,7 +243,7 @@ func TestFileIngestion(t *testing.T) { //ok
 		{
 			desc:     "Ingest from blob with inline mapping",
 			ingestor: queuedIngestor,
-			src:      "https://adxingestiondemo.blob.core.windows.net/data/demo.json",
+			src:      blob,
 			options: []azkustoingest.FileOption{
 				azkustoingest.IngestionMapping(
 					"[{\"column\":\"header_time\",\"datatype\":\"datetime\",\"Properties\":{\"path\":\"$.header.time\"}},{\"column\":\"header_id\",\"datatype\":\"guid\",\"Properties\":{\"path\":\"$.header.id\"}},{\"column\":\"header_api_version\",\"Properties\":{\"path\":\"$.header.api_version\"},\"datatype\":\"string\"},{\"column\":\"payload_data\",\"datatype\":\"string\",\"Properties\":{\"path\":\"$.payload.data\"}},{\"column\":\"payload_user\",\"datatype\":\"string\",\"Properties\":{\"path\":\"$.payload.user\"}}]",
