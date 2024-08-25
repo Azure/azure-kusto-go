@@ -328,11 +328,16 @@ func (i *Ingestion) upstreamQueue(resourceUri *resources.URI) (*azqueue.QueueCli
 	queueUrl := resourceUri.URL()
 	serviceUrl := fmt.Sprintf("%s://%s?%s", queueUrl.Scheme, queueUrl.Host, resourceUri.SAS().Encode())
 
-	return azqueue.NewQueueClientWithNoCredential(serviceUrl, &azqueue.ClientOptions{
+	service, err := azqueue.NewServiceClientWithNoCredential(serviceUrl, &azqueue.ClientOptions{
 		ClientOptions: azcore.ClientOptions{
 			Transport: i.http,
 		},
 	})
+	if err != nil {
+		return nil, errors.E(errors.OpFileIngest, errors.KBlobstore, err)
+	}
+
+	return service.NewQueueClient(resourceUri.ObjectName()), nil
 }
 
 var nower = time.Now
