@@ -304,86 +304,6 @@ func W(inner error, outer error) *Error {
 	return o
 }
 
-// OneToErr translates what we think is a Kusto OneApiError into an Error. If we don't recognize it, we return nil.
-// This tries to wrap the internal errors, but the errors that are generated are some type of early draft of OneApiError,
-// not the current spec. Because the errors we see don't conform to the current OneAPIError spec, had to take guesses on
-// what we will receive. The spec says we shouldn't get a list of errors, but we do(we should get an embedded error).
-// So I'm taking the guess that these are supposed to be wrapped errors.
-func OneToErr(m map[string]interface{}, op Op) *Error {
-	if m == nil {
-		return nil
-	}
-
-	if _, ok := m["OneApiErrors"]; ok {
-		var topErr *Error
-		if oneErrors, ok := m["OneApiErrors"].([]interface{}); ok {
-			var bottomErr *Error
-			for _, oneErr := range oneErrors {
-				if errMap, ok := oneErr.(map[string]interface{}); ok {
-					e := oneToErr(errMap, bottomErr, op)
-					if e == nil {
-						continue
-					}
-					if topErr == nil {
-						topErr = e
-						bottomErr = e
-						continue
-					}
-					bottomErr = e
-				}
-			}
-			return topErr
-		}
-	}
-	return nil
-}
-
-func oneToErr(m map[string]interface{}, err *Error, op Op) *Error {
-	errJSON, ok := m["error"]
-	if !ok {
-		return nil
-	}
-	errMap, ok := errJSON.(map[string]interface{})
-	if !ok {
-		return nil
-	}
-
-	var msg string
-	msgInter, ok := errMap["message"]
-	if !ok {
-		return nil
-	}
-
-	if msg, ok = msgInter.(string); !ok {
-		return nil
-	}
-
-	var code string
-
-	codeInter, ok := errMap["code"]
-	if ok {
-		codeStr, ok := codeInter.(string)
-		if ok {
-			code = codeStr
-		}
-	}
-
-	var kind Kind
-	switch code {
-	case "LimitsExceeded":
-		kind = KLimitsExceeded
-		msg = msg + ";See https://docs.microsoft.com/en-us/azure/kusto/concepts/querylimits"
-	}
-
-	if err == nil {
-		return ES(op, kind, msg)
-	}
-
-	err = W(ES(op, kind, msg), err)
-
-	return err
-}
-
 func (e *HttpError) IsThrottled() bool {
 	return e != nil && (e.StatusCode == http.StatusTooManyRequests)
 }
@@ -413,7 +333,7 @@ type CombinedError struct {
 	Errors []error
 }
 
-func (c CombinedError) Error() string {
+func (c *CombinedError) Error() string {
 	result := ""
 	for _, err := range c.Errors {
 		result += fmt.Sprintf("'%s';", err.Error())
@@ -421,66 +341,51 @@ func (c CombinedError) Error() string {
 	return result
 }
 
-// Flatten flattens and combines errors. If the error is not a *CombinedError, it is returned as is.
-func Flatten(e error) error {
-	if c, ok := e.(*CombinedError); ok {
-		if len(c.Errors) == 0 {
-			return nil
-		}
-		errorQueue := make([]error, 0, len(c.Errors))
-		errorSet := make(map[string]bool, len(c.Errors))
-
-		for _, err := range c.Errors {
-			errorQueue = append(errorQueue, err)
-		}
-
-		res := make([]error, 0, len(errorQueue))
-
-		for len(errorQueue) > 0 {
-			err := errorQueue[0]
-			errorQueue = errorQueue[1:]
-			if combined, ok := err.(*CombinedError); ok {
-				for _, err := range combined.Errors {
-					if _, ok := errorSet[err.Error()]; !ok {
-						errorSet[err.Error()] = true
-						errorQueue = append(errorQueue, err)
-					}
-				}
-			} else {
-				if _, ok := errorSet[err.Error()]; !ok {
-					errorSet[err.Error()] = true
-					res = append(res, err)
-				}
-			}
-		}
-
-		if len(res) == 0 {
-			return nil
-		}
-		if len(res) == 1 {
-			return res[0]
-		}
-		return &CombinedError{Errors: res}
-	} else {
-		return e
+func NewCombinedError() *CombinedError {
+	return &CombinedError{
+		Errors: []error{},
 	}
 }
 
-func TryCombinedError(errs ...error) error {
-	// filter out nil errors
-	nonulls := make([]error, 0, len(errs))
-	for _, err := range errs {
-		if err != nil {
-			nonulls = append(nonulls, err)
+func (c *CombinedError) AddError(e error) bool {
+	if e == nil {
+		return false
+	}
+
+	var c2 *CombinedError
+	if errors.As(e, &c2) {
+		for _, err := range c2.Errors {
+			if c.AddError(err) {
+				return true
+			}
+		}
+		return false
+	}
+
+	for _, err := range c.Errors {
+		if err.Error() == e.Error() {
+			return false
 		}
 	}
+	c.Errors = append(c.Errors, e)
+	return true
+}
 
-	if len(nonulls) == 0 {
+func (c *CombinedError) Unwrap() error {
+	if len(c.Errors) == 0 {
 		return nil
 	}
-	if len(nonulls) == 1 {
-		return Flatten(nonulls[0])
+	if len(c.Errors) == 1 {
+		return c.Errors[0]
 	}
 
-	return Flatten(&CombinedError{Errors: nonulls})
+	return c
+}
+
+func CombineErrors(errs ...error) error {
+	combined := NewCombinedError()
+	for _, err := range errs {
+		combined.AddError(err)
+	}
+	return combined.Unwrap()
 }

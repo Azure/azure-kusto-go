@@ -23,11 +23,11 @@ type requestProperties struct {
 }
 
 type queryOptions struct {
-	requestProperties  *requestProperties
-	queryIngestion     bool
-	v2FrameCapacity    int
-	v2RowCapacity      int
-	v2FragmentCapacity int
+	requestProperties *requestProperties
+	queryIngestion    bool
+	v2IoCapacity      int
+	v2RowCapacity     int
+	v2TableCapacity   int
 }
 
 const ResultsProgressiveEnabledValue = "results_progressive_enabled"
@@ -92,15 +92,15 @@ const ResultsErrorReportingPlacementInData = "in_data"
 const ResultsErrorReportingPlacementEndOfTable = "end_of_table"
 const ResultsErrorReportingPlacementEndOfDataset = "end_of_dataset"
 
-// V2FrameCapacity sets the capacity of data frames from the Kusto service.
-func V2FrameCapacity(i int) QueryOption {
+// V2IoCapacity sets the size of the buffer, in frames, when reading from the network.
+func V2IoCapacity(i int) QueryOption {
 	return func(q *queryOptions) error {
-		q.v2FrameCapacity = i
+		q.v2IoCapacity = i
 		return nil
 	}
 }
 
-// V2RowCapacity sets the capacity of the buffer of data rows in the result set.
+// V2RowCapacity sets the capacity of the buffer of data rows per table.
 func V2RowCapacity(i int) QueryOption {
 	return func(q *queryOptions) error {
 		q.v2RowCapacity = i
@@ -108,10 +108,10 @@ func V2RowCapacity(i int) QueryOption {
 	}
 }
 
-// V2FragmentCapacity sets the capacity of the buffer of data fragments in the result set.
-func V2FragmentCapacity(i int) QueryOption {
+// V2TableCapacity sets the capacity of the buffer of data fragments in the result set.
+func V2TableCapacity(i int) QueryOption {
 	return func(q *queryOptions) error {
-		q.v2FragmentCapacity = i
+		q.v2TableCapacity = i
 		return nil
 	}
 }
