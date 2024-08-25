@@ -16,7 +16,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Better defaults for buffer sizes.
 
 ### Fixed
-
+- Fixed plenty of sync issues.
+- Reduced allocations.
 
 ## [1.0.0-preview-4] - 2024-06-05
 ### Changed
@@ -30,9 +31,6 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Fixed
 - Fixed Mapping Kind not working correctly with certain formats.
-- Fixed plenty of sync issues.
-- Reduced allocations.
-
 
 ## [1.0.0-preview-3] - 2024-06-05
 ### Added 
