@@ -5,7 +5,7 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
-## [1.0.0-preview-5] - 2024-08-25
+## [1.0.0-preview-5] - 2024-08-27
 ### Changed
 - Removed `Skip` option from `IterativeTable`, as the usecase for it was not clear.
 - `WithUserManagedIdentity` has been deprecated in favor of more specific functions:
@@ -18,6 +18,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ### Fixed
 - Fixed plenty of sync issues.
 - Reduced allocations.
+
+### Security
+- Use the new azqueue library.
+- Various dependency updates.
 
 ## [1.0.0-preview-4] - 2024-06-05
 ### Changed

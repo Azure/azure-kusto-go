@@ -201,7 +201,8 @@ func TestIngestionStatus(t *testing.T) {
 
 		// Once with table status reporting
 		res, err := ingestor.FromReader(ctx, reader, azkustoingest.ReportResultToTable())
-		assert.NoError(t, err)
+		require.NoError(t, err)
+
 		err = <-res.Wait(ctx)
 		assert.Error(t, err)
 		status, err := azkustoingest.GetIngestionStatus(err)
