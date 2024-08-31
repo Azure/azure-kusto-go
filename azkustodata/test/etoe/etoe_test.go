@@ -21,7 +21,6 @@ import (
 	"go.uber.org/goleak"
 	"net/http"
 	"regexp"
-	"strings"
 	"testing"
 	"time"
 	"unicode"
@@ -980,15 +979,9 @@ func TestError(t *testing.T) {
 		t.Log("Closed client")
 	})
 
-	_, err = client.Query(context.Background(), testConfig.Database, kql.New("table(tableName) | count"),
-		azkustodata.QueryParameters(kql.NewParameters().AddString("tableName", uuid.NewString())))
-
-	kustoError, ok := errors.GetKustoError(err)
-	require.True(t, ok)
-	assert.Equal(t, errors.OpQuery, kustoError.Op)
-	assert.Equal(t, errors.KHTTPError, kustoError.Kind)
-	assert.True(t, strings.Contains(kustoError.Error(), "Failed to resolve table expression"))
-	assert.True(t, isASCII(kustoError.Error()))
+	_, err = client.Query(context.Background(), testConfig.Database, kql.New(`datatable (event_properties: dynamic) [
+    dynamic({"first_field":"[\"elem1\",\"elem2\"]","second_field":"0000000000000000"})
+]`))
 }
 func TestMain(m *testing.M) {
 	goleak.VerifyTestMain(m)

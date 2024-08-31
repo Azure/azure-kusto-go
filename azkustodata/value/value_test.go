@@ -1,7 +1,7 @@
 package value
 
 import (
-	"github.com/goccy/go-json"
+	"encoding/json"
 	"math"
 	"strings"
 	"testing"
