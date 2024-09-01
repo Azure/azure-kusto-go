@@ -54,7 +54,7 @@ func TestIngestionStatus(t *testing.T) {
 
 	// Change the ingestion batching time
 	batchingStmt := kql.New(".alter table ").AddTable(tableName).AddLiteral(
-		" policy ingestionbatching @'{ \"MaximumBatchingTimeSpan\": \"00:00:05\", \"MaximumNumberOfItems\": 500, \"MaximumRawDataSizeMB\": 1024 }' ")
+		" policy ingestionbatching @'{ \"MaximumBatchingTimeSpan\": \"00:00:10\", \"MaximumNumberOfItems\": 500, \"MaximumRawDataSizeMB\": 1024 }' ")
 	_, err = client.Mgmt(ctx, testConfig.Database, batchingStmt)
 	require.NoError(t, err, "failed to reduce the default batching time")
 
