@@ -155,4 +155,8 @@ func TestBoolAsInt(t *testing.T) {
 	trueInt, err := rows[3].BoolByIndex(0)
 	assert.NoError(t, err)
 	assert.Equal(t, *trueInt, true)
+
+	nullBool, err := rows[4].BoolByIndex(0)
+	assert.NoError(t, err)
+	assert.Nil(t, nullBool)
 }
