@@ -1,0 +1,31 @@
+{
+  "Tables": [
+    {
+      "TableName": "Table_0",
+      "Columns": [
+        {
+          "ColumnName": "a",
+          "DataType": "Boolean",
+          "ColumnType": "bool"
+        }
+      ],
+      "Rows": [
+        [
+          false
+        ],
+        [
+          0
+        ],
+        [
+          true
+        ],
+        [
+          1
+        ],
+        [
+          null
+        ]
+      ]
+    }
+  ]
+}

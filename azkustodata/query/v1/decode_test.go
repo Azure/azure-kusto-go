@@ -21,6 +21,9 @@ var partialErrorFile string
 //go:embed testData/error.txt
 var errorFile string
 
+//go:embed testData/booleanInt.json
+var booleanIntFile string
+
 func TestDecodeSuccess(t *testing.T) {
 	t.Parallel()
 

@@ -128,3 +128,35 @@ func TestDatasetPartialErrors(t *testing.T) {
 	assert.Nil(t, ds)
 	assert.ErrorContains(t, err, "Query execution has exceeded the allowed limits")
 }
+
+func TestBoolAsInt(t *testing.T) {
+	t.Parallel()
+
+	reader := io.NopCloser(strings.NewReader(booleanIntFile))
+	ctx := context.Background()
+	op := errors.OpQuery
+	ds, err := NewDatasetFromReader(ctx, op, reader)
+	assert.NoError(t, err)
+
+	rows := ds.Tables()[0].Rows()
+
+	falseBool, err := rows[0].BoolByIndex(0)
+	assert.NoError(t, err)
+	assert.Equal(t, *falseBool, false)
+
+	falseInt, err := rows[1].BoolByIndex(0)
+	assert.NoError(t, err)
+	assert.Equal(t, *falseInt, false)
+
+	trueBool, err := rows[2].BoolByIndex(0)
+	assert.NoError(t, err)
+	assert.Equal(t, *trueBool, true)
+
+	trueInt, err := rows[3].BoolByIndex(0)
+	assert.NoError(t, err)
+	assert.Equal(t, *trueInt, true)
+
+	nullBool, err := rows[4].BoolByIndex(0)
+	assert.NoError(t, err)
+	assert.Nil(t, nullBool)
+}
