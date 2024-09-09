@@ -1,8 +1,8 @@
 package v2
 
 import (
+	"encoding/json"
 	"github.com/Azure/azure-kusto-go/azkustodata/errors"
-	"github.com/goccy/go-json"
 )
 
 // assertToken asserts that the next token in the decoder is the expected token.

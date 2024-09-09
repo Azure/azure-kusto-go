@@ -1,9 +1,9 @@
 package value
 
 import (
+	"encoding/json"
 	"fmt"
 	"github.com/Azure/azure-kusto-go/azkustodata/types"
-	"github.com/goccy/go-json"
 	"math"
 	"reflect"
 )

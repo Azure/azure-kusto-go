@@ -3,9 +3,9 @@ package v2
 import (
 	"bytes"
 	"context"
+	"encoding/json"
 	"github.com/Azure/azure-kusto-go/azkustodata/errors"
 	"github.com/Azure/azure-kusto-go/azkustodata/query"
-	"github.com/goccy/go-json"
 	"io"
 )
 
