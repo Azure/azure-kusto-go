@@ -8,7 +8,6 @@ require (
 	// This is a faster drop-in replacement for encoding/json.
 	// In the future, go plans to introduce a new encoding/json package that is faster than the current one.
 	// We will switch to that when it is available.
-	github.com/goccy/go-json v0.10.3
 	github.com/google/uuid v1.6.0
 	github.com/kylelemons/godebug v1.1.0
 	github.com/samber/lo v1.47.0

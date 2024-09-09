@@ -2,11 +2,11 @@ package v2
 
 import (
 	"bytes"
+	"encoding/json"
 	"github.com/Azure/azure-kusto-go/azkustodata/errors"
 	"github.com/Azure/azure-kusto-go/azkustodata/query"
 	"github.com/Azure/azure-kusto-go/azkustodata/types"
 	"github.com/Azure/azure-kusto-go/azkustodata/value"
-	"github.com/goccy/go-json"
 	"io"
 )
 
@@ -280,7 +280,6 @@ func decodeNestedValue(decoder *json.Decoder, buffer []byte) (json.Token, error)
 			break
 		}
 	}
-
 	finalOffset := decoder.InputOffset()
 
 	return json.Token(buffer[initialOffset:finalOffset]), nil
