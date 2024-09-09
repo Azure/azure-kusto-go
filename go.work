@@ -7,7 +7,7 @@ use (
 )
 
 replace (
-	github.com/Azure/azure-kusto-go/azkustodata v1.0.0-preview-4 => ./azkustodata
-	github.com/Azure/azure-kusto-go/azkustoingest v1.0.0-preview-4 => ./azkustoingest
-	github.com/Azure/azure-kusto-go/quickstart v1.0.0-preview-4 => ./quickstart
+	github.com/Azure/azure-kusto-go/azkustodata v1.0.0-preview-5 => ./azkustodata
+	github.com/Azure/azure-kusto-go/azkustoingest v1.0.0-preview-5 => ./azkustoingest
+	github.com/Azure/azure-kusto-go/quickstart v1.0.0-preview-5 => ./quickstart
 )
