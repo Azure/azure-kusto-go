@@ -67,7 +67,7 @@ func (r *Result) putQueued(mgr *resources.Manager) {
 
 	// StreamIngest initial record
 	r.record.Status = Pending
-	err = client.Write(r.record.IngestionSourceID.String(), r.record.ToMap())
+	err = client.Write(context.Background(), r.record.IngestionSourceID.String(), r.record.ToMap())
 	if err != nil {
 		r.record.Status = StatusRetrievalFailed
 		r.record.FailureStatus = Permanent
@@ -119,7 +119,7 @@ func (r *Result) poll(ctx context.Context) {
 				return
 
 			case <-timer.C:
-				smap, err := r.tableClient.Read(r.record.IngestionSourceID.String())
+				smap, err := r.tableClient.Read(ctx, r.record.IngestionSourceID.String())
 				if err != nil {
 					if attempts == 0 {
 						r.record.Status = StatusRetrievalFailed
