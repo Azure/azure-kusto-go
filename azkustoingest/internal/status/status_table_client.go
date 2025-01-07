@@ -5,6 +5,7 @@ import (
 	"encoding/json"
 	"github.com/Azure/azure-kusto-go/azkustoingest/internal/resources"
 	"github.com/Azure/azure-sdk-for-go/sdk/azcore"
+	"github.com/Azure/azure-sdk-for-go/sdk/azcore/policy"
 	"github.com/Azure/azure-sdk-for-go/sdk/data/aztables"
 	"github.com/Azure/azure-sdk-for-go/storage"
 	"github.com/google/uuid"
@@ -26,11 +27,12 @@ type TableClient struct {
 }
 
 // NewTableClient Creates an azure table client.
-func NewTableClient(uri resources.URI) (*TableClient, error) {
-
+func NewTableClient(client policy.Transporter, uri resources.URI) (*TableClient, error) {
 	cred, err := aztables.NewClientWithNoCredential(uri.String(), &aztables.ClientOptions{
-		ClientOptions: azcore.ClientOptions{},
-	}) // TODO: pass http client
+		ClientOptions: azcore.ClientOptions{
+			Transport: client,
+		},
+	})
 	if err != nil {
 		return nil, err
 	}
@@ -41,7 +43,7 @@ func NewTableClient(uri resources.URI) (*TableClient, error) {
 	}, nil
 }
 
-// Read reads a table record cotaining ingestion status.
+// Read reads a table record containing ingestion status.
 func (c *TableClient) Read(ctx context.Context, ingestionSourceID string) (map[string]interface{}, error) {
 	var emptyID = uuid.Nil.String()
 	entity, err := c.client.GetEntity(ctx, ingestionSourceID, emptyID, nil)
@@ -59,7 +61,7 @@ func (c *TableClient) Read(ctx context.Context, ingestionSourceID string) (map[s
 	return m, nil
 }
 
-// Write reads a table record cotaining ingestion status.
+// Write reads a table record containing ingestion status.
 func (c *TableClient) Write(ctx context.Context, ingestionSourceID string, data map[string]interface{}) error {
 	dataCopy := make(map[string]interface{})
 	for k, v := range data {
