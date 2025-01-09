@@ -11,10 +11,10 @@ import (
 	"github.com/google/uuid"
 )
 
-// TODO: figure out how to insert these to the new
 const (
+	// todo: should we set this timeout?
 	defaultTimeoutMsec = 10000
-	fullMetadata       = "application/json;odata=fullmetadata"
+	fullMetadata       = aztables.MetadataFormatFull
 )
 
 // TableClient allows reading and writing to azure tables.
@@ -75,7 +75,12 @@ func (c *TableClient) Write(ctx context.Context, ingestionSourceID string, data 
 		return err
 	}
 
-	_, err = c.client.UpsertEntity(ctx, bytes, nil)
+	format := fullMetadata
 
+	_, err = c.client.AddEntity(ctx, bytes, &aztables.AddEntityOptions{
+		Format: &format,
+	})
+
+	// TODO - what should we do in case it already exists?
 	return err
 }
