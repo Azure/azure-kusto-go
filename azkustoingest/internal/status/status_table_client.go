@@ -8,11 +8,12 @@ import (
 	"github.com/Azure/azure-sdk-for-go/sdk/azcore/policy"
 	"github.com/Azure/azure-sdk-for-go/sdk/data/aztables"
 	"github.com/google/uuid"
+	"time"
 )
 
 const (
-	defaultTimeoutMsec = 10000
-	fullMetadata       = aztables.MetadataFormatFull
+	defaultTimeoutSeconds = 10
+	fullMetadata          = aztables.MetadataFormatFull
 )
 
 // TableClient allows reading and writing to azure tables.
@@ -58,7 +59,7 @@ func (c *TableClient) Read(ctx context.Context, ingestionSourceID string) (map[s
 
 // Write reads a table record containing ingestion status.
 func (c *TableClient) Write(ctx context.Context, ingestionSourceID string, data map[string]interface{}) error {
-	ctx, cancel := context.WithTimeout(ctx, defaultTimeoutMsec)
+	ctx, cancel := context.WithTimeout(ctx, defaultTimeoutSeconds*time.Second)
 	defer cancel()
 
 	data["PartitionKey"] = ingestionSourceID
