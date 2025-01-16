@@ -7,7 +7,6 @@ import (
 	"github.com/Azure/azure-sdk-for-go/sdk/azcore"
 	"github.com/Azure/azure-sdk-for-go/sdk/azcore/policy"
 	"github.com/Azure/azure-sdk-for-go/sdk/data/aztables"
-	"github.com/Azure/azure-sdk-for-go/storage"
 	"github.com/google/uuid"
 )
 
@@ -20,9 +19,6 @@ const (
 type TableClient struct {
 	tableURI resources.URI
 	client   *aztables.Client
-
-	service storage.TableServiceClient
-	table   *storage.Table
 }
 
 // NewTableClient Creates an azure table client.
