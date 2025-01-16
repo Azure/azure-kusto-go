@@ -46,26 +46,6 @@ func (lr LogRow) CSVMarshal() []string {
 	}
 }
 
-func TestParseLong(t *testing.T) { //ok
-	client, err := azkustodata.New(azkustodata.NewConnectionStringBuilder("https://asaf.swedencentral.dev.kusto.windows.net").WithAzCli())
-	require.NoError(t, err)
-	dataset, err := client.Query(context.Background(), "Data", kql.New("wewlad"))
-	require.NoError(t, err)
-
-	type res struct {
-		A map[string]interface{} `kusto:"a"`
-	}
-
-	tb := dataset.Tables()[0]
-	structs, err := query.ToStructs[res](tb)
-	require.NoError(t, err)
-
-	for _, s := range structs {
-		fmt.Println(s)
-	}
-
-}
-
 func TestFileIngestion(t *testing.T) { //ok
 	t.Parallel()
 
