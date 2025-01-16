@@ -12,7 +12,6 @@ import (
 )
 
 const (
-	// todo: should we set this timeout?
 	defaultTimeoutMsec = 10000
 	fullMetadata       = aztables.MetadataFormatFull
 )
@@ -28,7 +27,7 @@ type TableClient struct {
 
 // NewTableClient Creates an azure table client.
 func NewTableClient(client policy.Transporter, uri resources.URI) (*TableClient, error) {
-	cred, err := aztables.NewClientWithNoCredential(uri.String(), &aztables.ClientOptions{
+	tableClient, err := aztables.NewClientWithNoCredential(uri.String(), &aztables.ClientOptions{
 		ClientOptions: azcore.ClientOptions{
 			Transport: client,
 		},
@@ -39,7 +38,7 @@ func NewTableClient(client policy.Transporter, uri resources.URI) (*TableClient,
 
 	return &TableClient{
 		tableURI: uri,
-		client:   cred,
+		client:   tableClient,
 	}, nil
 }
 
@@ -63,14 +62,13 @@ func (c *TableClient) Read(ctx context.Context, ingestionSourceID string) (map[s
 
 // Write reads a table record containing ingestion status.
 func (c *TableClient) Write(ctx context.Context, ingestionSourceID string, data map[string]interface{}) error {
-	dataCopy := make(map[string]interface{})
-	for k, v := range data {
-		dataCopy[k] = v
-	}
-	dataCopy["PartitionKey"] = ingestionSourceID
-	dataCopy["RowKey"] = uuid.Nil.String()
+	ctx, cancel := context.WithTimeout(ctx, defaultTimeoutMsec)
+	defer cancel()
 
-	bytes, err := json.Marshal(dataCopy)
+	data["PartitionKey"] = ingestionSourceID
+	data["RowKey"] = uuid.Nil.String()
+
+	bytes, err := json.Marshal(data)
 	if err != nil {
 		return err
 	}
@@ -81,6 +79,5 @@ func (c *TableClient) Write(ctx context.Context, ingestionSourceID string, data 
 		Format: &format,
 	})
 
-	// TODO - what should we do in case it already exists?
 	return err
 }
