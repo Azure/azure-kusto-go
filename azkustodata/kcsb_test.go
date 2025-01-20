@@ -29,7 +29,7 @@ func TestGetConnectionStringBuilder(t *testing.T) {
 		},
 		{
 			name:             "test_conn_string_fullstring",
-			connectionString: "https://help.kusto.windows.net/Samples;aad user id=1234;password=****;application key=1234;application client id=1234;application key=0987;authority id=123456;application token=token;user token=usertoken;;interactivelogin=false; domainhint=www.google.com",
+			connectionString: "https://help.kusto.windows.net/Samples;aad user id=1234;password=****;application key=1234;application client id=1234;application key=0987;authority id=123456;application token=token;user token=usertoken;; domainhint=www.google.com",
 			want: ConnectionStringBuilder{
 				DataSource:             "https://help.kusto.windows.net/Samples",
 				AadUserID:              "1234",
