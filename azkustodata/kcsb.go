@@ -569,7 +569,7 @@ func (kcsb *ConnectionStringBuilder) newTokenProvider() (*TokenProvider, error) 
 		}
 	case kcsb.InteractiveLogin || kcsb.AadFederatedSecurity: // If AadFed is set, but no other auth method is set, default to interactive login
 		init = func(ci *CloudInfo, cliOpts *azcore.ClientOptions, appClientId string) (azcore.TokenCredential, error) {
-			inOpts := &azidentity.InteractiveReBrowserCredentialOptions{}
+			inOpts := &azidentity.InteractiveBrowserCredentialOptions{}
 			inOpts.ClientID = ci.KustoClientAppID
 			inOpts.TenantID = kcsb.AuthorityId
 			inOpts.RedirectURL = ci.KustoClientRedirectURI
