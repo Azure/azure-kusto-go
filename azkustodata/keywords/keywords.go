@@ -102,13 +102,13 @@ func createInstance() *Config {
 		panic(err.Error())
 	}
 
-	for i, word := range config.Keywords {
+	for _, word := range config.Keywords {
 		supported, ok := supportedKeywords[word.Name]
 		if !ok {
 			panic("Keyword " + word.Name + " is unexpected. This is a bug - please report it.")
 		}
 
-		config.Keywords[i].IsSupported = supported
+		word.IsSupported = supported
 
 		lookup[normalizeKeyword(word.Name)] = word
 		for _, alias := range word.Aliases {
