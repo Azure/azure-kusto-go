@@ -29,8 +29,9 @@ func TestGetConnectionStringBuilder(t *testing.T) {
 		},
 		{
 			name:             "test_conn_string_fullstring",
-			connectionString: "https://help.kusto.windows.net/Samples;aad user id=1234;password=****;application key=1234;application client id=1234;application key=0987;authority id=123456;application token=token;user token=usertoken;; domainhint=www.google.com",
+			connectionString: "https://help.kusto.windows.net/Samples;aad user id=1234;password=****;application key=1234;application client id=1234;application key=0987;authority id=123456;application token=token;user token=usertoken;Fed=true",
 			want: ConnectionStringBuilder{
+				AadFederatedSecurity:   true,
 				DataSource:             "https://help.kusto.windows.net/Samples",
 				AadUserID:              "1234",
 				Password:               "****",
@@ -44,7 +45,6 @@ func TestGetConnectionStringBuilder(t *testing.T) {
 				MsiAuthentication:      false,
 				ManagedServiceIdentity: "",
 				InteractiveLogin:       false,
-				RedirectURL:            "www.google.com",
 			},
 		},
 	}
@@ -68,10 +68,11 @@ func TestGetConnectionStringBuilder(t *testing.T) {
 
 func TestWithAadUserPassAuth(t *testing.T) {
 	want := ConnectionStringBuilder{
-		DataSource:  "endpoint",
-		AadUserID:   "userid",
-		Password:    "password",
-		AuthorityId: "authorityID",
+		AadFederatedSecurity: true,
+		DataSource:           "endpoint",
+		AadUserID:            "userid",
+		Password:             "password",
+		AuthorityId:          "authorityID",
 	}
 
 	actual := NewConnectionStringBuilder("endpoint").WithAadUserPassAuth("userid", "password", "authorityID")
@@ -95,8 +96,9 @@ func TestWithAadUserPassAuthErr(t *testing.T) {
 
 func TestWithAadUserToken(t *testing.T) {
 	want := ConnectionStringBuilder{
-		DataSource: "endpoint",
-		UserToken:  "token",
+		AadFederatedSecurity: true,
+		DataSource:           "endpoint",
+		UserToken:            "token",
 	}
 
 	actual := NewConnectionStringBuilder("endpoint").WithAadUserToken("token")
@@ -107,6 +109,7 @@ func TestWithAadUserToken(t *testing.T) {
 
 func TestWithWorkloadIdentity(t *testing.T) {
 	want := ConnectionStringBuilder{
+		AadFederatedSecurity:    true,
 		DataSource:              "endpoint",
 		ApplicationClientId:     "clientID",
 		AuthorityId:             "authorityID",
@@ -123,7 +126,7 @@ func TestWithAadUserTokenErr(t *testing.T) {
 	defer func() {
 		if res := recover(); res == nil {
 			t.Errorf("Should have panic")
-		} else if res != "Error: UserToken cannot be null" {
+		} else if res != "Error: User Token cannot be null" {
 			t.Errorf("Wrong panic message: %s", res)
 		}
 	}()
