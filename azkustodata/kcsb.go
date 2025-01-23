@@ -111,33 +111,16 @@ func assignValue(kcsb *ConnectionStringBuilder, rawKey string, value string) err
 
 // ConnectionString Generates a connection string from the current state of the ConnectionStringBuilder.
 func (kcsb *ConnectionStringBuilder) ConnectionString(secrets bool) (string, error) {
-	values := map[string]string{}
-
-	values[keywords.DataSource] = kcsb.DataSource
-	values[keywords.InitialCatalog] = kcsb.InitialCatalog
-	if kcsb.AadFederatedSecurity {
-		values[keywords.FederatedSecurity] = "true"
-	}
-	values[keywords.ApplicationClientId] = kcsb.ApplicationClientId
-	values[keywords.UserId] = kcsb.AadUserID
-	values[keywords.AuthorityId] = kcsb.AuthorityId
-	values[keywords.ApplicationToken] = kcsb.ApplicationToken
-	values[keywords.UserToken] = kcsb.UserToken
-	values[keywords.ApplicationKey] = kcsb.ApplicationKey
-	if kcsb.SendCertificateChain {
-		values[keywords.ApplicationCertificateX5C] = "true"
-	}
-
-	if !isEmpty(kcsb.ApplicationCertificatePath) {
-		values[keywords.ApplicationCertificateBlob] = base64.StdEncoding.EncodeToString(kcsb.ApplicationCertificateBytes)
-	}
-
 	builder := strings.Builder{}
 
-	for k, v := range values {
+	writeValue := func(k string, v string) error {
+		if isEmpty(v) {
+			return nil
+		}
+
 		keyword, err := keywords.GetKeyword(k)
 		if err != nil {
-			return "", err
+			return err
 		}
 
 		builder.WriteString(keyword.Name)
@@ -149,7 +132,49 @@ func (kcsb *ConnectionStringBuilder) ConnectionString(secrets bool) (string, err
 		}
 
 		builder.WriteRune(';')
+		return nil
 	}
+
+	if err := writeValue(keywords.DataSource, kcsb.DataSource); err != nil {
+		return "", err
+	}
+	if err := writeValue(keywords.InitialCatalog, kcsb.InitialCatalog); err != nil {
+		return "", err
+	}
+	if kcsb.AadFederatedSecurity {
+		if err := writeValue(keywords.FederatedSecurity, "true"); err != nil {
+			return "", err
+		}
+	}
+	if err := writeValue(keywords.ApplicationClientId, kcsb.ApplicationClientId); err != nil {
+		return "", err
+	}
+	if err := writeValue(keywords.UserId, kcsb.AadUserID); err != nil {
+		return "", err
+	}
+	if err := writeValue(keywords.AuthorityId, kcsb.AuthorityId); err != nil {
+		return "", err
+	}
+	if err := writeValue(keywords.ApplicationToken, kcsb.ApplicationToken); err != nil {
+		return "", err
+	}
+	if err := writeValue(keywords.UserToken, kcsb.UserToken); err != nil {
+		return "", err
+	}
+	if err := writeValue(keywords.ApplicationKey, kcsb.ApplicationKey); err != nil {
+		return "", err
+	}
+	if kcsb.SendCertificateChain {
+		if err := writeValue(keywords.ApplicationCertificateX5C, "true"); err != nil {
+			return "", err
+		}
+	}
+	if len(kcsb.ApplicationCertificateBytes) != 0 {
+		if err := writeValue(keywords.ApplicationCertificateBlob, base64.StdEncoding.EncodeToString(kcsb.ApplicationCertificateBytes)); err != nil {
+			return "", err
+		}
+	}
+
 	s := builder.String()
 	if len(s) > 0 {
 		s = s[:len(s)-1] // remove trailing ';'

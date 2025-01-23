@@ -43,7 +43,7 @@ var (
 )
 
 var (
-	supportedKeywords = map[string]bool{
+	keywordSupported = map[string]bool{
 		DataSource:                true,
 		InitialCatalog:            true,
 		FederatedSecurity:         true,
@@ -72,7 +72,6 @@ var (
 		ApplicationCertificateIssuerDistinguishedName:  false,
 		ApplicationCertificateSubjectDistinguishedName: false,
 	}
-	lookup = map[string]Keyword{}
 )
 
 // Keyword represents an individual keyword in the JSON.
@@ -88,6 +87,7 @@ type Keyword struct {
 type Config struct {
 	Version  string    `json:"version"`
 	Keywords []Keyword `json:"keywords"`
+	lookup   map[string]Keyword
 }
 
 // normalizeKeyword normalizes a keyword by making it lowercase and removing spaces.
@@ -96,23 +96,26 @@ func normalizeKeyword(keyword string) string {
 }
 
 func createInstance() *Config {
-	config := Config{}
+	config := Config{
+		lookup: make(map[string]Keyword),
+	}
 	err := json.Unmarshal(jsonFile, &config)
 	if err != nil {
 		panic(err.Error())
 	}
 
 	for _, word := range config.Keywords {
-		supported, ok := supportedKeywords[word.Name]
+		supported, ok := keywordSupported[word.Name]
 		if !ok {
-			panic("Keyword " + word.Name + " is unexpected. This is a bug - please report it.")
+			// If you get this error, you probably need to update the keywords\kcsb.json file.
+			panic("Keyword " + word.Name + " not found in embedded kcsb.json file. Please report this issue.")
 		}
 
 		word.IsSupported = supported
 
-		lookup[normalizeKeyword(word.Name)] = word
+		config.lookup[normalizeKeyword(word.Name)] = word
 		for _, alias := range word.Aliases {
-			lookup[normalizeKeyword(alias)] = word
+			config.lookup[normalizeKeyword(alias)] = word
 		}
 	}
 
@@ -120,7 +123,7 @@ func createInstance() *Config {
 }
 
 func GetKeyword(keyword string) (*Keyword, error) {
-	word, ok := lookup[normalizeKeyword(keyword)]
+	word, ok := Instance.lookup[normalizeKeyword(keyword)]
 	if !ok {
 		return nil, errors.ES(errors.OpUnknown, errors.KFailedToParse, "The Connection String keyword `%s` is unknown.", keyword)
 	}
