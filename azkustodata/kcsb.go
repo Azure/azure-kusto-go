@@ -110,7 +110,7 @@ func assignValue(kcsb *ConnectionStringBuilder, rawKey string, value string) err
 }
 
 // ConnectionString Generates a connection string from the current state of the ConnectionStringBuilder.
-func (kcsb *ConnectionStringBuilder) ConnectionString(secrets bool) (string, error) {
+func (kcsb *ConnectionStringBuilder) ConnectionString(includeSecrets bool) (string, error) {
 	builder := strings.Builder{}
 
 	writeValue := func(k string, v string) error {
@@ -125,7 +125,7 @@ func (kcsb *ConnectionStringBuilder) ConnectionString(secrets bool) (string, err
 
 		builder.WriteString(keyword.Name)
 		builder.WriteRune('=')
-		if keyword.Secret && secrets {
+		if keyword.Secret && !includeSecrets {
 			builder.WriteString(SecretReplacement)
 		} else {
 			builder.WriteString(v)

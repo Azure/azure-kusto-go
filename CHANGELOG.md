@@ -11,7 +11,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - [BREAKING] Aligned KCSB (Kusto Connection String Builder) parsing with other SDKS:
   - Removed keywords `InteractiveLogin` and `RedirectURL`
   - Keywords are now case-insensitive, and ignore spaces.
-  - Added GetConnectionString(secrets bool) method to KCSB, to get a canonical connection string, with or without secrets.
+  - Added `GetConnectionString(includeSecrets bool)` method to KCSB, to get a canonical connection string, with or without secrets.
 
 ## [1.0.0-preview-5] - 2024-09-09
 

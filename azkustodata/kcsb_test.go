@@ -1,6 +1,8 @@
 package azkustodata
 
 import (
+	"github.com/Azure/azure-kusto-go/azkustodata/errors"
+	"strings"
 	"testing"
 
 	"github.com/Azure/azure-sdk-for-go/sdk/azcore"
@@ -258,8 +260,8 @@ func TestWithUnsupportedKeyword(t *testing.T) {
 	defer func() {
 		if res := recover(); res == nil {
 			t.Errorf("Should have panic")
-		} else if res != "Error: Unsupported keyword: DstsFed" {
-			t.Errorf("Wrong panic message: %s", res)
+		} else if !strings.Contains(res.(*errors.Error).Error(), "The Connection String keyword `DstsFed` is not supported.") {
+			t.Errorf("Wrong panic message: %s", res.(*errors.Error).Error())
 		}
 	}()
 	NewConnectionStringBuilder("Data Source=mycluster.kusto.windows.net;AppClientId=myclientid;AppKey=myappkey;DstsFed=true")
@@ -269,8 +271,8 @@ func TestWithInvalidKeyword(t *testing.T) {
 	defer func() {
 		if res := recover(); res == nil {
 			t.Errorf("Should have panic")
-		} else if res != "Error: Invalid keyword: InvalidKey" {
-			t.Errorf("Wrong panic message: %s", res)
+		} else if !strings.Contains(res.(*errors.Error).Error(), "The Connection String keyword `InvalidKey` is unknown.") {
+			t.Errorf("Wrong panic message: %s", res.(*errors.Error).Error())
 		}
 	}()
 	NewConnectionStringBuilder("Data Source=mycluster.kusto.windows.net;AppClientId=myclientid;AppKey=myappkey;InvalidKey=invalidKey")
