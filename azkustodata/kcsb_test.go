@@ -230,5 +230,59 @@ func TestGetTokenProviderHappy(t *testing.T) {
 			assert.NotNil(t, got)
 		})
 	}
+}
 
+/*    @Test
+void testWithUnsupportedKeyword() {
+    Assertions.assertThrows(IllegalArgumentException.class,
+            () -> new ConnectionStringBuilder("Data Source=mycluster.kusto.windows.net;AppClientId=myclientid;AppKey=myappkey;DstsFed=true"));
+}
+
+@Test
+void testWithInvalidKeyword() {
+    Assertions.assertThrows(IllegalArgumentException.class,
+            () -> new ConnectionStringBuilder("Data Source=mycluster.kusto.windows.net;AppClientId=myclientid;AppKey=myappkey;InvalidKey=invalidKey"));
+}
+
+@Test
+void testStringConversion() {
+    String connectionString = "Data Source=mycluster.kusto.windows.net;AppClientId=myclientid;AppKey=myappkey;";
+    ConnectionStringBuilder builder = new ConnectionStringBuilder(connectionString);
+
+    // Assert that the fields have been set correctly
+    Assertions.assertEquals("Data Source=mycluster.kusto.windows.net;Application Client Id=myclientid;Application Key=****", builder.toString());
+    Assertions.assertEquals("Data Source=mycluster.kusto.windows.net;Application Client Id=myclientid;Application Key=myappkey", builder.toString(true));
+}*/
+
+func TestWithUnsupportedKeyword(t *testing.T) {
+	defer func() {
+		if res := recover(); res == nil {
+			t.Errorf("Should have panic")
+		} else if res != "Error: Unsupported keyword: DstsFed" {
+			t.Errorf("Wrong panic message: %s", res)
+		}
+	}()
+	NewConnectionStringBuilder("Data Source=mycluster.kusto.windows.net;AppClientId=myclientid;AppKey=myappkey;DstsFed=true")
+}
+
+func TestWithInvalidKeyword(t *testing.T) {
+	defer func() {
+		if res := recover(); res == nil {
+			t.Errorf("Should have panic")
+		} else if res != "Error: Invalid keyword: InvalidKey" {
+			t.Errorf("Wrong panic message: %s", res)
+		}
+	}()
+	NewConnectionStringBuilder("Data Source=mycluster.kusto.windows.net;AppClientId=myclientid;AppKey=myappkey;InvalidKey=invalidKey")
+}
+
+func TestStringConversion(t *testing.T) {
+	connectionString := "Data Source=mycluster.kusto.windows.net;AppClientId=myclientid;AppKey=myappkey;"
+	builder := NewConnectionStringBuilder(connectionString)
+
+	s, err := builder.ConnectionString(false)
+	assert.Nil(t, err)
+	assert.Equal(t, "Data Source=mycluster.kusto.windows.net;Application Client Id=myclientid;Application Key=****", s)
+	s, err = builder.ConnectionString(true)
+	assert.Equal(t, "Data Source=mycluster.kusto.windows.net;Application Client Id=myclientid;Application Key=myappkey", s)
 }
