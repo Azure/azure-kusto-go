@@ -234,28 +234,6 @@ func TestGetTokenProviderHappy(t *testing.T) {
 	}
 }
 
-/*    @Test
-void testWithUnsupportedKeyword() {
-    Assertions.assertThrows(IllegalArgumentException.class,
-            () -> new ConnectionStringBuilder("Data Source=mycluster.kusto.windows.net;AppClientId=myclientid;AppKey=myappkey;DstsFed=true"));
-}
-
-@Test
-void testWithInvalidKeyword() {
-    Assertions.assertThrows(IllegalArgumentException.class,
-            () -> new ConnectionStringBuilder("Data Source=mycluster.kusto.windows.net;AppClientId=myclientid;AppKey=myappkey;InvalidKey=invalidKey"));
-}
-
-@Test
-void testStringConversion() {
-    String connectionString = "Data Source=mycluster.kusto.windows.net;AppClientId=myclientid;AppKey=myappkey;";
-    ConnectionStringBuilder builder = new ConnectionStringBuilder(connectionString);
-
-    // Assert that the fields have been set correctly
-    Assertions.assertEquals("Data Source=mycluster.kusto.windows.net;Application Client Id=myclientid;Application Key=****", builder.toString());
-    Assertions.assertEquals("Data Source=mycluster.kusto.windows.net;Application Client Id=myclientid;Application Key=myappkey", builder.toString(true));
-}*/
-
 func TestWithUnsupportedKeyword(t *testing.T) {
 	defer func() {
 		if res := recover(); res == nil {
