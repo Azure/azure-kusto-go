@@ -1,6 +1,8 @@
 package azkustodata
 
 import (
+	"github.com/Azure/azure-kusto-go/azkustodata/errors"
+	"strings"
 	"testing"
 
 	"github.com/Azure/azure-sdk-for-go/sdk/azcore"
@@ -29,23 +31,22 @@ func TestGetConnectionStringBuilder(t *testing.T) {
 		},
 		{
 			name:             "test_conn_string_fullstring",
-			connectionString: "https://help.kusto.windows.net/Samples;aad user id=1234;password=****;application key=1234;application client id=1234;application key=0987;application certificate=avsefsfbsrgbrb; authority id=123456;application token=token;user token=usertoken;;interactivelogin=false; domainhint=www.google.com",
+			connectionString: "https://help.kusto.windows.net/Samples;aad user id=1234;password=****;application key=1234;application client id=1234;application key=0987;authority id=123456;application token=token;user token=usertoken;Fed=true",
 			want: ConnectionStringBuilder{
-				DataSource:                 "https://help.kusto.windows.net/Samples",
-				AadUserID:                  "1234",
-				Password:                   "****",
-				UserToken:                  "usertoken",
-				ApplicationClientId:        "1234",
-				ApplicationKey:             "0987",
-				AuthorityId:                "123456",
-				ApplicationCertificatePath: "avsefsfbsrgbrb",
-				SendCertificateChain:       false,
-				ApplicationToken:           "token",
-				AzCli:                      false,
-				MsiAuthentication:          false,
-				ManagedServiceIdentity:     "",
-				InteractiveLogin:           false,
-				RedirectURL:                "www.google.com",
+				AadFederatedSecurity:   true,
+				DataSource:             "https://help.kusto.windows.net/Samples",
+				AadUserID:              "1234",
+				Password:               "****",
+				UserToken:              "usertoken",
+				ApplicationClientId:    "1234",
+				ApplicationKey:         "0987",
+				AuthorityId:            "123456",
+				SendCertificateChain:   false,
+				ApplicationToken:       "token",
+				AzCli:                  false,
+				MsiAuthentication:      false,
+				ManagedServiceIdentity: "",
+				InteractiveLogin:       false,
 			},
 		},
 	}
@@ -69,10 +70,11 @@ func TestGetConnectionStringBuilder(t *testing.T) {
 
 func TestWithAadUserPassAuth(t *testing.T) {
 	want := ConnectionStringBuilder{
-		DataSource:  "endpoint",
-		AadUserID:   "userid",
-		Password:    "password",
-		AuthorityId: "authorityID",
+		AadFederatedSecurity: true,
+		DataSource:           "endpoint",
+		AadUserID:            "userid",
+		Password:             "password",
+		AuthorityId:          "authorityID",
 	}
 
 	actual := NewConnectionStringBuilder("endpoint").WithAadUserPassAuth("userid", "password", "authorityID")
@@ -96,8 +98,9 @@ func TestWithAadUserPassAuthErr(t *testing.T) {
 
 func TestWithAadUserToken(t *testing.T) {
 	want := ConnectionStringBuilder{
-		DataSource: "endpoint",
-		UserToken:  "token",
+		AadFederatedSecurity: true,
+		DataSource:           "endpoint",
+		UserToken:            "token",
 	}
 
 	actual := NewConnectionStringBuilder("endpoint").WithAadUserToken("token")
@@ -108,6 +111,7 @@ func TestWithAadUserToken(t *testing.T) {
 
 func TestWithWorkloadIdentity(t *testing.T) {
 	want := ConnectionStringBuilder{
+		AadFederatedSecurity:    true,
 		DataSource:              "endpoint",
 		ApplicationClientId:     "clientID",
 		AuthorityId:             "authorityID",
@@ -124,7 +128,7 @@ func TestWithAadUserTokenErr(t *testing.T) {
 	defer func() {
 		if res := recover(); res == nil {
 			t.Errorf("Should have panic")
-		} else if res != "Error: UserToken cannot be null" {
+		} else if res != "Error: User Token cannot be null" {
 			t.Errorf("Wrong panic message: %s", res)
 		}
 	}()
@@ -228,5 +232,37 @@ func TestGetTokenProviderHappy(t *testing.T) {
 			assert.NotNil(t, got)
 		})
 	}
+}
 
+func TestWithUnsupportedKeyword(t *testing.T) {
+	defer func() {
+		if res := recover(); res == nil {
+			t.Errorf("Should have panic")
+		} else if !strings.Contains(res.(*errors.Error).Error(), "The Connection String keyword `DstsFed` is not supported.") {
+			t.Errorf("Wrong panic message: %s", res.(*errors.Error).Error())
+		}
+	}()
+	NewConnectionStringBuilder("Data Source=mycluster.kusto.windows.net;AppClientId=myclientid;AppKey=myappkey;DstsFed=true")
+}
+
+func TestWithInvalidKeyword(t *testing.T) {
+	defer func() {
+		if res := recover(); res == nil {
+			t.Errorf("Should have panic")
+		} else if !strings.Contains(res.(*errors.Error).Error(), "The Connection String keyword `InvalidKey` is unknown.") {
+			t.Errorf("Wrong panic message: %s", res.(*errors.Error).Error())
+		}
+	}()
+	NewConnectionStringBuilder("Data Source=mycluster.kusto.windows.net;AppClientId=myclientid;AppKey=myappkey;InvalidKey=invalidKey")
+}
+
+func TestStringConversion(t *testing.T) {
+	connectionString := "Data Source=mycluster.kusto.windows.net;AppClientId=myclientid;AppKey=myappkey;"
+	builder := NewConnectionStringBuilder(connectionString)
+
+	s, err := builder.ConnectionString(false)
+	assert.Nil(t, err)
+	assert.Equal(t, "Data Source=mycluster.kusto.windows.net;Application Client Id=myclientid;Application Key=****", s)
+	s, err = builder.ConnectionString(true)
+	assert.Equal(t, "Data Source=mycluster.kusto.windows.net;Application Client Id=myclientid;Application Key=myappkey", s)
 }
