@@ -2,8 +2,8 @@ package value
 
 import (
 	"encoding/json"
+	"fmt"
 	"math"
-	"strings"
 	"testing"
 	"time"
 
@@ -472,7 +472,7 @@ func TestString(t *testing.T) {
 	}
 }
 
-func TestTimespan(t *testing.T) {
+func TestTimespanUnmarshal(t *testing.T) {
 	t.Parallel()
 
 	tests := []struct {
@@ -533,26 +533,45 @@ func TestTimespan(t *testing.T) {
 			assert.NoError(t, err)
 
 			assert.EqualValues(t, test.want, got)
-
-			strGot := got.Marshal()
-
-			if test.i == nil || got.value == nil {
-				assert.Equal(t, "00:00:00", strGot)
-				return
-			}
-			assert.EqualValues(t, removeLeadingZeros(test.i.(string)), removeLeadingZeros(strGot))
 		})
 	}
 }
 
-func removeLeadingZeros(s string) string {
-	if len(s) == 0 {
-		return s
+func TestTimespanMarshal(t *testing.T) {
+	t.Parallel()
+
+	tests := []struct {
+		timespan *Timespan
+		expected string
+	}{
+		{expected: "00:00:00", timespan: nil},
+		{expected: "00:00:00", timespan: NewTimespan(0)},
+		{expected: "00:00:00", timespan: &Timespan{newPointerValue[time.Duration](nil)}},
+		{expected: "00:00:00", timespan: NewTimespan(-1 * time.Nanosecond)},
+		{expected: "00:00:00", timespan: NewTimespan(-10 * time.Nanosecond)},
+		{expected: "00:00:00", timespan: NewTimespan(1 * time.Nanosecond)},
+		{expected: "00:00:00", timespan: NewTimespan(10 * time.Nanosecond)},
+		{expected: "-00:00:01", timespan: NewTimespan(-1 * time.Second)},
+		{expected: "-1.00:00:00", timespan: NewTimespan(-1 * day)},
+		{expected: "1.00:00:00", timespan: NewTimespan(1 * day)},
+		{expected: "12.00:00:00", timespan: NewTimespan(12 * day)},
+		{expected: "123.00:00:00", timespan: NewTimespan(123 * day)},
+		{expected: "1.00:00:01", timespan: NewTimespan(1*day + time.Second)},
+		{expected: "00:00:00.0010000", timespan: NewTimespan(1 * time.Millisecond)},
+		{expected: "00:00:00.0000001", timespan: NewTimespan(1 * tick)},
+		{expected: "-00:00:00.0000001", timespan: NewTimespan(-1 * tick)},
+		{expected: "23:59:59.9999999", timespan: NewTimespan(day - tick)},
+		{expected: "-23:59:59.9999999", timespan: NewTimespan(-day + tick)},
+		{expected: "00:00:30", timespan: NewTimespan(30 * time.Second)},
+		{expected: "3.17:25:30.5000000", timespan: NewTimespan(3*day + 17*time.Hour + 25*time.Minute + 30*time.Second + 500*time.Millisecond)},
 	}
-	if string(s[0]) == "-" {
-		return string(s[0]) + strings.Trim(s[1:], "0:.")
+
+	for i, test := range tests {
+		test := test // capture
+		t.Run(fmt.Sprintf("%d", i), func(t *testing.T) {
+			assert.EqualValues(t, test.expected, test.timespan.Marshal())
+		})
 	}
-	return strings.Trim(s, "0:.")
 }
 
 func TestDecimal(t *testing.T) {
