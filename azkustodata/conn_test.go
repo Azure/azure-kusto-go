@@ -2,7 +2,9 @@ package azkustodata
 
 import (
 	"context"
+	"time"
 	"github.com/Azure/azure-kusto-go/azkustodata/errors"
+	"github.com/Azure/azure-kusto-go/azkustodata/value"
 	"github.com/Azure/azure-kusto-go/azkustodata/kql"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
@@ -196,6 +198,72 @@ func TestSetConnectorDetails(t *testing.T) {
 			} else {
 				assert.Equal(t, tt.expectedUser, kcsb.UserForTracing)
 			}
+		})
+	}
+}
+
+func TestTimeout(t *testing.T) {
+	t.Parallel()
+
+	fixedTime := time.Date(1997, 3, 9, 6, 14, 6, 3, time.UTC)
+	nower = func() time.Time {
+		return fixedTime
+	}
+
+	newContextWithTimeout := func(duration time.Duration) context.Context {
+		ctx, _ := context.WithDeadline(context.Background(), fixedTime.Add(duration))
+		return ctx
+	}
+
+	tests := []struct {
+		name                  string
+		ctx                   context.Context
+		callType              int
+		queryOptions          []QueryOption
+		expectedServerTimeout time.Duration
+	}{
+		{
+			name:                  "TestDefaultQuery",
+			ctx:                   context.Background(),
+			callType:              queryCall,
+			expectedServerTimeout: defaultQueryTimeout,
+		},
+		{
+			name:                  "TestDefaultMgmt",
+			ctx:                   context.Background(),
+			callType:              mgmtCall,
+			expectedServerTimeout: defaultMgmtTimeout,
+		},
+		{
+			name:                  "OptionSet",
+			ctx:                   context.Background(),
+			callType:              queryCall,
+			queryOptions:          []QueryOption{ServerTimeout(15 * time.Second)},
+			expectedServerTimeout: 15 * time.Second,
+		},
+		{
+			name:                  "Context",
+			ctx:                   newContextWithTimeout(15 * time.Second),
+			callType:              queryCall,
+			expectedServerTimeout: 15 * time.Second,
+		},
+		{
+			name:                  "ContextAndOption",
+			ctx:                   newContextWithTimeout(15 * time.Second),
+			queryOptions:          []QueryOption{ServerTimeout(250 * time.Second)},
+			callType:              queryCall,
+			expectedServerTimeout: 250 * time.Second,
+		},
+	}
+	for _, tt := range tests {
+		tt := tt // Capture
+		t.Run(tt.name, func(t *testing.T) {
+			t.Parallel()
+
+			opts, err := setQueryOptions(tt.ctx, errors.OpUnknown, kql.New("test"), tt.callType, tt.queryOptions...)
+			require.NoError(t, err)
+
+			require.Equal(t, value.TimespanString(tt.expectedServerTimeout), opts.requestProperties.Options[ServerTimeoutValue])
 		})
 	}
 }
