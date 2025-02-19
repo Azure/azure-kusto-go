@@ -31,7 +31,7 @@ func GenerateConnectionString(clusterUrl string, authenticationMode Authenticati
 		// For more information, see https://docs.microsoft.com/en-us/azure/active-directory/managed-identities-azure-resources/overview
 		var clientID = os.Getenv("MANAGED_IDENTITY_CLIENT_ID")
 		if clientID != "" {
-			return kcs.WithUserManagedIdentity(clientID)
+			return kcs.WithUserAssignedIdentityClientId(clientID)
 		}
 		return kcs.WithSystemManagedIdentity()
 	case AppKey:
