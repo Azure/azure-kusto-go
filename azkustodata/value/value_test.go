@@ -3,10 +3,9 @@ package value
 import (
 	"encoding/json"
 	"fmt"
-
 	"math"
 	"testing"
-	"fmt"
+	"time"
 
 	"github.com/google/uuid"
 	"github.com/stretchr/testify/assert"
