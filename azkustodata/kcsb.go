@@ -14,26 +14,24 @@ import (
 )
 
 type ConnectionStringBuilder struct {
-	DataSource                     string
-	InitialCatalog                 string // TODO - implement default db support
-	AadFederatedSecurity           bool
-	AadUserID                      string
-	Password                       string
-	UserToken                      string
-	ApplicationClientId            string
-	ApplicationKey                 string
-	AuthorityId                    string
-	ApplicationCertificatePath     string
-	ApplicationCertificateBytes    []byte
-	ApplicationCertificatePassword []byte
-	SendCertificateChain           bool
-	ApplicationToken               string
-	AzCli                          bool
-	MsiAuthentication              bool
-	WorkloadAuthentication         bool
-	FederationTokenFilePath        string
-	// Deprecated: Use ManagedServiceIdentityClientId or ManagedServiceIdentityResourceId instead
-	ManagedServiceIdentity           string
+	DataSource                       string
+	InitialCatalog                   string // TODO - implement default db support
+	AadFederatedSecurity             bool
+	AadUserID                        string
+	Password                         string
+	UserToken                        string
+	ApplicationClientId              string
+	ApplicationKey                   string
+	AuthorityId                      string
+	ApplicationCertificatePath       string
+	ApplicationCertificateBytes      []byte
+	ApplicationCertificatePassword   []byte
+	SendCertificateChain             bool
+	ApplicationToken                 string
+	AzCli                            bool
+	MsiAuthentication                bool
+	WorkloadAuthentication           bool
+	FederationTokenFilePath          string
 	ManagedServiceIdentityClientId   string
 	ManagedServiceIdentityResourceId string
 	InteractiveLogin                 bool
@@ -232,7 +230,6 @@ func (kcsb *ConnectionStringBuilder) resetConnectionString() {
 	kcsb.AzCli = false
 	kcsb.MsiAuthentication = false
 	kcsb.WorkloadAuthentication = false
-	kcsb.ManagedServiceIdentity = ""
 	kcsb.ManagedServiceIdentityClientId = ""
 	kcsb.ManagedServiceIdentityResourceId = ""
 	kcsb.InteractiveLogin = false
@@ -330,13 +327,6 @@ func (kcsb *ConnectionStringBuilder) WithAzCli() *ConnectionStringBuilder {
 	kcsb.AadFederatedSecurity = true
 	kcsb.AzCli = true
 	return kcsb
-}
-
-// Deprecated: use WithUserManagedIdentityClientId or WithUserManagedIdentityResourceId instead
-// WithUserManagedIdentity Creates a Kusto Connection string builder that will authenticate with AAD application, using
-// an application token obtained from a Microsoft Service Identity endpoint using user assigned id.
-func (kcsb *ConnectionStringBuilder) WithUserManagedIdentity(clientID string) *ConnectionStringBuilder {
-	return kcsb.WithUserAssignedIdentityClientId(clientID)
 }
 
 // WithUserAssignedIdentityClientId Creates a Kusto Connection string builder that will authenticate with AAD application, using
@@ -500,9 +490,7 @@ func (kcsb *ConnectionStringBuilder) newTokenProvider() (*TokenProvider, error) 
 			// new kcsb.ManagedServiceIdentityResourceId field
 			// if no client id is provided, the logic falls back to set up
 			// the system assigned identity
-			if !isEmpty(kcsb.ManagedServiceIdentity) {
-				opts.ID = azidentity.ClientID(kcsb.ManagedServiceIdentity)
-			} else if !isEmpty(kcsb.ManagedServiceIdentityClientId) {
+			if !isEmpty(kcsb.ManagedServiceIdentityClientId) {
 				opts.ID = azidentity.ClientID(kcsb.ManagedServiceIdentityClientId)
 			} else if !isEmpty(kcsb.ManagedServiceIdentityResourceId) {
 				opts.ID = azidentity.ResourceID(kcsb.ManagedServiceIdentityResourceId)

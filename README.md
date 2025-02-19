@@ -108,7 +108,7 @@ client, err = azkustodata.New(kustoConnectionString)
 #### Using a user-assigned managed identity
 
 ```go
-kustoConnectionString := kustoConnectionStringBuilder.WithUserManagedIdentity(clientID)
+kustoConnectionString := kustoConnectionStringBuilder.WithUserAssignedIdentityClientId(clientID)
 client, err = azkustodata.New(kustoConnectionString)
 ```
 

@@ -110,7 +110,7 @@ func ExampleAuthorization_config() {
 
 func ExampleAuthorization_msi() {
 
-	kcsb := NewConnectionStringBuilder("endpoint").WithUserManagedIdentity("clientID")
+	kcsb := NewConnectionStringBuilder("endpoint").WithUserAssignedIdentityClientId("clientID")
 
 	// Normally here you take a client.
 	_, err := New(kcsb)
