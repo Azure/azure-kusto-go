@@ -2,9 +2,11 @@ package value
 
 import (
 	"encoding/json"
+	"fmt"
+
 	"math"
 	"testing"
-	"time"
+	"fmt"
 
 	"github.com/google/uuid"
 	"github.com/stretchr/testify/assert"
@@ -565,9 +567,9 @@ func TestTimespanMarshal(t *testing.T) {
 		{expected: "3.17:25:30.5000000", timespan: NewTimespan(3*day + 17*time.Hour + 25*time.Minute + 30*time.Second + 500*time.Millisecond)},
 	}
 
-	for _, test := range tests {
+	for i, test := range tests {
 		test := test // capture
-		t.Run("", func(t *testing.T) {
+		t.Run(fmt.Sprintf("%d", i), func(t *testing.T) {
 			assert.EqualValues(t, test.expected, test.timespan.Marshal())
 		})
 	}
