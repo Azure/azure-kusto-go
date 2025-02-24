@@ -33,20 +33,19 @@ func TestGetConnectionStringBuilder(t *testing.T) {
 			name:             "test_conn_string_fullstring",
 			connectionString: "https://help.kusto.windows.net/Samples;aad user id=1234;password=****;application key=1234;application client id=1234;application key=0987;authority id=123456;application token=token;user token=usertoken;Fed=true",
 			want: ConnectionStringBuilder{
-				AadFederatedSecurity:   true,
-				DataSource:             "https://help.kusto.windows.net/Samples",
-				AadUserID:              "1234",
-				Password:               "****",
-				UserToken:              "usertoken",
-				ApplicationClientId:    "1234",
-				ApplicationKey:         "0987",
-				AuthorityId:            "123456",
-				SendCertificateChain:   false,
-				ApplicationToken:       "token",
-				AzCli:                  false,
-				MsiAuthentication:      false,
-				ManagedServiceIdentity: "",
-				InteractiveLogin:       false,
+				AadFederatedSecurity: true,
+				DataSource:           "https://help.kusto.windows.net/Samples",
+				AadUserID:            "1234",
+				Password:             "****",
+				UserToken:            "usertoken",
+				ApplicationClientId:  "1234",
+				ApplicationKey:       "0987",
+				AuthorityId:          "123456",
+				SendCertificateChain: false,
+				ApplicationToken:     "token",
+				AzCli:                false,
+				MsiAuthentication:    false,
+				InteractiveLogin:     false,
 			},
 		},
 	}
@@ -170,14 +169,6 @@ func TestGetTokenProviderHappy(t *testing.T) {
 				ApplicationKey:      "somekey",
 			},
 		}, {
-			name: "test_tokenprovider_managedsi",
-			kcsb: ConnectionStringBuilder{
-				DataSource:             "https://endpoint/test_tokenprovider_managedsi",
-				ManagedServiceIdentity: "managedid",
-				MsiAuthentication:      true,
-				ClientOptions:          &azcore.ClientOptions{},
-			},
-		}, {
 			name: "test_tokenprovider_managedui_clientId",
 			kcsb: ConnectionStringBuilder{
 				DataSource:                     "https://endpoint/test_tokenprovider_managedui_clientID",
@@ -194,7 +185,7 @@ func TestGetTokenProviderHappy(t *testing.T) {
 				ClientOptions:                    &azcore.ClientOptions{},
 			},
 		}, {
-			name: "test_tokenprovider_managedidauth2",
+			name: "test_`tokenprovider_managedidauth2",
 			kcsb: ConnectionStringBuilder{
 				DataSource:        "https://endpoint/test_tokenprovider_managedidauth2",
 				MsiAuthentication: true,

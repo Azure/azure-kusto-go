@@ -14,26 +14,24 @@ import (
 )
 
 type ConnectionStringBuilder struct {
-	DataSource                     string
-	InitialCatalog                 string // TODO - implement default db support
-	AadFederatedSecurity           bool
-	AadUserID                      string
-	Password                       string
-	UserToken                      string
-	ApplicationClientId            string
-	ApplicationKey                 string
-	AuthorityId                    string
-	ApplicationCertificatePath     string
-	ApplicationCertificateBytes    []byte
-	ApplicationCertificatePassword []byte
-	SendCertificateChain           bool
-	ApplicationToken               string
-	AzCli                          bool
-	MsiAuthentication              bool
-	WorkloadAuthentication         bool
-	FederationTokenFilePath        string
-	// Deprecated: Use ManagedServiceIdentityClientId or ManagedServiceIdentityResourceId instead
-	ManagedServiceIdentity           string
+	DataSource                       string
+	InitialCatalog                   string // TODO - implement default db support
+	AadFederatedSecurity             bool
+	AadUserID                        string
+	Password                         string
+	UserToken                        string
+	ApplicationClientId              string
+	ApplicationKey                   string
+	AuthorityId                      string
+	ApplicationCertificatePath       string
+	ApplicationCertificateBytes      []byte
+	ApplicationCertificatePassword   []byte
+	SendCertificateChain             bool
+	ApplicationToken                 string
+	AzCli                            bool
+	MsiAuthentication                bool
+	WorkloadAuthentication           bool
+	FederationTokenFilePath          string
 	ManagedServiceIdentityClientId   string
 	ManagedServiceIdentityResourceId string
 	InteractiveLogin                 bool
