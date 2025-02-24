@@ -5,13 +5,47 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
-## Unreleased
+## [1.0.0] - 2025-02-19
 
 ### Changed
+- [BREAKING] The minimal go version is now 1.22
+- [BREAKING]  Split the main module into two packages:
+  - azkustodata - contains querying, management APIs.
+  - azkustoingest - contains ingestion in all its forms.
+- [BREAKING]  New API for querying, see MIGRATION.md for more details.
+- [BREAKING]  Constructing ingest clients is now done using a KustoConnectionStringBuilder, and not a client struct.
+- [BREAKING]  Changes in the kusto type system:
+  - Kusto values will now return a pointer when they are nullable. This applies to all types except for string.
+  - Decimal values are now represented as `decimal.Decimal` instead of `string`. This is to maintain efficiency and ease of use.
 - [BREAKING] Aligned KCSB (Kusto Connection String Builder) parsing with other SDKS:
   - Removed keywords `InteractiveLogin` and `RedirectURL`
   - Keywords are now case-insensitive, and ignore spaces.
   - Added `GetConnectionString(includeSecrets bool)` method to KCSB, to get a canonical connection string, with or without secrets.
+  - the `WithApplicationCertificate` on `KustoConnectionStringBuilder` was removed as it was ambiguous and not implemented correctly. Instead there are two new methods:
+    - `WithAppCertificatePath` - Receives the path to the certificate file.
+    - `WithAppCertificateBytes` - Receives the certificate bytes in-memory.  
+      Both methods accept an optional password for the certificate.
+  - `WithUserManagedIdentity` has been removed in favor of more specific functions:
+    - `WithUserAssignedIdentityClientId` - Receives the MSI client id
+    - `WithUserAssignedIdentityResourceId` - Receives the MSI resource id
+- [BREAKING] The Dynamic type now returns a []byte of json, it's up to the user to marshall it to the desired type. It can also be null.
+- [BREAKING] ManagedStreamingClient constructor now only requires the query endpoint, and will infer the ingest endpoint from it. If you want to use a different endpoint, use the `azkustoingest.WithCustomIngestConnectionString()` option.
+- [BREAKING] Removed the old deprecated Stream() method on queued ingest client, instead use azkustoingest.NewStreaming() or azkustoingest.NewManaged() for proper streaming ingest client.
+- [BREAKING] Removed `QueryIngestion()` option for Query client. If you want to perform commands against the dm, create a query client with the "ingest-" endpoint.
+
+  
+# Added
+- Added autocorrection for endpoints for ingest clients. When creating a client, the "ingest-" will be added or removed as needed. To avoid this behavior, use the `azkustoingest.WithoutEndpointCorrection()` option.
+- Passing a default database and table for ingestion is not necessary anymore, and can be done using Options.
+   ```go
+   // before:
+  	queryClient := kusto.New("https://ingest-somecluster.kusto.windows.net")
+    client := ingest.New(quetryClient, "some-db", "some-table")
+  
+    // after:
+    client := azkustoingest.New("https://ingest-somecluster.kusto.windows.net", azkustoingest.WithDefaultDatabase("someDb"), azkustoingest.WithDefaultTable("someTable"))
+  ```
+
 
 ## [1.0.0-preview-5] - 2024-09-09
 
@@ -22,15 +56,15 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ## [1.0.0-preview-4] - 2024-08-27
 ### Changed
 - the `WithApplicationCertificate` on `KustoConnectionStringBuilder` was removed as it was ambiguous and not implemented correctly. Instead there are two new methods:
-    - `WithAppCertificatePath` - Receives the path to the certificate file.
-    - `WithAppCertificateBytes` - Receives the certificate bytes in-memory.  
-      Both methods accept an optional password for the certificate.
+  - `WithAppCertificatePath` - Receives the path to the certificate file.
+  - `WithAppCertificateBytes` - Receives the certificate bytes in-memory.  
+    Both methods accept an optional password for the certificate.
 - `WithUserManagedIdentity` has been deprecated in favor of more specific functions:
-    - `WithUserAssignedIdentityClientId` - Receives the MSI client id
-    - `WithUserAssignedIdentityResourceId` - Receives the MSI resource id
+  - `WithUserAssignedIdentityClientId` - Receives the MSI client id
+  - `WithUserAssignedIdentityResourceId` - Receives the MSI resource id
 - `WithUserManagedIdentity` has been deprecated in favor of more specific functions:
-    - `WithUserAssignedIdentityClientId` - Receives the MSI client id
-    - `WithUserAssignedIdentityResourceId` - Receives the MSI resource id
+  - `WithUserAssignedIdentityClientId` - Receives the MSI client id
+  - `WithUserAssignedIdentityResourceId` - Receives the MSI resource id
 - V2FrameCapacity was renamed to V2IoCapacity to better reflect its purpose.
 - V2FragmentCapacity was renamed to V2TableCapacity to better reflect its purpose.
 - Removed `Skip` option from `IterativeTable`, as the usecase for it was not clear.
@@ -106,7 +140,6 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ## [0.15.0] - 2023-12-04
 
 ### Changed (BREAKING)
-
 - Queries are no longer progressive by default.
 - `ResultsProgressiveDisable()` has been removed.
 - Use `ResultsProgressiveEnabled()` to enable progressive queries.
