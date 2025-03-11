@@ -91,7 +91,6 @@ func (q *Parameters) ToDeclarationString() string {
 	}
 	sort.Strings(keys)
 
-	// Iterate over sorted keys
 	for i, key := range keys {
 		build.WriteString(key)
 		build.WriteString(":")
