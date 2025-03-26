@@ -1,7 +1,7 @@
 module github.com/Azure/azure-kusto-go/quickstart
 
 go 1.22
-toolchain go1.23.7
+toolchain go1.24.1
 
 require github.com/Azure/azure-kusto-go/azkustodata v1.0.1
 
@@ -17,7 +17,7 @@ require (
 	github.com/AzureAD/microsoft-authentication-library-for-go v1.3.3 // indirect
 	github.com/cenkalti/backoff/v4 v4.3.0 // indirect
 	github.com/gofrs/uuid v4.4.0+incompatible // indirect
-	github.com/golang-jwt/jwt/v5 v5.2.1 // indirect
+	github.com/golang-jwt/jwt/v5 v5.2.2 // indirect
 	github.com/google/uuid v1.6.0 // indirect
 	github.com/kylelemons/godebug v1.1.0 // indirect
 	github.com/pkg/browser v0.0.0-20240102092130-5ac0b6a4141c // indirect
