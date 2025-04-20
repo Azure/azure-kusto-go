@@ -83,7 +83,7 @@ You can also authenticate a client using a system- or user-assigned managed iden
 
 // Initialize a new kusto client using the default Azure credential
 kustoConnectionString := kustoConnectionStringBuilder.WithDefaultAzureCredential()
-client, err = azkustodata.New(kustoConnectionString)
+client, err := azkustodata.New(kustoConnectionString)
 if err != nil {
 	panic("add error handling")
 }
@@ -95,49 +95,49 @@ defer client.Close()
 
 ```go
 kustoConnectionString := kustoConnectionStringBuilder.WithAzCli()
-client, err = azkustodata.New(kustoConnectionString)
+client, err := azkustodata.New(kustoConnectionString)
 ```
 
 #### Using a system-assigned managed identity
 
 ```go
 kustoConnectionString := kustoConnectionStringBuilder.WithSystemManagedIdentity()
-client, err = azkustodata.New(kustoConnectionString)
+client, err := azkustodata.New(kustoConnectionString)
 ```
 
 #### Using a user-assigned managed identity
 
 ```go
 kustoConnectionString := kustoConnectionStringBuilder.WithUserAssignedIdentityClientId(clientID)
-client, err = azkustodata.New(kustoConnectionString)
+client, err := azkustodata.New(kustoConnectionString)
 ```
 
 #### Using a k8s workload identity
 
 ```go
 kustoConnectionString := kustoConnectionStringBuilder.WithKubernetesWorkloadIdentity(appId, tokenFilePath, authorityID)
-client, err = kusto.New(kustoConnectionString)
+client, err := kusto.New(kustoConnectionString)
 ```
 
 #### Using a bearer token
 
 ```go
 kustoConnectionString := kustoConnectionStringBuilder.WithApplicationToken(appId, token)
-client, err = azkustodata.New(kustoConnectionString)
+client, err := azkustodata.New(kustoConnectionString)
 ```
 
 #### Using an app id and secret
 
 ```go
 kustoConnectionString := kustoConnectionStringBuilder.WithAadAppKey(clientID, clientSecret, tenantID)
-client, err = azkustodata.New(kustoConnectionString)
+client, err := azkustodata.New(kustoConnectionString)
 ```
 
 #### Using an application certificate
 
 ```go
 kustoConnectionString := kustoConnectionStringBuilder.WithAppCertificate(appId, certificate, thumbprint, sendCertChain, authorityID)
-client, err = azkustodata.New(kustoConnectionString)
+client, err := azkustodata.New(kustoConnectionString)
 ```
 
 ### Querying
@@ -150,7 +150,7 @@ client, err = azkustodata.New(kustoConnectionString)
 The simplest queries can be built using `kql.New`:
 
 ```go
-query := kql.New("systemNodes | project CollectionTime, NodeId")
+q := kql.New("systemNodes | project CollectionTime, NodeId")
 ```
 
 Queries can only be built using a string literals known at compile time, and special methods for specific parts of the query.  
@@ -167,7 +167,7 @@ Management commands can not use parameters, and therefore should be built using 
 Parameters can be implicitly referenced in a query:
 
 ```go
-query := kql.New("systemNodes | project CollectionTime, NodeId | where CollectionTime > startTime and NodeId == nodeIdValue")
+q := kql.New("systemNodes | project CollectionTime, NodeId | where CollectionTime > startTime and NodeId == nodeIdValue")
 ```
 
 Here, `startTime` and `nodeIdValue` are parameters that can be passed to the query.
@@ -207,14 +207,14 @@ dt, _ := time.Parse(time.RFC3339Nano, "2020-03-04T14:05:01.3109965Z")
 tableName := "system nodes"
 value := 1
 
-query := kql.New("")
+q := kql.New("")
             .AddTable(tableName)
             .AddLiteral(" | where CollectionTime == ").AddDateTime(dt)
             .AddLiteral(" and ")
             .AddLiteral("NodeId == ").AddInt(value)
 
 // To view the query string, use the String() method:
-fmt.Println(query.String())
+fmt.Println(q.String())
 // Output: ['system nodes'] | where CollectionTime == datetime(2020-03-04T14:05:01.3109965Z) and NodeId == int(1)
 ```
 
@@ -228,7 +228,7 @@ The kusto `table` package queries data into a ***table.Row** which can be printe
 
 ```go
 // Query our database table "systemNodes" for the CollectionTimes and the NodeIds.
-dataset, err := client.IterativeQuery(ctx, "database", query)
+dataset, err := client.IterativeQuery(ctx, "database", q)
 if err != nil {
 	panic("add error handling")
 }
@@ -255,7 +255,7 @@ for rowResult := range primaryResult.Table().Rows() {
 }
 
 // Alternatively, use the `Query` method to get all of the data at once.
-dataset, err := client.Query(ctx, "database", query)
+dataset, err := client.Query(ctx, "database", q)
 if err != nil {
     panic("add error handling")
 }
@@ -283,7 +283,7 @@ type NodeRec struct {
 	CollectionTime time.Time
 }
 
-dataset, err := client.IterativeQuery(ctx, "database", query)
+dataset, err := client.IterativeQuery(ctx, "database", q)
 if err != nil {
 panic("add error handling")
 }
@@ -298,15 +298,15 @@ panic("add error handling")
 }
 
 for result := range query.ToStructsIterative[NodeRec](primaryResult.Table()) {
-    if result.Err() != nil {
+    if result.Err != nil {
         panic("add error handling")
     }
-    node := result.Struct()
+    node := result.Out
     fmt.Println(node.ID)
 }	
 
 // Or use the `Query` method to get all of the data at once.
-dataset, err := client.Query(ctx, "database", query)
+dataset, err := client.Query(ctx, "database", q)
 if err != nil {
     panic("add error handling")
 }
