@@ -71,7 +71,7 @@ func TestIngestionStatus(t *testing.T) {
 		defer cancel()
 
 		count := 5
-		var ch [5]chan error
+		var ch [5]<-chan error
 		var errors [5]error
 
 		for i := 0; i < count; i++ {
@@ -96,7 +96,7 @@ func TestIngestionStatus(t *testing.T) {
 		defer cancel()
 
 		count := 5
-		var ch [5]chan error
+		var ch [5]<-chan error
 		var errors [5]error
 
 		for i := 0; i < count; i++ {
