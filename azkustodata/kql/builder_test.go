@@ -129,6 +129,11 @@ func TestBuilder(t *testing.T) {
 				AddColumn("b\na\nz").AddLiteral(" == ").
 				AddFunction("f_u_n\u1234c").AddLiteral("()"),
 			`database("f\"\"o").["b\\a\\r"] | where ["b\na\nz"] == ["f_u_n\u1234c"]()`},
+		{
+			"Test Empty String",
+			New(`myTable | where col = `).AddString(""),
+			`myTable | where col = ""`,
+		},
 	}
 	for _, test := range tests {
 		t.Run(test.name, func(t *testing.T) {
