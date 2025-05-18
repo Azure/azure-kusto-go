@@ -3,9 +3,9 @@ module github.com/Azure/azure-kusto-go/quickstart
 go 1.22
 toolchain go1.24.1
 
-require github.com/Azure/azure-kusto-go/azkustodata v1.0.2
+require github.com/Azure/azure-kusto-go/azkustodata v1.0.3
 
-require github.com/Azure/azure-kusto-go/azkustoingest v1.0.2
+require github.com/Azure/azure-kusto-go/azkustoingest v1.0.3
 
 require (
 	github.com/Azure/azure-sdk-for-go/sdk/azcore v1.17.0 // indirect
