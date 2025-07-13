@@ -10,6 +10,7 @@ import (
 	"github.com/Azure/azure-kusto-go/azkustoingest/internal/resources"
 	"github.com/google/uuid"
 	"io"
+	"net/http"
 )
 
 type Ingestor interface {
@@ -33,6 +34,7 @@ type Ingestion struct {
 
 	withoutEndpointCorrection    bool
 	customIngestConnectionString *azkustodata.ConnectionStringBuilder
+	httpClient                   *http.Client
 	applicationForTracing        string
 	clientVersionForTracing      string
 }
@@ -50,7 +52,13 @@ func New(kcsb *azkustodata.ConnectionStringBuilder, options ...Option) (*Ingesti
 	i.applicationForTracing = clientDetails.ApplicationForTracing()
 	i.clientVersionForTracing = clientDetails.ClientVersionForTracing()
 
-	client, err := azkustodata.New(kcsb)
+	var client *azkustodata.Client
+	var err error
+	if i.httpClient != nil {
+		client, err = azkustodata.New(kcsb, azkustodata.WithHttpClient(i.httpClient))
+	} else {
+		client, err = azkustodata.New(kcsb)
+	}
 	if err != nil {
 		return nil, err
 	}
@@ -217,4 +225,9 @@ func (i *Ingestion) Close() error {
 	}
 	err = i.fs.Close()
 	return err
+}
+
+// HttpClient returns the HTTP client used by the ingestion client.
+func (i *Ingestion) HttpClient() *http.Client {
+	return i.client.HttpClient()
 }
