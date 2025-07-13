@@ -15,7 +15,7 @@ type PopulationData struct {
 	Pop   int `kusto:"Population"` // use the kusto tag to map to a different column name
 }
 
-func ExampleIterativeQuery() {
+func Example_iterativeQuery() {
 	// Create a client using the default Azure credential
 	kcsb := azkustodata.NewConnectionStringBuilder("https://help.kusto.windows.net/").WithDefaultAzureCredential()
 	client, err := azkustodata.New(kcsb)

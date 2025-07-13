@@ -8,7 +8,7 @@ import (
 	"github.com/Azure/azure-kusto-go/azkustodata/value"
 )
 
-func ExampleMgmt() {
+func Example_mgmt() {
 	// Create a client using the default Azure credential
 	kcsb := azkustodata.NewConnectionStringBuilder("https://help.kusto.windows.net/").WithDefaultAzureCredential()
 	client, err := azkustodata.New(kcsb)
