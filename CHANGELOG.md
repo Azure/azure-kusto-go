@@ -9,8 +9,6 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Added
 - `WithHttpClient` option support for all ingest client types (`New`, `NewStreaming`, `NewManaged`) to enable custom HTTP client configuration and instrumentation such as OpenTelemetry
-- `HttpClient()` method for `Ingestion` and `Streaming` clients to access the underlying HTTP client
-- `QueuedHttpClient()` and `StreamingHttpClient()` methods for `Managed` client to access both underlying HTTP clients
 
 ## [1.0.3] - 2025-05-18
 
