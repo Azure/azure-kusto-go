@@ -54,11 +54,13 @@ func New(kcsb *azkustodata.ConnectionStringBuilder, options ...Option) (*Ingesti
 
 	var client *azkustodata.Client
 	var err error
+
 	if i.httpClient != nil {
 		client, err = azkustodata.New(kcsb, azkustodata.WithHttpClient(i.httpClient))
 	} else {
 		client, err = azkustodata.New(kcsb)
 	}
+
 	if err != nil {
 		return nil, err
 	}
