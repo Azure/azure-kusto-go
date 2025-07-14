@@ -228,8 +228,3 @@ func (i *Ingestion) Close() error {
 	err = i.fs.Close()
 	return err
 }
-
-// HttpClient returns the HTTP client used by the ingestion client.
-func (i *Ingestion) HttpClient() *http.Client {
-	return i.client.HttpClient()
-}

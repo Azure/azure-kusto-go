@@ -8,7 +8,6 @@ import (
 	"github.com/Azure/azure-kusto-go/azkustoingest/ingestoptions"
 	"github.com/Azure/azure-kusto-go/azkustoingest/internal/queued"
 	"io"
-	"net/http"
 	"time"
 
 	"github.com/Azure/azure-kusto-go/azkustodata/errors"
@@ -218,14 +217,4 @@ func (m *Managed) newProp() properties.All {
 
 func (m *Managed) Close() error {
 	return errors.CombineErrors(m.queued.Close(), m.streaming.Close())
-}
-
-// QueuedHttpClient returns the HTTP client used by the queued ingestion client.
-func (m *Managed) QueuedHttpClient() *http.Client {
-	return m.queued.HttpClient()
-}
-
-// StreamingHttpClient returns the HTTP client used by the streaming ingestion client.
-func (m *Managed) StreamingHttpClient() *http.Client {
-	return m.streaming.HttpClient()
 }

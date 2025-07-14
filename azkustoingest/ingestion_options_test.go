@@ -279,8 +279,8 @@ func TestWithHttpClient(t *testing.T) {
 		assert.NotNil(t, ingest)
 
 		// Verify that the underlying client is using our custom HTTP client
-		// by checking if the timeout matches
-		actualClient := ingest.HttpClient()
+		// by checking if the timeout matches using private field
+		actualClient := ingest.client.HttpClient()
 		assert.Equal(t, customClient.Timeout, actualClient.Timeout)
 
 		// Cleanup
@@ -294,7 +294,8 @@ func TestWithHttpClient(t *testing.T) {
 		assert.NotNil(t, streaming)
 
 		// Verify that the underlying client is using our custom HTTP client
-		actualClient := streaming.HttpClient()
+		// by checking if the timeout matches using private field
+		actualClient := streaming.client.HttpClient()
 		assert.Equal(t, customClient.Timeout, actualClient.Timeout)
 
 		// Cleanup
@@ -308,8 +309,9 @@ func TestWithHttpClient(t *testing.T) {
 		assert.NotNil(t, managed)
 
 		// Verify that both queued and streaming clients are using our custom HTTP client
-		queuedClient := managed.QueuedHttpClient()
-		streamingClient := managed.StreamingHttpClient()
+		// by checking if the timeout matches using private fields
+		queuedClient := managed.queued.client.HttpClient()
+		streamingClient := managed.streaming.client.HttpClient()
 		assert.Equal(t, customClient.Timeout, queuedClient.Timeout)
 		assert.Equal(t, customClient.Timeout, streamingClient.Timeout)
 

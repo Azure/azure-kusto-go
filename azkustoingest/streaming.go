@@ -7,7 +7,6 @@ import (
 	"github.com/Azure/azure-kusto-go/azkustoingest/ingestoptions"
 	"github.com/Azure/azure-kusto-go/azkustoingest/internal/utils"
 	"io"
-	"net/http"
 	"os"
 
 	"github.com/Azure/azure-kusto-go/azkustodata"
@@ -197,11 +196,6 @@ func (i *Streaming) newProp() properties.All {
 
 func (i *Streaming) Close() error {
 	return i.streamConn.Close()
-}
-
-// HttpClient returns the HTTP client used by the streaming ingestion client.
-func (i *Streaming) HttpClient() *http.Client {
-	return i.client.HttpClient()
 }
 
 func generateBlobUriPayloadReader(fPath string) io.Reader {
