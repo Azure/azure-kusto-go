@@ -1,7 +1,8 @@
 module github.com/Azure/azure-kusto-go/quickstart
 
-go 1.22
-toolchain go1.24.1
+go 1.23.0
+
+toolchain go1.24.4
 
 require github.com/Azure/azure-kusto-go/azkustodata v1.0.3
 

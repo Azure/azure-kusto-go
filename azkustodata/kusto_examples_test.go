@@ -157,7 +157,7 @@ func ExampleClient_Query_rows() {
 	}
 }
 
-func ExampleCustomHttpClient() { // nolint:govet // Example code
+func ExampleNew_customHttpClient() { // nolint:govet // Example code
 	// Create a connection string builder with your Azure ClientID, Secret and TenantID.
 	kcsb := NewConnectionStringBuilder("endpoint").WithAadAppKey("clientID", "clientSecret", "tenentID")
 	httpClient := &http.Client{

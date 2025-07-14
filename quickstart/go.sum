@@ -1,7 +1,6 @@
-github.com/Azure/azure-kusto-go/azkustodata v1.0.1 h1:8Pu9wEatlaqAeBQm9TzhXk7OIgs918TtqYJK5gdcEzg=
-github.com/Azure/azure-kusto-go/azkustodata v1.0.1/go.mod h1:Pn7QdMmFDxX6E8Fd6i4ekadl6gU6cYOUD8O7Ol0E0/A=
-github.com/Azure/azure-kusto-go/azkustoingest v1.0.1 h1:zHQKphPWITWynPfk/RaGnBV8L7/DOwBnb7Tn5c00+HE=
-github.com/Azure/azure-kusto-go/azkustoingest v1.0.1/go.mod h1:2JOYcnUVY39zWEqi/emjlbT3pD4rSB7eeGv3XJgNeYc=
+github.com/Azure/azure-kusto-go/azkustodata v1.0.3 h1:7RZmg7TsMLqcJHD4Ktzbg5Wx1IOjXqU/2NV6yx5CYKk=
+github.com/Azure/azure-kusto-go/azkustoingest v1.0.3 h1:nukuK1f/IDrIdu3PHbPBS9zOtUNHuKp7+GXd7W+QuB8=
+github.com/Azure/azure-kusto-go/azkustoingest v1.0.3/go.mod h1:YhgxEcTty1N4AaxeGsCZI6mhTM9LlwSWr+6S81VcqRQ=
 github.com/Azure/azure-sdk-for-go/sdk/azcore v1.17.0 h1:g0EZJwz7xkXQiZAI5xi9f3WWFYBlX1CPTrR+NDToRkQ=
 github.com/Azure/azure-sdk-for-go/sdk/azcore v1.17.0/go.mod h1:XCW7KnZet0Opnr7HccfUw1PLc4CjHqpcaxW8DHklNkQ=
 github.com/Azure/azure-sdk-for-go/sdk/azidentity v1.8.1 h1:1mvYtZfWQAnwNah/C+Z+Jb9rQH95LPE2vlmMuWAHJk8=

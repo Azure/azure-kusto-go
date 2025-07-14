@@ -3,7 +3,9 @@ package azkustoingest
 import (
 	"github.com/Azure/azure-kusto-go/azkustodata"
 	"github.com/stretchr/testify/assert"
+	"net/http"
 	"testing"
+	"time"
 )
 
 func TestIsReservedHostname(t *testing.T) {
@@ -257,4 +259,63 @@ func TestCtorOptions(t *testing.T) {
 			assert.Equal(t, tt.defaultTable, table)
 		})
 	}
+}
+
+func TestWithHttpClient(t *testing.T) {
+	t.Parallel()
+
+	// Create a custom HTTP client with a specific timeout
+	customClient := &http.Client{
+		Timeout: 30 * time.Second,
+	}
+
+	// Create a connection string builder
+	kcsb := azkustodata.NewConnectionStringBuilder("https://help.kusto.windows.net")
+
+	t.Run("Queued", func(t *testing.T) {
+		// Create an ingestion client with the custom HTTP client
+		ingest, err := New(kcsb, WithHttpClient(customClient))
+		assert.NoError(t, err)
+		assert.NotNil(t, ingest)
+
+		// Verify that the underlying client is using our custom HTTP client
+		// by checking if the timeout matches using private field
+		actualClient := ingest.client.HttpClient()
+		assert.Equal(t, customClient.Timeout, actualClient.Timeout)
+
+		// Cleanup
+		ingest.Close()
+	})
+
+	t.Run("Streaming", func(t *testing.T) {
+		// Create a streaming ingestion client with the custom HTTP client
+		streaming, err := NewStreaming(kcsb, WithHttpClient(customClient))
+		assert.NoError(t, err)
+		assert.NotNil(t, streaming)
+
+		// Verify that the underlying client is using our custom HTTP client
+		// by checking if the timeout matches using private field
+		actualClient := streaming.client.HttpClient()
+		assert.Equal(t, customClient.Timeout, actualClient.Timeout)
+
+		// Cleanup
+		streaming.Close()
+	})
+
+	t.Run("Managed", func(t *testing.T) {
+		// Create a managed ingestion client with the custom HTTP client
+		managed, err := NewManaged(kcsb, WithHttpClient(customClient))
+		assert.NoError(t, err)
+		assert.NotNil(t, managed)
+
+		// Verify that both queued and streaming clients are using our custom HTTP client
+		// by checking if the timeout matches using private fields
+		queuedClient := managed.queued.client.HttpClient()
+		streamingClient := managed.streaming.client.HttpClient()
+		assert.Equal(t, customClient.Timeout, queuedClient.Timeout)
+		assert.Equal(t, customClient.Timeout, streamingClient.Timeout)
+
+		// Cleanup
+		managed.Close()
+	})
 }
