@@ -5,7 +5,7 @@ go 1.23.0
 toolchain go1.24.4
 
 require (
-	github.com/Azure/azure-kusto-go/azkustodata v1.0.3
+	github.com/Azure/azure-kusto-go/azkustodata v1.1.0
 	github.com/Azure/azure-sdk-for-go/sdk/azcore v1.17.0
 	github.com/Azure/azure-sdk-for-go/sdk/data/aztables v1.3.0
 	github.com/Azure/azure-sdk-for-go/sdk/storage/azblob v1.6.0
