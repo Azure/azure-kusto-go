@@ -141,10 +141,9 @@ func TestWellTrustedEndpoints_NationalClouds(t *testing.T) {
 		"https://kustofrbwrznltavls.kusto.usgovcloudapi.net,https://login.microsoftonline.us",
 		"https://kusto7j53clqswr4he.kusto.core.eaglex.ic.gov,https://login.microsoftonline.eaglex.ic.gov",
 		"https://rpe2e0422132101fct2.kusto.core.microsoft.scloud,https://login.microsoftonline.microsoft.scloud",
-		fmt.Sprintf("https://kustozszokb5yrauyq.kusto.chinacloudapi.cn,%s", chinaCloudLoginUrl),
-		"https://kustofrbwrznltavls.kusto.usgovcloudapi.net,https://login.microsoftonline.us",
-		"https://kusto7j53clqswr4he.kusto.core.eaglex.ic.gov,https://login.microsoftonline.eaglex.ic.gov",
-		"https://rpe2e0422132101fct2.kusto.core.microsoft.scloud,https://login.microsoftonline.microsoft.scloud",
+		"https://abc.kusto.sovcloud-api.fr,https://login.sovcloud-identity.fr",
+		"https://efg.kusto.sovcloud-api.de,https://login.sovcloud-identity.de",
+		"https://hij.kusto.sovcloud-api.sg,https://login.sovcloud-identity.sg",
 	} {
 		clusterAndLoginEndpoint := strings.Split(c, ",")
 		err := validateEndpoint(clusterAndLoginEndpoint[0], clusterAndLoginEndpoint[1])
