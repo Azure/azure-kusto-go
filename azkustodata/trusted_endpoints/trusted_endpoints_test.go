@@ -2,10 +2,10 @@ package trustedEndpoints
 
 import (
 	"fmt"
-	"github.com/samber/lo"
 	"strings"
 	"testing"
 
+	"github.com/samber/lo"
 	"github.com/stretchr/testify/require"
 )
 
@@ -141,10 +141,9 @@ func TestWellTrustedEndpoints_NationalClouds(t *testing.T) {
 		"https://kustofrbwrznltavls.kusto.usgovcloudapi.net,https://login.microsoftonline.us",
 		"https://kusto7j53clqswr4he.kusto.core.eaglex.ic.gov,https://login.microsoftonline.eaglex.ic.gov",
 		"https://rpe2e0422132101fct2.kusto.core.microsoft.scloud,https://login.microsoftonline.microsoft.scloud",
-		fmt.Sprintf("https://kustozszokb5yrauyq.kusto.chinacloudapi.cn,%s", chinaCloudLoginUrl),
-		"https://kustofrbwrznltavls.kusto.usgovcloudapi.net,https://login.microsoftonline.us",
-		"https://kusto7j53clqswr4he.kusto.core.eaglex.ic.gov,https://login.microsoftonline.eaglex.ic.gov",
-		"https://rpe2e0422132101fct2.kusto.core.microsoft.scloud,https://login.microsoftonline.microsoft.scloud",
+		"https://abc.kusto.sovcloud-api.fr,https://login.sovcloud-identity.fr",
+		"https://efg.kusto.sovcloud-api.de,https://login.sovcloud-identity.de",
+		"https://hij.kusto.sovcloud-api.sg,https://login.sovcloud-identity.sg",
 	} {
 		clusterAndLoginEndpoint := strings.Split(c, ",")
 		err := validateEndpoint(clusterAndLoginEndpoint[0], clusterAndLoginEndpoint[1])
@@ -233,11 +232,11 @@ func TestWellTrustedEndpoints_EndpointsOverride(t *testing.T) {
 }
 
 func TestWellTrustedEndpoints_AdditionalWebsites(t *testing.T) {
-	Instance.AddTrustedHosts([]MatchRule{{suffix: ".someotherdomain1.net", exact: false}}, true)
+	Instance.AddTrustedHosts([]MatchRule{{Suffix: ".someotherdomain1.net", Exact: false}}, true)
 
 	// 2nd call - to validate that addition works
-	Instance.AddTrustedHosts([]MatchRule{{suffix: "www.someotherdomain2.net", exact: true}}, false)
-	Instance.AddTrustedHosts([]MatchRule{{suffix: "www.someotherdomain3.net", exact: true}}, false)
+	Instance.AddTrustedHosts([]MatchRule{{Suffix: "www.someotherdomain2.net", Exact: true}}, false)
+	Instance.AddTrustedHosts([]MatchRule{{Suffix: "www.someotherdomain3.net", Exact: true}}, false)
 
 	for _, clusterName := range []string{"https://some.someotherdomain1.net", "https://www.someotherdomain2.net"} {
 		err := checkEndpoint(clusterName, defaultPublicLoginUrl, false)
