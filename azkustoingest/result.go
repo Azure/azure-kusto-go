@@ -2,6 +2,7 @@ package azkustoingest
 
 import (
 	"context"
+	"errors"
 	"fmt"
 	"math/rand"
 	"time"
@@ -82,7 +83,19 @@ func (r *Result) putQueued(ctx context.Context, i *Ingestion) {
 func (r *Result) Wait(ctx context.Context) <-chan error {
 	ch := make(chan error, 1)
 
-	if r.record.Status.IsFinal() || !r.reportToTable {
+	if !r.reportToTable {
+		ch <- errors.New("status reporting is not enabled")
+		close(ch)
+		return ch
+	}
+
+	if r.tableClient == nil {
+		ch <- errors.New("table client is not initialized")
+		close(ch)
+		return ch
+	}
+
+	if r.record.Status.IsFinal() {
 		close(ch)
 		return ch
 	}
@@ -104,40 +117,37 @@ func (r *Result) poll(ctx context.Context) {
 	attempts := 3
 	delay := [3]int{120, 60, 10} // attempts are counted backwards
 
-	// create a table client
-	if r.tableClient != nil {
-		// Create a ticker to poll the table in 10 second intervals.
-		timer := time.NewTimer(pollInterval)
-		defer timer.Stop()
+	// Create a ticker to poll the table in 10 second intervals.
+	timer := time.NewTimer(pollInterval)
+	defer timer.Stop()
 
-		for {
-			select {
-			case <-ctx.Done():
-				r.record.Status = StatusRetrievalCanceled
-				r.record.FailureStatus = Transient
-				return
+	for {
+		select {
+		case <-ctx.Done():
+			r.record.Status = StatusRetrievalCanceled
+			r.record.FailureStatus = Transient
+			return
 
-			case <-timer.C:
-				smap, err := r.tableClient.Read(ctx, r.record.IngestionSourceID.String())
-				if err != nil {
-					if attempts == 0 {
-						r.record.Status = StatusRetrievalFailed
-						r.record.FailureStatus = Transient
-						r.record.Details = "Failed reading from Status Table: " + err.Error()
-						return
-					}
-
-					attempts = attempts - 1
-					time.Sleep(time.Duration(delay[attempts]+rand.Intn(5)) * time.Second)
-				} else {
-					r.record.FromMap(smap)
-					if r.record.Status.IsFinal() {
-						return
-					}
+		case <-timer.C:
+			smap, err := r.tableClient.Read(ctx, r.record.IngestionSourceID.String())
+			if err != nil {
+				if attempts == 0 {
+					r.record.Status = StatusRetrievalFailed
+					r.record.FailureStatus = Transient
+					r.record.Details = "Failed reading from Status Table: " + err.Error()
+					return
 				}
 
-				timer.Reset(pollInterval)
+				attempts = attempts - 1
+				time.Sleep(time.Duration(delay[attempts]+rand.Intn(5)) * time.Second)
+			} else {
+				r.record.FromMap(smap)
+				if r.record.Status.IsFinal() {
+					return
+				}
 			}
+
+			timer.Reset(pollInterval)
 		}
 	}
 }
