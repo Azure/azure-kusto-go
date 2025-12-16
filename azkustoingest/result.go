@@ -83,6 +83,14 @@ func (r *Result) putQueued(ctx context.Context, i *Ingestion) {
 func (r *Result) Wait(ctx context.Context) <-chan error {
 	ch := make(chan error, 1)
 
+	if r.record.Status.IsFinal() {
+		if !r.record.Status.IsSuccess() {
+			ch <- r.record
+		}
+		close(ch)
+		return ch
+	}
+
 	if !r.reportToTable {
 		ch <- errors.New("status reporting is not enabled")
 		close(ch)
@@ -91,11 +99,6 @@ func (r *Result) Wait(ctx context.Context) <-chan error {
 
 	if r.tableClient == nil {
 		ch <- errors.New("table client is not initialized")
-		close(ch)
-		return ch
-	}
-
-	if r.record.Status.IsFinal() {
 		close(ch)
 		return ch
 	}
