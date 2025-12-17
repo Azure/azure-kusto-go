@@ -98,7 +98,7 @@ type statusRecord struct {
 
 	// IngestionSourcePath is the URI of the blob, potentially including the secret needed to access
 	// the blob. This can be a filesystem URI (on-premises deployments only),
-	// or an Azure Blob Storage URI (including a SAS key or a semicolon followed by the account key).
+	// or an Azure IngestBlob Storage URI (including a SAS key or a semicolon followed by the account key).
 	IngestionSourcePath string
 
 	// Database is the name of the database holding the target table.

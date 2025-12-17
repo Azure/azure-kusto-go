@@ -3,14 +3,15 @@ package azkustoingest
 import (
 	"context"
 	"fmt"
+	"io"
+	"net/http"
+
 	"github.com/Azure/azure-kusto-go/azkustodata"
 	"github.com/Azure/azure-kusto-go/azkustodata/errors"
 	"github.com/Azure/azure-kusto-go/azkustoingest/internal/properties"
 	"github.com/Azure/azure-kusto-go/azkustoingest/internal/queued"
 	"github.com/Azure/azure-kusto-go/azkustoingest/internal/resources"
 	"github.com/google/uuid"
-	"io"
-	"net/http"
 )
 
 type Ingestor interface {
@@ -172,17 +173,24 @@ func (i *Ingestion) fromFile(ctx context.Context, fPath string, options []FileOp
 
 	result.record.IngestionSourcePath = fPath
 
+	blobURL := fPath
+	size := int64(0)
 	if local {
-		err = i.fs.Local(ctx, fPath, props)
-	} else {
-		err = i.fs.Blob(ctx, fPath, 0, props)
+		blobURL, size, err = i.fs.UploadLocalToBlob(ctx, fPath, props)
+		if err != nil {
+			return nil, err
+		}
 	}
 
+	if err = result.putQueued(ctx, i); err != nil {
+		return nil, err
+	}
+
+	err = i.fs.IngestBlob(ctx, blobURL, size, props)
 	if err != nil {
 		return nil, err
 	}
 
-	result.putQueued(ctx, i)
 	return result, nil
 }
 
@@ -200,13 +208,20 @@ func (i *Ingestion) fromReader(ctx context.Context, reader io.Reader, options []
 		return nil, err
 	}
 
-	path, err := i.fs.Reader(ctx, reader, props)
+	blobURL, size, err := i.fs.UploadReaderToBlob(ctx, reader, props)
 	if err != nil {
 		return nil, err
 	}
 
-	result.record.IngestionSourcePath = path
-	result.putQueued(ctx, i)
+	if err = result.putQueued(ctx, i); err != nil {
+		return nil, err
+	}
+
+	err = i.fs.IngestBlob(ctx, blobURL, size, props)
+	if err != nil {
+		return nil, err
+	}
+
 	return result, nil
 }
 
