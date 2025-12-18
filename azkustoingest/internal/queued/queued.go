@@ -58,7 +58,7 @@ type Ingestion struct {
 	http  *http.Client
 	db    string
 	table string
-	mgr   *resources.Manager
+	mgr   resources.ResourcesManager
 
 	uploadStream uploadStream
 	uploadBlob   uploadBlob
