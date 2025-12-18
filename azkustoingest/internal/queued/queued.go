@@ -196,12 +196,13 @@ func (i *Ingestion) Reader(ctx context.Context, reader io.Reader, props properti
 
 	size := int64(0)
 
-	if shouldCompress {
-		reader = gzip.Compress(reader)
-	}
-
 	// Go over all the containers and try to upload the file to each one. If we succeed, we are done.
 	for attempts, containerUri := range containers {
+		currentReader := reader
+		if shouldCompress {
+			currentReader = gzip.Compress(currentReader)
+		}
+
 		if attempts >= StorageMaxRetryPolicy {
 			return "", errors.ES(errors.OpFileIngest, errors.KBlobstore, "max retry policy reached").SetNoRetry()
 		}
@@ -214,7 +215,7 @@ func (i *Ingestion) Reader(ctx context.Context, reader io.Reader, props properti
 
 		_, err = i.uploadStream(
 			ctx,
-			reader,
+			currentReader,
 			client,
 			containerName,
 			blobName,
@@ -227,7 +228,7 @@ func (i *Ingestion) Reader(ctx context.Context, reader io.Reader, props properti
 		}
 
 		i.mgr.ReportStorageResourceResult(containerUri.Account(), true)
-		if gz, ok := reader.(*gzip.Streamer); ok {
+		if gz, ok := currentReader.(*gzip.Streamer); ok {
 			size = gz.InputSize()
 		}
 		err = i.Blob(ctx, fullUrl(client, containerName, blobName), size, props)
