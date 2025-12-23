@@ -13,7 +13,7 @@ import (
 // Result provides a way for users track the state of ingestion jobs.
 type Result struct {
 	record        statusRecord
-	tableClient   *status.TableClient
+	tableClient   status.TableClientReader
 	reportToTable bool
 }
 
@@ -77,9 +77,58 @@ func (r *Result) putQueued(ctx context.Context, i *Ingestion) {
 	r.tableClient = client
 }
 
+type waitConfig struct {
+	interval           time.Duration
+	immediateFirst     bool
+	retryBackoffDelay  []time.Duration
+	retryBackoffJitter time.Duration
+}
+
+type WaitOption func(o *waitConfig)
+
+func WithImmediateFirst() WaitOption {
+	return func(o *waitConfig) {
+		o.immediateFirst = true
+	}
+}
+
+func WithInterval(interval time.Duration) WaitOption {
+	return func(o *waitConfig) {
+		o.interval = interval
+	}
+}
+
+func WithRetryBackoffDelay(delay ...time.Duration) WaitOption {
+	return func(o *waitConfig) {
+		o.retryBackoffDelay = delay
+	}
+}
+
+func WithRetryBackoffJitter(jitter time.Duration) WaitOption {
+	return func(o *waitConfig) {
+		o.retryBackoffJitter = jitter
+	}
+}
+
+var (
+	DefaultWaitPollInterval           = 10 * time.Second
+	DefaultWaitPollRetryBackoffDelay  = []time.Duration{10 * time.Second, 60 * time.Second, 120 * time.Second}
+	DefaultWaitPollRetryBackoffJitter = 5 * time.Second
+)
+
 // Wait returns a channel that can be checked for ingestion results.
 // In order to check actual status please use the ReportResultToTable option when ingesting data.
-func (r *Result) Wait(ctx context.Context) <-chan error {
+func (r *Result) Wait(ctx context.Context, options ...WaitOption) <-chan error {
+	cfg := waitConfig{
+		interval:           DefaultWaitPollInterval,
+		retryBackoffDelay:  DefaultWaitPollRetryBackoffDelay,
+		retryBackoffJitter: DefaultWaitPollRetryBackoffJitter,
+	}
+
+	for _, o := range options {
+		o(&cfg)
+	}
+
 	ch := make(chan error, 1)
 
 	if r.record.Status.IsFinal() || !r.reportToTable {
@@ -90,7 +139,7 @@ func (r *Result) Wait(ctx context.Context) <-chan error {
 	go func() {
 		defer close(ch)
 
-		r.poll(ctx)
+		r.poll(ctx, &cfg)
 		if !r.record.Status.IsSuccess() {
 			ch <- r.record
 		}
@@ -99,15 +148,15 @@ func (r *Result) Wait(ctx context.Context) <-chan error {
 	return ch
 }
 
-func (r *Result) poll(ctx context.Context) {
-	const pollInterval = 10 * time.Second
-	attempts := 3
-	delay := [3]int{120, 60, 10} // attempts are counted backwards
-
+func (r *Result) poll(ctx context.Context, cfg *waitConfig) {
 	// create a table client
 	if r.tableClient != nil {
-		// Create a ticker to poll the table in 10 second intervals.
-		timer := time.NewTimer(pollInterval)
+		initialInterval := cfg.interval
+		if cfg.immediateFirst {
+			initialInterval = 0
+		}
+		attempts := cfg.retryBackoffDelay[:]
+		timer := time.NewTimer(initialInterval)
 		defer timer.Stop()
 
 		for {
@@ -119,16 +168,20 @@ func (r *Result) poll(ctx context.Context) {
 
 			case <-timer.C:
 				smap, err := r.tableClient.Read(ctx, r.record.IngestionSourceID.String())
+				sleepTime := cfg.interval
 				if err != nil {
-					if attempts == 0 {
+					if len(attempts) == 0 {
 						r.record.Status = StatusRetrievalFailed
 						r.record.FailureStatus = Transient
 						r.record.Details = "Failed reading from Status Table: " + err.Error()
 						return
 					}
 
-					attempts = attempts - 1
-					time.Sleep(time.Duration(delay[attempts]+rand.Intn(5)) * time.Second)
+					sleepTime += attempts[0]
+					attempts = attempts[1:]
+					if cfg.retryBackoffJitter > 0 {
+						sleepTime += time.Duration(rand.Intn(int(cfg.retryBackoffJitter)))
+					}
 				} else {
 					r.record.FromMap(smap)
 					if r.record.Status.IsFinal() {
@@ -136,7 +189,7 @@ func (r *Result) poll(ctx context.Context) {
 					}
 				}
 
-				timer.Reset(pollInterval)
+				timer.Reset(sleepTime)
 			}
 		}
 	}
