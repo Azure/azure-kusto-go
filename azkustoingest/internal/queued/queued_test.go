@@ -5,17 +5,20 @@ import (
 	"compress/gzip"
 	"context"
 	"fmt"
-	"github.com/Azure/azure-kusto-go/azkustoingest/ingestoptions"
-	"github.com/Azure/azure-kusto-go/azkustoingest/internal/utils"
 	"io"
 	"os"
+	"sync/atomic"
 	"testing"
 
 	"github.com/Azure/azure-kusto-go/azkustodata/errors"
+	"github.com/Azure/azure-kusto-go/azkustoingest/ingestoptions"
 	"github.com/Azure/azure-kusto-go/azkustoingest/internal/properties"
-	"github.com/stretchr/testify/assert"
-
+	"github.com/Azure/azure-kusto-go/azkustoingest/internal/resources"
+	"github.com/Azure/azure-kusto-go/azkustoingest/internal/utils"
 	"github.com/Azure/azure-sdk-for-go/sdk/storage/azblob"
+
+	"github.com/stretchr/testify/assert"
+	"github.com/stretchr/testify/require"
 )
 
 func TestFormatDiscovery(t *testing.T) {
@@ -360,6 +363,221 @@ func TestShouldCompress(t *testing.T) {
 			got := ShouldCompress(test.props,
 				utils.CompressionDiscovery(test.props.Source.OriginalSource))
 			assert.Equal(t, test.want, got)
+		})
+	}
+}
+
+type retryingBlobstore struct {
+	out            *bytes.Buffer
+	remainingFails atomic.Int32 // remaining failures before success
+}
+
+func newRetryingBlobstore(out *bytes.Buffer, failCount int) *retryingBlobstore {
+	r := &retryingBlobstore{out: out}
+	r.remainingFails.Store(int32(failCount))
+	return r
+}
+
+func (r *retryingBlobstore) uploadBlobStream(_ context.Context, reader io.Reader, _ *azblob.Client, _ string, _ string, _ *azblob.UploadStreamOptions) (azblob.UploadStreamResponse, error) {
+	remaining := r.remainingFails.Add(-1)
+
+	if remaining >= 0 {
+		_, _ = io.Copy(io.Discard, reader) // Consume some content to simulate failed upload
+		return azblob.UploadStreamResponse{}, fmt.Errorf("simulated upload failure, %d remaining", remaining)
+	}
+
+	_, err := io.Copy(r.out, reader)
+	return azblob.UploadStreamResponse{}, err
+}
+
+type fakeResourceManager struct {
+	storageContainers []*resources.URI
+	storageQueues     []*resources.URI
+	tables            []*resources.URI
+}
+
+var _ resources.ResourcesManager = (*fakeResourceManager)(nil)
+
+func mustParseURIs(uris ...string) []*resources.URI {
+	parsed := make([]*resources.URI, len(uris))
+	for i, uri := range uris {
+		uriParsed, err := resources.Parse(uri)
+		if err != nil {
+			panic(err)
+		}
+		parsed[i] = uriParsed
+	}
+	return parsed
+}
+
+func newFakeResourceManager(storageContainers []string, storageQueues []string, tables []string) *fakeResourceManager {
+	return &fakeResourceManager{
+		storageContainers: mustParseURIs(storageContainers...),
+		storageQueues:     mustParseURIs(storageQueues...),
+		tables:            mustParseURIs(tables...),
+	}
+}
+
+func (f fakeResourceManager) ReportStorageResourceResult(_ string, _ bool) {
+
+}
+
+func (f fakeResourceManager) GetRankedStorageContainers() ([]*resources.URI, error) {
+	return f.storageContainers, nil
+}
+
+func (f fakeResourceManager) GetRankedStorageQueues() ([]*resources.URI, error) {
+	return f.storageQueues, nil
+}
+
+func (f fakeResourceManager) GetTables() ([]*resources.URI, error) {
+	return f.tables, nil
+}
+
+func (f fakeResourceManager) Close() {
+}
+
+type nonSeekableReader struct {
+	r io.Reader
+}
+
+func newNonSeekableReader(r io.Reader) *nonSeekableReader {
+	return &nonSeekableReader{r: r}
+}
+
+func (n *nonSeekableReader) Read(p []byte) (int, error) {
+	return n.r.Read(p)
+}
+
+func TestReaderRetry(t *testing.T) {
+	t.Parallel()
+
+	const content = "The quick brown fox jumps over the lazy dog"
+
+	tests := []struct {
+		name           string
+		shouldCompress bool
+		failCount      int
+		nonSeekable    bool
+		failError      string
+	}{
+		{
+			name:           "success on first attempt without compression",
+			shouldCompress: false,
+			failCount:      0,
+		},
+		{
+			name:           "success after 2 retries without compression",
+			shouldCompress: false,
+			failCount:      2,
+		},
+		{
+			name:           "success on first attempt with compression",
+			shouldCompress: true,
+			failCount:      0,
+		},
+		{
+			name:           "success after 2 retries with compression",
+			shouldCompress: true,
+			failCount:      2,
+		},
+		{
+			name:           "success on first attempt without compression non-seekable reader",
+			shouldCompress: false,
+			failCount:      0,
+			nonSeekable:    true,
+		},
+		{
+			name:           "fail without compression non-seekable reader",
+			shouldCompress: false,
+			failCount:      2,
+			nonSeekable:    true,
+			failError:      "reader does not support seeking, cannot retry: simulated upload failure",
+		},
+		{
+			name:           "success on first attempt with compression non-seekable reader",
+			shouldCompress: true,
+			failCount:      0,
+			nonSeekable:    true,
+		},
+		{
+			name:           "fail with compression non-seekable reader",
+			shouldCompress: true,
+			failCount:      2,
+			nonSeekable:    true,
+			failError:      "reader does not support seeking, cannot retry: simulated upload failure",
+		},
+	}
+
+	compressedFormat := properties.TXT
+	assert.True(t, compressedFormat.ShouldCompress())
+
+	mgr := newFakeResourceManager(
+		[]string{
+			"https://account.blob.core.windows.net/container",
+			"https://account.blob.core.windows.net/container2",
+			"https://account.blob.core.windows.net/container3",
+			"https://account.blob.core.windows.net/container4",
+			"https://account.blob.core.windows.net/container5",
+			"https://account.blob.core.windows.net/container6",
+		},
+		[]string{
+			"https://account.queue.core.windows.net/queue",
+		},
+		nil,
+	)
+
+	for _, tc := range tests {
+		t.Run(tc.name, func(t *testing.T) {
+			t.Parallel()
+			r := require.New(t)
+
+			if len(mgr.storageContainers) <= tc.failCount {
+				r.FailNow("not enough storage containers to test retry logic")
+			}
+
+			finalOutput := new(bytes.Buffer)
+			i := &Ingestion{
+				uploadStream: newRetryingBlobstore(finalOutput, tc.failCount).uploadBlobStream,
+				mgr:          mgr,
+			}
+
+			var reader io.Reader = bytes.NewReader([]byte(content))
+			if tc.nonSeekable {
+				reader = newNonSeekableReader(reader)
+			}
+
+			_, err := i.Reader(t.Context(), reader, properties.All{
+				Source: properties.SourceOptions{
+					DontCompress: !tc.shouldCompress,
+				},
+				Ingestion: properties.Ingestion{
+					DatabaseName: "", // empty string to fail Ingestion.Blob
+					Additional: properties.Additional{
+						Format:      compressedFormat,
+						AuthContext: "token",
+					},
+				},
+			})
+
+			if tc.failError != "" {
+				r.ErrorContains(err, tc.failError)
+				return
+			} else {
+				r.ErrorContains(err, "could not marshal the ingestion blob info") // Ingestion.Blob error message
+			}
+
+			var output string
+			if tc.shouldCompress {
+				gr, err := gzip.NewReader(finalOutput)
+				r.NoError(err)
+				decompressed, err := io.ReadAll(gr)
+				r.NoError(err)
+				output = string(decompressed)
+			} else {
+				output = finalOutput.String()
+			}
+			r.Equal(content, output)
 		})
 	}
 }
