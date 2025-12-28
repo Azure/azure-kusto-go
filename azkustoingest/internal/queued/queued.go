@@ -58,7 +58,7 @@ type Ingestion struct {
 	http  *http.Client
 	db    string
 	table string
-	mgr   *resources.Manager
+	mgr   resources.ResourcesManager
 
 	uploadStream uploadStream
 	uploadBlob   uploadBlob
@@ -193,15 +193,17 @@ func (i *Ingestion) Reader(ctx context.Context, reader io.Reader, props properti
 	compression := utils.CompressionDiscovery(props.Source.OriginalSource)
 	shouldCompress := ShouldCompress(&props, compression)
 	blobName := GenBlobName(i.db, i.table, nower(), filepath.Base(uuid.New().String()), filepath.Base(props.Source.OriginalSource), compression, shouldCompress, props.Ingestion.Additional.Format.String())
+	seeker, isSeekable := reader.(io.Seeker)
 
 	size := int64(0)
 
-	if shouldCompress {
-		reader = gzip.Compress(reader)
-	}
-
 	// Go over all the containers and try to upload the file to each one. If we succeed, we are done.
 	for attempts, containerUri := range containers {
+		currentReader := reader
+		if shouldCompress {
+			currentReader = gzip.Compress(currentReader)
+		}
+
 		if attempts >= StorageMaxRetryPolicy {
 			return "", errors.ES(errors.OpFileIngest, errors.KBlobstore, "max retry policy reached").SetNoRetry()
 		}
@@ -214,7 +216,7 @@ func (i *Ingestion) Reader(ctx context.Context, reader io.Reader, props properti
 
 		_, err = i.uploadStream(
 			ctx,
-			reader,
+			currentReader,
 			client,
 			containerName,
 			blobName,
@@ -223,11 +225,18 @@ func (i *Ingestion) Reader(ctx context.Context, reader io.Reader, props properti
 
 		if err != nil {
 			i.mgr.ReportStorageResourceResult(containerUri.Account(), false)
-			continue
+			if isSeekable {
+				_, err = seeker.Seek(0, io.SeekStart)
+				if err != nil {
+					return "", errors.ES(errors.OpFileIngest, errors.KLocalFileSystem, "could not seek the reader to the start: %s", err)
+				}
+				continue
+			}
+			return "", errors.ES(errors.OpFileIngest, errors.KLocalFileSystem, "reader does not support seeking, cannot retry: %v", err)
 		}
 
 		i.mgr.ReportStorageResourceResult(containerUri.Account(), true)
-		if gz, ok := reader.(*gzip.Streamer); ok {
+		if gz, ok := currentReader.(*gzip.Streamer); ok {
 			size = gz.InputSize()
 		}
 		err = i.Blob(ctx, fullUrl(client, containerName, blobName), size, props)
