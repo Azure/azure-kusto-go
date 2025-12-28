@@ -547,7 +547,7 @@ func TestReaderRetry(t *testing.T) {
 				reader = newNonSeekableReader(reader)
 			}
 
-			_, err := i.Reader(t.Context(), reader, properties.All{
+			_, _, err := i.UploadReaderToBlob(t.Context(), reader, properties.All{
 				Source: properties.SourceOptions{
 					DontCompress: !tc.shouldCompress,
 				},
