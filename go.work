@@ -1,4 +1,4 @@
-go 1.23.0
+go 1.24.0
 
 toolchain go1.24.4
 
@@ -9,7 +9,7 @@ use (
 )
 
 replace (
-	github.com/Azure/azure-kusto-go/azkustodata v1.1.0 => ./azkustodata
-	github.com/Azure/azure-kusto-go/azkustoingest v1.1.0 => ./azkustoingest
-	github.com/Azure/azure-kusto-go/quickstart v1.1.0 => ./quickstart
+	github.com/Azure/azure-kusto-go/azkustodata v1.2.0 => ./azkustodata
+	github.com/Azure/azure-kusto-go/azkustoingest v1.2.0 => ./azkustoingest
+	github.com/Azure/azure-kusto-go/quickstart v1.2.0 => ./quickstart
 )

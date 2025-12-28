@@ -5,6 +5,19 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [1.2.0] - 2025-12-28
+
+### Added
+
+- `result.Wait()` is now configurable: the polling interval and delay can be set using the options parameter - by
+  @noamcohen97
+
+### Fixed
+
+- Better error reporting on various failures – by @noamcohen97
+- Fixed issues with retries - by @noamcohen97
+- Fixed race conditions in ingestion clients, and improved error quality – by @noamcohen97
+
 ## [1.1.0] - 2025-07-15
 
 ### Added
