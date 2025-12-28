@@ -228,11 +228,11 @@ func (i *Ingestion) UploadReaderToBlob(ctx context.Context, reader io.Reader, pr
 			if isSeekable {
 				_, err = seeker.Seek(0, io.SeekStart)
 				if err != nil {
-					return "", errors.ES(errors.OpFileIngest, errors.KLocalFileSystem, "could not seek the reader to the start: %s", err)
+					return "", 0, errors.ES(errors.OpFileIngest, errors.KLocalFileSystem, "could not seek the reader to the start: %s", err)
 				}
 				continue
 			}
-			return "", errors.ES(errors.OpFileIngest, errors.KLocalFileSystem, "reader does not support seeking, cannot retry: %v", err)
+			return "", 0, errors.ES(errors.OpFileIngest, errors.KLocalFileSystem, "reader does not support seeking, cannot retry: %v", err)
 		}
 
 		i.mgr.ReportStorageResourceResult(containerUri.Account(), true)
