@@ -2,6 +2,7 @@ package azkustoingest
 
 import (
 	"context"
+	"errors"
 	"fmt"
 	"math/rand"
 	"time"
@@ -131,7 +132,22 @@ func (r *Result) Wait(ctx context.Context, options ...WaitOption) <-chan error {
 
 	ch := make(chan error, 1)
 
-	if r.record.Status.IsFinal() || !r.reportToTable {
+	if r.record.Status.IsFinal() {
+		if !r.record.Status.IsSuccess() {
+			ch <- r.record
+		}
+		close(ch)
+		return ch
+	}
+
+	if !r.reportToTable {
+		ch <- errors.New("status reporting is not enabled")
+		close(ch)
+		return ch
+	}
+
+	if r.tableClient == nil {
+		ch <- errors.New("table client is not initialized")
 		close(ch)
 		return ch
 	}
@@ -149,48 +165,45 @@ func (r *Result) Wait(ctx context.Context, options ...WaitOption) <-chan error {
 }
 
 func (r *Result) poll(ctx context.Context, cfg *waitConfig) {
-	// create a table client
-	if r.tableClient != nil {
-		initialInterval := cfg.interval
-		if cfg.immediateFirst {
-			initialInterval = 0
-		}
-		attempts := cfg.retryBackoffDelay[:]
-		timer := time.NewTimer(initialInterval)
-		defer timer.Stop()
+	initialInterval := cfg.interval
+	if cfg.immediateFirst {
+		initialInterval = 0
+	}
+	attempts := cfg.retryBackoffDelay[:]
+	timer := time.NewTimer(initialInterval)
+	defer timer.Stop()
 
-		for {
-			select {
-			case <-ctx.Done():
-				r.record.Status = StatusRetrievalCanceled
-				r.record.FailureStatus = Transient
-				return
+	for {
+		select {
+		case <-ctx.Done():
+			r.record.Status = StatusRetrievalCanceled
+			r.record.FailureStatus = Transient
+			return
 
-			case <-timer.C:
-				smap, err := r.tableClient.Read(ctx, r.record.IngestionSourceID.String())
-				sleepTime := cfg.interval
-				if err != nil {
-					if len(attempts) == 0 {
-						r.record.Status = StatusRetrievalFailed
-						r.record.FailureStatus = Transient
-						r.record.Details = "Failed reading from Status Table: " + err.Error()
-						return
-					}
-
-					sleepTime += attempts[0]
-					attempts = attempts[1:]
-					if cfg.retryBackoffJitter > 0 {
-						sleepTime += time.Duration(rand.Intn(int(cfg.retryBackoffJitter)))
-					}
-				} else {
-					r.record.FromMap(smap)
-					if r.record.Status.IsFinal() {
-						return
-					}
+		case <-timer.C:
+			smap, err := r.tableClient.Read(ctx, r.record.IngestionSourceID.String())
+			sleepTime := cfg.interval
+			if err != nil {
+				if len(attempts) == 0 {
+					r.record.Status = StatusRetrievalFailed
+					r.record.FailureStatus = Transient
+					r.record.Details = "Failed reading from Status Table: " + err.Error()
+					return
 				}
 
-				timer.Reset(sleepTime)
+				sleepTime += attempts[0]
+				attempts = attempts[1:]
+				if cfg.retryBackoffJitter > 0 {
+					sleepTime += time.Duration(rand.Intn(int(cfg.retryBackoffJitter)))
+				}
+			} else {
+				r.record.FromMap(smap)
+				if r.record.Status.IsFinal() {
+					return
+				}
 			}
+
+			timer.Reset(sleepTime)
 		}
 	}
 }
