@@ -3,7 +3,6 @@ package trustedEndpoints
 import (
 	_ "embed"
 	"encoding/json"
-	"fmt"
 	"math"
 	"net/url"
 	"strings"
@@ -135,15 +134,6 @@ func newFastSuffixMatcher(rules []MatchRule) (*FastSuffixMatcher, error) {
 	}, nil
 }
 
-func values[T comparable, R any](m map[T]R) []R {
-	l := make([]R, 0, len(m))
-	for _, val := range m {
-		l = append(l, val)
-	}
-
-	return l
-}
-
 func createFastSuffixMatcherFromExisting(rules []MatchRule, existing *FastSuffixMatcher) (*FastSuffixMatcher, error) {
 	if existing == nil || len(existing.rules) == 0 {
 		return newFastSuffixMatcher(rules)
@@ -236,6 +226,7 @@ func (trusted *TrustedEndpoints) validateHostnameIsTrusted(host string, loginEnd
 	return errors.ES(
 		errors.OpUnknown,
 		errors.KClientArgs,
-		fmt.Sprintf("Can't communicate with '%s' as this hostname is currently not trusted; please see https://aka.ms/kustotrustedendpoints.", host),
+		"Can't communicate with '%s' as this hostname is currently not trusted; please see https://aka.ms/kustotrustedendpoints.",
+		host,
 	).SetNoRetry()
 }
