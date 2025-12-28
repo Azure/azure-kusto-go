@@ -33,11 +33,11 @@ func (r *Result) putProps(props properties.All) {
 }
 
 // putQueued sets the initial success status depending on status reporting state
-func (r *Result) putQueued(ctx context.Context, i *Ingestion) {
+func (r *Result) putQueued(ctx context.Context, i *Ingestion) error {
 	// If not checking status, just return queued
 	if !r.reportToTable {
 		r.record.Status = Queued
-		return
+		return nil
 	}
 
 	// Get table URI
@@ -46,14 +46,14 @@ func (r *Result) putQueued(ctx context.Context, i *Ingestion) {
 		r.record.Status = StatusRetrievalFailed
 		r.record.FailureStatus = Permanent
 		r.record.Details = "Failed getting status table URI: " + err.Error()
-		return
+		return &r.record
 	}
 
 	if len(tableResources) == 0 {
 		r.record.Status = StatusRetrievalFailed
 		r.record.FailureStatus = Permanent
 		r.record.Details = "Ingestion resources do not include a status table URI: " + err.Error()
-		return
+		return &r.record
 	}
 
 	// create a table client
@@ -62,7 +62,7 @@ func (r *Result) putQueued(ctx context.Context, i *Ingestion) {
 		r.record.Status = StatusRetrievalFailed
 		r.record.FailureStatus = Permanent
 		r.record.Details = "Failed Creating a Status Table client: " + err.Error()
-		return
+		return &r.record
 	}
 
 	// StreamIngest initial record
@@ -72,10 +72,11 @@ func (r *Result) putQueued(ctx context.Context, i *Ingestion) {
 		r.record.Status = StatusRetrievalFailed
 		r.record.FailureStatus = Permanent
 		r.record.Details = "Failed writing initial status record: " + err.Error()
-		return
+		return &r.record
 	}
 
 	r.tableClient = client
+	return nil
 }
 
 type waitConfig struct {
