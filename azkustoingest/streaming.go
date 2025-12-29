@@ -177,7 +177,7 @@ func streamImpl(c streamIngestor, ctx context.Context, payload io.Reader, props 
 
 	result := newResult()
 	result.putProps(props)
-	result.record.Status = "Success"
+	result.record.Status = Succeeded
 
 	return result, nil
 }
