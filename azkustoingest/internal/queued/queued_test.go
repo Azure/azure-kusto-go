@@ -547,7 +547,7 @@ func TestReaderRetry(t *testing.T) {
 				reader = newNonSeekableReader(reader)
 			}
 
-			_, err := i.Reader(t.Context(), reader, properties.All{
+			_, _, err := i.UploadReaderToBlob(t.Context(), reader, properties.All{
 				Source: properties.SourceOptions{
 					DontCompress: !tc.shouldCompress,
 				},
@@ -564,7 +564,7 @@ func TestReaderRetry(t *testing.T) {
 				r.ErrorContains(err, tc.failError)
 				return
 			} else {
-				r.ErrorContains(err, "could not marshal the ingestion blob info") // Ingestion.Blob error message
+				r.NoError(err)
 			}
 
 			var output string
