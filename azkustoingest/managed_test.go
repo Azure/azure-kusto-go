@@ -405,7 +405,7 @@ func TestManaged(t *testing.T) {
 			} else {
 				assert.NoError(t, err)
 				if test.expectedStatus == "" {
-					test.expectedStatus = "Success"
+					test.expectedStatus = Succeeded
 				}
 				assert.Equal(t, result.record.Status, test.expectedStatus)
 			}
@@ -420,7 +420,7 @@ func TestManaged(t *testing.T) {
 			} else {
 				assert.NoError(t, err)
 				if test.expectedStatus == "" {
-					test.expectedStatus = "Success"
+					test.expectedStatus = Succeeded
 				}
 				assert.Equal(t, result.record.Status, test.expectedStatus)
 			}

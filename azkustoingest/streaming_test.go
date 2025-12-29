@@ -207,7 +207,7 @@ func TestStreaming(t *testing.T) {
 				assert.Nil(t, result)
 			} else {
 				assert.NoError(t, err)
-				assert.Equal(t, result.record.Status, StatusCode("Success"))
+				assert.Equal(t, result.record.Status, Succeeded)
 			}
 
 			result, err = streaming.FromReader(ctx, bytes.NewReader(internalData), test.options...)
@@ -216,7 +216,7 @@ func TestStreaming(t *testing.T) {
 				assert.Nil(t, result)
 			} else {
 				assert.NoError(t, err)
-				assert.Equal(t, result.record.Status, StatusCode("Success"))
+				assert.Equal(t, result.record.Status, Succeeded)
 			}
 
 		})
