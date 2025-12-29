@@ -564,7 +564,7 @@ func TestReaderRetry(t *testing.T) {
 				r.ErrorContains(err, tc.failError)
 				return
 			} else {
-				r.ErrorContains(err, "could not marshal the ingestion blob info") // Ingestion.Blob error message
+				r.NoError(err)
 			}
 
 			var output string
