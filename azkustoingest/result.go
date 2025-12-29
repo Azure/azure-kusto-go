@@ -32,7 +32,7 @@ func (r *Result) putProps(props properties.All) {
 	r.record.FromProps(props)
 }
 
-// putQueued sets the initial success status depending on status reporting state
+// putQueued sets the initial success status depending on the status reporting state, returning the record on failure.
 func (r *Result) putQueued(ctx context.Context, i *Ingestion) error {
 	// If not checking status, just return queued
 	if !r.reportToTable {
@@ -52,7 +52,7 @@ func (r *Result) putQueued(ctx context.Context, i *Ingestion) error {
 	if len(tableResources) == 0 {
 		r.record.Status = StatusRetrievalFailed
 		r.record.FailureStatus = Permanent
-		r.record.Details = "Ingestion resources do not include a status table URI: " + err.Error()
+		r.record.Details = "Ingestion resources does not include a status table URI."
 		return &r.record
 	}
 

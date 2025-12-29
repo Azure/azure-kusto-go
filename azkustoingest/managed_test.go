@@ -5,6 +5,11 @@ import (
 	"context"
 	goErrors "errors"
 	"fmt"
+	"io"
+	"strings"
+	"testing"
+	"time"
+
 	"github.com/Azure/azure-kusto-go/azkustodata"
 	"github.com/Azure/azure-kusto-go/azkustodata/errors"
 	v1 "github.com/Azure/azure-kusto-go/azkustodata/query/v1"
@@ -12,10 +17,6 @@ import (
 	"github.com/Azure/azure-kusto-go/azkustoingest/internal/properties"
 	"github.com/Azure/azure-kusto-go/azkustoingest/internal/resources"
 	"github.com/cenkalti/backoff/v4"
-	"io"
-	"strings"
-	"testing"
-	"time"
 
 	"github.com/google/uuid"
 	"github.com/stretchr/testify/assert"
@@ -55,8 +56,8 @@ func TestManaged(t *testing.T) {
 		expectedStatus  StatusCode
 		expectedError   error
 		expectedCounter int
-		onLocal         func(t *testing.T, ctx context.Context, from string, props properties.All) error
-		onReader        func(t *testing.T, ctx context.Context, reader io.Reader, props properties.All) (string, error)
+		onLocal         func(t *testing.T, ctx context.Context, from string, props properties.All) (string, int64, error)
+		onReader        func(t *testing.T, ctx context.Context, reader io.Reader, props properties.All) (string, int64, error)
 		onBlob          func(t *testing.T, ctx context.Context, from string, fileSize int64, props properties.All) error
 		isBigFile       bool
 		blobPath        string
@@ -246,14 +247,14 @@ func TestManaged(t *testing.T) {
 				require.Fail(t, "Unexpected queued ingest call")
 				return nil, nil
 			},
-			onReader: func(t *testing.T, ctx context.Context, reader io.Reader, props properties.All) (string, error) {
+			onReader: func(t *testing.T, ctx context.Context, reader io.Reader, props properties.All) (string, int64, error) {
 				counter++
 				assert.Equal(t, "defaultDb", props.Ingestion.DatabaseName)
 				assert.Equal(t, "defaultTable", props.Ingestion.TableName)
 				all, err := io.ReadAll(reader)
 				assert.NoError(t, err)
 				assert.Equal(t, compressedBytes, all)
-				return "", nil
+				return "", 0, nil
 			},
 			expectedCounter: 4,
 			expectedStatus:  Queued,
@@ -279,14 +280,14 @@ func TestManaged(t *testing.T) {
 				require.Fail(t, "Unexpected queued ingest call")
 				return nil, nil
 			},
-			onReader: func(t *testing.T, ctx context.Context, reader io.Reader, props properties.All) (string, error) {
+			onReader: func(t *testing.T, ctx context.Context, reader io.Reader, props properties.All) (string, int64, error) {
 				counter++
 				assert.Equal(t, "defaultDb", props.Ingestion.DatabaseName)
 				assert.Equal(t, "defaultTable", props.Ingestion.TableName)
 				all, err := io.ReadAll(reader)
 				assert.NoError(t, err)
 				assert.Equal(t, bigData, all)
-				return "", nil
+				return "", 0, nil
 			},
 			expectedCounter: 1,
 			expectedStatus:  Queued,
@@ -344,15 +345,15 @@ func TestManaged(t *testing.T) {
 
 			ingestion, err := newFromClient(mockClient, &Ingestion{db: "defaultDb", table: "defaultTable"})
 			ingestion.fs = resources.FsMock{
-				OnLocal: func(ctx context.Context, from string, props properties.All) error {
+				OnLocal: func(ctx context.Context, from string, props properties.All) (string, int64, error) {
 					if test.onLocal == nil {
-						return nil
+						return "", 0, nil
 					}
 					return test.onLocal(t, ctx, from, props)
 				},
-				OnReader: func(ctx context.Context, reader io.Reader, props properties.All) (string, error) {
+				OnReader: func(ctx context.Context, reader io.Reader, props properties.All) (string, int64, error) {
 					if test.onReader == nil {
-						return "", nil
+						return "", 0, nil
 					}
 					return test.onReader(t, ctx, reader, props)
 				},
