@@ -7,9 +7,3 @@ use (
 	azkustoingest
 	quickstart
 )
-
-replace (
-	github.com/Azure/azure-kusto-go/azkustodata v1.2.0 => ./azkustodata
-	github.com/Azure/azure-kusto-go/azkustoingest v1.2.0 => ./azkustoingest
-	github.com/Azure/azure-kusto-go/quickstart v1.2.0 => ./quickstart
-)
