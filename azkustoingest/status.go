@@ -234,16 +234,16 @@ func (r *statusRecord) String() string {
 func (r statusRecord) Error() string {
 	switch r.Status {
 	case Succeeded:
-		return fmt.Sprintf("Ingestion succeeded\n" + r.String())
+		return fmt.Sprintf("Ingestion succeeded\n%s", r.String())
 
 	case Queued:
-		return fmt.Sprintf("Ingestion Queued\n" + r.String())
+		return fmt.Sprintf("Ingestion Queued\n%s", r.String())
 
 	case PartiallySucceeded:
-		return fmt.Sprintf("Ingestion succeeded partially\n" + r.String())
+		return fmt.Sprintf("Ingestion succeeded partially\n%s", r.String())
 
 	default:
-		return fmt.Sprintf("Ingestion Failed\n" + r.String())
+		return fmt.Sprintf("Ingestion Failed\n%s", r.String())
 	}
 }
 
