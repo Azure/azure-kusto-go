@@ -371,14 +371,17 @@ func (c *CombinedError) AddError(e error) bool {
 	return true
 }
 
-func (c *CombinedError) Unwrap() error {
+func (c *CombinedError) Unwrap() []error {
+	return c.Errors
+}
+
+func (c *CombinedError) GetError() error {
 	if len(c.Errors) == 0 {
 		return nil
 	}
 	if len(c.Errors) == 1 {
 		return c.Errors[0]
 	}
-
 	return c
 }
 
@@ -387,5 +390,5 @@ func CombineErrors(errs ...error) error {
 	for _, err := range errs {
 		combined.AddError(err)
 	}
-	return combined.Unwrap()
+	return combined.GetError()
 }

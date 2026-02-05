@@ -4,9 +4,10 @@ import (
 	"bytes"
 	"context"
 	"encoding/json"
+	"io"
+
 	"github.com/Azure/azure-kusto-go/azkustodata/errors"
 	"github.com/Azure/azure-kusto-go/azkustodata/query"
-	"io"
 )
 
 // DefaultIoCapacity is the default capacity of the channel that receives frames from the Kusto service. Lower capacity means less memory usage, but might cause the channel to block if the frames are not consumed fast enough.
@@ -234,7 +235,7 @@ func combineOneApiErrors(errs []OneApiError) error {
 	for _, e := range errs {
 		c.AddError(&e)
 	}
-	return c.Unwrap()
+	return c.GetError()
 }
 
 // readPrimaryTable reads a primary table from the dataset.
