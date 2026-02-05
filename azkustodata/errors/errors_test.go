@@ -6,6 +6,7 @@ import (
 	"io"
 	"log"
 	"testing"
+	"time"
 
 	"github.com/kylelemons/godebug/pretty"
 )
@@ -117,6 +118,45 @@ func TestRetry(t *testing.T) {
 			},
 			want: true,
 		},
+		// CombinedError tests - these verify the Unwrap() []error fix works correctly
+		{
+			desc: "CombinedError with 3 plain errors (no *Error) - not retryable",
+			err: CombineErrors(
+				fmt.Errorf("error 1"),
+				fmt.Errorf("error 2"),
+				fmt.Errorf("error 3"),
+			),
+			want: false,
+		},
+		{
+			desc: "CombinedError with 3 errors, last is retryable *Error",
+			err: CombineErrors(
+				fmt.Errorf("error 1"),
+				fmt.Errorf("error 2"),
+				&Error{Kind: KTimeout},
+			),
+			want: true,
+		},
+		{
+			desc: "CombinedError with 5 errors, one retryable *Error among them",
+			err: CombineErrors(
+				fmt.Errorf("error 1"),
+				fmt.Errorf("error 2"),
+				fmt.Errorf("error 3"),
+				&Error{Kind: KHTTPError, restErrMsg: []byte(`{"error": {"@permanent": false}}`)},
+				fmt.Errorf("error 5"),
+			),
+			want: true,
+		},
+		{
+			desc: "CombinedError with permanent *Error - not retryable",
+			err: CombineErrors(
+				fmt.Errorf("error 1"),
+				&Error{Kind: KTimeout, permanent: true},
+				fmt.Errorf("error 3"),
+			),
+			want: false,
+		},
 	}
 
 	for _, test := range tests {
@@ -125,5 +165,58 @@ func TestRetry(t *testing.T) {
 		if got != test.want {
 			t.Errorf("Test(%s): got %v, want %v", test.desc, got, test.want)
 		}
+	}
+}
+
+// TestCombinedErrorUnwrapNoInfiniteLoop verifies that errors.As on CombinedError
+// with multiple errors does not cause an infinite loop (the original bug).
+func TestCombinedErrorUnwrapNoInfiniteLoop(t *testing.T) {
+	// Create a CombinedError with 3+ errors
+	combined := CombineErrors(
+		fmt.Errorf("error 1"),
+		fmt.Errorf("error 2"),
+		fmt.Errorf("error 3"),
+		fmt.Errorf("error 4"),
+	)
+
+	// This would hang forever with the old buggy Unwrap() implementation
+	// that returned 'c' (itself) when len(c.Errors) >= 2
+	done := make(chan bool, 1)
+	go func() {
+		var target *Error
+		errors.As(combined, &target) // Should NOT infinite loop
+		done <- true
+	}()
+
+	select {
+	case <-done:
+		// Success - errors.As completed without hanging
+	case <-time.After(1 * time.Second):
+		t.Fatal("errors.As on CombinedError caused infinite loop (timeout after 1 second)")
+	}
+}
+
+// TestCombinedErrorAsFindsNestedError verifies errors.As can find *Error
+// inside a CombinedError with multiple errors.
+func TestCombinedErrorAsFindsNestedError(t *testing.T) {
+	expectedErr := &Error{Op: OpQuery, Kind: KTimeout, Err: fmt.Errorf("timeout occurred")}
+
+	combined := CombineErrors(
+		fmt.Errorf("error 1"),
+		fmt.Errorf("error 2"),
+		expectedErr,
+		fmt.Errorf("error 4"),
+	)
+
+	var target *Error
+	if !errors.As(combined, &target) {
+		t.Fatal("errors.As failed to find *Error inside CombinedError")
+	}
+
+	if target.Op != OpQuery {
+		t.Errorf("got Op=%v, want Op=%v", target.Op, OpQuery)
+	}
+	if target.Kind != KTimeout {
+		t.Errorf("got Kind=%v, want Kind=%v", target.Kind, KTimeout)
 	}
 }
