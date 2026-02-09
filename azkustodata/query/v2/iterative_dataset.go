@@ -232,8 +232,8 @@ func readDataSetCompletion(dec *json.Decoder) error {
 // combineOneApiErrors combines multiple OneApiErrors into a single error, de-duping them if needed.
 func combineOneApiErrors(errs []OneApiError) error {
 	c := errors.NewCombinedError()
-	for _, e := range errs {
-		c.AddError(&e)
+	for i := range errs {
+		c.AddError(&errs[i])
 	}
 	return c.GetError()
 }
