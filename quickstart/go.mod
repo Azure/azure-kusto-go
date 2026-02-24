@@ -4,9 +4,9 @@ go 1.23.0
 
 toolchain go1.24.4
 
-require github.com/Azure/azure-kusto-go/azkustodata v1.2.0
+require github.com/Azure/azure-kusto-go/azkustodata v1.2.1
 
-require github.com/Azure/azure-kusto-go/azkustoingest v1.2.0
+require github.com/Azure/azure-kusto-go/azkustoingest v1.2.1
 
 require (
 	github.com/Azure/azure-sdk-for-go/sdk/azcore v1.17.0 // indirect
