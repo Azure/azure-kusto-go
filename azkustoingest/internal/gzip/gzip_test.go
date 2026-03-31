@@ -2,11 +2,12 @@ package gzip
 
 import (
 	"bytes"
-	"compress/gzip"
 	"io"
 	"math/rand"
 	"os"
 	"testing"
+
+	"github.com/klauspost/compress/gzip"
 )
 
 const letterBytes = "abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ"

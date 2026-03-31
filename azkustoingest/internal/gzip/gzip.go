@@ -3,10 +3,11 @@
 package gzip
 
 import (
-	"compress/gzip"
 	"io"
 	"sync"
 	"sync/atomic"
+
+	"github.com/klauspost/compress/gzip"
 )
 
 var compressPool = &sync.Pool{
