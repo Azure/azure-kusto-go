@@ -14,6 +14,19 @@ func (c CompressionType) String() string {
 	return "unknown compression type"
 }
 
+// ToFileExtension returns the standard file extension for the compression type,
+// without a leading dot.
+func (c CompressionType) ToFileExtension() (string, bool) {
+	switch c {
+	case GZIP:
+		return "gz", true
+	case ZIP:
+		return "zip", true
+	default:
+		return "", false
+	}
+}
+
 //goland:noinspection GoUnusedConst - Part of the API
 const (
 	// CTUnknown indicates that that the compression type was unset.
