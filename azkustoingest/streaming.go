@@ -5,7 +5,6 @@ import (
 	"context"
 	"encoding/json"
 	"github.com/Azure/azure-kusto-go/azkustoingest/ingestoptions"
-	"github.com/Azure/azure-kusto-go/azkustoingest/internal/utils"
 	"io"
 	"os"
 
@@ -117,7 +116,7 @@ func prepFileAndProps(fPath string, props *properties.All, options []FileOption,
 	}
 
 	props.Source.OriginalSource = fPath
-	compression := utils.CompressionDiscovery(fPath)
+	compression := queued.EffectiveCompressionType(props, fPath)
 	err = queued.CompleteFormatFromFileName(props, fPath)
 	if err != nil {
 		return nil, err, true

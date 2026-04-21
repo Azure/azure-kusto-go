@@ -375,6 +375,7 @@ func TestGenBlobName(t *testing.T) {
 
 	tests := []struct {
 		name                  string
+		fileName              string
 		compressionFromSource ingestoptions.CompressionType
 		shouldCompress        bool
 		dataFormat            string
@@ -382,6 +383,7 @@ func TestGenBlobName(t *testing.T) {
 	}{
 		{
 			name:                  "should compress always yields gz",
+			fileName:              "file",
 			compressionFromSource: ingestoptions.CTNone,
 			shouldCompress:        true,
 			dataFormat:            "csv",
@@ -389,6 +391,7 @@ func TestGenBlobName(t *testing.T) {
 		},
 		{
 			name:                  "no compression and no source compression uses csv",
+			fileName:              "file",
 			compressionFromSource: ingestoptions.CTNone,
 			shouldCompress:        false,
 			dataFormat:            "csv",
@@ -396,6 +399,7 @@ func TestGenBlobName(t *testing.T) {
 		},
 		{
 			name:                  "no compression and no source compression uses json",
+			fileName:              "file",
 			compressionFromSource: ingestoptions.CTNone,
 			shouldCompress:        false,
 			dataFormat:            "json",
@@ -403,6 +407,7 @@ func TestGenBlobName(t *testing.T) {
 		},
 		{
 			name:                  "unknown source compression falls back to format",
+			fileName:              "file",
 			compressionFromSource: ingestoptions.CTUnknown,
 			shouldCompress:        false,
 			dataFormat:            "csv",
@@ -410,6 +415,7 @@ func TestGenBlobName(t *testing.T) {
 		},
 		{
 			name:                  "explicit gzip source compression keeps gz suffix",
+			fileName:              "file",
 			compressionFromSource: ingestoptions.GZIP,
 			shouldCompress:        false,
 			dataFormat:            "csv",
@@ -417,6 +423,23 @@ func TestGenBlobName(t *testing.T) {
 		},
 		{
 			name:                  "explicit zip source compression keeps zip suffix",
+			fileName:              "file",
+			compressionFromSource: ingestoptions.ZIP,
+			shouldCompress:        false,
+			dataFormat:            "csv",
+			expectedSuffix:        ".zip",
+		},
+		{
+			name:                  "double extension prevention - file.json.gz with GZIP",
+			fileName:              "data.json.gz",
+			compressionFromSource: ingestoptions.GZIP,
+			shouldCompress:        false,
+			dataFormat:            "json",
+			expectedSuffix:        ".gz",
+		},
+		{
+			name:                  "double extension prevention - file.csv.zip with ZIP",
+			fileName:              "data.csv.zip",
 			compressionFromSource: ingestoptions.ZIP,
 			shouldCompress:        false,
 			dataFormat:            "csv",
@@ -428,8 +451,12 @@ func TestGenBlobName(t *testing.T) {
 		tt := tt
 		t.Run(tt.name, func(t *testing.T) {
 			t.Parallel()
-			blobName := GenBlobName("db", "table", nower(), "guid", "file", tt.compressionFromSource, tt.shouldCompress, tt.dataFormat)
+			blobName := GenBlobName("db", "table", nower(), "guid", tt.fileName, tt.compressionFromSource, tt.shouldCompress, tt.dataFormat)
 			assert.True(t, strings.HasSuffix(blobName, tt.expectedSuffix), "expected %q to have suffix %q", blobName, tt.expectedSuffix)
+
+			// Verify no double compression extensions
+			assert.False(t, strings.HasSuffix(blobName, ".gz.gz"), "should not have double .gz extension in %q", blobName)
+			assert.False(t, strings.HasSuffix(blobName, ".zip.zip"), "should not have double .zip extension in %q", blobName)
 		})
 	}
 }

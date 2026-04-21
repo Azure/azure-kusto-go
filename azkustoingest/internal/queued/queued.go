@@ -10,6 +10,7 @@ import (
 	"net/url"
 	"os"
 	"path/filepath"
+	"strings"
 	"time"
 
 	"github.com/Azure/azure-kusto-go/azkustoingest/ingestoptions"
@@ -190,7 +191,7 @@ func (i *Ingestion) UploadReaderToBlob(ctx context.Context, reader io.Reader, pr
 		return "", 0, errors.ES(errors.OpFileIngest, errors.KBlobstore, "no Kusto queue resources are defined, there is no queue to upload to").SetNoRetry()
 	}
 
-	compression := effectiveCompressionType(&props, props.Source.OriginalSource)
+	compression := EffectiveCompressionType(&props, props.Source.OriginalSource)
 	shouldCompress := ShouldCompress(&props, compression)
 	blobName := GenBlobName(i.db, i.table, nower(), filepath.Base(uuid.New().String()), filepath.Base(props.Source.OriginalSource), compression, shouldCompress, props.Ingestion.Additional.Format.String())
 	seeker, isSeekable := reader.(io.Seeker)
@@ -353,7 +354,7 @@ var nower = time.Now
 // localToBlob copies from a local to an Azure Blobstore blob. It returns the URL of the Blob, the local file info and an
 // error if there was one.
 func (i *Ingestion) localToBlob(ctx context.Context, from string, client *azblob.Client, container string, props *properties.All) (string, int64, error) {
-	compression := effectiveCompressionType(props, from)
+	compression := EffectiveCompressionType(props, from)
 	shouldCompress := ShouldCompress(props, compression)
 	blobName := GenBlobName(i.db, i.table, nower(), filepath.Base(uuid.New().String()), filepath.Base(from), compression, shouldCompress, props.Ingestion.Additional.Format.String())
 
@@ -425,12 +426,27 @@ func GenBlobName(databaseName string, tableName string, time time.Time, guid str
 		}
 	}
 
+	fileName = stripCompressionSuffix(fileName)
 	blobName := fmt.Sprintf("%s_%s_%s_%s_%s.%s", databaseName, tableName, time, guid, fileName, extension)
 
 	return blobName
 }
 
-func effectiveCompressionType(props *properties.All, sourcePath string) ingestoptions.CompressionType {
+// stripCompressionSuffix removes a known compression extension (.gz, .zip) from a filename
+// to prevent double-extensions like "file.json.gz.gz" when GenBlobName appends the extension.
+func stripCompressionSuffix(fileName string) string {
+	lower := strings.ToLower(fileName)
+	for _, suffix := range []string{".gz", ".zip"} {
+		if strings.HasSuffix(lower, suffix) {
+			return fileName[:len(fileName)-len(suffix)]
+		}
+	}
+	return fileName
+}
+
+// EffectiveCompressionType returns the user-configured compression type if set,
+// otherwise falls back to file-extension discovery.
+func EffectiveCompressionType(props *properties.All, sourcePath string) ingestoptions.CompressionType {
 	if props.Source.CompressionType != ingestoptions.CTUnknown {
 		return props.Source.CompressionType
 	}
