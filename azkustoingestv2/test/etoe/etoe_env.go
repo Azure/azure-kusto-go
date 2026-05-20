@@ -60,6 +60,9 @@ func (c *Config) newTokenProvider() (httpclient.TokenProvider, func(), error) {
 		return nil, nil, fmt.Errorf("failed to create azkustodata client for token: %w", err)
 	}
 	tkp := client.Auth().TokenProvider
+	// SetHttp must be called before AcquireToken — the token provider needs an HTTP client
+	// to fetch cloud metadata, and it's normally only set during actual query execution.
+	tkp.SetHttp(client.HttpClient())
 	cleanup := func() { client.Close() }
 	return func(ctx context.Context) (string, error) {
 		token, _, err := tkp.AcquireToken(ctx)
