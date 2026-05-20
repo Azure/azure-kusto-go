@@ -107,11 +107,9 @@ func (c *cachedData) isExpired() bool {
 // DefaultConfigurationCache is the default implementation of ConfigurationCache.
 type DefaultConfigurationCache struct {
 	configClient *ConfigurationClient
-	authProvider func(ctx context.Context) (string, error)
 
-	refreshInterval time.Duration
+	refreshInterval    time.Duration
 	skipSecurityChecks bool
-	clientDetails   *ingestoptions.ClientDetails
 
 	mu    sync.RWMutex
 	cache *cachedData
@@ -124,11 +122,6 @@ type DefaultConfigurationCacheOption func(*DefaultConfigurationCache)
 // WithCacheRefreshInterval sets the refresh interval for the cache.
 func WithCacheRefreshInterval(interval time.Duration) DefaultConfigurationCacheOption {
 	return func(c *DefaultConfigurationCache) { c.refreshInterval = interval }
-}
-
-// WithCacheAuthProvider sets the auth token provider.
-func WithCacheAuthProvider(provider func(ctx context.Context) (string, error)) DefaultConfigurationCacheOption {
-	return func(c *DefaultConfigurationCache) { c.authProvider = provider }
 }
 
 // NewDefaultConfigurationCache creates a new DefaultConfigurationCache.
@@ -186,16 +179,7 @@ func (c *DefaultConfigurationCache) refreshConfiguration(ctx context.Context) (*
 		return c.cache.configuration, nil
 	}
 
-	var token string
-	if c.authProvider != nil {
-		var err error
-		token, err = c.authProvider(ctx)
-		if err != nil {
-			return nil, fmt.Errorf("failed to get auth token for configuration: %w", err)
-		}
-	}
-
-	resp, err := c.configClient.FetchConfiguration(ctx, token)
+	resp, err := c.configClient.FetchConfiguration(ctx)
 	if err != nil {
 		// If we have stale data, return it rather than failing
 		if c.cache != nil {
@@ -206,8 +190,10 @@ func (c *DefaultConfigurationCache) refreshConfiguration(ctx context.Context) (*
 
 	refreshAfter := c.refreshInterval
 	if resp.ContainerSettings != nil && resp.ContainerSettings.RefreshInterval != "" {
-		if parsed, err := parseTimeSpan(resp.ContainerSettings.RefreshInterval); err == nil {
-			refreshAfter = parsed
+		if parsed, parseErr := parseTimeSpan(resp.ContainerSettings.RefreshInterval); parseErr == nil {
+			if parsed < refreshAfter {
+				refreshAfter = parsed
+			}
 		}
 	}
 
@@ -242,9 +228,52 @@ func (c *DefaultConfigurationCache) backgroundRefresh() {
 	}
 }
 
-// parseTimeSpan parses a .NET-style time span string (e.g., "01:00:00") into a time.Duration.
+// parseTimeSpan parses a .NET-style time span string into a time.Duration.
+// Supports: "HH:mm:ss", "d.HH:mm:ss", "HH:mm:ss.fffffff"
 func parseTimeSpan(s string) (time.Duration, error) {
-	var hours, minutes, seconds int
+	var days, hours, minutes, seconds int
+	var frac float64
+
+	// Try d.HH:mm:ss format
+	n, _ := fmt.Sscanf(s, "%d.%d:%d:%d", &days, &hours, &minutes, &seconds)
+	if n == 4 {
+		return time.Duration(days)*24*time.Hour +
+			time.Duration(hours)*time.Hour +
+			time.Duration(minutes)*time.Minute +
+			time.Duration(seconds)*time.Second, nil
+	}
+
+	// Try HH:mm:ss.fffffff format
+	n, _ = fmt.Sscanf(s, "%d:%d:%d.%f", &hours, &minutes, &seconds, &frac)
+	if n >= 3 {
+		d := time.Duration(hours)*time.Hour +
+			time.Duration(minutes)*time.Minute +
+			time.Duration(seconds)*time.Second
+		if n == 4 {
+			// Parse fractional seconds from string to avoid float precision issues
+			for i := len(s) - 1; i >= 0; i-- {
+				if s[i] == '.' {
+					fracStr := s[i+1:]
+					fracNanos := int64(0)
+					for j, c := range fracStr {
+						if j >= 7 {
+							break
+						}
+						fracNanos = fracNanos*10 + int64(c-'0')
+					}
+					// Pad to 7 digits (100ns units)
+					for j := len(fracStr); j < 7; j++ {
+						fracNanos *= 10
+					}
+					d += time.Duration(fracNanos) * 100 * time.Nanosecond
+					break
+				}
+			}
+		}
+		return d, nil
+	}
+
+	// Try plain HH:mm:ss
 	n, err := fmt.Sscanf(s, "%d:%d:%d", &hours, &minutes, &seconds)
 	if err != nil || n != 3 {
 		return 0, fmt.Errorf("invalid time span format: %s", s)

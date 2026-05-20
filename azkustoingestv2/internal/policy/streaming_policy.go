@@ -209,5 +209,10 @@ func (p *DefaultManagedStreamingPolicy) StreamingErrorCallback(source ingestopti
 }
 
 func (p *DefaultManagedStreamingPolicy) StreamingSuccessCallback(source ingestoptions.IngestionSource, database, table string, details ManagedStreamingRequestSuccessDetails) {
-	// Default implementation does nothing
+	key := database + "-" + table
+
+	p.mu.Lock()
+	defer p.mu.Unlock()
+
+	delete(p.defaultToQueuedByTable, key)
 }

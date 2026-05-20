@@ -6,6 +6,7 @@ package upload
 import (
 	"compress/gzip"
 	"context"
+	"fmt"
 	"io"
 	"log/slog"
 	"sync"
@@ -70,9 +71,17 @@ func (u *ContainerUploaderBase) SetIgnoreSizeLimit(ignore bool) {
 
 // Upload uploads a single local source with retry and container cycling.
 func (u *ContainerUploaderBase) Upload(ctx context.Context, source ingestoptions.LocalSource) (*ingestoptions.BlobSource, error) {
+	// Validate source
 	stream, err := source.Data()
 	if err != nil {
-		return nil, ingestoptions.NewIngestClientError("failed to get source data", err, true)
+		return nil, ingestoptions.NewUploadFailedError(
+			ingestoptions.UploadErrorSourceNotReadable, source.Name(), err,
+		)
+	}
+	if stream == nil {
+		return nil, ingestoptions.NewUploadFailedError(
+			ingestoptions.UploadErrorSourceIsNull, source.Name(), nil,
+		)
 	}
 
 	name := source.GenerateBlobName()
@@ -81,8 +90,16 @@ func (u *ContainerUploaderBase) Upload(ctx context.Context, source ingestoptions
 	if !u.ignoreSizeLimit {
 		if sizer, ok := stream.(interface{ Len() int }); ok {
 			size := int64(sizer.Len())
+			if size == 0 {
+				return nil, ingestoptions.NewUploadFailedError(
+					ingestoptions.UploadErrorSourceIsEmpty, source.Name(), nil,
+				)
+			}
 			if size > u.maxDataSize {
-				return nil, ingestoptions.NewIngestSizeLimitExceededError(size, u.maxDataSize)
+				return nil, ingestoptions.NewUploadFailedError(
+					ingestoptions.UploadErrorSourceSizeLimitExceed, source.Name(),
+					fmt.Errorf("size %d exceeds max %d", size, u.maxDataSize),
+				)
 			}
 		}
 	}

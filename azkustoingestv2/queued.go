@@ -5,16 +5,15 @@ package azkustoingestv2
 
 import (
 	"context"
-	"encoding/json"
 	"fmt"
+	"io"
 	"log/slog"
 	"net/url"
 	"time"
 
-	"github.com/google/uuid"
-
 	"github.com/Azure/azure-kusto-go/azkustoingestv2/ingestoptions"
 	"github.com/Azure/azure-kusto-go/azkustoingestv2/internal/config"
+	"github.com/Azure/azure-kusto-go/azkustoingestv2/internal/httpclient"
 	"github.com/Azure/azure-kusto-go/azkustoingestv2/internal/upload"
 )
 
@@ -63,6 +62,12 @@ func (c *QueuedIngestClient) IngestBlobs(ctx context.Context, database, table st
 		return nil, ingestoptions.NewIngestClientError("sources list cannot be empty", nil, true)
 	}
 
+	if props != nil {
+		if err := props.Validate(); err != nil {
+			return nil, err
+		}
+	}
+
 	maxBlobs, err := c.MaxSourcesPerMultiIngest(ctx)
 	if err != nil {
 		return nil, err
@@ -99,25 +104,42 @@ func (c *QueuedIngestClient) IngestBlobs(ctx context.Context, database, table st
 	blobs := make([]ingestBlob, 0, len(sources))
 	for _, s := range sources {
 		blobs = append(blobs, ingestBlob{
-			BlobPath: s.BlobPath(),
+			URL:      s.BlobPath(),
 			SourceID: s.SourceID().String(),
 			RawSize:  s.BlobExactSize,
 		})
+	}
+
+	// Build inline mapping JSON if present
+	var inlineMappingJSON string
+	if len(props.IngestionMapping) > 0 {
+		var err error
+		inlineMappingJSON, err = ingestoptions.SerializeColumnMappings(props.IngestionMapping)
+		if err != nil {
+			return nil, fmt.Errorf("failed to serialize inline mapping: %w", err)
+		}
 	}
 
 	request := &ingestRequest{
 		Timestamp: time.Now().UTC().Format(time.RFC3339),
 		Blobs:     blobs,
 		Properties: ingestRequestPayload{
-			Format:                props.Format.String(),
-			IngestionMappingRef:   props.IngestionMappingRef,
-			FlushImmediately:      props.FlushImmediately,
-			IgnoreFirstRecord:     props.IgnoreFirstRecord,
-			IngestIfNotExists:     props.IngestIfNotExists,
-			Tags:                  props.Tags,
-			DropByTags:            props.DropByTags,
-			IngestByTags:          props.IngestByTags,
-			CreationTime:          props.CreationTime,
+			Format:                    props.Format.String(),
+			IngestionMappingRef:       props.IngestionMappingRef,
+			IngestionMapping:          inlineMappingJSON,
+			EnableTracking:            props.EnableTracking,
+			FlushImmediately:          props.FlushImmediately,
+			IgnoreFirstRecord:         props.IgnoreFirstRecord,
+			IgnoreLastRecordIfInvalid: props.IgnoreLastRecordIfInvalid,
+			IngestIfNotExists:         props.IngestIfNotExists,
+			Tags:                      props.SynthesizeTags(),
+			SkipBatching:              props.SkipBatching,
+			DeleteAfterDownload:       props.DeleteAfterDownload,
+			IgnoreSizeLimit:           props.IgnoreSizeLimit,
+			CreationTime:              props.CreationTime,
+			ZipPattern:                props.ZipPattern,
+			ExtendSchema:              props.ExtendSchema,
+			RecreateSchema:            props.RecreateSchema,
 		},
 	}
 
@@ -182,22 +204,29 @@ func sanitizeBlobURL(blobPath string) string {
 
 // ingestBlob is the blob payload for the ingest request.
 type ingestBlob struct {
-	BlobPath string `json:"blobPath"`
+	URL      string `json:"url"`
 	SourceID string `json:"sourceId,omitempty"`
 	RawSize  int64  `json:"rawSize,omitempty"`
 }
 
 // ingestRequestPayload holds the properties portion of the ingest request.
 type ingestRequestPayload struct {
-	Format              string   `json:"format,omitempty"`
-	IngestionMappingRef string   `json:"ingestionMappingReference,omitempty"`
-	FlushImmediately    bool     `json:"flushImmediately,omitempty"`
-	IgnoreFirstRecord   bool     `json:"ignoreFirstRecord,omitempty"`
-	IngestIfNotExists   string   `json:"ingestIfNotExists,omitempty"`
-	Tags                []string `json:"tags,omitempty"`
-	DropByTags          []string `json:"dropByTags,omitempty"`
-	IngestByTags        []string `json:"ingestByTags,omitempty"`
-	CreationTime        string   `json:"creationTime,omitempty"`
+	Format                    string   `json:"format,omitempty"`
+	IngestionMappingRef       string   `json:"ingestionMappingReference,omitempty"`
+	IngestionMapping          string   `json:"ingestionMapping,omitempty"`
+	EnableTracking            bool     `json:"enableTracking,omitempty"`
+	FlushImmediately          bool     `json:"flushImmediately,omitempty"`
+	IgnoreFirstRecord         bool     `json:"ignoreFirstRecord,omitempty"`
+	IgnoreLastRecordIfInvalid bool     `json:"ignoreLastRecordIfInvalid,omitempty"`
+	IngestIfNotExists         string   `json:"ingestIfNotExists,omitempty"`
+	Tags                      []string `json:"tags,omitempty"`
+	SkipBatching              bool     `json:"skipBatching,omitempty"`
+	DeleteAfterDownload       bool     `json:"deleteAfterDownload,omitempty"`
+	IgnoreSizeLimit           bool     `json:"ignoreSizeLimit,omitempty"`
+	CreationTime              string   `json:"creationTime,omitempty"`
+	ZipPattern                string   `json:"zipPattern,omitempty"`
+	ExtendSchema              bool     `json:"extend_schema,omitempty"`
+	RecreateSchema            bool     `json:"recreate_schema,omitempty"`
 }
 
 // ingestRequest is the full queued ingest request payload.
@@ -208,42 +237,76 @@ type ingestRequest struct {
 }
 
 // APIClient provides HTTP methods against the Kusto DM and Engine endpoints.
-// This is a thin wrapper intended to be implemented with actual HTTP calls.
 type APIClient struct {
-	DMURL     string
-	EngineURL string
-	// httpClient would be configured with auth, tracing headers, etc.
+	DMURL      string
+	EngineURL  string
+	baseClient *httpclient.BaseClient
 }
 
 // NewAPIClient creates a new APIClient.
-func NewAPIClient(dmURL, engineURL string) *APIClient {
-	return &APIClient{DMURL: dmURL, EngineURL: engineURL}
+func NewAPIClient(dmURL, engineURL string, baseClient *httpclient.BaseClient) *APIClient {
+	return &APIClient{DMURL: dmURL, EngineURL: engineURL, baseClient: baseClient}
 }
 
 // PostQueuedIngest submits a queued ingestion request.
 func (a *APIClient) PostQueuedIngest(ctx context.Context, database, table string, request *ingestRequest) (*ingestoptions.IngestResponse, error) {
-	// TODO: Implement actual HTTP POST to DM endpoint
-	// POST {dmURL}/v2/rest/ingest/{database}/{table}
-	_, _ = json.Marshal(request)
+	apiURL := fmt.Sprintf("%s/v1/rest/ingestion/queued/%s/%s", a.DMURL, database, table)
+
+	var result struct {
+		IngestionOperationID string `json:"ingestionOperationId"`
+	}
+	resp, err := a.baseClient.DoJSON(ctx, "POST", apiURL, request, &result)
+	if err != nil {
+		return nil, fmt.Errorf("queued ingest POST failed: %w", err)
+	}
+
+	if resp.StatusCode != 200 {
+		return nil, httpclient.ParseErrorResponse(resp)
+	}
+
 	return &ingestoptions.IngestResponse{
-		OperationID: uuid.New().String(),
+		OperationID: result.IngestionOperationID,
 	}, nil
 }
 
 // PostStreamingIngest submits a streaming ingestion request.
-func (a *APIClient) PostStreamingIngest(ctx context.Context, database, table string, data []byte, format string, mappingName string, blobURL string, compression ingestoptions.CompressionType) (*StreamingIngestResponse, error) {
-	// TODO: Implement actual HTTP POST to Engine endpoint
-	// POST {engineURL}/v1/rest/ingest/{database}/{table}?streamFormat={format}&mappingName={mappingName}
+func (a *APIClient) PostStreamingIngest(ctx context.Context, database, table string, body io.Reader, contentType string, format string, mappingName string, blobURL string, compression ingestoptions.CompressionType) (*StreamingIngestResponse, error) {
+	apiURL := fmt.Sprintf("%s/v1/rest/ingest/%s/%s?streamFormat=%s", a.EngineURL, database, table, format)
+	if mappingName != "" {
+		apiURL += "&mappingName=" + url.QueryEscape(mappingName)
+	}
+	if blobURL != "" {
+		apiURL += "&sourceKind=uri"
+	}
+
+	resp, err := a.baseClient.Do(ctx, "POST", apiURL, body, contentType)
+	if err != nil {
+		return nil, fmt.Errorf("streaming ingest POST failed: %w", err)
+	}
+	defer resp.Body.Close()
+
+	if resp.StatusCode != 200 {
+		return nil, httpclient.ParseErrorResponse(resp)
+	}
+
 	return &StreamingIngestResponse{}, nil
 }
 
 // GetIngestStatus retrieves the status of an ingestion operation.
 func (a *APIClient) GetIngestStatus(ctx context.Context, database, table, operationID string, details bool) (*StatusResponse, error) {
-	// TODO: Implement actual HTTP GET from DM endpoint
-	// GET {dmURL}/v2/rest/ingest/{database}/{table}/operations/{operationID}?details={details}
-	return &StatusResponse{
-		Status: &OperationStatus{},
-	}, nil
+	apiURL := fmt.Sprintf("%s/v1/rest/ingestion/queued/%s/%s/%s?details=%t", a.DMURL, database, table, operationID, details)
+
+	var result StatusResponse
+	resp, err := a.baseClient.DoJSON(ctx, "GET", apiURL, nil, &result)
+	if err != nil {
+		return nil, fmt.Errorf("get ingest status failed: %w", err)
+	}
+
+	if resp.StatusCode != 200 {
+		return nil, httpclient.ParseErrorResponse(resp)
+	}
+
+	return &result, nil
 }
 
 // StreamingIngestResponse is the response from a streaming ingestion request.

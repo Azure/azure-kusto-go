@@ -121,3 +121,65 @@ func NewIngestSizeLimitExceededError(actualSize, maxAllowedSize int64) *IngestSi
 		ActualSize:     actualSize,
 	}
 }
+
+// IngestServiceError represents a non-permanent service error from Kusto.
+// These are transient errors that may succeed on retry.
+type IngestServiceError struct {
+	IngestError
+}
+
+// NewIngestServiceError creates a new IngestServiceError.
+func NewIngestServiceError(message string, cause error, failureCode int, failureSubCode string) *IngestServiceError {
+	return &IngestServiceError{
+		IngestError: IngestError{
+			Message:        message,
+			Cause:          cause,
+			FailureCode:    failureCode,
+			FailureSubCode: failureSubCode,
+			IsPermanent:    false,
+		},
+	}
+}
+
+// UploadErrorCode categorizes upload failure reasons.
+type UploadErrorCode string
+
+const (
+	UploadErrorSourceIsNull          UploadErrorCode = "SOURCE_IS_NULL"
+	UploadErrorSourceNotFound        UploadErrorCode = "SOURCE_NOT_FOUND"
+	UploadErrorSourceNotReadable     UploadErrorCode = "SOURCE_NOT_READABLE"
+	UploadErrorSourceIsEmpty         UploadErrorCode = "SOURCE_IS_EMPTY"
+	UploadErrorSourceSizeLimitExceed UploadErrorCode = "SOURCE_SIZE_LIMIT_EXCEEDED"
+	UploadErrorNoContainers          UploadErrorCode = "NO_CONTAINERS_AVAILABLE"
+	UploadErrorUploadFailed          UploadErrorCode = "UPLOAD_FAILED"
+	UploadErrorContainerNotFound     UploadErrorCode = "CONTAINER_NOT_FOUND"
+	UploadErrorCompressionFailed     UploadErrorCode = "COMPRESSION_FAILED"
+	UploadErrorUnknown               UploadErrorCode = "UNKNOWN"
+)
+
+// UploadFailedError represents a failed upload operation.
+type UploadFailedError struct {
+	IngestError
+	ErrorCode UploadErrorCode
+	FileName  string
+}
+
+func (e *UploadFailedError) Error() string {
+	if e.Message != "" {
+		return e.Message
+	}
+	return fmt.Sprintf("upload failed [%s]: %s", e.ErrorCode, e.FileName)
+}
+
+// NewUploadFailedError creates a new UploadFailedError.
+func NewUploadFailedError(code UploadErrorCode, fileName string, cause error) *UploadFailedError {
+	return &UploadFailedError{
+		IngestError: IngestError{
+			Message:     fmt.Sprintf("upload failed [%s]: %s", code, fileName),
+			Cause:       cause,
+			IsPermanent: true,
+		},
+		ErrorCode: code,
+		FileName:  fileName,
+	}
+}

@@ -9,6 +9,7 @@ import (
 
 	"github.com/Azure/azure-kusto-go/azkustoingestv2/ingestoptions"
 	"github.com/Azure/azure-kusto-go/azkustoingestv2/internal/config"
+	"github.com/Azure/azure-kusto-go/azkustoingestv2/internal/httpclient"
 	"github.com/Azure/azure-kusto-go/azkustoingestv2/internal/policy"
 	"github.com/Azure/azure-kusto-go/azkustoingestv2/internal/upload"
 )
@@ -23,7 +24,12 @@ type clientConfig struct {
 
 	// HTTP and identity
 	HTTPClient    *http.Client
+	TokenProvider httpclient.TokenProvider
 	ClientDetails *ingestoptions.ClientDetails
+
+	// S2S / Fabric Private Link
+	S2STokenProvider         httpclient.S2STokenProvider
+	S2SFabricPLAccessContext string
 
 	// Uploader options
 	UploadMethod   ingestoptions.UploadMethod
@@ -47,6 +53,11 @@ func WithDMURL(url string) ClientOption {
 // WithEngineURL sets the Engine endpoint URL.
 func WithEngineURL(url string) ClientOption {
 	return func(c *clientConfig) { c.EngineURL = url }
+}
+
+// WithTokenProvider sets the token provider for authentication.
+func WithTokenProvider(p httpclient.TokenProvider) ClientOption {
+	return func(c *clientConfig) { c.TokenProvider = p }
 }
 
 // WithUploadMethod sets the upload method (Storage, Lake, or Default).
@@ -94,6 +105,16 @@ func WithClientDetails(details *ingestoptions.ClientDetails) ClientOption {
 	return func(c *clientConfig) { c.ClientDetails = details }
 }
 
+// WithS2STokenProvider sets the S2S token provider for Fabric Private Link.
+func WithS2STokenProvider(p httpclient.S2STokenProvider) ClientOption {
+	return func(c *clientConfig) { c.S2STokenProvider = p }
+}
+
+// WithS2SFabricAccessContext sets the Fabric Private Link access context.
+func WithS2SFabricAccessContext(ctx string) ClientOption {
+	return func(c *clientConfig) { c.S2SFabricPLAccessContext = ctx }
+}
+
 func defaultClientConfig() *clientConfig {
 	return &clientConfig{
 		UploadMethod:          ingestoptions.UploadMethodDefault,
@@ -102,6 +123,21 @@ func defaultClientConfig() *clientConfig {
 		RetryPolicy:           ingestoptions.DefaultSimpleRetryPolicy(),
 		ConfigRefreshInterval: ingestoptions.DefaultConfigurationRefreshInterval,
 	}
+}
+
+// buildBaseClient creates a shared BaseClient from the config.
+func buildBaseClient(cfg *clientConfig) *httpclient.BaseClient {
+	var opts []httpclient.Option
+	if cfg.HTTPClient != nil {
+		opts = append(opts, httpclient.WithHTTPClient(cfg.HTTPClient))
+	}
+	if cfg.S2STokenProvider != nil {
+		opts = append(opts, httpclient.WithS2STokenProvider(cfg.S2STokenProvider))
+	}
+	if cfg.S2SFabricPLAccessContext != "" {
+		opts = append(opts, httpclient.WithS2SFabricAccessContext(cfg.S2SFabricPLAccessContext))
+	}
+	return httpclient.NewBaseClient(cfg.TokenProvider, cfg.ClientDetails, opts...)
 }
 
 // NewQueuedClient creates a new QueuedIngestClient with the given options.
@@ -113,9 +149,10 @@ func NewQueuedClient(dmURL string, opts ...ClientOption) (*QueuedIngestClient, e
 		opt(cfg)
 	}
 
-	apiClient := NewAPIClient(cfg.DMURL, cfg.EngineURL)
+	baseClient := buildBaseClient(cfg)
+	apiClient := NewAPIClient(cfg.DMURL, cfg.EngineURL, baseClient)
 
-	configClient := config.NewConfigurationClient(cfg.DMURL, cfg.HTTPClient, cfg.ClientDetails)
+	configClient := config.NewConfigurationClient(cfg.DMURL, baseClient)
 	configCache := config.NewDefaultConfigurationCache(configClient,
 		config.WithCacheRefreshInterval(cfg.ConfigRefreshInterval),
 	)
@@ -144,7 +181,8 @@ func NewStreamingClient(engineURL string, opts ...ClientOption) (*StreamingInges
 		opt(cfg)
 	}
 
-	apiClient := NewAPIClient(cfg.DMURL, cfg.EngineURL)
+	baseClient := buildBaseClient(cfg)
+	apiClient := NewAPIClient(cfg.DMURL, cfg.EngineURL, baseClient)
 	return NewStreamingIngestClient(apiClient), nil
 }
 
@@ -158,9 +196,10 @@ func NewManagedStreamingClient(dmURL, engineURL string, opts ...ClientOption) (*
 		opt(cfg)
 	}
 
-	apiClient := NewAPIClient(cfg.DMURL, cfg.EngineURL)
+	baseClient := buildBaseClient(cfg)
+	apiClient := NewAPIClient(cfg.DMURL, cfg.EngineURL, baseClient)
 
-	configClient := config.NewConfigurationClient(cfg.DMURL, cfg.HTTPClient, cfg.ClientDetails)
+	configClient := config.NewConfigurationClient(cfg.DMURL, baseClient)
 	configCache := config.NewDefaultConfigurationCache(configClient,
 		config.WithCacheRefreshInterval(cfg.ConfigRefreshInterval),
 	)

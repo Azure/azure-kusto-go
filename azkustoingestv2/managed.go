@@ -5,9 +5,11 @@ package azkustoingestv2
 
 import (
 	"context"
+	"errors"
 	"fmt"
 	"io"
 	"log/slog"
+	"strings"
 	"time"
 
 	"github.com/Azure/azure-kusto-go/azkustoingestv2/ingestoptions"
@@ -229,14 +231,69 @@ func categorizeError(err error) policy.ManagedStreamingErrorCategory {
 	if err == nil {
 		return policy.ErrorCategoryUnknown
 	}
-	// TODO: Implement proper error categorization based on HTTP response codes
+
+	msg := strings.ToLower(err.Error())
+
+	// Check for streaming ingestion off
+	if strings.Contains(msg, "streaming") &&
+		(strings.Contains(msg, "disabled") || strings.Contains(msg, "not enabled") || strings.Contains(msg, "off")) {
+		return policy.ErrorCategoryStreamingIngestionOff
+	}
+
+	// Check for table configuration issues
+	if strings.Contains(msg, "update policy") || strings.Contains(msg, "schema") || strings.Contains(msg, "incompatible") {
+		return policy.ErrorCategoryTableConfigurationPreventsStreaming
+	}
+
+	// Check for payload too large
+	if strings.Contains(msg, "too large") || strings.Contains(msg, "exceeds") ||
+		strings.Contains(msg, "maximum allowed size") ||
+		strings.Contains(msg, "kustorequestpayloadtoolargeexception") {
+		return policy.ErrorCategoryRequestPropertiesPreventStreaming
+	}
+
+	// Check failure codes from IngestError or IngestRequestError
+	failureCode := extractFailureCode(err)
+	if failureCode == 413 {
+		return policy.ErrorCategoryRequestPropertiesPreventStreaming
+	}
+	if failureCode == 429 || strings.Contains(msg, "kustorequestthrottledexception") {
+		return policy.ErrorCategoryThrottled
+	}
+
 	return policy.ErrorCategoryOther
 }
 
-// isPermError checks if an error is permanent.
+// extractFailureCode extracts the failure code from an error, unwrapping as needed.
+func extractFailureCode(err error) int {
+	for err != nil {
+		switch e := err.(type) {
+		case *ingestoptions.IngestRequestError:
+			return e.FailureCode
+		case *ingestoptions.IngestServiceError:
+			return e.FailureCode
+		case *ingestoptions.IngestError:
+			return e.FailureCode
+		}
+		err = errors.Unwrap(err)
+	}
+	return 0
+}
+
+// isPermError checks if an error is permanent, unwrapping wrapped errors.
 func isPermError(err error) bool {
-	if ie, ok := err.(*ingestoptions.IngestError); ok {
-		return ie.IsPermanent
+	for err != nil {
+		switch e := err.(type) {
+		case *ingestoptions.IngestRequestError:
+			return e.IsPermanent
+		case *ingestoptions.IngestServiceError:
+			return e.IsPermanent
+		case *ingestoptions.IngestClientError:
+			return e.IsPermanent
+		case *ingestoptions.IngestError:
+			return e.IsPermanent
+		}
+		err = errors.Unwrap(err)
 	}
 	return false
 }

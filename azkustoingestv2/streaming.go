@@ -4,7 +4,9 @@
 package azkustoingestv2
 
 import (
+	"bytes"
 	"context"
+	"encoding/json"
 	"fmt"
 	"io"
 	"log/slog"
@@ -56,9 +58,11 @@ func (c *StreamingIngestClient) Ingest(ctx context.Context, database, table stri
 			"database", database,
 			"table", table,
 		)
+		blobBody, _ := json.Marshal(map[string]string{"SourceUri": s.BlobPath()})
 		_, err := c.apiClient.PostStreamingIngest(
 			ctx, database, table,
-			nil, format, mappingName,
+			bytes.NewReader(blobBody), "application/json",
+			format, mappingName,
 			s.BlobPath(), s.CompressionType(),
 		)
 		if err != nil {
@@ -78,9 +82,15 @@ func (c *StreamingIngestClient) Ingest(ctx context.Context, database, table stri
 		if err := c.checkStreamingSize(data); err != nil {
 			return nil, err
 		}
+		contentEncoding := ""
+		if s.CompressionType() == ingestoptions.CompressionGZip {
+			contentEncoding = "gzip"
+		}
+		_ = contentEncoding
 		_, err = c.apiClient.PostStreamingIngest(
 			ctx, database, table,
-			data, format, mappingName,
+			bytes.NewReader(data), "application/octet-stream",
+			format, mappingName,
 			"", s.CompressionType(),
 		)
 		if err != nil {
@@ -102,7 +112,8 @@ func (c *StreamingIngestClient) Ingest(ctx context.Context, database, table stri
 		}
 		_, err = c.apiClient.PostStreamingIngest(
 			ctx, database, table,
-			data, format, mappingName,
+			bytes.NewReader(data), "application/octet-stream",
+			format, mappingName,
 			"", s.CompressionType(),
 		)
 		if err != nil {

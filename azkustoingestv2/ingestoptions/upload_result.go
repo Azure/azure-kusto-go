@@ -5,19 +5,6 @@ package ingestoptions
 
 import "fmt"
 
-// UploadErrorCode represents error codes for upload operations.
-type UploadErrorCode string
-
-const (
-	UploadErrorSourceNotFound    UploadErrorCode = "SOURCE_NOT_FOUND"
-	UploadErrorSourceNotReadable UploadErrorCode = "SOURCE_NOT_READABLE"
-	UploadErrorSourceIsEmpty     UploadErrorCode = "SOURCE_IS_EMPTY"
-	UploadErrorUploadFailed      UploadErrorCode = "UPLOAD_FAILED"
-	UploadErrorContainerNotFound UploadErrorCode = "CONTAINER_NOT_FOUND"
-	UploadErrorCompressionFailed UploadErrorCode = "COMPRESSION_FAILED"
-	UploadErrorUnknown           UploadErrorCode = "UNKNOWN"
-)
-
 // UploadResult represents the result of an upload operation.
 type UploadResult struct {
 	// BlobSource is the blob source that was created by the upload.

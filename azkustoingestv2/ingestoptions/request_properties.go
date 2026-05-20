@@ -3,6 +3,12 @@
 
 package ingestoptions
 
+import (
+	"encoding/json"
+	"fmt"
+	"strings"
+)
+
 // IngestRequestProperties contains properties for an ingestion request.
 type IngestRequestProperties struct {
 	// Format is the data format.
@@ -17,6 +23,8 @@ type IngestRequestProperties struct {
 	FlushImmediately bool
 	// IgnoreFirstRecord indicates whether the first record should be ignored (header row).
 	IgnoreFirstRecord bool
+	// IgnoreLastRecordIfInvalid indicates whether the last record should be ignored if invalid.
+	IgnoreLastRecordIfInvalid bool
 	// Tags are custom tags associated with this ingestion operation.
 	Tags []string
 	// DropByTags are tags used for extent drop-by operations.
@@ -29,8 +37,53 @@ type IngestRequestProperties struct {
 	ValidationPolicy *ValidationPolicy
 	// CreationTime sets the creation time for the ingested data extents.
 	CreationTime string
+	// ZipPattern is a regex pattern for selecting files from a zip archive.
+	ZipPattern string
+	// ExtendSchema allows automatic schema extension on ingestion.
+	ExtendSchema bool
+	// RecreateSchema recreates the table schema on ingestion.
+	RecreateSchema bool
+	// SkipBatching disables batching and ingests immediately.
+	SkipBatching bool
+	// DeleteAfterDownload deletes the blob after download.
+	DeleteAfterDownload bool
+	// IgnoreSizeLimit ignores the size limit for uploads.
+	IgnoreSizeLimit bool
 	// AdditionalProperties holds any additional properties as key-value pairs.
 	AdditionalProperties map[string]string
+}
+
+// Validate checks the properties for consistency errors.
+func (p *IngestRequestProperties) Validate() error {
+	if p.IngestionMappingRef != "" && len(p.IngestionMapping) > 0 {
+		return NewIngestClientError(
+			"cannot specify both ingestionMappingReference and inline ingestionMapping",
+			nil, true,
+		)
+	}
+	return nil
+}
+
+// SynthesizeTags combines Tags, DropByTags, and IngestByTags into a single tags list
+// with the appropriate prefixes.
+func (p *IngestRequestProperties) SynthesizeTags() []string {
+	var result []string
+	result = append(result, p.Tags...)
+	for _, t := range p.IngestByTags {
+		if !strings.HasPrefix(t, "ingest-by:") {
+			result = append(result, "ingest-by:"+t)
+		} else {
+			result = append(result, t)
+		}
+	}
+	for _, t := range p.DropByTags {
+		if !strings.HasPrefix(t, "drop-by:") {
+			result = append(result, "drop-by:"+t)
+		} else {
+			result = append(result, t)
+		}
+	}
+	return result
 }
 
 // ColumnMapping defines an ingestion column mapping.
@@ -39,12 +92,22 @@ type ColumnMapping struct {
 	Name string `json:"Name"`
 	// MappingKind is the kind of mapping (e.g., "CsvMapping", "JsonMapping").
 	MappingKind string `json:"Kind,omitempty"`
-	// Ordinal is the column ordinal (for CSV mappings).
-	Ordinal int `json:"Ordinal,omitempty"`
-	// ConstantValue is a constant value for the column.
-	ConstantValue string `json:"ConstValue,omitempty"`
-	// Path is the JSON path (for JSON mappings).
-	Path string `json:"Properties,omitempty"`
+	// DataType is the Kusto data type (e.g., "string", "int", "datetime").
+	DataType string `json:"DataType,omitempty"`
+	// Properties holds format-specific mapping properties.
+	Properties map[string]string `json:"Properties,omitempty"`
+}
+
+// SerializeColumnMappings serializes column mappings to a JSON string.
+func SerializeColumnMappings(mappings []ColumnMapping) (string, error) {
+	if len(mappings) == 0 {
+		return "", nil
+	}
+	data, err := json.Marshal(mappings)
+	if err != nil {
+		return "", fmt.Errorf("failed to serialize column mappings: %w", err)
+	}
+	return string(data), nil
 }
 
 // ValidationPolicy defines the validation policy for ingestion.
@@ -105,9 +168,27 @@ func (b *IngestRequestPropertiesBuilder) WithIgnoreFirstRecord(ignore bool) *Ing
 	return b
 }
 
+// WithIgnoreLastRecordIfInvalid sets whether to ignore the last record if invalid.
+func (b *IngestRequestPropertiesBuilder) WithIgnoreLastRecordIfInvalid(ignore bool) *IngestRequestPropertiesBuilder {
+	b.props.IgnoreLastRecordIfInvalid = ignore
+	return b
+}
+
 // WithTags sets the ingestion tags.
 func (b *IngestRequestPropertiesBuilder) WithTags(tags []string) *IngestRequestPropertiesBuilder {
 	b.props.Tags = tags
+	return b
+}
+
+// WithDropByTags sets the drop-by tags.
+func (b *IngestRequestPropertiesBuilder) WithDropByTags(tags []string) *IngestRequestPropertiesBuilder {
+	b.props.DropByTags = tags
+	return b
+}
+
+// WithIngestByTags sets the ingest-by tags.
+func (b *IngestRequestPropertiesBuilder) WithIngestByTags(tags []string) *IngestRequestPropertiesBuilder {
+	b.props.IngestByTags = tags
 	return b
 }
 
@@ -123,14 +204,41 @@ func (b *IngestRequestPropertiesBuilder) WithCreationTime(ct string) *IngestRequ
 	return b
 }
 
+// WithZipPattern sets the zip file pattern.
+func (b *IngestRequestPropertiesBuilder) WithZipPattern(pattern string) *IngestRequestPropertiesBuilder {
+	b.props.ZipPattern = pattern
+	return b
+}
+
+// WithExtendSchema enables automatic schema extension.
+func (b *IngestRequestPropertiesBuilder) WithExtendSchema(extend bool) *IngestRequestPropertiesBuilder {
+	b.props.ExtendSchema = extend
+	return b
+}
+
+// WithRecreateSchema enables schema recreation.
+func (b *IngestRequestPropertiesBuilder) WithRecreateSchema(recreate bool) *IngestRequestPropertiesBuilder {
+	b.props.RecreateSchema = recreate
+	return b
+}
+
+// WithSkipBatching disables batching.
+func (b *IngestRequestPropertiesBuilder) WithSkipBatching(skip bool) *IngestRequestPropertiesBuilder {
+	b.props.SkipBatching = skip
+	return b
+}
+
 // WithAdditionalProperty sets an additional property.
 func (b *IngestRequestPropertiesBuilder) WithAdditionalProperty(key, value string) *IngestRequestPropertiesBuilder {
 	b.props.AdditionalProperties[key] = value
 	return b
 }
 
-// Build returns the constructed IngestRequestProperties.
-func (b *IngestRequestPropertiesBuilder) Build() *IngestRequestProperties {
+// Build returns the constructed IngestRequestProperties after validation.
+func (b *IngestRequestPropertiesBuilder) Build() (*IngestRequestProperties, error) {
 	result := b.props
-	return &result
+	if err := result.Validate(); err != nil {
+		return nil, err
+	}
+	return &result, nil
 }
