@@ -7,6 +7,7 @@ import (
 	"fmt"
 	"io"
 	"os"
+	"strings"
 	"sync/atomic"
 	"testing"
 
@@ -84,12 +85,14 @@ func TestCompressionDiscovery(t *testing.T) {
 type fakeBlobstore struct {
 	out       *bytes.Buffer
 	shouldErr bool
+	blobName  string
 }
 
-func (f *fakeBlobstore) uploadBlobStream(_ context.Context, reader io.Reader, _ *azblob.Client, _ string, _ string, _ *azblob.UploadStreamOptions) (azblob.UploadStreamResponse, error) {
+func (f *fakeBlobstore) uploadBlobStream(_ context.Context, reader io.Reader, _ *azblob.Client, _ string, blob string, _ *azblob.UploadStreamOptions) (azblob.UploadStreamResponse, error) {
 	if f.shouldErr {
 		return azblob.UploadStreamResponse{}, fmt.Errorf("error")
 	}
+	f.blobName = blob
 	_, err := io.Copy(f.out, reader)
 	return azblob.UploadStreamResponse{}, err
 }
@@ -365,6 +368,134 @@ func TestShouldCompress(t *testing.T) {
 			assert.Equal(t, test.want, got)
 		})
 	}
+}
+
+func TestGenBlobName(t *testing.T) {
+	t.Parallel()
+
+	tests := []struct {
+		name                  string
+		fileName              string
+		compressionFromSource ingestoptions.CompressionType
+		shouldCompress        bool
+		dataFormat            string
+		expectedSuffix        string
+	}{
+		{
+			name:                  "should compress always yields gz",
+			fileName:              "file",
+			compressionFromSource: ingestoptions.CTNone,
+			shouldCompress:        true,
+			dataFormat:            "csv",
+			expectedSuffix:        ".gz",
+		},
+		{
+			name:                  "no compression and no source compression uses csv",
+			fileName:              "file",
+			compressionFromSource: ingestoptions.CTNone,
+			shouldCompress:        false,
+			dataFormat:            "csv",
+			expectedSuffix:        ".csv",
+		},
+		{
+			name:                  "no compression and no source compression uses json",
+			fileName:              "file",
+			compressionFromSource: ingestoptions.CTNone,
+			shouldCompress:        false,
+			dataFormat:            "json",
+			expectedSuffix:        ".json",
+		},
+		{
+			name:                  "unknown source compression falls back to format",
+			fileName:              "file",
+			compressionFromSource: ingestoptions.CTUnknown,
+			shouldCompress:        false,
+			dataFormat:            "csv",
+			expectedSuffix:        ".csv",
+		},
+		{
+			name:                  "explicit gzip source compression keeps gz suffix",
+			fileName:              "file",
+			compressionFromSource: ingestoptions.GZIP,
+			shouldCompress:        false,
+			dataFormat:            "csv",
+			expectedSuffix:        ".gz",
+		},
+		{
+			name:                  "explicit zip source compression keeps zip suffix",
+			fileName:              "file",
+			compressionFromSource: ingestoptions.ZIP,
+			shouldCompress:        false,
+			dataFormat:            "csv",
+			expectedSuffix:        ".zip",
+		},
+		{
+			name:                  "double extension prevention - file.json.gz with GZIP",
+			fileName:              "data.json.gz",
+			compressionFromSource: ingestoptions.GZIP,
+			shouldCompress:        false,
+			dataFormat:            "json",
+			expectedSuffix:        ".gz",
+		},
+		{
+			name:                  "double extension prevention - file.csv.zip with ZIP",
+			fileName:              "data.csv.zip",
+			compressionFromSource: ingestoptions.ZIP,
+			shouldCompress:        false,
+			dataFormat:            "csv",
+			expectedSuffix:        ".zip",
+		},
+	}
+
+	for _, tt := range tests {
+		tt := tt
+		t.Run(tt.name, func(t *testing.T) {
+			t.Parallel()
+			blobName := GenBlobName("db", "table", nower(), "guid", tt.fileName, tt.compressionFromSource, tt.shouldCompress, tt.dataFormat)
+			assert.True(t, strings.HasSuffix(blobName, tt.expectedSuffix), "expected %q to have suffix %q", blobName, tt.expectedSuffix)
+
+			// Verify no double compression extensions
+			assert.False(t, strings.HasSuffix(blobName, ".gz.gz"), "should not have double .gz extension in %q", blobName)
+			assert.False(t, strings.HasSuffix(blobName, ".zip.zip"), "should not have double .zip extension in %q", blobName)
+		})
+	}
+}
+
+func TestUploadReaderToBlobRespectsExplicitCompressionTypeForBlobName(t *testing.T) {
+	t.Parallel()
+
+	const content = "The quick brown fox jumps over the lazy dog"
+
+	var compressed bytes.Buffer
+	gzw := gzip.NewWriter(&compressed)
+	_, err := gzw.Write([]byte(content))
+	require.NoError(t, err)
+	require.NoError(t, gzw.Close())
+
+	fbs := &fakeBlobstore{out: &bytes.Buffer{}}
+	i := &Ingestion{
+		db:           "database",
+		table:        "table",
+		uploadStream: fbs.uploadBlobStream,
+		mgr: newFakeResourceManager(
+			[]string{"https://account.blob.core.windows.net/container"},
+			[]string{"https://account.queue.core.windows.net/queue"},
+			nil,
+		),
+	}
+
+	_, _, err = i.UploadReaderToBlob(t.Context(), bytes.NewReader(compressed.Bytes()), properties.All{
+		Source: properties.SourceOptions{
+			CompressionType: ingestoptions.GZIP,
+		},
+		Ingestion: properties.Ingestion{
+			Additional: properties.Additional{Format: properties.CSV},
+		},
+	})
+	require.NoError(t, err)
+
+	assert.Equal(t, compressed.Bytes(), fbs.out.Bytes(), "reader payload should not be recompressed when source is already gzip")
+	assert.True(t, strings.HasSuffix(fbs.blobName, ".gz"), "expected blob name to retain gzip extension, got %q", fbs.blobName)
 }
 
 type retryingBlobstore struct {

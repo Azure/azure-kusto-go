@@ -124,7 +124,7 @@ func (m *Managed) FromFile(ctx context.Context, fPath string, options ...FileOpt
 				// Failed fetch blob properties
 				return nil, err
 			}
-			compressionTypeForEstimation = utils.CompressionDiscovery(fPath)
+			compressionTypeForEstimation = queued.EffectiveCompressionType(&props, fPath)
 			props.Ingestion.RawDataSize = utils.EstimateRawDataSize(compressionTypeForEstimation, size)
 		} else {
 			// If user sets raw data size we always want to devide it for estimation

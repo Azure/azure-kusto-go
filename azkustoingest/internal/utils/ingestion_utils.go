@@ -81,8 +81,7 @@ func FetchBlobSize(fPath string, ctx context.Context, client *http.Client) (size
 
 func EstimateRawDataSize(compression ingestoptions.CompressionType, fileSize int64) int64 {
 	switch compression {
-	case ingestoptions.GZIP:
-	case ingestoptions.ZIP:
+	case ingestoptions.GZIP, ingestoptions.ZIP:
 		return fileSize * EstimatedCompressionFactor
 	}
 

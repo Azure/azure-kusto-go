@@ -6,6 +6,18 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 
+## [1.2.2] - 2026-04-22
+
+### Fixed
+
+- Fixed queued compression metadata handling: `GenBlobName` no longer incorrectly overrides blob extension, and compression discovery now respects `Source.CompressionType` configuration before falling back to file extension detection
+- Fixed `EstimateRawDataSize` not applying compression factor for GZIP sources
+
+### Changed
+
+- Upgraded MSAL Go (`microsoft-authentication-library-for-go`) to v1.7.1 for sovereign cloud support
+
+
 ## [1.2.1] - 2026-02-24
 
 
