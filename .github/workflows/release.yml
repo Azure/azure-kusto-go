@@ -6,6 +6,7 @@ on:
     tags:
       - "azkustodata/**"
       - "azkustoingest/**"
+      - "azkustoingestv2/**"
 
 permissions:
   checks: write
@@ -43,6 +44,22 @@ jobs:
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
           TAG_PREFIX_REGEX: "azkustoingest/v"
+
+      - name: Pull new module version
+        uses: andrewslotin/go-proxy-pull-action@master
+
+  build-ingest-v2:
+    if: startsWith(github.ref, 'refs/tags/azkustoingestv2/')
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Release
+        uses: docker://antonyurchenko/git-release:v6
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          TAG_PREFIX_REGEX: "azkustoingestv2/v"
 
       - name: Pull new module version
         uses: andrewslotin/go-proxy-pull-action@master

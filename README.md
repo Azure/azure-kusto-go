@@ -2,14 +2,16 @@
 
 - [About Azure Data Explorer](https://azure.microsoft.com/en-us/services/data-explorer/)
 - [Data Client documentation](https://godoc.org/github.com/Azure/azure-kusto-go/azkustodata)
-- [Ingest Client documentation](https://godoc.org/github.com/Azure/azure-kusto-go/azkustoingest)
+- [Ingest V2 Client documentation (Recommended)](https://pkg.go.dev/github.com/Azure/azure-kusto-go/azkustoingestv2)
+- [Ingest Client documentation (Legacy)](https://godoc.org/github.com/Azure/azure-kusto-go/azkustoingest)
 
 # Version 1.0.0-preview Released (BREAKING CHANGES)
 Version 1.0.0-preview introduced a significant change to the package structure, aligning Azure-Kusto-Go with all other Kusto SDKs structure.
 The original package, `github.com/Azure/azure-kusto-go` is no longer published.
 Instead, there are two new packages:
 - `github.com/Azure/azure-kusto-go/azkustodata` - for query and management commands.
-- `github.com/Azure/azure-kusto-go/azkustoingest` - for interacting with the ingesting data.
+- `github.com/Azure/azure-kusto-go/azkustoingest` *(legacy)* - original ingestion client using Azure Storage SDK queues.
+- `github.com/Azure/azure-kusto-go/azkustoingestv2` *(recommended)* - next-generation ingestion client with HTTP-based REST APIs, managed streaming, and status tracking.
 
 For more information, see the [migration guide](MIGRATION.md) and [changelog](CHANGELOG.md)
 
@@ -21,8 +23,15 @@ Use `github.com/Azure/azure-kusto-go/azkustodata` in your application to:
 
 - Query Kusto/Azure Data Explorer clusters for rows, optionally into structs.
 
-Use `github.com/Azure/azure-kusto-go/azkustoingest` in your application to:
+Use `github.com/Azure/azure-kusto-go/azkustoingest` *(legacy)* in your application to:
 - Import data into Kusto from local file, Azure Blob Storage file, Stream, or an `io.Reader`.
+- **Note:** For new projects, prefer `azkustoingestv2` below.
+
+Use `github.com/Azure/azure-kusto-go/azkustoingestv2` *(recommended)* in your application to:
+- Import data into Kusto using the next-generation V2 REST APIs with streaming, queued, and managed streaming ingestion.
+- Track ingestion operation status with `GetOperationSummary`/`GetOperationDetails`.
+- Benefit from automatic streaming-to-queued fallback with managed streaming.
+- See the [azkustoingestv2 README](azkustoingestv2/README.md) for full documentation and samples.
 
 
 Key links:
@@ -325,16 +334,124 @@ for _, node := range structs {
 
 ### Ingestion
 
-The `azkustoingest` package provides access to Kusto's ingestion service for importing data into Kusto. This requires
-some prerequisite knowledge of acceptable data formats, mapping references, etc.
+This SDK provides two ingestion packages:
 
-That documentation can be found [here](https://docs.microsoft.com/en-us/azure/kusto/management/data-ingestion/)
+| Package | Status | Description |
+|---------|--------|-------------|
+| `azkustoingestv2` | **Recommended** | Next-generation ingestion client with HTTP-based REST APIs, explicit source types, managed streaming, and operation status tracking. |
+| `azkustoingest` | Legacy | Original ingestion client using Azure Storage SDK queues. Still supported but not actively developed. |
+
+General ingestion documentation can be found [here](https://docs.microsoft.com/en-us/azure/kusto/management/data-ingestion/).
+
+##### V1 vs V2 API Comparison
+
+| Feature | V1 (`azkustoingest`) | V2 (`azkustoingestv2`) |
+|---------|---------------------|------------------------|
+| **Queued client** | `azkustoingest.New(connString)` | `azkustoingestv2.NewQueuedClient(dmURL, opts...)` |
+| **Streaming client** | `azkustoingest.NewStreaming(connString)` | `azkustoingestv2.NewStreamingClient(engineURL, opts...)` |
+| **Managed streaming** | `azkustoingest.NewManaged(connString)` | `azkustoingestv2.NewManagedStreamingClient(dmURL, engineURL, opts...)` |
+| **Ingest from file** | `in.FromFile(ctx, path, opts...)` | `client.Ingest(ctx, db, table, NewFileSource(...), props)` |
+| **Ingest from blob** | `in.FromFile(ctx, blobURL, opts...)` | `client.Ingest(ctx, db, table, NewBlobSource(...), props)` |
+| **Ingest from stream** | `in.FromReader(ctx, reader, opts...)` | `client.Ingest(ctx, db, table, NewStreamSource(...), props)` |
+| **Auth** | `ConnectionStringBuilder` | `WithTokenProvider(func)` option |
+| **Status tracking** | Limited | `GetOperationSummary` / `GetOperationDetails` |
+| **Queued transport** | Azure Storage SDK queues | HTTP-based REST APIs |
+
+---
+
+#### Ingestion V2 — `azkustoingestv2` (Recommended)
+
+The `azkustoingestv2` package provides a redesigned ingestion client with:
+- **Explicit source types** — `FileSource`, `BlobSource`, `StreamSource` for clear, type-safe ingestion
+- **Unified `Ingest()` method** — Single method accepting typed sources instead of separate `FromFile`/`FromReader`/`FromBlob`
+- **HTTP-based REST APIs** — No dependency on Azure Storage SDK for queued ingestion
+- **Managed streaming** — Automatic fallback from streaming to queued ingestion on failure
+- **Operation status tracking** — `GetOperationSummary` and `GetOperationDetails` for monitoring
+
+##### V2 Client types
+
+| Client | Constructor | Description |
+|--------|-------------|-------------|
+| Queued | `azkustoingestv2.NewQueuedClient(dmURL, opts...)` | Uploads to blob then queues for batched ingestion. Most reliable for large volumes. |
+| Streaming | `azkustoingestv2.NewStreamingClient(engineURL, opts...)` | Directly streams data into the engine. Fast but limited by size. |
+| Managed Streaming | `azkustoingestv2.NewManagedStreamingClient(dmURL, engineURL, opts...)` | **Recommended.** Tries streaming first, automatically falls back to queued on failure. |
+
+##### V2 Creating clients
+
+```go
+import (
+    "github.com/Azure/azure-kusto-go/azkustoingestv2"
+    "github.com/Azure/azure-kusto-go/azkustoingestv2/ingestoptions"
+)
+
+// Managed streaming client (recommended for production)
+client, err := azkustoingestv2.NewManagedStreamingClient(
+    "https://ingest-mycluster.kusto.windows.net",  // DM endpoint
+    "https://mycluster.kusto.windows.net",          // Engine endpoint
+    azkustoingestv2.WithTokenProvider(tokenFunc),
+)
+
+// Queued-only client
+client, err := azkustoingestv2.NewQueuedClient(
+    "https://ingest-mycluster.kusto.windows.net",
+    azkustoingestv2.WithTokenProvider(tokenFunc),
+)
+
+// Streaming-only client
+client, err := azkustoingestv2.NewStreamingClient(
+    "https://mycluster.kusto.windows.net",
+    azkustoingestv2.WithTokenProvider(tokenFunc),
+)
+
+defer client.Close()
+```
+
+##### V2 Ingestion from sources
+
+All V2 clients use a unified `Ingest(ctx, database, table, source, props)` method with typed sources:
+
+```go
+// Ingest from a local file
+source := ingestoptions.NewFileSource("data.csv", ingestoptions.FormatCSV)
+props := &ingestoptions.IngestRequestProperties{Format: ingestoptions.FormatCSV}
+resp, err := client.Ingest(ctx, "database", "table", source, props)
+
+// Ingest from a blob
+blobSource, _ := ingestoptions.NewBlobSource(
+    "https://myaccount.blob.core.windows.net/container/data.json?sas=...",
+    ingestoptions.FormatJSON,
+)
+resp, err := client.Ingest(ctx, "database", "table", blobSource, props)
+
+// Ingest from a stream (io.ReadCloser)
+streamSource := ingestoptions.NewStreamSource(readCloser, ingestoptions.FormatCSV)
+resp, err := client.Ingest(ctx, "database", "table", streamSource, props)
+
+// resp.Kind tells you if streaming or queued was used (for managed streaming)
+```
+
+##### V2 Operation status tracking
+
+```go
+// Get a summary of the ingestion operation
+summary, err := client.GetOperationSummary(ctx, resp.OperationID)
+
+// Get detailed per-shard status
+details, err := client.GetOperationDetails(ctx, resp.OperationID)
+```
+
+For full documentation, see the [azkustoingestv2 README](azkustoingestv2/README.md) and [samples](azkustoingestv2/samples/).
+
+---
+
+#### Ingestion V1 — `azkustoingest` (Legacy)
+
+> **Note:** `azkustoingest` is the original ingestion package. For new projects, prefer `azkustoingestv2` above.
 
 If ingesting data from memory, it is suggested that you stream the data in via `FromReader()` passing in the reader
 from an `io.Pipe()`. The data will not begin ingestion until the writer closes.
 
-
-#### Creating a queued ingestion client
+##### Creating a queued ingestion client
 There are a few types of ingestion clients:
 * Queued Ingest - `azkustoingest.New()` - the default client, uses queues and batching to ingest data. Most reliable.
 * Streaming Ingest - `azkustoingest.NewStreaming()` - Directly streams data into the engine. Fast, but is limited with size and can fail.
@@ -372,7 +489,7 @@ in, err := azkustoingest.New(kustoConnectionString, azkustoingest.WithoutEndpoin
 in, err := azkustoingest.NewManaged(kustoConnectionString, azkustoingest.WithCustomIngestConnectionString(azkustodata.NewConnectionStringBuilder("https://ingest-<cluster>").WithDefaultAzureCredential()))
 ```
 
-#### Ingestion From a File
+##### Ingestion From a File
 
 Ingesting a local file requires simply passing the path to the file to be ingested:
 
@@ -385,7 +502,7 @@ if _, err := in.FromFile(ctx, "/path/to/a/local/file"); err != nil {
 `FromFile()` will accept Unix path names on Unix platforms and Windows path names on Windows platforms.
 The file will not be deleted after upload (there is an option that will allow that though).
 
-#### Ingestion From a Blob Storage File
+##### Ingestion From a Blob Storage File
 
 This package will also accept ingestion from an Azure Blob Storage file:
 
@@ -397,7 +514,7 @@ if _, err := in.FromFile(ctx, "https://myaccount.blob.core.windows.net/$root/myb
 
 This will ingest a file from Azure Blob Storage. We only support `https://` paths and your domain name may differ than what is here.
 
-#### Ingestion from an io.Reader
+##### Ingestion from an io.Reader
 
 Sometimes you want to ingest a stream of data that you have in memory without writing to disk.  You can do this simply by chunking the
 data via an `io.Reader`.
