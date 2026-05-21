@@ -45,7 +45,6 @@ func TestStreamingIngestion(t *testing.T) {
 		t.Fatalf("failed to create query client: %v", err)
 	}
 	defer queryClient.Close()
-	testshared.SetDefaultDatabase(testConfig.Database)
 
 	streamingClient, err := azkustoingestv2.NewStreamingClient(
 		testConfig.engineURL,
@@ -168,7 +167,6 @@ func TestManagedStreamingIngestion(t *testing.T) {
 		t.Fatalf("failed to create query client: %v", err)
 	}
 	defer queryClient.Close()
-	testshared.SetDefaultDatabase(testConfig.Database)
 
 	managedClient, err := azkustoingestv2.NewManagedStreamingClient(
 		testConfig.dmURL, testConfig.engineURL,
@@ -272,7 +270,6 @@ func TestQueuedIngestion(t *testing.T) {
 		t.Fatalf("failed to create query client: %v", err)
 	}
 	defer queryClient.Close()
-	testshared.SetDefaultDatabase(testConfig.Database)
 
 	queuedClient, err := azkustoingestv2.NewQueuedClient(
 		testConfig.dmURL,
@@ -400,7 +397,6 @@ func TestQueuedStatusTracking(t *testing.T) {
 		t.Fatalf("failed to create query client: %v", err)
 	}
 	defer queryClient.Close()
-	testshared.SetDefaultDatabase(testConfig.Database)
 
 	queuedClient, err := azkustoingestv2.NewQueuedClient(
 		testConfig.dmURL,

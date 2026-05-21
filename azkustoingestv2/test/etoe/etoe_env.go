@@ -13,6 +13,7 @@ import (
 	"strings"
 
 	"github.com/Azure/azure-kusto-go/azkustodata"
+	"github.com/Azure/azure-kusto-go/azkustodata/testshared"
 	"github.com/Azure/azure-kusto-go/azkustoingestv2/internal/httpclient"
 )
 
@@ -128,4 +129,5 @@ func init() {
 	}
 
 	skipETOE = false
+	testshared.SetDefaultDatabase(testConfig.Database)
 }
