@@ -20,7 +20,7 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - name: Checkout
-        uses: actions/checkout@v4
+        uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4.4.0
 
       - name: Release
         uses: docker://antonyurchenko/git-release:v6
@@ -29,14 +29,14 @@ jobs:
           TAG_PREFIX_REGEX: "azkustodata/v"
 
       - name: Pull new module version
-        uses: andrewslotin/go-proxy-pull-action@master
+        uses: andrewslotin/go-proxy-pull-action@00af8a5a49c844d6dde0bbbc116b72d8fd7ae97c # v1.5.0
 
   build-ingest:
     if: startsWith(github.ref, 'refs/tags/azkustoingest/')
     runs-on: ubuntu-latest
     steps:
       - name: Checkout
-        uses: actions/checkout@v4
+        uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4.4.0
 
       - name: Release
         uses: docker://antonyurchenko/git-release:v6
@@ -45,4 +45,4 @@ jobs:
           TAG_PREFIX_REGEX: "azkustoingest/v"
 
       - name: Pull new module version
-        uses: andrewslotin/go-proxy-pull-action@master
+        uses: andrewslotin/go-proxy-pull-action@00af8a5a49c844d6dde0bbbc116b72d8fd7ae97c # v1.5.0
