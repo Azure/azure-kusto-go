@@ -87,6 +87,28 @@ jobs:
           BLOB_URI_FOR_TEST: ${{ secrets.BLOB_URI_FOR_TEST }}
           GOMAXPROCS: 200
 
+      - name: Get dependencies ingest-v2
+        run: |
+          cd azkustoingestv2
+          go get -v -t -d ./...
+
+      - name: Build ingest-v2
+        run: |
+          cd azkustoingestv2
+          go build -v ./...
+
+      - name: Run tests ingest-v2
+        run: |
+          cd azkustoingestv2
+          go test -p 100 -race -coverprofile=coverage.out -json ./... 2>&1 > /tmp/gotest-ingestv2.log
+        env:
+          ENGINE_CONNECTION_STRING: ${{ secrets.ENGINE_CONNECTION_STRING }}
+          TEST_DATABASE: ${{ secrets.TEST_DATABASE }}
+          SECONDARY_ENGINE_CONNECTION_STRING: ${{ secrets.SECONDARY_ENGINE_CONNECTION_STRING }}
+          SECONDARY_DATABASE: ${{ secrets.SECONDARY_DATABASE }}
+          BLOB_URI_FOR_TEST: ${{ secrets.BLOB_URI_FOR_TEST }}
+          GOMAXPROCS: 200
+
       - name: Display tests data
         if: always()
         run: |
@@ -104,6 +126,15 @@ jobs:
       - name: Parse tests ingest
         if: always()
         run: cat /tmp/gotest-ingest.log | go-junit-report -parser gojson > report-ingest.xml
+
+      - name: Display tests ingest-v2
+        if: always()
+        run: |
+          tparse -all -file=/tmp/gotest-ingestv2.log
+
+      - name: Parse tests ingest-v2
+        if: always()
+        run: cat /tmp/gotest-ingestv2.log | go-junit-report -parser gojson > report-ingestv2.xml
 
       - name: Test Results
         if: always()
