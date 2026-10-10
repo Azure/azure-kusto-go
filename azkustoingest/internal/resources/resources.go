@@ -26,6 +26,11 @@ const (
 	defaultMultiplier      = 2
 	retryCount             = 4
 	fetchInterval          = 1 * time.Hour
+	authRefreshInterval    = 1 * time.Hour
+	authNoRefreshTimeout   = 10 * time.Hour
+
+	authRetryIntervalWithCachedToken    = 15 * time.Minute
+	authRetryIntervalWithoutCachedToken = 3 * time.Second
 )
 
 // mgmter is a private interface that allows us to write hermetic tests against the azkustodata.Client.Mgmt() method.
@@ -116,15 +121,19 @@ type ResourcesManager interface {
 
 // Manager manages Kusto resources.
 type Manager struct {
-	client                   mgmter
-	done                     chan struct{}
-	resources                atomic.Value // Stores Ingestion
-	lastFetchTime            atomic.Value // Stores time.Time
-	kustoToken               token
-	authTokenCacheExpiration time.Time
-	authLock                 sync.Mutex
-	fetchLock                sync.Mutex
-	rankedStorageAccount     *RankedStorageAccountSet
+	client                 mgmter
+	done                   chan struct{}
+	resources              atomic.Value // Stores Ingestion
+	lastFetchTime          atomic.Value // Stores time.Time
+	kustoToken             token
+	hasAuthToken           bool
+	authTokenRefreshTime   time.Time
+	authTokenValidUntil    time.Time
+	nextAuthRefreshAttempt time.Time
+	authLock               sync.Mutex
+	fetchLock              sync.Mutex
+	rankedStorageAccount   *RankedStorageAccountSet
+	now                    func() time.Time
 }
 
 var _ ResourcesManager = (*Manager)(nil)
@@ -134,8 +143,9 @@ func New(client mgmter) (*Manager, error) {
 	m := &Manager{client: client, done: make(chan struct{}), rankedStorageAccount: newDefaultRankedStorageAccountSet()}
 	m.authLock = sync.Mutex{}
 	m.fetchLock = sync.Mutex{}
+	m.now = func() time.Time { return time.Now().UTC() }
 
-	m.authTokenCacheExpiration = time.Now().UTC()
+	m.authTokenRefreshTime = m.now()
 	go m.renewResources()
 
 	return m, nil
@@ -180,10 +190,44 @@ func (m *Manager) renewResources() {
 func (m *Manager) AuthContext(ctx context.Context) (string, error) {
 	m.authLock.Lock()
 	defer m.authLock.Unlock()
-	if m.authTokenCacheExpiration.After(time.Now().UTC()) {
+	now := m.currentTime()
+
+	if m.hasAuthToken && m.authTokenRefreshTime.After(now) {
 		return m.kustoToken.AuthContext, nil
 	}
 
+	if m.nextAuthRefreshAttempt.After(now) {
+		if m.hasAuthToken && m.authTokenValidUntil.After(now) {
+			return m.kustoToken.AuthContext, nil
+		}
+
+		if m.nextAuthRefreshAttempt.Sub(now) <= authRetryIntervalWithoutCachedToken {
+			return "", fmt.Errorf("problem getting authorization context from Kusto via Mgmt: refresh is temporarily throttled")
+		}
+	}
+
+	tk, err := m.refreshAuthContext(ctx)
+	now = m.currentTime()
+	if err != nil {
+		if m.hasAuthToken && m.authTokenValidUntil.After(now) {
+			m.nextAuthRefreshAttempt = now.Add(authRetryIntervalWithCachedToken)
+			return m.kustoToken.AuthContext, nil
+		}
+
+		m.nextAuthRefreshAttempt = now.Add(authRetryIntervalWithoutCachedToken)
+		return "", fmt.Errorf("problem getting authorization context from Kusto via Mgmt: %w", err)
+	}
+
+	m.kustoToken = tk
+	m.hasAuthToken = true
+	m.authTokenRefreshTime = now.Add(authRefreshInterval)
+	m.authTokenValidUntil = now.Add(authNoRefreshTimeout)
+	m.nextAuthRefreshAttempt = time.Time{}
+
+	return tk.AuthContext, nil
+}
+
+func (m *Manager) refreshAuthContext(ctx context.Context) (token, error) {
 	var dataset v1.Dataset
 	retryCtx := backoff.WithContext(initBackoff(), ctx)
 	err := backoff.Retry(func() error {
@@ -202,24 +246,26 @@ func (m *Manager) AuthContext(ctx context.Context) (string, error) {
 	}, retryCtx)
 
 	if err != nil {
-		return "", fmt.Errorf("problem getting authorization context from Kusto via Mgmt: %s", err)
+		return token{}, err
 	}
 
 	tokens, err := query.ToStructs[token](dataset)
 	if err != nil {
-		return "", err
+		return token{}, err
 	}
 	if tokens == nil {
-		return "", fmt.Errorf("call for AuthContext returned no Rows")
+		return token{}, fmt.Errorf("call for AuthContext returned no Rows")
 	}
 
 	if len(tokens) != 1 {
-		return "", fmt.Errorf("call for AuthContext returned more than 1 Row")
+		return token{}, fmt.Errorf("call for AuthContext returned more than 1 Row")
 	}
 
-	m.kustoToken = tokens[0]
-	m.authTokenCacheExpiration = time.Now().UTC().Add(time.Hour)
-	return tokens[0].AuthContext, nil
+	return tokens[0], nil
+}
+
+func (m *Manager) currentTime() time.Time {
+	return m.now().UTC()
 }
 
 // ingestResc represents a kusto Mgmt() record about a resource
