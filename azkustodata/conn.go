@@ -178,6 +178,10 @@ func (c *Conn) doRequestImpl(
 		token, tokenType, tkerr := c.auth.TokenProvider.AcquireToken(ctx)
 		if tkerr != nil {
 			closeRequestBody(buff)
+			// Keep client-side errors (e.g. an untrusted auth metadata source) permanent instead of internal.
+			if e, ok := tkerr.(*errors.Error); ok && e.Kind == errors.KClientArgs {
+				return nil, nil, errors.ES(op, errors.KClientArgs, "Error while getting token : %s", tkerr).SetNoRetry()
+			}
 			return nil, nil, errors.ES(op, errors.KInternal, "Error while getting token : %s", tkerr)
 		}
 		headers.Add("Authorization", fmt.Sprintf("%s %s", tokenType, token))

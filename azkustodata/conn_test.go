@@ -307,7 +307,17 @@ func (testStreamFormat) KnownOrDefault() DataFormatForStreaming { return testStr
 
 const untrustedMetadata = `{"AzureAD":{"LoginEndpoint":"https://login.microsoftonline.com","LoginMfaRequired":false,"KustoClientAppId":"x","KustoClientRedirectUri":"x","KustoServiceResourceId":"https://untrusted.example.com","FirstPartyAuthorityUrl":"x"}}`
 
+// forgetMetadata drops cached auth metadata for the given URIs after the test, so repeated runs (-count=N) start clean.
+func forgetMetadata(t *testing.T, uris ...string) {
+	t.Cleanup(func() {
+		for _, u := range uris {
+			cloudInfoCache.Delete(u)
+		}
+	})
+}
+
 func newRecordingClient(t *testing.T, endpoint string, rt *recordingTransport) *Client {
+	forgetMetadata(t, endpoint)
 	kcsb := NewConnectionStringBuilder(endpoint).WithApplicationToken("app", "secret-token")
 	client, err := New(kcsb, WithHttpClient(&http.Client{Transport: rt}))
 	require.NoError(t, err)
@@ -396,6 +406,7 @@ func TestUntrustedEndpointNeverAcquiresToken(t *testing.T) {
 	t.Parallel()
 	rt := &recordingTransport{metadata: untrustedMetadata}
 	cred := &countingCredential{}
+	forgetMetadata(t, "https://attacker-cred.example.com")
 	kcsb := NewConnectionStringBuilder("https://attacker-cred.example.com").WithTokenCredential(cred)
 	client, err := New(kcsb, WithHttpClient(&http.Client{Transport: rt}))
 	require.NoError(t, err)
@@ -414,6 +425,7 @@ func TestTokenProviderRejectsUntrustedMetadataSource(t *testing.T) {
 	cred := &countingCredential{}
 
 	// Token provider reads its audience from an untrusted host, while the Conn targets a trusted host.
+	forgetMetadata(t, "https://attacker-tp.example.com", "https://mismatch.westus.kusto.windows.net")
 	kcsb := NewConnectionStringBuilder("https://attacker-tp.example.com").WithTokenCredential(cred)
 	client, err := New(kcsb, WithHttpClient(httpClient))
 	require.NoError(t, err)
@@ -423,6 +435,7 @@ func TestTokenProviderRejectsUntrustedMetadataSource(t *testing.T) {
 	err = conn.StreamIngest(context.Background(), "db", "t", strings.NewReader("a"), testStreamFormat{}, "", "", false)
 	require.Error(t, err)
 	assert.Contains(t, err.Error(), "not trusted")
+	assert.False(t, errors.Retry(err), "an untrusted metadata source must not be retried: %v", err)
 	assert.Equal(t, int32(0), cred.calls.Load())
 	assert.Empty(t, rt.authHeaders)
 }
@@ -457,6 +470,7 @@ func (blockingTransport) RoundTrip(req *http.Request) (*http.Response, error) {
 
 func TestEndpointValidationHonorsContext(t *testing.T) {
 	t.Parallel()
+	forgetMetadata(t, "https://blocking-meta.example.com")
 	kcsb := NewConnectionStringBuilder("https://blocking-meta.example.com").WithApplicationToken("app", "secret-token")
 	client, err := New(kcsb, WithHttpClient(&http.Client{Transport: blockingTransport{}}))
 	require.NoError(t, err)
@@ -495,4 +509,44 @@ func TestEndpointValidationRetryClassification(t *testing.T) {
 	require.Error(t, err)
 	assert.False(t, errors.Retry(err), "streaming must keep the no-retry classification of an untrusted endpoint: %v", err)
 	assert.Empty(t, untrusted.authHeaders)
+}
+
+// hostBlockingTransport blocks metadata requests to one host until the request context ends; other hosts get an empty
+// (public cloud default) metadata response.
+type hostBlockingTransport struct{ blockHost string }
+
+func (b hostBlockingTransport) RoundTrip(req *http.Request) (*http.Response, error) {
+	if req.URL.Hostname() == b.blockHost {
+		<-req.Context().Done()
+		return nil, req.Context().Err()
+	}
+	return &http.Response{StatusCode: http.StatusOK, Status: "200 OK", Header: http.Header{}, Body: io.NopCloser(strings.NewReader("")), Request: req}, nil
+}
+
+func TestTokenProviderMetadataHonorsContext(t *testing.T) {
+	t.Parallel()
+	const tokenSource = "https://ingest-ctxtp.westus.kusto.windows.net"
+	const target = "https://ctxtp.westus.kusto.windows.net"
+	forgetMetadata(t, tokenSource, target)
+	httpClient := &http.Client{Transport: hostBlockingTransport{blockHost: "ingest-ctxtp.westus.kusto.windows.net"}}
+
+	// As with streaming from an ingest client: the Conn targets the engine while the token comes from the DM URL.
+	client, err := New(NewConnectionStringBuilder(tokenSource).WithTokenCredential(&countingCredential{}), WithHttpClient(httpClient))
+	require.NoError(t, err)
+	conn, err := NewConn(target, client.Auth(), httpClient, client.ClientDetails())
+	require.NoError(t, err)
+
+	ctx, cancel := context.WithTimeout(context.Background(), 200*time.Millisecond)
+	defer cancel()
+	done := make(chan error, 1)
+	go func() {
+		done <- conn.StreamIngest(ctx, "db", "t", strings.NewReader("a"), testStreamFormat{}, "", "", false)
+	}()
+
+	select {
+	case err := <-done:
+		require.Error(t, err)
+	case <-time.After(5 * time.Second):
+		t.Fatal("token provider metadata fetch did not stop when the context was cancelled")
+	}
 }
