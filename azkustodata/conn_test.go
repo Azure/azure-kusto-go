@@ -5,12 +5,15 @@ import (
 	"github.com/Azure/azure-kusto-go/azkustodata/errors"
 	"github.com/Azure/azure-kusto-go/azkustodata/kql"
 	"github.com/Azure/azure-kusto-go/azkustodata/value"
+	"github.com/Azure/azure-sdk-for-go/sdk/azcore"
+	"github.com/Azure/azure-sdk-for-go/sdk/azcore/policy"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 	"io"
 	"net/http"
 	"strings"
 	"sync"
+	"sync/atomic"
 	"testing"
 	"time"
 )
@@ -378,4 +381,48 @@ func TestTrustedEndpointWithPortIsAccepted(t *testing.T) {
 	err := client.conn.(*Conn).StreamIngest(context.Background(), "db", "t", strings.NewReader("a"), testStreamFormat{}, "", "", false)
 	require.NoError(t, err)
 	assert.Equal(t, []string{"Bearer secret-token"}, rt.authHeaders)
+}
+
+type countingCredential struct {
+	calls atomic.Int32
+}
+
+func (c *countingCredential) GetToken(_ context.Context, _ policy.TokenRequestOptions) (azcore.AccessToken, error) {
+	c.calls.Add(1)
+	return azcore.AccessToken{Token: "cred-token", ExpiresOn: time.Now().Add(time.Hour)}, nil
+}
+
+func TestUntrustedEndpointNeverAcquiresToken(t *testing.T) {
+	t.Parallel()
+	rt := &recordingTransport{metadata: untrustedMetadata}
+	cred := &countingCredential{}
+	kcsb := NewConnectionStringBuilder("https://attacker-cred.example.com").WithTokenCredential(cred)
+	client, err := New(kcsb, WithHttpClient(&http.Client{Transport: rt}))
+	require.NoError(t, err)
+
+	_, err = client.Query(context.Background(), "db", kql.New("print 1"))
+	require.Error(t, err)
+	assert.Equal(t, int32(0), cred.calls.Load(), "token must not be acquired for an untrusted endpoint")
+	assert.Empty(t, rt.authHeaders)
+}
+
+func TestTokenProviderRejectsUntrustedMetadataSource(t *testing.T) {
+	t.Parallel()
+	// Metadata for every host claims the public cloud, so only the hostname decides trust.
+	rt := &recordingTransport{metadata: untrustedMetadata}
+	httpClient := &http.Client{Transport: rt}
+	cred := &countingCredential{}
+
+	// Token provider reads its audience from an untrusted host, while the Conn targets a trusted host.
+	kcsb := NewConnectionStringBuilder("https://attacker-tp.example.com").WithTokenCredential(cred)
+	client, err := New(kcsb, WithHttpClient(httpClient))
+	require.NoError(t, err)
+	conn, err := NewConn("https://mismatch.westus.kusto.windows.net", client.Auth(), httpClient, client.ClientDetails())
+	require.NoError(t, err)
+
+	err = conn.StreamIngest(context.Background(), "db", "t", strings.NewReader("a"), testStreamFormat{}, "", "", false)
+	require.Error(t, err)
+	assert.Contains(t, err.Error(), "not trusted")
+	assert.Equal(t, int32(0), cred.calls.Load())
+	assert.Empty(t, rt.authHeaders)
 }

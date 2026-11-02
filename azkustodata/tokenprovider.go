@@ -7,6 +7,7 @@ import (
 	"strings"
 	"sync/atomic"
 
+	truestedEndpoints "github.com/Azure/azure-kusto-go/azkustodata/trusted_endpoints"
 	"github.com/Azure/azure-kusto-go/azkustodata/utils"
 
 	"github.com/Azure/azure-sdk-for-go/sdk/azcore"
@@ -105,6 +106,11 @@ func getCommonCloudInfo(kcsb *ConnectionStringBuilder, http func() *http.Client)
 
 	cloud, err := GetMetadata(kcsb.DataSource, client)
 	if err != nil {
+		return nil, nil, "", err
+	}
+	// The metadata determines the token audience and authority, so its source must itself be trusted,
+	// independently of the endpoint the token is later sent to.
+	if err := truestedEndpoints.Instance.ValidateTrustedEndpoint(kcsb.DataSource, cloud.LoginEndpoint); err != nil {
 		return nil, nil, "", err
 	}
 	cliOpts := kcsb.ClientOptions

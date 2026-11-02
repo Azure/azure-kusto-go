@@ -11,6 +11,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ### Security
 
 - Trusted-endpoint validation errors are no longer ignored. Requests (query, management, and streaming ingestion) to an endpoint that is not a trusted Kusto host, or whose auth metadata cannot be retrieved, now fail before any authentication token is acquired or sent.
+- The token provider now also validates that the endpoint it reads auth metadata (token audience and authority) from is a trusted Kusto host, so an untrusted server can never choose the token audience.
 
 ### Fixed
 
