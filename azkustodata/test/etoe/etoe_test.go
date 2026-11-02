@@ -10,6 +10,7 @@ import (
 	"github.com/Azure/azure-kusto-go/azkustodata/query"
 	v1 "github.com/Azure/azure-kusto-go/azkustodata/query/v1"
 	"github.com/Azure/azure-kusto-go/azkustodata/testshared"
+	trustedEndpoints "github.com/Azure/azure-kusto-go/azkustodata/trusted_endpoints"
 	"github.com/Azure/azure-kusto-go/azkustodata/utils"
 	"github.com/Azure/azure-kusto-go/azkustodata/value"
 	"github.com/Azure/azure-sdk-for-go/sdk/azcore"
@@ -887,6 +888,9 @@ func TestStatement(t *testing.T) {
 }
 
 func TestNoRedirects(t *testing.T) {
+	// The fixture host is not a Kusto endpoint; trust it explicitly so the redirect handling is exercised.
+	require.NoError(t, trustedEndpoints.Instance.AddTrustedHosts([]trustedEndpoints.MatchRule{{Suffix: "statusreturner.azurewebsites.net", Exact: true}}, false))
+
 	redirectCodes := []int{301, 302, 307, 308}
 	for _, code := range redirectCodes {
 		code := code

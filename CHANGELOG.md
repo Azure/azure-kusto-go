@@ -6,6 +6,17 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 
+## [Unreleased]
+
+### Security
+
+- Trusted-endpoint validation errors are no longer ignored. Requests (query, management, and streaming ingestion) to an endpoint that is not a trusted Kusto host, or whose auth metadata cannot be retrieved, now fail before any authentication token is acquired or sent.
+
+### Fixed
+
+- Trusted-endpoint validation now ignores the port in the endpoint URL (e.g. `https://mycluster.kusto.windows.net:443`).
+
+
 ## [1.2.2] - 2026-04-22
 
 ### Fixed

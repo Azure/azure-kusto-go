@@ -7,7 +7,10 @@ import (
 	"github.com/Azure/azure-kusto-go/azkustodata/value"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
+	"io"
+	"net/http"
 	"strings"
+	"sync"
 	"testing"
 	"time"
 )
@@ -266,4 +269,113 @@ func TestTimeout(t *testing.T) {
 			require.Equal(t, value.TimespanString(tt.expectedServerTimeout), opts.requestProperties.Options[ServerTimeoutValue])
 		})
 	}
+}
+
+type recordingTransport struct {
+	mu          sync.Mutex
+	metadata    string
+	metaStatus  int
+	authHeaders []string
+	paths       []string
+}
+
+func (r *recordingTransport) RoundTrip(req *http.Request) (*http.Response, error) {
+	r.mu.Lock()
+	r.paths = append(r.paths, req.URL.Path)
+	if a := req.Header.Get("Authorization"); a != "" {
+		r.authHeaders = append(r.authHeaders, a)
+	}
+	r.mu.Unlock()
+
+	if req.URL.Path == metadataPath {
+		status := r.metaStatus
+		if status == 0 {
+			status = http.StatusOK
+		}
+		return &http.Response{StatusCode: status, Status: http.StatusText(status), Header: http.Header{}, Body: io.NopCloser(strings.NewReader(r.metadata)), Request: req}, nil
+	}
+	return &http.Response{StatusCode: http.StatusOK, Status: "200 OK", Header: http.Header{}, Body: io.NopCloser(strings.NewReader("")), Request: req}, nil
+}
+
+type testStreamFormat struct{}
+
+func (testStreamFormat) CamelCase() string                      { return "csv" }
+func (testStreamFormat) KnownOrDefault() DataFormatForStreaming { return testStreamFormat{} }
+
+const untrustedMetadata = `{"AzureAD":{"LoginEndpoint":"https://login.microsoftonline.com","LoginMfaRequired":false,"KustoClientAppId":"x","KustoClientRedirectUri":"x","KustoServiceResourceId":"https://untrusted.example.com","FirstPartyAuthorityUrl":"x"}}`
+
+func newRecordingClient(t *testing.T, endpoint string, rt *recordingTransport) *Client {
+	kcsb := NewConnectionStringBuilder(endpoint).WithApplicationToken("app", "secret-token")
+	client, err := New(kcsb, WithHttpClient(&http.Client{Transport: rt}))
+	require.NoError(t, err)
+	return client
+}
+
+func TestUntrustedEndpointNeverReceivesToken(t *testing.T) {
+	t.Parallel()
+
+	tests := []struct {
+		name       string
+		endpoint   string
+		metaStatus int
+		call       func(c *Client) error
+	}{
+		{
+			name:     "Query",
+			endpoint: "https://attacker-query.example.com:443",
+			call: func(c *Client) error {
+				_, err := c.Query(context.Background(), "db", kql.New("print 1"))
+				return err
+			},
+		},
+		{
+			name:     "Mgmt",
+			endpoint: "https://attacker-mgmt.example.com",
+			call: func(c *Client) error {
+				_, err := c.Mgmt(context.Background(), "db", kql.New(".show tables"))
+				return err
+			},
+		},
+		{
+			name:     "StreamIngest",
+			endpoint: "https://attacker-stream.example.com",
+			call: func(c *Client) error {
+				return c.conn.(*Conn).StreamIngest(context.Background(), "db", "t", strings.NewReader("a"), testStreamFormat{}, "", "", false)
+			},
+		},
+		{
+			name:       "MetadataFailure",
+			endpoint:   "https://attacker-metafail.example.com",
+			metaStatus: http.StatusInternalServerError,
+			call: func(c *Client) error {
+				_, err := c.Query(context.Background(), "db", kql.New("print 1"))
+				return err
+			},
+		},
+	}
+
+	for _, tt := range tests {
+		tt := tt
+		t.Run(tt.name, func(t *testing.T) {
+			t.Parallel()
+			rt := &recordingTransport{metadata: untrustedMetadata, metaStatus: tt.metaStatus}
+			client := newRecordingClient(t, tt.endpoint, rt)
+
+			err := tt.call(client)
+			require.Error(t, err)
+			assert.Contains(t, err.Error(), "could not validate endpoint")
+			assert.Empty(t, rt.authHeaders, "token must not be sent to an untrusted endpoint")
+			assert.Equal(t, []string{metadataPath}, rt.paths)
+		})
+	}
+}
+
+func TestTrustedEndpointWithPortIsAccepted(t *testing.T) {
+	t.Parallel()
+	rt := &recordingTransport{}
+	client := newRecordingClient(t, "https://trustedport.westus.kusto.windows.net:443", rt)
+
+	err := client.conn.(*Conn).StreamIngest(context.Background(), "db", "t", strings.NewReader("a"), testStreamFormat{}, "", "", false)
+	require.NoError(t, err)
+	assert.Equal(t, []string{"Bearer secret-token"}, rt.authHeaders)
 }

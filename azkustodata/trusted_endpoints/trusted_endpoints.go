@@ -175,7 +175,8 @@ func (trusted *TrustedEndpoints) ValidateTrustedEndpoint(endpoint string, loginE
 		return err
 	}
 
-	host := u.Host
+	// Use Hostname() so an explicit port (e.g. ":443") does not affect suffix matching.
+	host := u.Hostname()
 	if host == "" {
 		host = endpoint
 	}
