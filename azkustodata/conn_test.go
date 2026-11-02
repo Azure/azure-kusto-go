@@ -426,3 +426,73 @@ func TestTokenProviderRejectsUntrustedMetadataSource(t *testing.T) {
 	assert.Equal(t, int32(0), cred.calls.Load())
 	assert.Empty(t, rt.authHeaders)
 }
+
+type closeRecorder struct {
+	io.Reader
+	closed atomic.Bool
+}
+
+func (c *closeRecorder) Close() error {
+	c.closed.Store(true)
+	return nil
+}
+
+func TestStreamIngestClosesPayloadWhenEndpointRejected(t *testing.T) {
+	t.Parallel()
+	rt := &recordingTransport{metadata: untrustedMetadata}
+	client := newRecordingClient(t, "https://attacker-close.example.com", rt)
+	payload := &closeRecorder{Reader: strings.NewReader("a")}
+
+	err := client.conn.(*Conn).StreamIngest(context.Background(), "db", "t", payload, testStreamFormat{}, "", "", false)
+	require.Error(t, err)
+	assert.True(t, payload.closed.Load(), "payload must be closed so a streaming compressor is not blocked")
+}
+
+type blockingTransport struct{}
+
+func (blockingTransport) RoundTrip(req *http.Request) (*http.Response, error) {
+	<-req.Context().Done()
+	return nil, req.Context().Err()
+}
+
+func TestEndpointValidationHonorsContext(t *testing.T) {
+	t.Parallel()
+	kcsb := NewConnectionStringBuilder("https://blocking-meta.example.com").WithApplicationToken("app", "secret-token")
+	client, err := New(kcsb, WithHttpClient(&http.Client{Transport: blockingTransport{}}))
+	require.NoError(t, err)
+
+	ctx, cancel := context.WithTimeout(context.Background(), 200*time.Millisecond)
+	defer cancel()
+	done := make(chan error, 1)
+	go func() {
+		done <- client.conn.(*Conn).StreamIngest(ctx, "db", "t", strings.NewReader("a"), testStreamFormat{}, "", "", false)
+	}()
+
+	select {
+	case err := <-done:
+		require.Error(t, err)
+	case <-time.After(5 * time.Second):
+		t.Fatal("endpoint validation did not stop when the context was cancelled")
+	}
+}
+
+func TestEndpointValidationRetryClassification(t *testing.T) {
+	t.Parallel()
+
+	transient := &recordingTransport{metadata: untrustedMetadata, metaStatus: http.StatusServiceUnavailable}
+	_, err := newRecordingClient(t, "https://retry-transient.example.com", transient).Query(context.Background(), "db", kql.New("print 1"))
+	require.Error(t, err)
+	assert.True(t, errors.Retry(err), "a metadata fetch failure may be transient and must stay retryable: %v", err)
+	assert.Empty(t, transient.authHeaders)
+
+	untrusted := &recordingTransport{metadata: untrustedMetadata}
+	_, err = newRecordingClient(t, "https://retry-untrusted.example.com", untrusted).Query(context.Background(), "db", kql.New("print 1"))
+	require.Error(t, err)
+	assert.False(t, errors.Retry(err), "an untrusted endpoint must not be retried: %v", err)
+	assert.Empty(t, untrusted.authHeaders)
+
+	err = newRecordingClient(t, "https://retry-untrusted-stream.example.com", untrusted).conn.(*Conn).StreamIngest(context.Background(), "db", "t", strings.NewReader("a"), testStreamFormat{}, "", "", false)
+	require.Error(t, err)
+	assert.False(t, errors.Retry(err), "streaming must keep the no-retry classification of an untrusted endpoint: %v", err)
+	assert.Empty(t, untrusted.authHeaders)
+}

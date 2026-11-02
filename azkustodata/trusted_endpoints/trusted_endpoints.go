@@ -177,6 +177,11 @@ func (trusted *TrustedEndpoints) ValidateTrustedEndpoint(endpoint string, loginE
 
 	// Use Hostname() so an explicit port (e.g. ":443") does not affect suffix matching.
 	host := u.Hostname()
+	// Drop any IPv6 zone (e.g. "[2001:db8::1%25.x.kusto.windows.net]"): it is not part of the destination
+	// address and must never be matched as a domain suffix. '%' is never valid in a DNS hostname.
+	if i := strings.IndexByte(host, '%'); i >= 0 {
+		host = host[:i]
+	}
 	if host == "" {
 		host = endpoint
 	}

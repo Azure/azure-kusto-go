@@ -16,6 +16,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ### Fixed
 
 - Trusted-endpoint validation now ignores the port in the endpoint URL (e.g. `https://mycluster.kusto.windows.net:443`).
+- IPv6 zone identifiers (`%25...`) in the endpoint URL are no longer treated as part of the hostname during trusted-endpoint validation.
+- Endpoint validation now honors the request context, closes the request body when the request is not sent, and keeps transient auth-metadata failures retryable.
 
 
 ## [1.2.2] - 2026-04-22
