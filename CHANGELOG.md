@@ -8,6 +8,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [1.2.3] - 2026-11-03
+
 ### Security
 
 - Trusted-endpoint validation errors are no longer ignored. Requests (query, management, and streaming ingestion) to an endpoint that is not a trusted Kusto host, or whose auth metadata cannot be retrieved, now fail before any authentication token is acquired or sent.
@@ -18,6 +20,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Trusted-endpoint validation now ignores the port in the endpoint URL (e.g. `https://mycluster.kusto.windows.net:443`).
 - IPv6 zone identifiers (`%25...`) in the endpoint URL are no longer treated as part of the hostname during trusted-endpoint validation.
 - Endpoint validation now honors the request context, closes the request body when the request is not sent, and keeps transient auth-metadata failures retryable.
+- Compressed (gzip/deflate) responses now always close the underlying HTTP body, even if closing the decompressor fails (#349).
 
 
 ## [1.2.2] - 2026-04-22
