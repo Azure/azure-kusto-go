@@ -33,6 +33,9 @@ type iterativeDataset struct {
 	// cancel is a function to cancel the reading of the dataset, and is called when the dataset is closed.
 	cancel context.CancelFunc
 
+	// reader is the frame reader that owns the response body, so that Close can interrupt a stalled read.
+	reader *frameReader
+
 	// currentTable is the table that is currently being read, as it can contain multiple fragments.
 	currentTable *iterativeTable
 
@@ -68,6 +71,7 @@ func NewIterativeDataset(ctx context.Context, r io.ReadCloser, ioCapacity int, r
 		cancel()
 		return nil, err
 	}
+	d.reader = reader
 
 	// Spin up two goroutines - one to parse the dataset, and one to read the frames.
 	go parseRoutine(d, cancel)
@@ -388,10 +392,11 @@ func (d *iterativeDataset) Tables() <-chan query.TableResult {
 	return d.results
 }
 
-// Close closes the dataset, cancelling the context and closing the results channel.
+// Close closes the dataset, cancelling the context and closing the underlying response body,
+// which also interrupts a read that is blocked waiting for more data.
 func (d *iterativeDataset) Close() error {
 	d.cancel()
-	return nil
+	return d.reader.close()
 }
 
 // ToDataset reads the entire iterative dataset, converting it to a regular dataset.
