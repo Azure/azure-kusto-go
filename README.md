@@ -67,8 +67,11 @@ After a successful build, non-fork runs also execute unit and authenticated E2E
 tests using the `azure-kusto-go-e2e` variable group and the
 `kusto-connectors-arm-sc` service connection. Fork pull requests skip that test
 job. Azure Pipelines must also be configured to allow builds from forks.
-Test logs have URL query strings redacted before report generation or publication;
-raw logs are kept outside the published artifact directory and deleted after redaction.
+Test output fragments are reassembled per package and test before URL query
+strings are redacted for report generation or publication. Raw logs are kept
+outside the published artifact directory and deleted after redaction.
+The redaction helper lives in [.azuredevops/redact_test_logs.py](.azuredevops/redact_test_logs.py);
+its regression tests run in the credential-free build job.
 
 ## Examples
 

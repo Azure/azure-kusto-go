@@ -63,6 +63,12 @@ jobs:
   - bash: |
       set -euo pipefail
 
+      python3 -B -m unittest discover -s .azuredevops -p 'test_*.py' -v
+    displayName: Test log redaction
+
+  - bash: |
+      set -euo pipefail
+
       go work sync
       for module in azkustodata azkustoingest; do
         pushd "${module}"
@@ -184,33 +190,7 @@ jobs:
           continue
         fi
 
-        python3 -B - "${rawLog}" "${log}" <<'PY'
-      import json
-      import re
-      import sys
-
-      url_query = re.compile(r"""(https?://[^\s"'<>?]+)\?[^\s"'<>]*""", re.IGNORECASE)
-
-      def redact(value):
-          if isinstance(value, str):
-              return url_query.sub(r"\1?[REDACTED]", value)
-          if isinstance(value, dict):
-              return {key: redact(item) for key, item in value.items()}
-          if isinstance(value, list):
-              return [redact(item) for item in value]
-          return value
-
-      with open(sys.argv[1], encoding="utf-8") as raw, open(
-          sys.argv[2], "w", encoding="utf-8"
-      ) as sanitized:
-          for line in raw:
-              try:
-                  event = json.loads(line)
-              except json.JSONDecodeError:
-                  sanitized.write(redact(line))
-              else:
-                  sanitized.write(json.dumps(redact(event)) + "\n")
-      PY
+        python3 -B .azuredevops/redact_test_logs.py "${rawLog}" "${log}"
         rm -- "${rawLog}"
         go-junit-report -parser gojson < "${log}" > "${results}/report-${module}.xml"
         if ! tparse -all -file="${log}"; then
