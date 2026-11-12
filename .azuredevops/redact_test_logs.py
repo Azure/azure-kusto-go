@@ -4,7 +4,8 @@ import re
 from pathlib import Path
 
 
-URL_QUERY = re.compile(r"""(https?://[^\s"'<>?]+)\?[^\s"'<>]*""", re.IGNORECASE)
+URL_QUERY = re.compile(r"""(https?://[^\s"<>?]+)\?[^\s"<>]*""", re.IGNORECASE)
+MAX_JSON_RECORD_BYTES = 60 * 1024
 
 
 def redact(value):
@@ -23,9 +24,26 @@ def sanitize_log(source, destination):
     ) as sanitized:
         pending = {}
 
+        def emit(event):
+            event = redact(event)
+            line = json.dumps(event)
+            if len(line.encode("utf-8")) <= MAX_JSON_RECORD_BYTES:
+                sanitized.write(line + "\n")
+                return
+            if not isinstance(event, dict) or not isinstance(event.get("Output"), str):
+                raise ValueError("Test event exceeds the JSON record size limit")
+            metadata = json.dumps({**event, "Output": ""})
+            # One character can expand to 12 ASCII bytes when JSON-escaped.
+            chunk_size = (MAX_JSON_RECORD_BYTES - len(metadata.encode("utf-8"))) // 12
+            if chunk_size < 1:
+                raise ValueError("Test event metadata exceeds the JSON record size limit")
+            for offset in range(0, len(event["Output"]), chunk_size):
+                chunk = event["Output"][offset : offset + chunk_size]
+                sanitized.write(json.dumps({**event, "Output": chunk}) + "\n")
+
         def flush(key):
             if key in pending:
-                sanitized.write(json.dumps(redact(pending.pop(key))) + "\n")
+                emit(pending.pop(key))
 
         for line in raw:
             try:
@@ -48,7 +66,7 @@ def sanitize_log(source, destination):
                                 not event.get("Test") and pending_key[0] == key[0]
                             ):
                                 flush(pending_key)
-                sanitized.write(json.dumps(redact(event)) + "\n")
+                emit(event)
         for key in list(pending):
             flush(key)
 

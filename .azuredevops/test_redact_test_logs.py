@@ -3,7 +3,7 @@ import tempfile
 import unittest
 from pathlib import Path
 
-from redact_test_logs import sanitize_log
+from redact_test_logs import MAX_JSON_RECORD_BYTES, sanitize_log
 
 
 def output(text, package="p", test="TestBlob"):
@@ -126,6 +126,64 @@ class RedactionTests(unittest.TestCase):
         ).splitlines()
         self.assertEqual(json.loads(lines[0]), event)
         self.assertEqual(lines[1], 'Head "https://a/f?[REDACTED]": failed')
+
+    def test_apostrophes_in_url_paths_and_queries(self):
+        for url in (
+            "https://a.blob.core.windows.net/c/report's.json?sv=1&sig=SYNTHETIC_TOKEN",
+            "https://a.blob.core.windows.net/c/f?name=report's&sig=SYNTHETIC_TOKEN",
+        ):
+            for split in range(1, len(url)):
+                with self.subTest(url=url, split=split):
+                    result = self.sanitize(
+                        [output('Head "' + url[:split]), output(url[split:] + '": failed\n')]
+                    )
+                    self.assertEqual(
+                        json.loads(result)["Output"],
+                        'Head "' + url.split("?")[0] + '?[REDACTED]": failed\n',
+                    )
+
+    def test_long_output_is_redacted_before_chunking(self):
+        fragments = ["x" * 2048 for _ in range(40)]
+        fragments += ["https://a.blob.core.windows.net/c/report's.json?sig=SYN"]
+        fragments += ["THETIC_TOKEN&sp=r\n"]
+        result = self.sanitize([output(fragment) for fragment in fragments])
+        lines = result.splitlines()
+        self.assertGreater(len(lines), 1)
+        for line in lines:
+            self.assertLessEqual(len(line.encode("utf-8")), MAX_JSON_RECORD_BYTES)
+        events = list(map(json.loads, lines))
+        self.assertEqual(
+            "".join(event["Output"] for event in events),
+            "x" * (40 * 2048)
+            + "https://a.blob.core.windows.net/c/report's.json?[REDACTED]\n",
+        )
+        for event in events:
+            self.assertEqual(event["Action"], "output")
+            self.assertEqual(event["Package"], "p")
+            self.assertEqual(event["Test"], "TestBlob")
+
+    def test_chunk_size_accounts_for_json_escaping_and_metadata(self):
+        text = ('"\\\t' + chr(0) + chr(0x1F600)) * 6000 + "\n"
+        event = output(text, test='"' * 2000)
+        event["Time"] = "2026-11-12T15:00:00Z"
+        lines = self.sanitize([event]).splitlines()
+        self.assertGreater(len(lines), 1)
+        events = list(map(json.loads, lines))
+        self.assertEqual("".join(item["Output"] for item in events), text)
+        for line, item in zip(lines, events):
+            self.assertLessEqual(len(line.encode("utf-8")), MAX_JSON_RECORD_BYTES)
+            self.assertEqual(item["Test"], event["Test"])
+            self.assertEqual(item["Time"], event["Time"])
+
+    def test_oversized_metadata_fails_without_publishing_a_record(self):
+        with tempfile.TemporaryDirectory() as directory:
+            source = Path(directory) / "raw.log"
+            target = Path(directory) / "sanitized.log"
+            event = output("hello\n", test="x" * MAX_JSON_RECORD_BYTES)
+            source.write_text(json.dumps(event) + "\n", encoding="utf-8")
+            with self.assertRaisesRegex(ValueError, "metadata exceeds"):
+                sanitize_log(source, target)
+            self.assertEqual(target.read_text(encoding="utf-8"), "")
 
     def test_missing_source_fails_without_creating_output(self):
         with tempfile.TemporaryDirectory() as directory:

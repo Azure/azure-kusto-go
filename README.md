@@ -70,6 +70,8 @@ job. Azure Pipelines must also be configured to allow builds from forks.
 Test output fragments are reassembled per package and test before URL query
 strings are redacted for report generation or publication. Raw logs are kept
 outside the published artifact directory and deleted after redaction.
+Redacted output is split into JSON records of at most 60 KiB, including JSON
+escaping and metadata, to stay below the test reporter's scanner limit.
 The redaction helper lives in [.azuredevops/redact_test_logs.py](.azuredevops/redact_test_logs.py);
 its regression tests run in the credential-free build job.
 
