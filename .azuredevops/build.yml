@@ -20,8 +20,61 @@ variables:
   value: $(Agent.TempDirectory)/go-bin
 
 jobs:
-- job: BuildAndTest
-  displayName: Build and test Go SDK
+- job: Build
+  displayName: Build Go SDK (including fork PRs)
+  timeoutInMinutes: 60
+  steps:
+  - checkout: self
+    clean: true
+    persistCredentials: false
+
+  # Ingestion tests use testing/synctest.Test, which requires Go 1.25 or newer.
+  - task: GoTool@0
+    displayName: Use Go 1.26
+    inputs:
+      version: '1.26'
+
+  - bash: |
+      set -euo pipefail
+
+      version="$(go env GOVERSION)"
+      echo "##vso[task.setvariable variable=GO_RESOLVED_VERSION]${version}"
+    displayName: Record resolved Go version
+
+  - task: Cache@2
+    displayName: Cache Go modules and build outputs
+    inputs:
+      key: '"go" | "$(Agent.OS)" | "$(GO_RESOLVED_VERSION)" | go.work | go.work.sum | **/go.sum'
+      restoreKeys: |
+        "go" | "$(Agent.OS)" | "$(GO_RESOLVED_VERSION)"
+      path: $(Pipeline.Workspace)/go
+
+  - bash: |
+      set -euo pipefail
+
+      unformatted="$(gofmt -s -l .)"
+      if [[ -n "${unformatted}" ]]; then
+        printf '%s\n' "${unformatted}"
+        exit 1
+      fi
+    displayName: Check Go formatting
+    continueOnError: true
+
+  - bash: |
+      set -euo pipefail
+
+      go work sync
+      for module in azkustodata azkustoingest; do
+        pushd "${module}"
+        go get -v -t -d ./...
+        go build -v ./...
+        popd
+      done
+    displayName: Sync workspace, restore dependencies, and build both modules
+
+- job: Test
+  displayName: Run unit and authenticated Kusto E2E tests
+  dependsOn: Build
   timeoutInMinutes: 60
   condition: and(succeeded(), or(ne(variables['Build.Reason'], 'PullRequest'), eq(variables['System.PullRequest.IsFork'], 'False')))
   variables:
@@ -33,7 +86,6 @@ jobs:
     clean: true
     persistCredentials: false
 
-  # Ingestion tests use testing/synctest.Test, which requires Go 1.25 or newer.
   - task: GoTool@0
     displayName: Use Go 1.26
     inputs:
@@ -67,25 +119,13 @@ jobs:
   - bash: |
       set -euo pipefail
 
-      unformatted="$(gofmt -s -l .)"
-      if [[ -n "${unformatted}" ]]; then
-        printf '%s\n' "${unformatted}"
-        exit 1
-      fi
-    displayName: Check Go formatting
-    continueOnError: true
-
-  - bash: |
-      set -euo pipefail
-
       go work sync
       for module in azkustodata azkustoingest; do
         pushd "${module}"
         go get -v -t -d ./...
-        go build -v ./...
         popd
       done
-    displayName: Sync workspace, restore dependencies, and build both modules
+    displayName: Sync workspace and restore test dependencies
 
   - task: AzureCLI@2
     displayName: Run unit and authenticated Kusto E2E tests

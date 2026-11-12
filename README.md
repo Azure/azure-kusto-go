@@ -59,6 +59,15 @@ go get github.com/Azure/azure-kusto-go
 - An [Azure Data Explorer Cluster](https://learn.microsoft.com/en-us/azure/data-explorer/).
 - An Azure Data Explorer Database. You can create a Database in your Azure Data Explorer Cluster using the [Azure Portal](https://learn.microsoft.com/en-us/azure/data-explorer/create-cluster-database-portal).
 
+### Azure Pipelines validation
+
+The [Azure pipeline](.azuredevops/build.yml) builds both SDK modules for pushes
+and pull requests, including fork pull requests, without Azure credentials.
+After a successful build, non-fork runs also execute unit and authenticated E2E
+tests using the `azure-kusto-go-e2e` variable group and the
+`kusto-connectors-arm-sc` service connection. Fork pull requests skip that test
+job. Azure Pipelines must also be configured to allow builds from forks.
+
 ## Examples
 
 Examples for various scenarios can be found on [pkg.go.dev](https://pkg.go.dev/github.com/Azure/azure-kusto-go#readme-examples) or in the example*_test.go files in our GitHub repo for [azure-kusto-go](https://github.com/Azure/azure-kusto-go/tree/master/kusto).
