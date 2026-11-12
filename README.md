@@ -67,6 +67,8 @@ After a successful build, non-fork runs also execute unit and authenticated E2E
 tests using the `azure-kusto-go-e2e` variable group and the
 `kusto-connectors-arm-sc` service connection. Fork pull requests skip that test
 job. Azure Pipelines must also be configured to allow builds from forks.
+Test logs have URL query strings redacted before report generation or publication;
+raw logs are kept outside the published artifact directory and deleted after redaction.
 
 ## Examples
 

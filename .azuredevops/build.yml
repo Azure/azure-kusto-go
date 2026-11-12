@@ -109,7 +109,7 @@ jobs:
   - bash: |
       set -euo pipefail
 
-      mkdir -p "${GOBIN}" "$(Agent.TempDirectory)/go-test-results"
+      mkdir -p "${GOBIN}" "$(Agent.TempDirectory)/go-test-results" "$(Agent.TempDirectory)/go-test-raw"
       go install github.com/jstemmer/go-junit-report/v2@7933520
       go install github.com/mfridman/tparse@v0.18.0
       go install github.com/boumenot/gocover-cobertura@v1.5.0
@@ -148,12 +148,13 @@ jobs:
         az account show --output none
 
         results="$(Agent.TempDirectory)/go-test-results"
+        raw="$(Agent.TempDirectory)/go-test-raw"
         status=0
         for module in azkustodata azkustoingest; do
           pushd "${module}"
           if ! go test -p 100 -race \
             -coverprofile="${results}/coverage-${module}.out" \
-            -json ./... > "${results}/gotest-${module}.log"; then
+            -json ./... > "${raw}/gotest-${module}.log" 2>&1; then
             echo "##vso[task.logissue type=error]${module} tests failed."
             status=1
           fi
@@ -172,15 +173,45 @@ jobs:
       set -euo pipefail
 
       results="$(Agent.TempDirectory)/go-test-results"
+      raw="$(Agent.TempDirectory)/go-test-raw"
       status=0
       for module in azkustodata azkustoingest; do
+        rawLog="${raw}/gotest-${module}.log"
         log="${results}/gotest-${module}.log"
-        if [[ ! -f "${log}" ]]; then
+        if [[ ! -f "${rawLog}" ]]; then
           echo "##vso[task.logissue type=error]Test log for ${module} is missing."
           status=1
           continue
         fi
 
+        python3 -B - "${rawLog}" "${log}" <<'PY'
+      import json
+      import re
+      import sys
+
+      url_query = re.compile(r"""(https?://[^\s"'<>?]+)\?[^\s"'<>]*""", re.IGNORECASE)
+
+      def redact(value):
+          if isinstance(value, str):
+              return url_query.sub(r"\1?[REDACTED]", value)
+          if isinstance(value, dict):
+              return {key: redact(item) for key, item in value.items()}
+          if isinstance(value, list):
+              return [redact(item) for item in value]
+          return value
+
+      with open(sys.argv[1], encoding="utf-8") as raw, open(
+          sys.argv[2], "w", encoding="utf-8"
+      ) as sanitized:
+          for line in raw:
+              try:
+                  event = json.loads(line)
+              except json.JSONDecodeError:
+                  sanitized.write(redact(line))
+              else:
+                  sanitized.write(json.dumps(redact(event)) + "\n")
+      PY
+        rm -- "${rawLog}"
         go-junit-report -parser gojson < "${log}" > "${results}/report-${module}.xml"
         if ! tparse -all -file="${log}"; then
           status=1
