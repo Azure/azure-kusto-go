@@ -59,6 +59,22 @@ go get github.com/Azure/azure-kusto-go
 - An [Azure Data Explorer Cluster](https://learn.microsoft.com/en-us/azure/data-explorer/).
 - An Azure Data Explorer Database. You can create a Database in your Azure Data Explorer Cluster using the [Azure Portal](https://learn.microsoft.com/en-us/azure/data-explorer/create-cluster-database-portal).
 
+### Azure Pipelines validation
+
+The [Azure pipeline](.azuredevops/build.yml) builds both SDK modules for pushes
+and pull requests, including fork pull requests, without Azure credentials.
+After a successful build, non-fork runs also execute unit and authenticated E2E
+tests using the `azure-kusto-go-e2e` variable group and the
+`kusto-connectors-arm-sc` service connection. Fork pull requests skip that test
+job. Azure Pipelines must also be configured to allow builds from forks.
+Test output fragments are reassembled per package and test before URL query
+strings are redacted for report generation or publication. Raw logs are kept
+outside the published artifact directory and deleted after redaction.
+Redacted output is split into JSON records of at most 60 KiB, including JSON
+escaping and metadata, to stay below the test reporter's scanner limit.
+The redaction helper lives in [.azuredevops/redact_test_logs.py](.azuredevops/redact_test_logs.py);
+its regression tests run in the credential-free build job.
+
 ## Examples
 
 Examples for various scenarios can be found on [pkg.go.dev](https://pkg.go.dev/github.com/Azure/azure-kusto-go#readme-examples) or in the example*_test.go files in our GitHub repo for [azure-kusto-go](https://github.com/Azure/azure-kusto-go/tree/master/kusto).
