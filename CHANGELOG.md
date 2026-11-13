@@ -8,6 +8,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Fixed
+
+- Query and management request bodies are no longer built in a pooled buffer. `http.Client.Do` can return before the transport has finished sending the body (an early response, an error, a cancelled context), and the buffer, already back in the pool, could be reset and refilled by the next request while still being sent: a data race that could send one request with another's body.
+
 ## [1.2.3] - 2026-11-03
 
 ### Security
