@@ -5,9 +5,15 @@ import (
 	"github.com/Azure/azure-kusto-go/azkustodata/errors"
 	"github.com/Azure/azure-kusto-go/azkustodata/kql"
 	"github.com/Azure/azure-kusto-go/azkustodata/value"
+	"github.com/Azure/azure-sdk-for-go/sdk/azcore"
+	"github.com/Azure/azure-sdk-for-go/sdk/azcore/policy"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
+	"io"
+	"net/http"
 	"strings"
+	"sync"
+	"sync/atomic"
 	"testing"
 	"time"
 )
@@ -265,5 +271,282 @@ func TestTimeout(t *testing.T) {
 
 			require.Equal(t, value.TimespanString(tt.expectedServerTimeout), opts.requestProperties.Options[ServerTimeoutValue])
 		})
+	}
+}
+
+type recordingTransport struct {
+	mu          sync.Mutex
+	metadata    string
+	metaStatus  int
+	authHeaders []string
+	paths       []string
+}
+
+func (r *recordingTransport) RoundTrip(req *http.Request) (*http.Response, error) {
+	r.mu.Lock()
+	r.paths = append(r.paths, req.URL.Path)
+	if a := req.Header.Get("Authorization"); a != "" {
+		r.authHeaders = append(r.authHeaders, a)
+	}
+	r.mu.Unlock()
+
+	if req.URL.Path == metadataPath {
+		status := r.metaStatus
+		if status == 0 {
+			status = http.StatusOK
+		}
+		return &http.Response{StatusCode: status, Status: http.StatusText(status), Header: http.Header{}, Body: io.NopCloser(strings.NewReader(r.metadata)), Request: req}, nil
+	}
+	return &http.Response{StatusCode: http.StatusOK, Status: "200 OK", Header: http.Header{}, Body: io.NopCloser(strings.NewReader("")), Request: req}, nil
+}
+
+type testStreamFormat struct{}
+
+func (testStreamFormat) CamelCase() string                      { return "csv" }
+func (testStreamFormat) KnownOrDefault() DataFormatForStreaming { return testStreamFormat{} }
+
+const untrustedMetadata = `{"AzureAD":{"LoginEndpoint":"https://login.microsoftonline.com","LoginMfaRequired":false,"KustoClientAppId":"x","KustoClientRedirectUri":"x","KustoServiceResourceId":"https://untrusted.example.com","FirstPartyAuthorityUrl":"x"}}`
+
+// forgetMetadata drops cached auth metadata for the given URIs after the test, so repeated runs (-count=N) start clean.
+func forgetMetadata(t *testing.T, uris ...string) {
+	t.Cleanup(func() {
+		for _, u := range uris {
+			cloudInfoCache.Delete(u)
+		}
+	})
+}
+
+func newRecordingClient(t *testing.T, endpoint string, rt *recordingTransport) *Client {
+	forgetMetadata(t, endpoint)
+	kcsb := NewConnectionStringBuilder(endpoint).WithApplicationToken("app", "secret-token")
+	client, err := New(kcsb, WithHttpClient(&http.Client{Transport: rt}))
+	require.NoError(t, err)
+	return client
+}
+
+func TestUntrustedEndpointNeverReceivesToken(t *testing.T) {
+	t.Parallel()
+
+	tests := []struct {
+		name       string
+		endpoint   string
+		metaStatus int
+		call       func(c *Client) error
+	}{
+		{
+			name:     "Query",
+			endpoint: "https://attacker-query.example.com:443",
+			call: func(c *Client) error {
+				_, err := c.Query(context.Background(), "db", kql.New("print 1"))
+				return err
+			},
+		},
+		{
+			name:     "Mgmt",
+			endpoint: "https://attacker-mgmt.example.com",
+			call: func(c *Client) error {
+				_, err := c.Mgmt(context.Background(), "db", kql.New(".show tables"))
+				return err
+			},
+		},
+		{
+			name:     "StreamIngest",
+			endpoint: "https://attacker-stream.example.com",
+			call: func(c *Client) error {
+				return c.conn.(*Conn).StreamIngest(context.Background(), "db", "t", strings.NewReader("a"), testStreamFormat{}, "", "", false)
+			},
+		},
+		{
+			name:       "MetadataFailure",
+			endpoint:   "https://attacker-metafail.example.com",
+			metaStatus: http.StatusInternalServerError,
+			call: func(c *Client) error {
+				_, err := c.Query(context.Background(), "db", kql.New("print 1"))
+				return err
+			},
+		},
+	}
+
+	for _, tt := range tests {
+		tt := tt
+		t.Run(tt.name, func(t *testing.T) {
+			t.Parallel()
+			rt := &recordingTransport{metadata: untrustedMetadata, metaStatus: tt.metaStatus}
+			client := newRecordingClient(t, tt.endpoint, rt)
+
+			err := tt.call(client)
+			require.Error(t, err)
+			assert.Contains(t, err.Error(), "could not validate endpoint")
+			assert.Empty(t, rt.authHeaders, "token must not be sent to an untrusted endpoint")
+			assert.Equal(t, []string{metadataPath}, rt.paths)
+		})
+	}
+}
+
+func TestTrustedEndpointWithPortIsAccepted(t *testing.T) {
+	t.Parallel()
+	rt := &recordingTransport{}
+	client := newRecordingClient(t, "https://trustedport.westus.kusto.windows.net:443", rt)
+
+	err := client.conn.(*Conn).StreamIngest(context.Background(), "db", "t", strings.NewReader("a"), testStreamFormat{}, "", "", false)
+	require.NoError(t, err)
+	assert.Equal(t, []string{"Bearer secret-token"}, rt.authHeaders)
+}
+
+type countingCredential struct {
+	calls atomic.Int32
+}
+
+func (c *countingCredential) GetToken(_ context.Context, _ policy.TokenRequestOptions) (azcore.AccessToken, error) {
+	c.calls.Add(1)
+	return azcore.AccessToken{Token: "cred-token", ExpiresOn: time.Now().Add(time.Hour)}, nil
+}
+
+func TestUntrustedEndpointNeverAcquiresToken(t *testing.T) {
+	t.Parallel()
+	rt := &recordingTransport{metadata: untrustedMetadata}
+	cred := &countingCredential{}
+	forgetMetadata(t, "https://attacker-cred.example.com")
+	kcsb := NewConnectionStringBuilder("https://attacker-cred.example.com").WithTokenCredential(cred)
+	client, err := New(kcsb, WithHttpClient(&http.Client{Transport: rt}))
+	require.NoError(t, err)
+
+	_, err = client.Query(context.Background(), "db", kql.New("print 1"))
+	require.Error(t, err)
+	assert.Equal(t, int32(0), cred.calls.Load(), "token must not be acquired for an untrusted endpoint")
+	assert.Empty(t, rt.authHeaders)
+}
+
+func TestTokenProviderRejectsUntrustedMetadataSource(t *testing.T) {
+	t.Parallel()
+	// Metadata for every host claims the public cloud, so only the hostname decides trust.
+	rt := &recordingTransport{metadata: untrustedMetadata}
+	httpClient := &http.Client{Transport: rt}
+	cred := &countingCredential{}
+
+	// Token provider reads its audience from an untrusted host, while the Conn targets a trusted host.
+	forgetMetadata(t, "https://attacker-tp.example.com", "https://mismatch.westus.kusto.windows.net")
+	kcsb := NewConnectionStringBuilder("https://attacker-tp.example.com").WithTokenCredential(cred)
+	client, err := New(kcsb, WithHttpClient(httpClient))
+	require.NoError(t, err)
+	conn, err := NewConn("https://mismatch.westus.kusto.windows.net", client.Auth(), httpClient, client.ClientDetails())
+	require.NoError(t, err)
+
+	err = conn.StreamIngest(context.Background(), "db", "t", strings.NewReader("a"), testStreamFormat{}, "", "", false)
+	require.Error(t, err)
+	assert.Contains(t, err.Error(), "not trusted")
+	assert.False(t, errors.Retry(err), "an untrusted metadata source must not be retried: %v", err)
+	assert.Equal(t, int32(0), cred.calls.Load())
+	assert.Empty(t, rt.authHeaders)
+}
+
+type closeRecorder struct {
+	io.Reader
+	closed atomic.Bool
+}
+
+func (c *closeRecorder) Close() error {
+	c.closed.Store(true)
+	return nil
+}
+
+func TestStreamIngestClosesPayloadWhenEndpointRejected(t *testing.T) {
+	t.Parallel()
+	rt := &recordingTransport{metadata: untrustedMetadata}
+	client := newRecordingClient(t, "https://attacker-close.example.com", rt)
+	payload := &closeRecorder{Reader: strings.NewReader("a")}
+
+	err := client.conn.(*Conn).StreamIngest(context.Background(), "db", "t", payload, testStreamFormat{}, "", "", false)
+	require.Error(t, err)
+	assert.True(t, payload.closed.Load(), "payload must be closed so a streaming compressor is not blocked")
+}
+
+type blockingTransport struct{}
+
+func (blockingTransport) RoundTrip(req *http.Request) (*http.Response, error) {
+	<-req.Context().Done()
+	return nil, req.Context().Err()
+}
+
+func TestEndpointValidationHonorsContext(t *testing.T) {
+	t.Parallel()
+	forgetMetadata(t, "https://blocking-meta.example.com")
+	kcsb := NewConnectionStringBuilder("https://blocking-meta.example.com").WithApplicationToken("app", "secret-token")
+	client, err := New(kcsb, WithHttpClient(&http.Client{Transport: blockingTransport{}}))
+	require.NoError(t, err)
+
+	ctx, cancel := context.WithTimeout(context.Background(), 200*time.Millisecond)
+	defer cancel()
+	done := make(chan error, 1)
+	go func() {
+		done <- client.conn.(*Conn).StreamIngest(ctx, "db", "t", strings.NewReader("a"), testStreamFormat{}, "", "", false)
+	}()
+
+	select {
+	case err := <-done:
+		require.Error(t, err)
+	case <-time.After(5 * time.Second):
+		t.Fatal("endpoint validation did not stop when the context was cancelled")
+	}
+}
+
+func TestEndpointValidationRetryClassification(t *testing.T) {
+	t.Parallel()
+
+	transient := &recordingTransport{metadata: untrustedMetadata, metaStatus: http.StatusServiceUnavailable}
+	_, err := newRecordingClient(t, "https://retry-transient.example.com", transient).Query(context.Background(), "db", kql.New("print 1"))
+	require.Error(t, err)
+	assert.True(t, errors.Retry(err), "a metadata fetch failure may be transient and must stay retryable: %v", err)
+	assert.Empty(t, transient.authHeaders)
+
+	untrusted := &recordingTransport{metadata: untrustedMetadata}
+	_, err = newRecordingClient(t, "https://retry-untrusted.example.com", untrusted).Query(context.Background(), "db", kql.New("print 1"))
+	require.Error(t, err)
+	assert.False(t, errors.Retry(err), "an untrusted endpoint must not be retried: %v", err)
+	assert.Empty(t, untrusted.authHeaders)
+
+	err = newRecordingClient(t, "https://retry-untrusted-stream.example.com", untrusted).conn.(*Conn).StreamIngest(context.Background(), "db", "t", strings.NewReader("a"), testStreamFormat{}, "", "", false)
+	require.Error(t, err)
+	assert.False(t, errors.Retry(err), "streaming must keep the no-retry classification of an untrusted endpoint: %v", err)
+	assert.Empty(t, untrusted.authHeaders)
+}
+
+// hostBlockingTransport blocks metadata requests to one host until the request context ends; other hosts get an empty
+// (public cloud default) metadata response.
+type hostBlockingTransport struct{ blockHost string }
+
+func (b hostBlockingTransport) RoundTrip(req *http.Request) (*http.Response, error) {
+	if req.URL.Hostname() == b.blockHost {
+		<-req.Context().Done()
+		return nil, req.Context().Err()
+	}
+	return &http.Response{StatusCode: http.StatusOK, Status: "200 OK", Header: http.Header{}, Body: io.NopCloser(strings.NewReader("")), Request: req}, nil
+}
+
+func TestTokenProviderMetadataHonorsContext(t *testing.T) {
+	t.Parallel()
+	const tokenSource = "https://ingest-ctxtp.westus.kusto.windows.net"
+	const target = "https://ctxtp.westus.kusto.windows.net"
+	forgetMetadata(t, tokenSource, target)
+	httpClient := &http.Client{Transport: hostBlockingTransport{blockHost: "ingest-ctxtp.westus.kusto.windows.net"}}
+
+	// As with streaming from an ingest client: the Conn targets the engine while the token comes from the DM URL.
+	client, err := New(NewConnectionStringBuilder(tokenSource).WithTokenCredential(&countingCredential{}), WithHttpClient(httpClient))
+	require.NoError(t, err)
+	conn, err := NewConn(target, client.Auth(), httpClient, client.ClientDetails())
+	require.NoError(t, err)
+
+	ctx, cancel := context.WithTimeout(context.Background(), 200*time.Millisecond)
+	defer cancel()
+	done := make(chan error, 1)
+	go func() {
+		done <- conn.StreamIngest(ctx, "db", "t", strings.NewReader("a"), testStreamFormat{}, "", "", false)
+	}()
+
+	select {
+	case err := <-done:
+		require.Error(t, err)
+	case <-time.After(5 * time.Second):
+		t.Fatal("token provider metadata fetch did not stop when the context was cancelled")
 	}
 }
