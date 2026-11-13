@@ -133,8 +133,6 @@ func parseRoutine(d *iterativeDataset, cancel context.CancelFunc) {
 
 func readDataSet(d *iterativeDataset) error {
 
-	var err error
-
 	// The first frame should be a DataSetHeader. We don't need to save it - just validate it.
 	if header, _, err := nextFrame(d); err == nil {
 		if err = validateDataSetHeader(header); err != nil {
@@ -162,7 +160,11 @@ func readDataSet(d *iterativeDataset) error {
 	// If we get a TableHeader, we read the table.
 	// If we get a DataTable, it means we have reached QueryCompletionInformation
 	// If we get a DataSetCompletion, we are done.
-	for decoder, frameType, err := nextFrame(d); err == nil; decoder, frameType, err = nextFrame(d) {
+	for {
+		decoder, frameType, err := nextFrame(d)
+		if err != nil {
+			return err
+		}
 		if frameType == DataTableFrameType {
 			if err = handleDataTable(d, decoder); err != nil {
 				return err
@@ -188,7 +190,6 @@ func readDataSet(d *iterativeDataset) error {
 		return errors.ES(errors.OpQuery, errors.KInternal, "unexpected frame type %s, expected DataTable, TableHeader, or DataSetCompletion", frameType)
 	}
 
-	return err
 }
 
 // nextFrame reads the next frame from the buffered channel.
