@@ -1,0 +1,241 @@
+trigger:
+  branches:
+    include:
+    - master
+
+pr:
+  branches:
+    include:
+    - '*'
+
+pool:
+  vmImage: ubuntu-latest
+
+variables:
+- name: GOMODCACHE
+  value: $(Pipeline.Workspace)/go/pkg/mod
+- name: GOCACHE
+  value: $(Pipeline.Workspace)/go/build-cache
+- name: GOBIN
+  value: $(Agent.TempDirectory)/go-bin
+
+jobs:
+- job: Build
+  displayName: Build Go SDK (including fork PRs)
+  timeoutInMinutes: 60
+  steps:
+  - checkout: self
+    clean: true
+    persistCredentials: false
+
+  # Ingestion tests use testing/synctest.Test, which requires Go 1.25 or newer.
+  - task: GoTool@0
+    displayName: Use Go 1.26
+    inputs:
+      version: '1.26'
+
+  - bash: |
+      set -euo pipefail
+
+      version="$(go env GOVERSION)"
+      echo "##vso[task.setvariable variable=GO_RESOLVED_VERSION]${version}"
+    displayName: Record resolved Go version
+
+  - task: Cache@2
+    displayName: Cache Go modules and build outputs
+    inputs:
+      key: '"go" | "$(Agent.OS)" | "$(GO_RESOLVED_VERSION)" | go.work | go.work.sum | **/go.sum'
+      restoreKeys: |
+        "go" | "$(Agent.OS)" | "$(GO_RESOLVED_VERSION)"
+      path: $(Pipeline.Workspace)/go
+
+  - bash: |
+      set -euo pipefail
+
+      unformatted="$(gofmt -s -l .)"
+      if [[ -n "${unformatted}" ]]; then
+        printf '%s\n' "${unformatted}"
+        exit 1
+      fi
+    displayName: Check Go formatting
+    continueOnError: true
+
+  - bash: |
+      set -euo pipefail
+
+      python3 -B -m unittest discover -s .azuredevops -p 'test_*.py' -v
+    displayName: Test log redaction
+
+  - bash: |
+      set -euo pipefail
+
+      go work sync
+      for module in azkustodata azkustoingest; do
+        pushd "${module}"
+        go get -v -t -d ./...
+        go build -v ./...
+        popd
+      done
+    displayName: Sync workspace, restore dependencies, and build both modules
+
+- job: Test
+  displayName: Run unit and authenticated Kusto E2E tests
+  dependsOn: Build
+  timeoutInMinutes: 60
+  condition: and(succeeded(), or(ne(variables['Build.Reason'], 'PullRequest'), eq(variables['System.PullRequest.IsFork'], 'False')))
+  variables:
+  # Configure all five test variables mapped below before running this pipeline.
+  # Mark BLOB_URI_FOR_TEST secret if it contains a SAS token.
+  - group: azure-kusto-go-e2e
+  steps:
+  - checkout: self
+    clean: true
+    persistCredentials: false
+
+  - task: GoTool@0
+    displayName: Use Go 1.26
+    inputs:
+      version: '1.26'
+
+  - bash: |
+      set -euo pipefail
+
+      version="$(go env GOVERSION)"
+      echo "##vso[task.setvariable variable=GO_RESOLVED_VERSION]${version}"
+    displayName: Record resolved Go version
+
+  - task: Cache@2
+    displayName: Cache Go modules and build outputs
+    inputs:
+      key: '"go" | "$(Agent.OS)" | "$(GO_RESOLVED_VERSION)" | go.work | go.work.sum | **/go.sum'
+      restoreKeys: |
+        "go" | "$(Agent.OS)" | "$(GO_RESOLVED_VERSION)"
+      path: $(Pipeline.Workspace)/go
+
+  - bash: |
+      set -euo pipefail
+
+      mkdir -p "${GOBIN}" "$(Agent.TempDirectory)/go-test-results" "$(Agent.TempDirectory)/go-test-raw"
+      go install github.com/jstemmer/go-junit-report/v2@7933520
+      go install github.com/mfridman/tparse@v0.18.0
+      go install github.com/boumenot/gocover-cobertura@v1.5.0
+      echo "##vso[task.prependpath]${GOBIN}"
+    displayName: Install test reporting tools
+
+  - bash: |
+      set -euo pipefail
+
+      go work sync
+      for module in azkustodata azkustoingest; do
+        pushd "${module}"
+        go get -v -t -d ./...
+        popd
+      done
+    displayName: Sync workspace and restore test dependencies
+
+  - task: AzureCLI@2
+    displayName: Run unit and authenticated Kusto E2E tests
+    inputs:
+      azureSubscription: kusto-connectors-arm-sc
+      scriptType: bash
+      scriptLocation: inlineScript
+      workingDirectory: $(Build.SourcesDirectory)
+      inlineScript: |
+        set -euo pipefail
+
+        for name in ENGINE_CONNECTION_STRING TEST_DATABASE SECONDARY_ENGINE_CONNECTION_STRING SECONDARY_DATABASE BLOB_URI_FOR_TEST; do
+          value="${!name:-}"
+          if [[ -z "${value}" || "${value}" == '$('* ]]; then
+            echo "##vso[task.logissue type=error]Required pipeline variable ${name} is missing or unresolved."
+            exit 1
+          fi
+        done
+
+        az account show --output none
+
+        results="$(Agent.TempDirectory)/go-test-results"
+        raw="$(Agent.TempDirectory)/go-test-raw"
+        status=0
+        for module in azkustodata azkustoingest; do
+          pushd "${module}"
+          if ! go test -p 100 -race \
+            -coverprofile="${results}/coverage-${module}.out" \
+            -json ./... > "${raw}/gotest-${module}.log" 2>&1; then
+            echo "##vso[task.logissue type=error]${module} tests failed."
+            status=1
+          fi
+          popd
+        done
+        exit "${status}"
+    env:
+      ENGINE_CONNECTION_STRING: $(ENGINE_CONNECTION_STRING)
+      TEST_DATABASE: $(TEST_DATABASE)
+      SECONDARY_ENGINE_CONNECTION_STRING: $(SECONDARY_ENGINE_CONNECTION_STRING)
+      SECONDARY_DATABASE: $(SECONDARY_DATABASE)
+      BLOB_URI_FOR_TEST: $(BLOB_URI_FOR_TEST)
+      GOMAXPROCS: '200'
+
+  - bash: |
+      set -euo pipefail
+
+      results="$(Agent.TempDirectory)/go-test-results"
+      raw="$(Agent.TempDirectory)/go-test-raw"
+      status=0
+      for module in azkustodata azkustoingest; do
+        rawLog="${raw}/gotest-${module}.log"
+        log="${results}/gotest-${module}.log"
+        if [[ ! -f "${rawLog}" ]]; then
+          echo "##vso[task.logissue type=error]Test log for ${module} is missing."
+          status=1
+          continue
+        fi
+
+        python3 -B .azuredevops/redact_test_logs.py "${rawLog}" "${log}"
+        rm -- "${rawLog}"
+        go-junit-report -parser gojson < "${log}" > "${results}/report-${module}.xml"
+        if ! tparse -all -file="${log}"; then
+          status=1
+        fi
+
+        coverage="${results}/coverage-${module}.out"
+        if [[ -f "${coverage}" ]]; then
+          pushd "${module}"
+          gocover-cobertura < "${coverage}" > "${results}/coverage-${module}.xml"
+          popd
+        fi
+      done
+      exit "${status}"
+    displayName: Display tests and generate JUnit and coverage reports
+    condition: succeededOrFailed()
+
+  - task: PublishTestResults@2
+    displayName: Publish Go test results
+    condition: succeededOrFailed()
+    inputs:
+      testResultsFormat: JUnit
+      testResultsFiles: $(Agent.TempDirectory)/go-test-results/report-*.xml
+      testRunTitle: Go SDK unit and Kusto E2E tests
+      failTaskOnFailedTests: true
+      failTaskOnMissingResultsFile: true
+
+  - task: UseDotNet@2
+    displayName: Set up coverage publisher runtime
+    condition: succeededOrFailed()
+    inputs:
+      packageType: sdk
+      version: '8.x'
+
+  - task: PublishCodeCoverageResults@2
+    displayName: Publish Go coverage
+    condition: succeededOrFailed()
+    inputs:
+      summaryFileLocation: $(Agent.TempDirectory)/go-test-results/coverage-*.xml
+      pathToSources: $(Build.SourcesDirectory)
+      failIfCoverageEmpty: true
+
+  - task: PublishPipelineArtifact@1
+    displayName: Publish test logs and coverage artifacts
+    condition: succeededOrFailed()
+    inputs:
+      targetPath: $(Agent.TempDirectory)/go-test-results
+      artifact: go-test-results
