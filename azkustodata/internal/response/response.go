@@ -3,6 +3,7 @@ package response
 import (
 	"compress/flate"
 	"compress/gzip"
+	stderrors "errors"
 	"fmt"
 	"io"
 	"net/http"
@@ -12,19 +13,12 @@ import (
 )
 
 type originalCloser struct {
-	original io.ReadCloser
-	wrapper  io.ReadCloser
-}
-
-func (o *originalCloser) Read(p []byte) (n int, err error) {
-	return o.wrapper.Read(p)
+	io.ReadCloser
+	original io.Closer
 }
 
 func (o *originalCloser) Close() error {
-	if err := o.wrapper.Close(); err != nil {
-		return err
-	}
-	return o.original.Close()
+	return stderrors.Join(o.ReadCloser.Close(), o.original.Close())
 }
 
 func TranslateBody(resp *http.Response, op errors.Op) (io.ReadCloser, error) {
@@ -45,7 +39,7 @@ func TranslateBody(resp *http.Response, op errors.Op) (io.ReadCloser, error) {
 		return nil, errors.ES(op, errors.KInternal, "Content-Encoding was unrecognized: %s", enc)
 	}
 	return &originalCloser{
-		original: body,
-		wrapper:  wrapper,
+		original:   body,
+		ReadCloser: wrapper,
 	}, nil
 }
