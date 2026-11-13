@@ -57,7 +57,7 @@ func TestNoRedirects(t *testing.T) {
 				_, err = client.Query(context.Background(), "db", kql.New("table"))
 				require.Error(t, err)
 				if test.failAtMetadata {
-					assert.Contains(t, err.Error(), fmt.Sprintf("%d", code))
+					assert.Contains(t, err.Error(), fmt.Sprintf("error %d %s", code, http.StatusText(code)))
 					assert.Contains(t, err.Error(), "metadata")
 				} else {
 					var httpError *errors.HttpError
