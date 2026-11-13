@@ -63,6 +63,16 @@ func TestNoRedirects(t *testing.T) {
 					var httpError *errors.HttpError
 					require.ErrorAs(t, err, &httpError)
 					assert.Equal(t, code, httpError.StatusCode)
+
+					// A replayable body makes 307/308 exercise the redirect policy.
+					req, err := http.NewRequestWithContext(context.Background(), http.MethodPost, server.URL+"/v2/rest/query", strings.NewReader(`{"db":"db","csl":"table"}`))
+					require.NoError(t, err)
+					require.NotNil(t, req.GetBody)
+
+					resp, err := client.http.Do(req)
+					require.NoError(t, err)
+					t.Cleanup(func() { require.NoError(t, resp.Body.Close()) })
+					assert.Equal(t, code, resp.StatusCode)
 				}
 				assert.Zero(t, redirectedRequests.Load())
 			})
