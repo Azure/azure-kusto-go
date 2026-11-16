@@ -2,6 +2,7 @@ package azkustodata
 
 import (
 	"context"
+	"fmt"
 	"github.com/Azure/azure-kusto-go/azkustodata/errors"
 	"github.com/Azure/azure-kusto-go/azkustodata/kql"
 	"github.com/Azure/azure-kusto-go/azkustodata/value"
@@ -11,12 +12,73 @@ import (
 	"github.com/stretchr/testify/require"
 	"io"
 	"net/http"
+	"net/http/httptest"
 	"strings"
 	"sync"
 	"sync/atomic"
 	"testing"
 	"time"
 )
+
+func TestNoRedirects(t *testing.T) {
+	t.Parallel()
+	for _, code := range []int{301, 302, 307, 308} {
+		for _, test := range []struct {
+			name           string
+			failAtMetadata bool
+		}{
+			{name: "cloud", failAtMetadata: true},
+			{name: "client"},
+		} {
+			t.Run(fmt.Sprintf("%s/%d", test.name, code), func(t *testing.T) {
+				t.Parallel()
+				var redirectedRequests atomic.Int32
+				server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+					if r.URL.Path == "/redirected" {
+						redirectedRequests.Add(1)
+						w.WriteHeader(http.StatusOK)
+						return
+					}
+					if r.URL.Path == metadataPath && !test.failAtMetadata {
+						w.WriteHeader(http.StatusNotFound)
+						return
+					}
+					w.Header().Set("Location", "/redirected")
+					w.WriteHeader(code)
+				}))
+				t.Cleanup(server.Close)
+				t.Cleanup(func() { cloudInfoCache.Delete(server.URL) })
+
+				// Exercise the SDK's default HTTP client and its redirect policy.
+				client, err := New(NewConnectionStringBuilder(server.URL))
+				require.NoError(t, err)
+				t.Cleanup(func() { require.NoError(t, client.Close()) })
+
+				_, err = client.Query(context.Background(), "db", kql.New("table"))
+				require.Error(t, err)
+				if test.failAtMetadata {
+					assert.Contains(t, err.Error(), fmt.Sprintf("error %d %s", code, http.StatusText(code)))
+					assert.Contains(t, err.Error(), "metadata")
+				} else {
+					var httpError *errors.HttpError
+					require.ErrorAs(t, err, &httpError)
+					assert.Equal(t, code, httpError.StatusCode)
+
+					// A replayable body makes 307/308 exercise the redirect policy.
+					req, err := http.NewRequestWithContext(context.Background(), http.MethodPost, server.URL+"/v2/rest/query", strings.NewReader(`{"db":"db","csl":"table"}`))
+					require.NoError(t, err)
+					require.NotNil(t, req.GetBody)
+
+					resp, err := client.http.Do(req)
+					require.NoError(t, err)
+					t.Cleanup(func() { require.NoError(t, resp.Body.Close()) })
+					assert.Equal(t, code, resp.StatusCode)
+				}
+				assert.Zero(t, redirectedRequests.Load())
+			})
+		}
+	}
+}
 
 func TestHeaders(t *testing.T) {
 	t.Parallel()
