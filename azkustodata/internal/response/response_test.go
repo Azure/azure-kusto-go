@@ -1,11 +1,16 @@
 package response
 
 import (
+	"bytes"
+	"compress/flate"
+	"compress/gzip"
 	stderrors "errors"
 	"io"
 	"net/http"
 	"strings"
+	"sync"
 	"testing"
+	"time"
 
 	"github.com/stretchr/testify/require"
 
@@ -105,4 +110,87 @@ func TestOriginalCloserRead(t *testing.T) {
 	data, err := io.ReadAll(oc)
 	r.NoError(err)
 	r.Equal("kusto payload", string(data))
+}
+
+// Close must interrupt the transport before touching an active decompressor.
+func TestTranslateBodyCloseInterruptsCompressedRead(t *testing.T) {
+	for _, encoding := range []string{"gzip", "deflate"} {
+		t.Run(encoding, func(t *testing.T) {
+			var compressed bytes.Buffer
+			var writer interface {
+				Write([]byte) (int, error)
+				Flush() error
+			}
+			if encoding == "gzip" {
+				writer = gzip.NewWriter(&compressed)
+			} else {
+				w, err := flate.NewWriter(&compressed, flate.DefaultCompression)
+				require.NoError(t, err)
+				writer = w
+			}
+			_, err := writer.Write([]byte("[payload\n"))
+			require.NoError(t, err)
+			require.NoError(t, writer.Flush())
+			body := &compressedStalledBody{reader: bytes.NewReader(compressed.Bytes()), reading: make(chan struct{}), closed: make(chan struct{})}
+			rc, err := TranslateBody(&http.Response{Body: body, Header: http.Header{"Content-Encoding": []string{encoding}}}, errors.OpQuery)
+			require.NoError(t, err)
+			done := make(chan struct{})
+			go func() { defer close(done); _, _ = io.Copy(io.Discard, rc) }()
+			select {
+			case <-body.reading:
+			case <-time.After(time.Second):
+				t.Fatal("read did not stall")
+			}
+			closeDone := make(chan struct{})
+			go func() { _ = rc.Close(); close(closeDone) }()
+			select {
+			case <-closeDone:
+			case <-time.After(time.Second):
+				// Release the reader even if a regression deadlocks Close.
+				body.Close()
+				<-closeDone
+				t.Fatal("Close did not interrupt compressed read")
+			}
+			<-done
+			_ = rc.Close()
+		})
+	}
+}
+
+type compressedStalledBody struct {
+	reader  *bytes.Reader
+	reading chan struct{}
+	closed  chan struct{}
+	once    sync.Once
+}
+
+func (b *compressedStalledBody) Read(p []byte) (int, error) {
+	if b.reader.Len() > 0 {
+		return b.reader.Read(p)
+	}
+	close(b.reading)
+	<-b.closed
+	return 0, io.ErrClosedPipe
+}
+func (b *compressedStalledBody) Close() error {
+	b.once.Do(func() { close(b.closed) })
+	return nil
+}
+
+func TestOriginalCloserClosesTransportFirst(t *testing.T) {
+	original := &trackingBody{}
+	wrapper := &transportOrderCloser{t: t, original: original}
+	closer := &originalCloser{original: original, ReadCloser: wrapper}
+	require.NoError(t, closer.Close())
+}
+
+type transportOrderCloser struct {
+	t        *testing.T
+	original *trackingBody
+}
+
+func (c *transportOrderCloser) Read([]byte) (int, error) { return 0, io.EOF }
+func (c *transportOrderCloser) Close() error {
+	require.True(c.t, c.original.closed, "transport must close before decompressor")
+	return nil
 }
