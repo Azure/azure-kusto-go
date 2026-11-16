@@ -1,6 +1,6 @@
 /*
-Package value holds Kusto data value representations. All types provide a Kusto that
-stores the native value and Valid which indicates if the value was set or was null.
+Package value holds Kusto data value representations. All types implement Kusto,
+which provides access to the native value through GetValue().
 
 # Kusto Value
 
@@ -21,17 +21,18 @@ This interface can hold the following values:
 	value.DateTime
 	value.Timespan
 
-Each type defined above has at minimum two fields:
+For pointer-backed types, a nil Ptr() result indicates a null value.
+The Kusto string type does not support null values; String stores a Go string
+to match this Kusto behavior.
+Unmarshalling nil into String produces the empty string ("").
 
-	.Value - The type specific value
-	.Valid - True if the value was non-null in the Kusto table
+Each provides at minimum the following methods:
 
-Each provides at minimum the following two methods:
-
+	.GetValue() - Returns the underlying Go value.
 	.String() - Returns the string representation of the value.
 	.Unmarshal() - Unmarshals the value into a standard Go type.
 
-The Unmarshal() is for internal use, it should not be needed by an end user. Use .Value or table.Row.ToStruct() instead.
+The Unmarshal() is for internal use, it should not be needed by an end user. Use .GetValue() or table.Row.ToStruct() instead.
 */
 package value
 
