@@ -10,6 +10,17 @@ import (
 // Option is an optional argument to New().
 type Option func(s *Ingestion)
 
+// WithStandardLibraryCompression selects the gzip implementation for SDK-compressed uploads.
+// The default is true, which uses the standard library's compress/gzip.
+// Setting it to false uses github.com/klauspost/compress/gzip instead.
+// This option applies to queued, streaming, and managed ingestion clients.
+// Existing options that disable compression and handling of precompressed input are unchanged.
+func WithStandardLibraryCompression(enabled bool) Option {
+	return func(s *Ingestion) {
+		s.useStandardLibraryCompression = enabled
+	}
+}
+
 // WithStaticBuffer configures the ingest client to upload data to Kusto using a set of one or more static memory buffers with a fixed size.
 // Only relevant for Queued and Managed ingestion.
 func WithStaticBuffer(bufferSize int, maxBuffers int) Option {
@@ -60,7 +71,7 @@ func WithHttpClient(client *http.Client) Option {
 }
 
 func getOptions(options []Option) *Ingestion {
-	s := &Ingestion{}
+	s := &Ingestion{useStandardLibraryCompression: true}
 	for _, o := range options {
 		o(s)
 	}

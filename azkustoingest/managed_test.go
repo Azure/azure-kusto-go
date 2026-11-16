@@ -368,10 +368,11 @@ func TestManaged(t *testing.T) {
 			managed := Managed{
 				queued: ingestion,
 				streaming: &Streaming{
-					db:         "defaultDb",
-					table:      "defaultTable",
-					client:     mockClient,
-					streamConn: streamIngestor,
+					useStandardLibraryCompression: true,
+					db:                            "defaultDb",
+					table:                         "defaultTable",
+					client:                        mockClient,
+					streamConn:                    streamIngestor,
 				},
 			}
 

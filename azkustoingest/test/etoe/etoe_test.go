@@ -1047,6 +1047,90 @@ func TestMultipleClusters(t *testing.T) { //ok
 	}
 }
 
+func TestAlternativeCompression(t *testing.T) {
+	t.Parallel()
+
+	if skipETOE || testing.Short() {
+		t.Skip("end to end tests disabled: missing test configuration or short mode")
+	}
+
+	client, err := azkustodata.New(testConfig.kcsb)
+	require.NoError(t, err)
+	t.Cleanup(func() { require.NoError(t, client.Close()) })
+
+	tests := []struct {
+		name        string
+		newIngestor func(...azkustoingest.Option) (azkustoingest.Ingestor, error)
+		report      bool
+	}{
+		{
+			name: "queued",
+			newIngestor: func(options ...azkustoingest.Option) (azkustoingest.Ingestor, error) {
+				return azkustoingest.New(testConfig.kcsb, options...)
+			},
+			report: true,
+		},
+		{
+			name: "streaming",
+			newIngestor: func(options ...azkustoingest.Option) (azkustoingest.Ingestor, error) {
+				return azkustoingest.NewStreaming(testConfig.kcsb, options...)
+			},
+		},
+		{
+			name: "managed",
+			newIngestor: func(options ...azkustoingest.Option) (azkustoingest.Ingestor, error) {
+				return azkustoingest.NewManaged(testConfig.kcsb, options...)
+			},
+			report: true,
+		},
+	}
+
+	for _, test := range tests {
+		for _, source := range []string{"file", "reader"} {
+			t.Run(test.name+"/"+source, func(t *testing.T) {
+				t.Parallel()
+
+				ctx, cancel := context.WithTimeout(context.Background(), 5*time.Minute)
+				defer cancel()
+
+				table := "goe2e_compression_" + strings.ReplaceAll(uuid.NewString(), "-", "")
+				require.NoError(t, testshared.CreateTestTable(t, client, table))
+				ingestor, err := test.newIngestor(
+					azkustoingest.WithDefaultDatabase(testConfig.Database),
+					azkustoingest.WithDefaultTable(table),
+					azkustoingest.WithStandardLibraryCompression(false),
+				)
+				require.NoError(t, err)
+				t.Cleanup(func() { require.NoError(t, ingestor.Close()) })
+
+				rows := createMockLogRows()
+				path := createCsvFileFromData(t, rows)
+				options := []azkustoingest.FileOption{azkustoingest.FileFormat(azkustoingest.CSV)}
+				if test.report {
+					options = append(options, azkustoingest.FlushImmediately(), azkustoingest.ReportResultToTable())
+				}
+
+				var result *azkustoingest.Result
+				if source == "file" {
+					result, err = ingestor.FromFile(ctx, path, options...)
+				} else {
+					reader, openErr := os.Open(path)
+					require.NoError(t, openErr)
+					defer reader.Close()
+					result, err = ingestor.FromReader(ctx, reader, options...)
+				}
+				require.NoError(t, err)
+				require.NoError(t, <-result.Wait(ctx))
+				require.NoError(t, waitForIngest(t, ctx, client, testConfig.Database, table, countStatement,
+					func(row query.Row, update interface{}) error { return row.ToStruct(update) },
+					&testshared.CountResult{Count: int64(len(rows))},
+					func() interface{} { return &testshared.CountResult{} },
+				))
+			})
+		}
+	}
+}
+
 func assertErrorsMatch(t *testing.T, got, want error) bool {
 	if azkustoingest.IsStatusRecord(got) {
 		if want == nil || !azkustoingest.IsStatusRecord(want) {

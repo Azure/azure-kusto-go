@@ -65,8 +65,9 @@ type Ingestion struct {
 	uploadStream uploadStream
 	uploadBlob   uploadBlob
 
-	bufferSize int
-	maxBuffers int
+	bufferSize                    int
+	maxBuffers                    int
+	useStandardLibraryCompression bool
 
 	applicationForTracing   string
 	clientVersionForTracing string
@@ -83,13 +84,21 @@ func WithStaticBuffer(bufferSize int, maxBuffers int) Option {
 	}
 }
 
+// WithStandardLibraryCompression selects standard-library gzip when enabled (the default).
+func WithStandardLibraryCompression(enabled bool) Option {
+	return func(s *Ingestion) {
+		s.useStandardLibraryCompression = enabled
+	}
+}
+
 // New is the constructor for Ingestion.
 func New(db, table string, mgr *resources.Manager, http *http.Client, applicationForTracing string, clientVersionForTracing string, options ...Option) (*Ingestion, error) {
 	i := &Ingestion{
-		db:    db,
-		table: table,
-		mgr:   mgr,
-		http:  http,
+		useStandardLibraryCompression: true,
+		db:                            db,
+		table:                         table,
+		mgr:                           mgr,
+		http:                          http,
 		uploadStream: func(ctx context.Context, reader io.Reader, client *azblob.Client, container, blob string,
 			options *azblob.UploadStreamOptions) (azblob.UploadStreamResponse, error) {
 			return client.UploadStream(ctx, container, blob, reader, options)
@@ -202,7 +211,7 @@ func (i *Ingestion) UploadReaderToBlob(ctx context.Context, reader io.Reader, pr
 	for attempts, containerUri := range containers {
 		currentReader := reader
 		if shouldCompress {
-			currentReader = gzip.Compress(currentReader)
+			currentReader = gzip.Compress(currentReader, i.useStandardLibraryCompression)
 		}
 
 		if attempts >= StorageMaxRetryPolicy {
@@ -378,7 +387,7 @@ func (i *Ingestion) localToBlob(ctx context.Context, from string, client *azblob
 	}
 
 	if shouldCompress {
-		gstream := gzip.New()
+		gstream := gzip.New(i.useStandardLibraryCompression)
 		gstream.Reset(file)
 
 		_, err = i.uploadStream(
