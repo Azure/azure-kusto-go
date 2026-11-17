@@ -80,7 +80,7 @@ func (m *Managed) streamWithRetries(ctx context.Context, payloadProvider func() 
 		if !hasCustomId {
 			props.Streaming.ClientRequestId = fmt.Sprintf("KGC.executeManagedStreamingIngest;%s;%d", managedUuid, i)
 		}
-		result, err = streamImpl(m.streaming.streamConn, ctx, payloadProvider(), props, isBlobUri)
+		result, err = m.streaming.streamImpl(ctx, payloadProvider(), props, isBlobUri)
 		i++
 		if err != nil {
 			if e, ok := err.(*errors.Error); ok {
@@ -173,7 +173,7 @@ func (m *Managed) managedStreamImpl(ctx context.Context, payload io.ReadCloser, 
 	compress := queued.ShouldCompress(&props, ingestoptions.CTUnknown)
 	var compressed io.Reader = payload
 	if compress {
-		compressed = gzip.Compress(io.NopCloser(payload))
+		compressed = gzip.Compress(io.NopCloser(payload), m.streaming.useStandardLibraryCompression)
 		props.Source.DontCompress = true
 	}
 

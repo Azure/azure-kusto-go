@@ -7,6 +7,7 @@ import (
 	"github.com/Azure/azure-kusto-go/azkustodata"
 	"io"
 	"os"
+	"path/filepath"
 	"strings"
 	"testing"
 
@@ -65,6 +66,84 @@ func fileAndReaderFromString(data string) (string, *bytes.Reader) {
 	}
 
 	return file.Name(), bytes.NewReader([]byte(data))
+}
+
+func TestIngestionCompressionProviders(t *testing.T) {
+	t.Parallel()
+
+	payload := []byte(strings.Repeat("gzip ingestion payload,12345\n", 1024))
+	providers := []struct {
+		name        string
+		options     []Option
+		useStandard bool
+	}{
+		{"default", nil, true},
+		{"standard library", []Option{WithStandardLibraryCompression(true)}, true},
+		{"alternative", []Option{WithStandardLibraryCompression(false)}, false},
+	}
+	for _, provider := range providers {
+		for _, managed := range []bool{false, true} {
+			for _, dontCompress := range []bool{false, true} {
+				t.Run(fmt.Sprintf("%s/managed=%t/dontCompress=%t", provider.name, managed, dontCompress), func(t *testing.T) {
+					t.Parallel()
+
+					options := []Option{WithDefaultDatabase("db"), WithDefaultTable("table")}
+					options = append(options, provider.options...)
+					expected := payload
+					if !dontCompress {
+						var err error
+						expected, err = io.ReadAll(gzip.Compress(bytes.NewReader(payload), provider.useStandard))
+						require.NoError(t, err)
+					}
+
+					mock := mockClient{endpoint: "https://test.kusto.windows.net"}
+					streaming, err := newStreamingFromClient(mock, getOptions(options))
+					require.NoError(t, err)
+					var calls int
+					streaming.streamConn = fakeStreamIngestor{
+						onStreamIngest: func(_ context.Context, _, _ string, body io.Reader, _ azkustodata.DataFormatForStreaming, _, _ string, isBlobUri bool) error {
+							calls++
+							require.False(t, isBlobUri)
+							got, err := io.ReadAll(body)
+							require.NoError(t, err)
+							require.Equal(t, expected, got)
+							return nil
+						},
+					}
+
+					var client Ingestor = streaming
+					if managed {
+						ingestion, err := newFromClient(mock, getOptions(options))
+						require.NoError(t, err)
+						client = newManagedFromClients(ingestion, streaming)
+					}
+					defer client.Close()
+
+					var fileOptions []FileOption
+					if dontCompress {
+						fileOptions = append(fileOptions, DontCompress())
+					}
+					_, err = client.FromReader(context.Background(), bytes.NewReader(payload), fileOptions...)
+					require.NoError(t, err)
+
+					path := filepath.Join(t.TempDir(), "input.csv")
+					require.NoError(t, os.WriteFile(path, payload, 0600))
+					_, err = client.FromFile(context.Background(), path, fileOptions...)
+					require.NoError(t, err)
+
+					expectedCalls := 2
+					if !dontCompress {
+						compressedPath := path + ".gz"
+						require.NoError(t, os.WriteFile(compressedPath, expected, 0600))
+						_, err = client.FromFile(context.Background(), compressedPath)
+						require.NoError(t, err)
+						expectedCalls++
+					}
+					require.Equal(t, expectedCalls, calls)
+				})
+			}
+		}
+	}
 }
 
 func TestStreaming(t *testing.T) {
@@ -195,10 +274,11 @@ func TestStreaming(t *testing.T) {
 			}
 
 			streaming := Streaming{
-				db:         "defaultDb",
-				table:      "defaultTable",
-				client:     mockClient,
-				streamConn: streamIngestor,
+				useStandardLibraryCompression: true,
+				db:                            "defaultDb",
+				table:                         "defaultTable",
+				client:                        mockClient,
+				streamConn:                    streamIngestor,
 			}
 
 			result, err := streaming.FromFile(ctx, filePath, test.options...)

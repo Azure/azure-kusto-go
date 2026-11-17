@@ -2,10 +2,16 @@ package azkustoingest
 
 import (
 	"bytes"
+	standardgzip "compress/gzip"
 	"context"
+	"encoding/base64"
 	goErrors "errors"
 	"fmt"
 	"io"
+	"math/rand"
+	"net/http"
+	"os"
+	"path/filepath"
 	"strings"
 	"testing"
 	"time"
@@ -32,6 +38,81 @@ func failIfQueuedCalled(t *testing.T, _ context.Context, _ string, query azkusto
 	}
 	require.Fail(t, "Queued ingest should not be called")
 	return nil, nil
+}
+
+func TestManagedAlternativeCompressionFallback(t *testing.T) {
+	t.Parallel()
+
+	random := make([]byte, 5*mb)
+	_, err := rand.New(rand.NewSource(1)).Read(random)
+	require.NoError(t, err)
+	largePayload := []byte(base64.StdEncoding.EncodeToString(random))
+
+	for _, scenario := range []struct {
+		name             string
+		payload          []byte
+		expectedAttempts int
+	}{
+		{"compressed output exceeds limit", largePayload, 0},
+		{"streaming retries exhausted", compressionTestPayload(), retryCount + 1},
+	} {
+		expected, err := io.ReadAll(gzip.Compress(bytes.NewReader(scenario.payload), false))
+		require.NoError(t, err)
+		standard, err := io.ReadAll(gzip.Compress(bytes.NewReader(scenario.payload), true))
+		require.NoError(t, err)
+		require.False(t, bytes.Equal(standard, expected), "payload must distinguish the compression providers")
+		if scenario.expectedAttempts == 0 {
+			require.Greater(t, int64(len(expected)), maxStreamingSize+1)
+		} else {
+			require.LessOrEqual(t, int64(len(expected)), maxStreamingSize)
+		}
+
+		for _, fromFile := range []bool{false, true} {
+			t.Run(fmt.Sprintf("%s/fromFile=%t", scenario.name, fromFile), func(t *testing.T) {
+				transport := &compressionTransport{}
+				client, err := NewManaged(azkustodata.NewConnectionStringBuilder("https://compression.kusto.windows.net").
+					WithApplicationToken("app", "test-token"),
+					WithDefaultDatabase("db"), WithDefaultTable("table"),
+					WithHttpClient(&http.Client{Transport: transport}),
+					WithStandardLibraryCompression(false))
+				require.NoError(t, err)
+				defer client.Close()
+
+				backoffPolicy := backoff.NewExponentialBackOff()
+				backoffPolicy.InitialInterval = time.Millisecond
+				options := []FileOption{FileFormat(CSV), backOff(backoffPolicy)}
+				var result *Result
+				if fromFile {
+					path := filepath.Join(t.TempDir(), "input.csv")
+					require.NoError(t, os.WriteFile(path, scenario.payload, 0600))
+					result, err = client.FromFile(context.Background(), path, options...)
+				} else {
+					result, err = client.FromReader(context.Background(), bytes.NewReader(scenario.payload), options...)
+				}
+				require.NoError(t, err)
+				require.NotNil(t, result)
+				require.Equal(t, Queued, result.record.Status)
+
+				transport.mu.Lock()
+				defer transport.mu.Unlock()
+				require.Len(t, transport.streaming, scenario.expectedAttempts)
+				for _, body := range transport.streaming {
+					require.Equal(t, expected, body, "each streaming retry must replay the complete gzip stream")
+				}
+				require.Len(t, transport.uploads, 1)
+				require.True(t, bytes.Equal(expected, transport.uploads[0]),
+					"queued fallback must preserve the complete gzip stream without recompression (expected %d bytes, got %d)",
+					len(expected), len(transport.uploads[0]))
+
+				reader, err := standardgzip.NewReader(bytes.NewReader(transport.uploads[0]))
+				require.NoError(t, err)
+				defer reader.Close()
+				actual, err := io.ReadAll(reader)
+				require.NoError(t, err)
+				require.Equal(t, scenario.payload, actual)
+			})
+		}
+	}
 }
 
 func TestManaged(t *testing.T) {
@@ -368,10 +449,11 @@ func TestManaged(t *testing.T) {
 			managed := Managed{
 				queued: ingestion,
 				streaming: &Streaming{
-					db:         "defaultDb",
-					table:      "defaultTable",
-					client:     mockClient,
-					streamConn: streamIngestor,
+					useStandardLibraryCompression: true,
+					db:                            "defaultDb",
+					table:                         "defaultTable",
+					client:                        mockClient,
+					streamConn:                    streamIngestor,
 				},
 			}
 

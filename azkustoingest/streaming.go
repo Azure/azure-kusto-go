@@ -23,10 +23,11 @@ type streamIngestor interface {
 
 // Streaming provides data ingestion from external sources into Kusto.
 type Streaming struct {
-	db         string
-	table      string
-	client     QueryClient
-	streamConn streamIngestor
+	db                            string
+	table                         string
+	client                        QueryClient
+	streamConn                    streamIngestor
+	useStandardLibraryCompression bool
 }
 
 type blobUri struct {
@@ -69,10 +70,11 @@ func newStreamingFromClient(client QueryClient, o *Ingestion) (*Streaming, error
 	}
 
 	i := &Streaming{
-		db:         o.db,
-		table:      o.table,
-		client:     client,
-		streamConn: streamConn,
+		db:                            o.db,
+		table:                         o.table,
+		client:                        client,
+		streamConn:                    streamConn,
+		useStandardLibraryCompression: o.useStandardLibraryCompression,
 	}
 
 	return i, nil
@@ -89,11 +91,11 @@ func (i *Streaming) FromFile(ctx context.Context, fPath string, options ...FileO
 	}
 
 	if !local {
-		return streamImpl(i.streamConn, ctx, generateBlobUriPayloadReader(fPath), props, true)
+		return i.streamImpl(ctx, generateBlobUriPayloadReader(fPath), props, true)
 	}
 
 	defer file.Close()
-	return streamImpl(i.streamConn, ctx, file, props, false)
+	return i.streamImpl(ctx, file, props, false)
 }
 
 // Returns the opened file, err, boolean indicator if its a local file
@@ -144,20 +146,20 @@ func (i *Streaming) FromReader(ctx context.Context, reader io.Reader, options ..
 		}
 	}
 
-	return streamImpl(i.streamConn, ctx, reader, props, false)
+	return i.streamImpl(ctx, reader, props, false)
 }
 
-func streamImpl(c streamIngestor, ctx context.Context, payload io.Reader, props properties.All, isBlobUri bool) (*Result, error) {
+func (i *Streaming) streamImpl(ctx context.Context, payload io.Reader, props properties.All, isBlobUri bool) (*Result, error) {
 	compress := queued.ShouldCompress(&props, ingestoptions.CTUnknown)
 	if compress && !isBlobUri {
-		payload = gzip.Compress(payload)
+		payload = gzip.Compress(payload, i.useStandardLibraryCompression)
 	}
 
 	if props.Ingestion.Additional.Format == DFUnknown {
 		props.Ingestion.Additional.Format = CSV
 	}
 
-	err := c.StreamIngest(ctx, props.Ingestion.DatabaseName, props.Ingestion.TableName, payload, props.Ingestion.Additional.Format,
+	err := i.streamConn.StreamIngest(ctx, props.Ingestion.DatabaseName, props.Ingestion.TableName, payload, props.Ingestion.Additional.Format,
 		props.Ingestion.Additional.IngestionMappingRef,
 		props.Streaming.ClientRequestId,
 		isBlobUri)

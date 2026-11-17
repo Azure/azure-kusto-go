@@ -8,6 +8,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Added
+
+- `azkustoingest.WithStandardLibraryCompression(false)` opts queued, streaming, and managed ingestion clients into klauspost gzip compression (https://github.com/klauspost/compress). Standard-library gzip remains the default.
+
 ## [1.2.3] - 2026-11-03
 
 ### Security

@@ -7,12 +7,14 @@ import (
 	"fmt"
 	"io"
 	"os"
+	"path/filepath"
 	"strings"
 	"sync/atomic"
 	"testing"
 
 	"github.com/Azure/azure-kusto-go/azkustodata/errors"
 	"github.com/Azure/azure-kusto-go/azkustoingest/ingestoptions"
+	internalgzip "github.com/Azure/azure-kusto-go/azkustoingest/internal/gzip"
 	"github.com/Azure/azure-kusto-go/azkustoingest/internal/properties"
 	"github.com/Azure/azure-kusto-go/azkustoingest/internal/resources"
 	"github.com/Azure/azure-kusto-go/azkustoingest/internal/utils"
@@ -198,10 +200,11 @@ func TestLocalToBlob(t *testing.T) {
 		fbs := &fakeBlobstore{shouldErr: test.uploadErr, out: &bytes.Buffer{}}
 
 		in := &Ingestion{
-			db:           "database",
-			table:        "table",
-			uploadStream: fbs.uploadBlobStream,
-			uploadBlob:   fbs.uploadBlobFile,
+			useStandardLibraryCompression: true,
+			db:                            "database",
+			table:                         "table",
+			uploadStream:                  fbs.uploadBlobStream,
+			uploadBlob:                    fbs.uploadBlobFile,
 		}
 
 		_, _, err := in.localToBlob(context.Background(), test.from, to, "test", &properties.All{})
@@ -235,6 +238,66 @@ func TestLocalToBlob(t *testing.T) {
 type fileInfo struct {
 	os.FileInfo
 	isDir bool
+}
+
+func TestCompressionProviders(t *testing.T) {
+	t.Parallel()
+
+	payload := []byte(strings.Repeat("gzip ingestion payload,12345\n", 1024))
+	providers := []struct {
+		name        string
+		options     []Option
+		useStandard bool
+	}{
+		{"default", nil, true},
+		{"standard library", []Option{WithStandardLibraryCompression(true)}, true},
+		{"alternative", []Option{WithStandardLibraryCompression(false)}, false},
+	}
+	for _, provider := range providers {
+		for _, dontCompress := range []bool{false, true} {
+			t.Run(fmt.Sprintf("%s/dontCompress=%t", provider.name, dontCompress), func(t *testing.T) {
+				t.Parallel()
+
+				expected := payload
+				if !dontCompress {
+					var err error
+					expected, err = io.ReadAll(internalgzip.Compress(bytes.NewReader(payload), provider.useStandard))
+					require.NoError(t, err)
+				}
+				mgr := newFakeResourceManager(
+					[]string{"https://account.blob.core.windows.net/container"},
+					[]string{"https://account.queue.core.windows.net/queue"}, nil)
+				output := &bytes.Buffer{}
+				blobstore := &fakeBlobstore{out: output}
+				ingestion, err := New("db", "table", nil, nil, "", "", provider.options...)
+				require.NoError(t, err)
+				ingestion.mgr = mgr
+				ingestion.uploadStream = blobstore.uploadBlobStream
+				ingestion.uploadBlob = blobstore.uploadBlobFile
+				props := properties.All{
+					Source:    properties.SourceOptions{DontCompress: dontCompress},
+					Ingestion: properties.Ingestion{Additional: properties.Additional{Format: properties.CSV}},
+				}
+
+				_, size, err := ingestion.UploadReaderToBlob(context.Background(), bytes.NewReader(payload), props)
+				require.NoError(t, err)
+				require.Equal(t, expected, output.Bytes())
+				if !dontCompress {
+					require.Equal(t, int64(len(payload)), size)
+				}
+
+				output.Reset()
+				path := filepath.Join(t.TempDir(), "input.csv")
+				require.NoError(t, os.WriteFile(path, payload, 0600))
+				client, err := azblob.NewClientWithNoCredential("https://account.blob.core.windows.net", nil)
+				require.NoError(t, err)
+				_, size, err = ingestion.localToBlob(context.Background(), path, client, "container", &props)
+				require.NoError(t, err)
+				require.Equal(t, expected, output.Bytes())
+				require.Equal(t, int64(len(payload)), size)
+			})
+		}
+	}
 }
 
 func (f fileInfo) IsDir() bool {
@@ -669,8 +732,9 @@ func TestReaderRetry(t *testing.T) {
 
 			finalOutput := new(bytes.Buffer)
 			i := &Ingestion{
-				uploadStream: newRetryingBlobstore(finalOutput, tc.failCount).uploadBlobStream,
-				mgr:          mgr,
+				useStandardLibraryCompression: true,
+				uploadStream:                  newRetryingBlobstore(finalOutput, tc.failCount).uploadBlobStream,
+				mgr:                           mgr,
 			}
 
 			var reader io.Reader = bytes.NewReader([]byte(content))

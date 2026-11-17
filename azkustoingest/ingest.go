@@ -30,8 +30,9 @@ type Ingestion struct {
 
 	fs queued.Queued
 
-	bufferSize int
-	maxBuffers int
+	bufferSize                    int
+	maxBuffers                    int
+	useStandardLibraryCompression bool
 
 	withoutEndpointCorrection    bool
 	customIngestConnectionString *azkustodata.ConnectionStringBuilder
@@ -79,7 +80,9 @@ func newFromClient(client QueryClient, i *Ingestion) (*Ingestion, error) {
 	i.client = client
 	i.mgr = mgr
 
-	fs, err := queued.New(i.db, i.table, mgr, client.HttpClient(), i.applicationForTracing, i.clientVersionForTracing, queued.WithStaticBuffer(i.bufferSize, i.maxBuffers))
+	fs, err := queued.New(i.db, i.table, mgr, client.HttpClient(), i.applicationForTracing, i.clientVersionForTracing,
+		queued.WithStaticBuffer(i.bufferSize, i.maxBuffers),
+		queued.WithStandardLibraryCompression(i.useStandardLibraryCompression))
 	if err != nil {
 		mgr.Close()
 		client.Close()

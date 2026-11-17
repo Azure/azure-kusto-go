@@ -6,10 +6,58 @@ import (
 	"io"
 	"math/rand"
 	"os"
+	"strings"
 	"testing"
+
+	klauspostgzip "github.com/klauspost/compress/gzip"
+	"github.com/stretchr/testify/require"
 )
 
 const letterBytes = "abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ"
+
+func TestCompressionProviders(t *testing.T) {
+	t.Parallel()
+
+	payload := []byte(strings.Repeat("gzip ingestion payload,12345\n", 1024))
+	tests := []struct {
+		name        string
+		useStandard []bool
+		newWriter   func(io.Writer) writer
+	}{
+		{"default", nil, func(w io.Writer) writer { return gzip.NewWriter(w) }},
+		{"standard library", []bool{true}, func(w io.Writer) writer { return gzip.NewWriter(w) }},
+		{"klauspost", []bool{false}, func(w io.Writer) writer { return klauspostgzip.NewWriter(w) }},
+	}
+
+	for _, test := range tests {
+		t.Run(test.name, func(t *testing.T) {
+			t.Parallel()
+
+			var expected bytes.Buffer
+			zw := test.newWriter(&expected)
+			_, err := zw.Write(payload)
+			require.NoError(t, err)
+			require.NoError(t, zw.Flush())
+			require.NoError(t, zw.Close())
+
+			compressed, err := io.ReadAll(Compress(bytes.NewReader(payload), test.useStandard...))
+			require.NoError(t, err)
+			require.Equal(t, expected.Bytes(), compressed)
+
+			zr, err := gzip.NewReader(bytes.NewReader(compressed))
+			require.NoError(t, err)
+			defer zr.Close()
+			got, err := io.ReadAll(zr)
+			require.NoError(t, err)
+			require.Equal(t, payload, got)
+		})
+	}
+}
+
+func TestCompressionSelectionRejectsMultipleArguments(t *testing.T) {
+	require.Panics(t, func() { New(true, false) })
+	require.Panics(t, func() { Compress(bytes.NewReader(nil), true, false) })
+}
 
 func randStringBytes(n int) string {
 	b := make([]byte, n)

@@ -388,6 +388,21 @@ in, err := azkustoingest.New(kustoConnectionString, azkustoingest.WithoutEndpoin
 in, err := azkustoingest.NewManaged(kustoConnectionString, azkustoingest.WithCustomIngestConnectionString(azkustodata.NewConnectionStringBuilder("https://ingest-<cluster>").WithDefaultAzureCredential()))
 ```
 
+#### Compression
+
+SDK-compressed uploads use Go's standard-library `compress/gzip` by default.
+To opt in to `github.com/klauspost/compress/gzip`, pass `WithStandardLibraryCompression(false)`
+when creating a queued, streaming, or managed ingestion client:
+
+```go
+in, err := azkustoingest.New(kustoConnectionString, azkustoingest.WithStandardLibraryCompression(false))
+```
+
+Omitting the option or passing `true` uses standard-library gzip.
+Both implementations produce gzip data. This option selects the implementation;
+it does not override options that disable compression or recompress inputs already
+recognized as compressed. The klauspost library remains an SDK module dependency.
+
 #### Ingestion From a File
 
 Ingesting a local file requires simply passing the path to the file to be ingested:
