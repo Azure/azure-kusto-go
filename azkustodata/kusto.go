@@ -183,6 +183,12 @@ type cancelOnCloseDataset struct {
 	cancel context.CancelFunc
 }
 
+// ToDataset materializes the dataset and releases the request context on every exit path, including early errors.
+func (d *cancelOnCloseDataset) ToDataset() (query.Dataset, error) {
+	defer d.Close()
+	return d.IterativeDataset.ToDataset()
+}
+
 func (d *cancelOnCloseDataset) Close() error {
 	d.cancel()
 	return d.IterativeDataset.Close()

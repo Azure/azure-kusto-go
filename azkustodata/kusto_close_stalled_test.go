@@ -7,6 +7,7 @@ import (
 	"net/http"
 	"net/http/httptest"
 	"strings"
+	"sync/atomic"
 	"testing"
 	"time"
 
@@ -67,22 +68,25 @@ func TestIterativeQueryCloseStalledCompressedRead(t *testing.T) {
 			defer srv.Close()
 			defer close(done)
 
-			client, err := New(NewConnectionStringBuilder(srv.URL))
+			tt := &trackingTransport{base: http.DefaultTransport}
+			client, err := New(NewConnectionStringBuilder(srv.URL), WithHttpClient(&http.Client{Transport: tt}))
 			require.NoError(t, err)
 			defer client.Close()
 
 			ds, err := client.IterativeQuery(t.Context(), "db", kql.New("print 1"))
 			require.NoError(t, err)
 
-			// Receiving the primary table proves the stream was consumed up to the stall, so the read
-			// goroutine is (about to be) blocked on the response body when Close runs.
 			select {
 			case tr := <-ds.Tables():
 				require.NotNil(t, tr)
 			case <-time.After(2 * time.Second):
 				t.Fatal("primary table was not delivered before the stall")
 			}
-			time.Sleep(100 * time.Millisecond)
+			body := tt.body.Load()
+			require.NotNil(t, body)
+			// The stream is stalled once a body Read is in flight and stays blocked (the server sends nothing more).
+			waitFor(t, "a stalled body read", 100*time.Millisecond, 2*time.Second, func() bool { return body.inRead.Load() > 0 })
+			require.False(t, body.closeOnce.Load(), "body must not be closed before dataset Close")
 
 			start := time.Now()
 			require.NoError(t, ds.Close())
@@ -92,15 +96,82 @@ func TestIterativeQueryCloseStalledCompressedRead(t *testing.T) {
 			case <-time.After(2 * time.Second):
 				t.Fatal("dataset read goroutine did not terminate after Close")
 			}
-			// The response body must be released too, so the server sees the connection go away.
+			// The SDK itself must close the response body, and only after the blocked read returned.
+			select {
+			case <-body.closed:
+			case <-time.After(2 * time.Second):
+				t.Fatal("response body was not closed after Close")
+			}
+			require.False(t, body.closedMidRead.Load(), "body was closed while a read was still in flight")
 			select {
 			case <-disconnected:
 			case <-time.After(2 * time.Second):
-				t.Fatal("response body was not closed after Close")
+				t.Fatal("server did not see the connection released")
 			}
 			require.Less(t, time.Since(start), 4*time.Second)
 		})
 	}
+}
+
+// trackingTransport wraps response bodies so a test can observe in-flight reads and Close calls.
+type trackingTransport struct {
+	base http.RoundTripper
+	body atomic.Pointer[trackingBody]
+}
+
+func (t *trackingTransport) RoundTrip(r *http.Request) (*http.Response, error) {
+	resp, err := t.base.RoundTrip(r)
+	if err != nil || !strings.HasSuffix(r.URL.Path, "/v2/rest/query") {
+		return resp, err
+	}
+	tb := &trackingBody{ReadCloser: resp.Body, closed: make(chan struct{})}
+	t.body.Store(tb)
+	resp.Body = tb
+	return resp, nil
+}
+
+type trackingBody struct {
+	io.ReadCloser
+	inRead        atomic.Int32 // number of Read calls currently in flight
+	closedMidRead atomic.Bool  // Close was called while a Read was in flight
+	closed        chan struct{}
+	closeOnce     atomic.Bool
+}
+
+func (b *trackingBody) Read(p []byte) (int, error) {
+	b.inRead.Add(1)
+	defer b.inRead.Add(-1)
+	return b.ReadCloser.Read(p)
+}
+
+func (b *trackingBody) Close() error {
+	if b.inRead.Load() > 0 {
+		b.closedMidRead.Store(true)
+	}
+	if b.closeOnce.CompareAndSwap(false, true) {
+		close(b.closed)
+	}
+	return b.ReadCloser.Close()
+}
+
+// waitFor polls cond until it holds continuously for hold, or fails after timeout.
+func waitFor(t *testing.T, what string, hold, timeout time.Duration, cond func() bool) {
+	t.Helper()
+	deadline := time.Now().Add(timeout)
+	var since time.Time
+	for time.Now().Before(deadline) {
+		if cond() {
+			if since.IsZero() {
+				since = time.Now()
+			} else if time.Since(since) >= hold {
+				return
+			}
+		} else {
+			since = time.Time{}
+		}
+		time.Sleep(5 * time.Millisecond)
+	}
+	t.Fatalf("timed out waiting for %s", what)
 }
 
 // drain consumes the channel until it is closed and signals completion.
