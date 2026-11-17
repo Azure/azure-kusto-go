@@ -33,9 +33,6 @@ type iterativeDataset struct {
 	// cancel is a function to cancel the reading of the dataset, and is called when the dataset is closed.
 	cancel context.CancelFunc
 
-	// reader is the frame reader that owns the response body, so that Close can interrupt a stalled read.
-	reader *frameReader
-
 	// currentTable is the table that is currently being read, as it can contain multiple fragments.
 	currentTable *iterativeTable
 
@@ -50,6 +47,11 @@ type iterativeDataset struct {
 // ioCapacity is the amount of buffered rows to keep in memory.
 // tableCapacity is the amount of tables to buffer.
 // rowCapacity is the amount of rows to buffer per table.
+//
+// The dataset takes ownership of r and closes it from its read goroutine after reading stops.
+// Dataset.Close does not close r. A caller that supplies its own reader is responsible for interrupting
+// a read that is blocked waiting for data (for example by cancelling the request that backs r) when it
+// closes the dataset. Client.IterativeQuery does this by cancelling the request context.
 func NewIterativeDataset(ctx context.Context, r io.ReadCloser, ioCapacity int, rowCapacity int, tableCapacity int) (query.IterativeDataset, error) {
 
 	ctx, cancel := context.WithCancel(ctx)
@@ -71,7 +73,6 @@ func NewIterativeDataset(ctx context.Context, r io.ReadCloser, ioCapacity int, r
 		cancel()
 		return nil, err
 	}
-	d.reader = reader
 
 	// Spin up two goroutines - one to parse the dataset, and one to read the frames.
 	go parseRoutine(d, cancel)
@@ -392,11 +393,12 @@ func (d *iterativeDataset) Tables() <-chan query.TableResult {
 	return d.results
 }
 
-// Close closes the dataset, cancelling the context and closing the underlying response body,
-// which also interrupts a read that is blocked waiting for more data.
+// Close cancels the dataset's context and returns immediately; it does not wait for cleanup.
+// The read goroutine closes the underlying reader itself once it stops reading, so the reader is never
+// closed concurrently with a read. See NewIterativeDataset for how a blocked read gets interrupted.
 func (d *iterativeDataset) Close() error {
 	d.cancel()
-	return d.reader.close()
+	return nil
 }
 
 // ToDataset reads the entire iterative dataset, converting it to a regular dataset.

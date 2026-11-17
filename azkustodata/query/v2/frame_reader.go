@@ -5,7 +5,6 @@ import (
 	"context"
 	"github.com/Azure/azure-kusto-go/azkustodata/errors"
 	"io"
-	"sync"
 )
 
 // frameReader reads frame-by-frame from a Kusto response.
@@ -19,9 +18,6 @@ type frameReader struct {
 	orig   io.ReadCloser
 	reader bufio.Reader
 	ctx    context.Context
-
-	closeOnce sync.Once
-	closeErr  error
 }
 
 func newFrameReader(r io.ReadCloser, ctx context.Context) (*frameReader, error) {
@@ -96,11 +92,7 @@ func (fr *frameReader) advance() ([]byte, error) {
 	return line, nil
 }
 
-// close closes the underlying reader. It is safe to call more than once, and concurrently with advance,
-// in which case a blocked read is interrupted by the closing of the reader.
+// Close closes the underlying reader.
 func (fr *frameReader) close() error {
-	fr.closeOnce.Do(func() {
-		fr.closeErr = fr.orig.Close()
-	})
-	return fr.closeErr
+	return fr.orig.Close()
 }

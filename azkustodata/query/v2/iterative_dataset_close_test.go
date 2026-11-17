@@ -49,17 +49,24 @@ func (b *stalledBody) Read(p []byte) (int, error) {
 	return n, err
 }
 
+func (b *stalledBody) interrupt() {
+	b.closeOnce.Do(func() { close(b.closed) })
+}
+
 func (b *stalledBody) Close() error {
 	b.mu.Lock()
 	b.closeCalls++
 	b.mu.Unlock()
-	b.closeOnce.Do(func() { close(b.closed) })
+	b.interrupt()
 	return nil
 }
 
-func TestIterativeDatasetCloseInterruptsStalledRead(t *testing.T) {
+func TestIterativeDatasetCloseDoesNotCloseReaderConcurrently(t *testing.T) {
 	body := newStalledBody()
-	d, err := NewIterativeDataset(context.Background(), body, 1, 1, 1)
+	ctx, cancel := context.WithCancel(context.Background())
+	defer cancel()
+
+	d, err := NewIterativeDataset(ctx, body, 1, 1, 1)
 	require.NoError(t, err)
 
 	select {
@@ -68,15 +75,22 @@ func TestIterativeDatasetCloseInterruptsStalledRead(t *testing.T) {
 		t.Fatal("reader never reached the stalled read")
 	}
 
+	// Close returns immediately and must not close the reader while a read is in flight.
 	require.NoError(t, d.Close())
+	time.Sleep(50 * time.Millisecond)
+	body.mu.Lock()
+	assert.Equal(t, 0, body.closeCalls)
+	body.mu.Unlock()
 
-	select {
-	case <-body.closed:
-	case <-time.After(2 * time.Second):
-		t.Fatal("Close did not close the response body")
-	}
+	// The caller owns interrupting the blocked read (for Client.IterativeQuery: request context
+	// cancellation). Simulate it by releasing the read; the read goroutine then closes the reader once.
+	body.interrupt()
+	require.Eventually(t, func() bool {
+		body.mu.Lock()
+		defer body.mu.Unlock()
+		return body.closeCalls == 1
+	}, 2*time.Second, 10*time.Millisecond)
 
-	// Closing again, and the read routine's own cleanup, must not close the body twice.
 	require.NoError(t, d.Close())
 	time.Sleep(50 * time.Millisecond)
 	body.mu.Lock()

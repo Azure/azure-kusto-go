@@ -144,8 +144,12 @@ func (c *Client) IterativeQuery(ctx context.Context, db string, kqlQuery Stateme
 	options = append(options, V2FragmentPrimaryTables())
 	options = append(options, ResultsErrorReportingPlacement(ResultsErrorReportingPlacementEndOfTable))
 
-	opts, res, err := c.rawV2(ctx, db, kqlQuery, options)
+	// The request context is cancelled when the dataset is closed, which interrupts a read that is blocked
+	// on the response body; the dataset's read goroutine then closes the body itself.
+	reqCtx, reqCancel := context.WithCancel(ctx)
+	opts, res, err := c.rawV2(reqCtx, db, kqlQuery, options)
 	if err != nil {
+		reqCancel()
 		return nil, err
 	}
 
@@ -164,7 +168,24 @@ func (c *Client) IterativeQuery(ctx context.Context, db string, kqlQuery Stateme
 		fragmentCapacity = opts.v2TableCapacity
 	}
 
-	return queryv2.NewIterativeDataset(ctx, res, frameCapacity, rowCapacity, fragmentCapacity)
+	ds, err := queryv2.NewIterativeDataset(reqCtx, res, frameCapacity, rowCapacity, fragmentCapacity)
+	if err != nil {
+		reqCancel()
+		return nil, err
+	}
+
+	return &cancelOnCloseDataset{IterativeDataset: ds, cancel: reqCancel}, nil
+}
+
+// cancelOnCloseDataset cancels the request context when the dataset is closed.
+type cancelOnCloseDataset struct {
+	query.IterativeDataset
+	cancel context.CancelFunc
+}
+
+func (d *cancelOnCloseDataset) Close() error {
+	d.cancel()
+	return d.IterativeDataset.Close()
 }
 
 func (c *Client) RawV2(ctx context.Context, db string, kqlQuery Statement, options []QueryOption) (io.ReadCloser, error) {

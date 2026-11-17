@@ -8,39 +8,17 @@ import (
 	"io"
 	"net/http"
 	"strings"
-	"sync"
 
 	"github.com/Azure/azure-kusto-go/azkustodata/errors"
 )
 
 type originalCloser struct {
 	io.ReadCloser
-	original  io.Closer
-	readMu    sync.Mutex
-	closed    bool
-	closeOnce sync.Once
-	closeErr  error
-}
-
-func (o *originalCloser) Read(p []byte) (int, error) {
-	o.readMu.Lock()
-	defer o.readMu.Unlock()
-	if o.closed {
-		return 0, io.ErrClosedPipe
-	}
-	return o.ReadCloser.Read(p)
+	original io.Closer
 }
 
 func (o *originalCloser) Close() error {
-	o.closeOnce.Do(func() {
-		// Interrupt a blocked read before waiting to release the decompressor.
-		originalErr := o.original.Close()
-		o.readMu.Lock()
-		defer o.readMu.Unlock()
-		o.closed = true
-		o.closeErr = stderrors.Join(o.ReadCloser.Close(), originalErr)
-	})
-	return o.closeErr
+	return stderrors.Join(o.ReadCloser.Close(), o.original.Close())
 }
 
 func TranslateBody(resp *http.Response, op errors.Op) (io.ReadCloser, error) {
