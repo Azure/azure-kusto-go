@@ -47,7 +47,8 @@ func TestRequestBodySurvivesLateRead(t *testing.T) {
 
 	const n = 20
 	for i := 0; i < n; i++ {
-		_, _, _, body, _ := conn.doRequest(context.Background(), execMgmt, "db", kql.New("").AddUnsafe(fmt.Sprintf("print request_%d", i)), requestProperties{})
+		_, _, _, body, err := conn.doRequest(context.Background(), execMgmt, "db", kql.New("").AddUnsafe(fmt.Sprintf("print request_%d", i)), requestProperties{})
+		require.NoError(t, err)
 		if body != nil {
 			_ = body.Close()
 		}
