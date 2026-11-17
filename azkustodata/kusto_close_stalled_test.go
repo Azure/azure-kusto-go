@@ -16,12 +16,13 @@ import (
 
 const stalledV2Frames = `[{"FrameType":"DataSetHeader","IsProgressive":false,"Version":"v2.0","IsFragmented":true,"ErrorReportingPlacement":"EndOfTable"}
 ,{"FrameType":"DataTable","TableId":0,"TableKind":"QueryProperties","TableName":"@ExtendedProperties","Columns":[],"Rows":[]}
+,{"FrameType":"TableHeader","TableId":1,"TableKind":"PrimaryResult","TableName":"PrimaryResult","Columns":[{"ColumnName":"a","ColumnType":"int"}]}
 `
 
-// TestIterativeQueryCloseStalledCompressedRead checks that closing an iterative dataset whose compressed
+// TestIterativeQueryCloseStalledCompressedRead checks that closing an iterative dataset whose (optionally compressed)
 // response stalls mid-stream returns nil and lets the read goroutine finish.
 func TestIterativeQueryCloseStalledCompressedRead(t *testing.T) {
-	for _, enc := range []string{"gzip", "deflate"} {
+	for _, enc := range []string{"identity", "gzip", "deflate"} {
 		enc := enc
 		t.Run(enc, func(t *testing.T) {
 			done := make(chan struct{})
@@ -33,12 +34,16 @@ func TestIterativeQueryCloseStalledCompressedRead(t *testing.T) {
 					return
 				}
 				w.Header().Set("Content-Type", "application/json")
-				w.Header().Set("Content-Encoding", enc)
+				if enc != "identity" {
+					w.Header().Set("Content-Encoding", enc)
+				}
 				w.WriteHeader(http.StatusOK)
 
 				var cw io.WriteCloser
 				var flusher interface{ Flush() error }
-				if enc == "gzip" {
+				if enc == "identity" {
+					cw, flusher = nopWriteCloser{w}, nopFlusher{}
+				} else if enc == "gzip" {
 					g := gzip.NewWriter(w)
 					cw, flusher = g, g
 				} else {
@@ -69,6 +74,16 @@ func TestIterativeQueryCloseStalledCompressedRead(t *testing.T) {
 			ds, err := client.IterativeQuery(t.Context(), "db", kql.New("print 1"))
 			require.NoError(t, err)
 
+			// Receiving the primary table proves the stream was consumed up to the stall, so the read
+			// goroutine is (about to be) blocked on the response body when Close runs.
+			select {
+			case tr := <-ds.Tables():
+				require.NotNil(t, tr)
+			case <-time.After(2 * time.Second):
+				t.Fatal("primary table was not delivered before the stall")
+			}
+			time.Sleep(100 * time.Millisecond)
+
 			start := time.Now()
 			require.NoError(t, ds.Close())
 
@@ -98,3 +113,11 @@ func drain[T any](ch <-chan T) <-chan struct{} {
 	}()
 	return out
 }
+
+type nopWriteCloser struct{ io.Writer }
+
+func (nopWriteCloser) Close() error { return nil }
+
+type nopFlusher struct{}
+
+func (nopFlusher) Flush() error { return nil }
