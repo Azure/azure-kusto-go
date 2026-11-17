@@ -170,7 +170,9 @@ func (c *Client) IterativeQuery(ctx context.Context, db string, kqlQuery Stateme
 
 	ds, err := queryv2.NewIterativeDataset(reqCtx, res, frameCapacity, rowCapacity, fragmentCapacity)
 	if err != nil {
+		// No read goroutine was started, so nothing else will close the response reader.
 		reqCancel()
+		_ = res.Close()
 		return nil, err
 	}
 

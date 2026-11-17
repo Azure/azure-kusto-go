@@ -136,6 +136,7 @@ type trackingBody struct {
 	closedMidRead atomic.Bool  // Close was called while a Read was in flight
 	closed        chan struct{}
 	closeOnce     atomic.Bool
+	closeCount    atomic.Int32 // total Close calls
 }
 
 func (b *trackingBody) Read(p []byte) (int, error) {
@@ -145,6 +146,7 @@ func (b *trackingBody) Read(p []byte) (int, error) {
 }
 
 func (b *trackingBody) Close() error {
+	b.closeCount.Add(1)
 	if b.inRead.Load() > 0 {
 		b.closedMidRead.Store(true)
 	}
