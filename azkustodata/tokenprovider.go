@@ -7,6 +7,7 @@ import (
 	"strings"
 	"sync/atomic"
 
+	truestedEndpoints "github.com/Azure/azure-kusto-go/azkustodata/trusted_endpoints"
 	"github.com/Azure/azure-kusto-go/azkustodata/utils"
 
 	"github.com/Azure/azure-sdk-for-go/sdk/azcore"
@@ -14,12 +15,13 @@ import (
 )
 
 type TokenProvider struct {
-	tokenCred   azcore.TokenCredential                  //Holds the received token credential as per the authorization
-	tokenScheme string                                  //Contains token scheme for tokenprovider
-	customToken string                                  //Holds the custom auth token to be used for authorization
-	initOnce    utils.OnceWithInit[*tokenWrapperResult] //To ensure tokenprovider will be initialized only once while aquiring token
-	scopes      []string                                //Contains scopes of the auth token
-	http        atomic.Value                            //Contains the http client to be used for token provider
+	tokenCred   azcore.TokenCredential          //Holds the received token credential as per the authorization
+	tokenScheme string                          //Contains token scheme for tokenprovider
+	customToken string                          //Holds the custom auth token to be used for authorization
+	initOnce    utils.Once[*tokenWrapperResult] //To ensure tokenprovider will be initialized only once while aquiring token
+	initFn      func(ctx context.Context) (*tokenWrapperResult, error)
+	scopes      []string     //Contains scopes of the auth token
+	http        atomic.Value //Contains the http client to be used for token provider
 }
 
 // tokenProvider need to be received as reference, to reflect updations to the structs
@@ -29,7 +31,7 @@ func (tkp *TokenProvider) AcquireToken(ctx context.Context) (string, string, err
 	}
 
 	if tkp.initOnce != nil {
-		_, err := tkp.initOnce.DoWithInit()
+		_, err := tkp.initOnce.Do(func() (*tokenWrapperResult, error) { return tkp.initFn(ctx) })
 		if err != nil {
 			return "", "", err
 		}
@@ -56,8 +58,9 @@ type tokenWrapperResult struct {
 }
 
 func (tkp *TokenProvider) setInit(kcsb *ConnectionStringBuilder, f func(*CloudInfo, *azcore.ClientOptions, string) (azcore.TokenCredential, error)) {
-	tkp.initOnce = utils.NewOnceWithInit(func() (*tokenWrapperResult, error) {
-		wrapper, err := tokenWrapper(kcsb, func() *http.Client { return tkp.http.Load().(*http.Client) }, f)
+	tkp.initOnce = utils.NewOnce[*tokenWrapperResult]()
+	tkp.initFn = func(ctx context.Context) (*tokenWrapperResult, error) {
+		wrapper, err := tokenWrapper(ctx, kcsb, func() *http.Client { return tkp.http.Load().(*http.Client) }, f)
 		if err != nil {
 			return nil, err
 		}
@@ -66,16 +69,16 @@ func (tkp *TokenProvider) setInit(kcsb *ConnectionStringBuilder, f func(*CloudIn
 		tkp.scopes = wrapper.scopes
 
 		return wrapper, err
-	})
+	}
 }
 
 func (tkp *TokenProvider) SetHttp(http *http.Client) {
 	tkp.http.Store(http)
 }
 
-func tokenWrapper(kcsb *ConnectionStringBuilder, http func() *http.Client, f func(*CloudInfo, *azcore.ClientOptions, string) (azcore.TokenCredential, error)) (*tokenWrapperResult,
+func tokenWrapper(ctx context.Context, kcsb *ConnectionStringBuilder, http func() *http.Client, f func(*CloudInfo, *azcore.ClientOptions, string) (azcore.TokenCredential, error)) (*tokenWrapperResult,
 	error) {
-	ci, cliOpts, appClientId, err := getCommonCloudInfo(kcsb, http)
+	ci, cliOpts, appClientId, err := getCommonCloudInfo(ctx, kcsb, http)
 	if err != nil {
 		return nil, err
 	}
@@ -97,14 +100,19 @@ func tokenWrapper(kcsb *ConnectionStringBuilder, http func() *http.Client, f fun
 	}, nil
 }
 
-func getCommonCloudInfo(kcsb *ConnectionStringBuilder, http func() *http.Client) (*CloudInfo, *azcore.ClientOptions, string, error) {
+func getCommonCloudInfo(ctx context.Context, kcsb *ConnectionStringBuilder, http func() *http.Client) (*CloudInfo, *azcore.ClientOptions, string, error) {
 	client := http()
 	if http == nil {
 		return nil, nil, "", fmt.Errorf("error: No http client provided")
 	}
 
-	cloud, err := GetMetadata(kcsb.DataSource, client)
+	cloud, err := getMetadata(ctx, kcsb.DataSource, client)
 	if err != nil {
+		return nil, nil, "", err
+	}
+	// The metadata determines the token audience and authority, so its source must itself be trusted,
+	// independently of the endpoint the token is later sent to.
+	if err := truestedEndpoints.Instance.ValidateTrustedEndpoint(kcsb.DataSource, cloud.LoginEndpoint); err != nil {
 		return nil, nil, "", err
 	}
 	cliOpts := kcsb.ClientOptions

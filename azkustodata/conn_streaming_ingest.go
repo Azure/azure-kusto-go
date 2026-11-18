@@ -68,6 +68,10 @@ func (c *Conn) StreamIngest(ctx context.Context, db, table string, payload io.Re
 	}
 
 	if err != nil {
+		// Client-side argument errors (e.g. an untrusted endpoint) are never transient; keep their no-retry classification.
+		if e, ok := err.(*errors.Error); ok && e.Kind == errors.KClientArgs {
+			return e
+		}
 		return errors.ES(errors.OpIngestStream, errors.KHTTPError, "streaming ingestion failed: endpoint(%s): %s", streamUrl.String(), err)
 	}
 

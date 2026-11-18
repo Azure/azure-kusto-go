@@ -99,12 +99,6 @@ const (
 func (c *Conn) doRequest(ctx context.Context, execType int, db string, query Statement, properties requestProperties) (errors.Op, http.Header, http.Header,
 	io.ReadCloser, error) {
 	var op errors.Op
-	err := c.validateEndpoint()
-	if err != nil {
-		op = errors.OpQuery
-		return 0, nil, nil, nil, errors.E(op, errors.KInternal, fmt.Errorf("could not validate endpoint: %w", err))
-	}
-
 	if execType == execQuery {
 		op = errors.OpQuery
 	} else if execType == execMgmt {
@@ -158,6 +152,12 @@ func (c *Conn) doRequestImpl(
 	headers http.Header,
 	errorContext string) (http.Header, io.ReadCloser, error) {
 
+	// Must run before any token is acquired or attached, for every request type.
+	if err := c.validateEndpoint(ctx, op); err != nil {
+		closeRequestBody(buff)
+		return nil, nil, err
+	}
+
 	// Replace non-ascii chars in headers with '?'
 	for _, values := range headers {
 		var builder strings.Builder
@@ -177,6 +177,11 @@ func (c *Conn) doRequestImpl(
 		c.auth.TokenProvider.SetHttp(c.client)
 		token, tokenType, tkerr := c.auth.TokenProvider.AcquireToken(ctx)
 		if tkerr != nil {
+			closeRequestBody(buff)
+			// Keep client-side errors (e.g. an untrusted auth metadata source) permanent instead of internal.
+			if e, ok := tkerr.(*errors.Error); ok && e.Kind == errors.KClientArgs {
+				return nil, nil, errors.ES(op, errors.KClientArgs, "Error while getting token : %s", tkerr).SetNoRetry()
+			}
 			return nil, nil, errors.ES(op, errors.KInternal, "Error while getting token : %s", tkerr)
 		}
 		headers.Add("Authorization", fmt.Sprintf("%s %s", tokenType, token))
@@ -206,20 +211,32 @@ func (c *Conn) doRequestImpl(
 	return resp.Header, body, nil
 }
 
-func (c *Conn) validateEndpoint() error {
-	if !c.endpointValidated.Load() {
-		var err error
-		if cloud, err := GetMetadata(c.endpoint, c.client); err == nil {
-			err = truestedEndpoints.Instance.ValidateTrustedEndpoint(c.endpoint, cloud.LoginEndpoint)
-			if err == nil {
-				c.endpointValidated.Store(true)
-			}
-		}
-
-		return err
+// validateEndpoint ensures c.endpoint is a trusted Kusto host. Failing to fetch the auth metadata is reported as a
+// retryable HTTP error (it may be transient), while an untrusted host is a permanent client error.
+func (c *Conn) validateEndpoint(ctx context.Context, op errors.Op) error {
+	if c.endpointValidated.Load() {
+		return nil
 	}
 
+	cloud, err := getMetadata(ctx, c.endpoint, c.client)
+	if err != nil {
+		return errors.ES(op, errors.KHTTPError, "could not validate endpoint: failed to retrieve auth metadata: %s", err)
+	}
+
+	if err := truestedEndpoints.Instance.ValidateTrustedEndpoint(c.endpoint, cloud.LoginEndpoint); err != nil {
+		return errors.ES(op, errors.KClientArgs, "could not validate endpoint: %s", err).SetNoRetry()
+	}
+
+	c.endpointValidated.Store(true)
 	return nil
+}
+
+// closeRequestBody releases a request body that will not be handed to the HTTP transport (which would otherwise
+// close it), e.g. so a streaming compressor writing into a pipe is not blocked forever.
+func closeRequestBody(body io.ReadCloser) {
+	if body != nil {
+		_ = body.Close()
+	}
 }
 
 const ClientRequestIdHeader = "x-ms-client-request-id"

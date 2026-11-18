@@ -1,6 +1,7 @@
 package azkustodata
 
 import (
+	"context"
 	"encoding/json"
 	"fmt"
 	kustoErrors "github.com/Azure/azure-kusto-go/azkustodata/errors"
@@ -52,6 +53,11 @@ var defaultCloudInfo = CloudInfo{
 var cloudInfoCache sync.Map
 
 func GetMetadata(kustoUri string, httpClient *http.Client) (CloudInfo, error) {
+	return getMetadata(context.Background(), kustoUri, httpClient)
+}
+
+// getMetadata is GetMetadata bound to ctx, so a caller's cancellation or deadline stops the metadata request.
+func getMetadata(ctx context.Context, kustoUri string, httpClient *http.Client) (CloudInfo, error) {
 	// retrieve &return if exists
 	once, ok := cloudInfoCache.Load(kustoUri)
 	if !ok {
@@ -70,7 +76,7 @@ func GetMetadata(kustoUri string, httpClient *http.Client) (CloudInfo, error) {
 		u.RawQuery = ""
 
 		// TODO should we make this timeout configurable.
-		req, err := http.NewRequest("GET", u.String(), nil)
+		req, err := http.NewRequestWithContext(ctx, http.MethodGet, u.String(), nil)
 
 		if err != nil {
 			return CloudInfo{}, kustoErrors.E(kustoErrors.OpCloudInfo, kustoErrors.KHTTPError, err)

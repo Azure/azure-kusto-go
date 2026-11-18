@@ -199,9 +199,21 @@ func TestWellTrustedEndpoints_EndpointsNegative(t *testing.T) {
 		"https://kusto.azurewebsites.net",
 		"https://test.kusto.core.microsoft.scloud",
 		"https://cluster.kusto.azuresynapse.azure.cn",
+		"https://[2001:db8::1%25.attacker.kusto.windows.net]:443",
+		"https://[2001:db8::1%25.attacker.kusto.windows.net]",
+		"https://evil%25.kusto.windows.net",
 	} {
 		err := checkEndpoint(c, defaultPublicLoginUrl, true)
-		require.NoError(t, err)
+		require.NoError(t, err, c)
+	}
+}
+
+func TestWellTrustedEndpoints_HostnameWithPortOrZone(t *testing.T) {
+	for _, c := range []string{
+		"https://somecluster.kusto.windows.net:443",
+		"https://[::1%25lo0]:8080",
+	} {
+		require.NoError(t, validateEndpoint(c, defaultPublicLoginUrl), c)
 	}
 }
 

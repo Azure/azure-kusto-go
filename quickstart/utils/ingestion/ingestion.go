@@ -31,7 +31,7 @@ func IngestSource(ingestClient *azkustoingest.Ingestion, DataSourceUri string, c
 	_, err := ingestClient.FromFile(ctx, DataSourceUri, options...)
 
 	if err != nil {
-		err := errors.ES(errors.OpFileIngest, errors.KOther, fmt.Sprintf("%s ingestion error", source))
+		err := errors.ES(errors.OpFileIngest, errors.KOther, "%s ingestion error", source)
 		utils.ErrorHandler(fmt.Sprintf("Ingestion exception while trying to ingest '%s' into '%s.%s'", DataSourceUri, databaseName, tableName), err)
 	}
 }

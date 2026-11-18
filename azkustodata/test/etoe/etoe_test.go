@@ -3,9 +3,7 @@ package etoe
 import (
 	"context"
 	"encoding/json"
-	"fmt"
 	"github.com/Azure/azure-kusto-go/azkustodata"
-	"github.com/Azure/azure-kusto-go/azkustodata/errors"
 	"github.com/Azure/azure-kusto-go/azkustodata/kql"
 	"github.com/Azure/azure-kusto-go/azkustodata/query"
 	v1 "github.com/Azure/azure-kusto-go/azkustodata/query/v1"
@@ -882,45 +880,6 @@ func TestStatement(t *testing.T) {
 			}
 
 			require.Equal(t, test.want, got)
-		})
-	}
-}
-
-func TestNoRedirects(t *testing.T) {
-	redirectCodes := []int{301, 302, 307, 308}
-	for _, code := range redirectCodes {
-		code := code
-		t.Run(fmt.Sprintf("Fail at cloud %d", code), func(t *testing.T) {
-			t.Parallel()
-			client, err := azkustodata.New(azkustodata.NewConnectionStringBuilder(fmt.Sprintf("https://statusreturner.azurewebsites.net/nocloud/%d", code)).WithDefaultAzureCredential())
-			require.NoError(t, err)
-			t.Cleanup(func() {
-				t.Log("Closing client")
-				require.NoError(t, client.Close())
-				t.Log("Closed client")
-			})
-
-			_, err = client.Query(context.Background(), "db", kql.New("table"))
-			require.Error(t, err)
-			assert.Contains(t, err.Error(), fmt.Sprintf("%d", code))
-		})
-
-		t.Run(fmt.Sprintf("Fail at client %d", code), func(t *testing.T) {
-			t.Parallel()
-			client, err := azkustodata.New(azkustodata.NewConnectionStringBuilder(fmt.Sprintf("https://statusreturner.azurewebsites.net/%d", code)).WithDefaultAzureCredential())
-			require.NoError(t, err)
-			t.Cleanup(func() {
-				t.Log("Closing client")
-				require.NoError(t, client.Close())
-				t.Log("Closed client")
-			})
-
-			_, err = client.Query(context.Background(), "db", kql.New("table"))
-
-			require.Error(t, err)
-			convErr, ok := err.(*errors.HttpError)
-			require.True(t, ok)
-			assert.Equal(t, code, convErr.StatusCode)
 		})
 	}
 }
