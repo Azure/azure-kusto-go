@@ -12,6 +12,12 @@ import (
 	"github.com/Azure/azure-kusto-go/azkustodata/errors"
 )
 
+// Constructors for the decompressing readers; variables so tests can wrap them and observe Read/Close order.
+var (
+	newGzipReader  = func(r io.Reader) (io.ReadCloser, error) { return gzip.NewReader(r) }
+	newFlateReader = func(r io.Reader) io.ReadCloser { return flate.NewReader(r) }
+)
+
 type originalCloser struct {
 	io.ReadCloser
 	original io.Closer
@@ -29,12 +35,12 @@ func TranslateBody(resp *http.Response, op errors.Op) (io.ReadCloser, error) {
 		return body, nil
 	case "gzip":
 		var err error
-		wrapper, err = gzip.NewReader(resp.Body)
+		wrapper, err = newGzipReader(resp.Body)
 		if err != nil {
 			return nil, errors.E(op, errors.KInternal, fmt.Errorf("gzip reader error: %w", err))
 		}
 	case "deflate":
-		wrapper = flate.NewReader(resp.Body)
+		wrapper = newFlateReader(resp.Body)
 	default:
 		return nil, errors.ES(op, errors.KInternal, "Content-Encoding was unrecognized: %s", enc)
 	}
