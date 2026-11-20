@@ -22,6 +22,48 @@ func (f endpointCorrectionTransport) RoundTrip(r *http.Request) (*http.Response,
 	return f(r)
 }
 
+func TestConfigurationFactoryCorrectEndpointRequests(t *testing.T) {
+	for _, tc := range []struct {
+		name     string
+		endpoint string
+		opts     []ClientOption
+		wantHost string
+	}{
+		{"engine", "https://cluster.kusto.windows.net", nil, "ingest-cluster.kusto.windows.net"},
+		{"dm", "https://ingest-cluster.kusto.windows.net", nil, "ingest-cluster.kusto.windows.net"},
+		{"opt-out", "https://cluster.kusto.windows.net", []ClientOption{WithoutEndpointCorrection()}, "cluster.kusto.windows.net"},
+		{"override", "https://cluster.kusto.windows.net", []ClientOption{WithDMURL("https://override.kusto.windows.net")}, "ingest-override.kusto.windows.net"},
+	} {
+		t.Run(tc.name, func(t *testing.T) {
+			var requests atomic.Int32
+			transport := endpointCorrectionTransport(func(r *http.Request) (*http.Response, error) {
+				requests.Add(1)
+				if r.Method != http.MethodGet || r.URL.Host != tc.wantHost ||
+					r.URL.Path != "/v1/rest/ingestion/configuration" {
+					t.Errorf("unexpected configuration request: %s %s", r.Method, r.URL)
+				}
+				return &http.Response{
+					StatusCode: http.StatusOK,
+					Header:     make(http.Header),
+					Body:       io.NopCloser(strings.NewReader(`{}`)),
+					Request:    r,
+				}, nil
+			})
+			opts := append([]ClientOption{WithHTTPClient(&http.Client{Transport: transport})}, tc.opts...)
+			client, err := NewConfigurationClient(tc.endpoint, opts...)
+			if err != nil {
+				t.Fatal(err)
+			}
+			if response, err := client.GetConfigurationDetails(t.Context()); err != nil || response == nil {
+				t.Fatalf("configuration read failed: response=%v err=%v", response, err)
+			}
+			if requests.Load() != 1 {
+				t.Fatalf("custom HTTP client received %d requests, want 1", requests.Load())
+			}
+		})
+	}
+}
+
 func TestFactoriesCorrectEndpointRequests(t *testing.T) {
 	const (
 		engine = "https://cluster.kusto.windows.net"

@@ -8,6 +8,7 @@ import (
 	"fmt"
 	"io"
 	"net/http"
+	"strings"
 
 	"github.com/Azure/azure-kusto-go/azkustoingestv2/internal/httpclient"
 )
@@ -28,7 +29,7 @@ func NewConfigurationClient(dmURL string, baseClient *httpclient.BaseClient) *Co
 
 // FetchConfiguration fetches the ingestion configuration from the DM endpoint.
 func (c *ConfigurationClient) FetchConfiguration(ctx context.Context) (*ConfigurationResponse, error) {
-	url := fmt.Sprintf("%s/v1/rest/ingestion/configuration", c.dmURL)
+	url := fmt.Sprintf("%s/v1/rest/ingestion/configuration", strings.TrimRight(c.dmURL, "/"))
 
 	resp, err := c.baseClient.Do(ctx, http.MethodGet, url, nil, "application/json")
 	if err != nil {

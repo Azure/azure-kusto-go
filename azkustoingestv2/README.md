@@ -338,6 +338,32 @@ if err != nil {
 }
 ```
 
+## Service Configuration
+
+Like Java V2's `ConfigurationClient.getConfigurationDetails()`, Go exposes a
+standalone configuration client. Each getter call makes a fresh authenticated
+request; caching is separate from this client.
+
+```go
+client, err := azkustoingestv2.NewConfigurationClient(
+    "https://ingest-mycluster.kusto.windows.net",
+    azkustoingestv2.WithTokenProvider(myTokenProvider),
+)
+if err != nil {
+    log.Fatal(err)
+}
+configuration, err := client.GetConfigurationDetails(ctx)
+if err != nil {
+    log.Fatal(err)
+}
+```
+
+Connectors can inspect `configuration.IngestionSettings.PreferredIngestionMethod`
+(`Rest`) and `configuration.ContainerSettings.PreferredUploadMethod` (`Lake`),
+checking for nil settings, to select an ingestion path. These preferences do not
+automatically switch the SDK to legacy ingestion. Upload target paths may contain
+SAS tokens; do not log the configuration.
+
 ## Managed Streaming Behavior
 
 The `ManagedStreamingIngestClient` uses built-in routing and retry behavior,
