@@ -5,10 +5,14 @@ package azkustoingestv2
 
 import (
 	"context"
+	"encoding/json"
 	"fmt"
 	"io"
 	"log/slog"
+	"net/http"
 	"net/url"
+	"strings"
+	"sync"
 	"time"
 
 	"github.com/Azure/azure-kusto-go/azkustoingestv2/ingestoptions"
@@ -20,15 +24,20 @@ import (
 // QueuedIngestClient handles ingestion through the queued ingestion path.
 // It uploads local sources to blob storage, then submits them to the DM service.
 type QueuedIngestClient struct {
-	apiClient      *APIClient
-	configCache    config.ConfigurationCache
-	uploader       upload.Uploader
-	ownsUploader   bool
-	logger         *slog.Logger
+	apiClient    *APIClient
+	configCache  config.ConfigurationCache
+	uploader     upload.Uploader
+	ownsUploader bool
+	logger       *slog.Logger
+
+	ownsConfigCache bool
+	closeOnce       sync.Once
+	closeErr        error
 }
 
-// NewQueuedIngestClient creates a new QueuedIngestClient.
-func NewQueuedIngestClient(apiClient *APIClient, configCache config.ConfigurationCache, uploader upload.Uploader, ownsUploader bool) *QueuedIngestClient {
+// newQueuedIngestClient creates a new QueuedIngestClient.
+// The supplied configuration cache remains caller-owned.
+func newQueuedIngestClient(apiClient *APIClient, configCache config.ConfigurationCache, uploader upload.Uploader, ownsUploader bool) *QueuedIngestClient {
 	return &QueuedIngestClient{
 		apiClient:    apiClient,
 		configCache:  configCache,
@@ -40,11 +49,23 @@ func NewQueuedIngestClient(apiClient *APIClient, configCache config.Configuratio
 
 // Ingest ingests data from a single source.
 func (c *QueuedIngestClient) Ingest(ctx context.Context, database, table string, source ingestoptions.IngestionSource, props *ingestoptions.IngestRequestProperties) (*ingestoptions.ExtendedIngestResponse, error) {
+	defer closeIngestionSource(source, c.logger)
+	if err := validateIngestionSource(source); err != nil {
+		return nil, err
+	}
 	switch s := source.(type) {
 	case *ingestoptions.BlobSource:
 		return c.IngestBlobs(ctx, database, table, []*ingestoptions.BlobSource{s}, props)
 	case ingestoptions.LocalSource:
-		blobSource, err := c.uploader.Upload(ctx, s)
+		props = normalizeIngestProperties(s, props)
+		if err := props.Validate(); err != nil {
+			return nil, err
+		}
+		local := s
+		if s.Format() != props.Format {
+			local = formattedLocalSource{LocalSource: s, format: props.Format}
+		}
+		blobSource, err := c.uploader.Upload(ctx, local)
 		if err != nil {
 			return nil, fmt.Errorf("failed to upload source: %w", err)
 		}
@@ -60,6 +81,11 @@ func (c *QueuedIngestClient) Ingest(ctx context.Context, database, table string,
 func (c *QueuedIngestClient) IngestBlobs(ctx context.Context, database, table string, sources []*ingestoptions.BlobSource, props *ingestoptions.IngestRequestProperties) (*ingestoptions.ExtendedIngestResponse, error) {
 	if len(sources) == 0 {
 		return nil, ingestoptions.NewIngestClientError("sources list cannot be empty", nil, true)
+	}
+	for i, source := range sources {
+		if source == nil {
+			return nil, ingestoptions.NewIngestClientError(fmt.Sprintf("blob source at index %d cannot be nil", i), nil, true)
+		}
 	}
 
 	if props != nil {
@@ -78,15 +104,26 @@ func (c *QueuedIngestClient) IngestBlobs(ctx context.Context, database, table st
 
 	// Validate all blobs have same format
 	if len(sources) > 1 {
-		firstFormat := sources[0].Format()
+		declaredFormat := sources[0].Format()
+		var requestedFormat ingestoptions.DataFormat
+		if props != nil {
+			requestedFormat = props.Format
+		}
+		firstFormat := resolveIngestFormat(sources[0], requestedFormat)
 		for _, s := range sources[1:] {
-			if s.Format() != firstFormat {
+			format := s.Format()
+			if (declaredFormat != ingestoptions.FormatUnknown && format != ingestoptions.FormatUnknown && format != declaredFormat) ||
+				resolveIngestFormat(s, requestedFormat) != firstFormat {
 				return nil, ingestoptions.NewIngestClientError(
 					"all blobs in the request must have the same format", nil, true,
 				)
 			}
+			if declaredFormat == ingestoptions.FormatUnknown {
+				declaredFormat = format
+			}
 		}
 	}
+	props = normalizeIngestProperties(sources[0], props)
 
 	// Check for duplicate blob URLs
 	seen := make(map[string]bool)
@@ -120,6 +157,15 @@ func (c *QueuedIngestClient) IngestBlobs(ctx context.Context, database, table st
 		}
 	}
 
+	var validationPolicyJSON string
+	if props.ValidationPolicy != nil {
+		data, err := json.Marshal(props.ValidationPolicy)
+		if err != nil {
+			return nil, fmt.Errorf("failed to serialize validation policy: %w", err)
+		}
+		validationPolicyJSON = string(data)
+	}
+
 	request := &ingestRequest{
 		Timestamp: time.Now().UTC().Format(time.RFC3339),
 		Blobs:     blobs,
@@ -127,8 +173,8 @@ func (c *QueuedIngestClient) IngestBlobs(ctx context.Context, database, table st
 			Format:                    props.Format.String(),
 			IngestionMappingRef:       props.IngestionMappingRef,
 			IngestionMapping:          inlineMappingJSON,
+			ValidationPolicy:          validationPolicyJSON,
 			EnableTracking:            props.EnableTracking,
-			FlushImmediately:          props.FlushImmediately,
 			IgnoreFirstRecord:         props.IgnoreFirstRecord,
 			IgnoreLastRecordIfInvalid: props.IgnoreLastRecordIfInvalid,
 			IngestIfNotExists:         props.IngestIfNotExists,
@@ -170,7 +216,10 @@ func (c *QueuedIngestClient) MaxSourcesPerMultiIngest(ctx context.Context) (int,
 
 // GetOperationSummary returns a summary of the ingestion operation.
 func (c *QueuedIngestClient) GetOperationSummary(ctx context.Context, op *IngestionOperation) (*OperationStatus, error) {
-	resp, err := c.GetOperationDetails(ctx, op)
+	if err := validateIngestionOperation(op); err != nil {
+		return nil, err
+	}
+	resp, err := c.apiClient.GetIngestStatus(ctx, op.Database, op.Table, op.OperationID, false)
 	if err != nil {
 		return nil, err
 	}
@@ -182,15 +231,23 @@ func (c *QueuedIngestClient) GetOperationSummary(ctx context.Context, op *Ingest
 
 // GetOperationDetails returns detailed status of the ingestion operation.
 func (c *QueuedIngestClient) GetOperationDetails(ctx context.Context, op *IngestionOperation) (*StatusResponse, error) {
+	if err := validateIngestionOperation(op); err != nil {
+		return nil, err
+	}
 	return c.apiClient.GetIngestStatus(ctx, op.Database, op.Table, op.OperationID, true)
 }
 
-// Close closes the client and optionally the owned uploader.
+// Close stops owned configuration refresh and closes the owned uploader.
 func (c *QueuedIngestClient) Close() error {
-	if c.ownsUploader && c.uploader != nil {
-		return c.uploader.Close()
-	}
-	return nil
+	c.closeOnce.Do(func() {
+		if c.ownsConfigCache && c.configCache != nil {
+			c.configCache.Close()
+		}
+		if c.ownsUploader && c.uploader != nil {
+			c.closeErr = c.uploader.Close()
+		}
+	})
+	return c.closeErr
 }
 
 func sanitizeBlobURL(blobPath string) string {
@@ -214,11 +271,11 @@ type ingestRequestPayload struct {
 	Format                    string   `json:"format,omitempty"`
 	IngestionMappingRef       string   `json:"ingestionMappingReference,omitempty"`
 	IngestionMapping          string   `json:"ingestionMapping,omitempty"`
+	ValidationPolicy          string   `json:"validationPolicy,omitempty"`
 	EnableTracking            bool     `json:"enableTracking,omitempty"`
-	FlushImmediately          bool     `json:"flushImmediately,omitempty"`
 	IgnoreFirstRecord         bool     `json:"ignoreFirstRecord,omitempty"`
 	IgnoreLastRecordIfInvalid bool     `json:"ignoreLastRecordIfInvalid,omitempty"`
-	IngestIfNotExists         string   `json:"ingestIfNotExists,omitempty"`
+	IngestIfNotExists         []string `json:"ingestIfNotExists,omitempty"`
 	Tags                      []string `json:"tags,omitempty"`
 	SkipBatching              bool     `json:"skipBatching,omitempty"`
 	DeleteAfterDownload       bool     `json:"deleteAfterDownload,omitempty"`
@@ -250,7 +307,8 @@ func NewAPIClient(dmURL, engineURL string, baseClient *httpclient.BaseClient) *A
 
 // PostQueuedIngest submits a queued ingestion request.
 func (a *APIClient) PostQueuedIngest(ctx context.Context, database, table string, request *ingestRequest) (*ingestoptions.IngestResponse, error) {
-	apiURL := fmt.Sprintf("%s/v1/rest/ingestion/queued/%s/%s", a.DMURL, database, table)
+	apiURL := fmt.Sprintf("%s/v1/rest/ingestion/queued/%s/%s",
+		strings.TrimRight(a.DMURL, "/"), url.PathEscape(database), url.PathEscape(table))
 
 	var result struct {
 		IngestionOperationID string `json:"ingestionOperationId"`
@@ -271,7 +329,8 @@ func (a *APIClient) PostQueuedIngest(ctx context.Context, database, table string
 
 // PostStreamingIngest submits a streaming ingestion request.
 func (a *APIClient) PostStreamingIngest(ctx context.Context, database, table string, body io.Reader, contentType string, format string, mappingName string, blobURL string, compression ingestoptions.CompressionType) (*StreamingIngestResponse, error) {
-	apiURL := fmt.Sprintf("%s/v1/rest/ingest/%s/%s?streamFormat=%s", a.EngineURL, database, table, format)
+	apiURL := fmt.Sprintf("%s/v1/rest/ingest/%s/%s?streamFormat=%s",
+		strings.TrimRight(a.EngineURL, "/"), url.PathEscape(database), url.PathEscape(table), url.QueryEscape(format))
 	if mappingName != "" {
 		apiURL += "&mappingName=" + url.QueryEscape(mappingName)
 	}
@@ -279,22 +338,27 @@ func (a *APIClient) PostStreamingIngest(ctx context.Context, database, table str
 		apiURL += "&sourceKind=uri"
 	}
 
-	resp, err := a.baseClient.Do(ctx, "POST", apiURL, body, contentType)
+	headers := make(http.Header)
+	if blobURL == "" && compression == ingestoptions.CompressionGZip {
+		headers.Set("Content-Encoding", "gzip")
+	}
+	resp, err := a.baseClient.DoWithHeaders(ctx, "POST", apiURL, body, contentType, headers)
 	if err != nil {
 		return nil, fmt.Errorf("streaming ingest POST failed: %w", err)
 	}
-	defer resp.Body.Close()
 
 	if resp.StatusCode != 200 {
 		return nil, httpclient.ParseErrorResponse(resp)
 	}
+	defer resp.Body.Close()
 
 	return &StreamingIngestResponse{}, nil
 }
 
 // GetIngestStatus retrieves the status of an ingestion operation.
 func (a *APIClient) GetIngestStatus(ctx context.Context, database, table, operationID string, details bool) (*StatusResponse, error) {
-	apiURL := fmt.Sprintf("%s/v1/rest/ingestion/queued/%s/%s/%s?details=%t", a.DMURL, database, table, operationID, details)
+	apiURL := fmt.Sprintf("%s/v1/rest/ingestion/queued/%s/%s/%s?details=%t",
+		strings.TrimRight(a.DMURL, "/"), url.PathEscape(database), url.PathEscape(table), url.PathEscape(operationID), details)
 
 	var result StatusResponse
 	resp, err := a.baseClient.DoJSON(ctx, "GET", apiURL, nil, &result)

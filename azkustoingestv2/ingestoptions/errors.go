@@ -9,6 +9,7 @@ import "fmt"
 type IngestError struct {
 	Message        string
 	Cause          error
+	HTTPStatusCode int // HTTP response status, independent of the service's @failureCode.
 	FailureCode    int
 	FailureSubCode string
 	IsPermanent    bool

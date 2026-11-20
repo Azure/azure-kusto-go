@@ -73,3 +73,37 @@ func TestKustoTrustedEndpointsDisabled(t *testing.T) {
 		t.Errorf("unexpected error when validation disabled: %v", err)
 	}
 }
+
+func TestKustoTrustedEndpointsValidateEndpointURL(t *testing.T) {
+	trusted := DefaultKustoTrustedEndpoints()
+	for _, tc := range []struct {
+		url     string
+		skip    bool
+		wantErr bool
+	}{
+		{"https://ingest-cluster.kusto.windows.net:443/v1/rest/ingestion", false, false},
+		{"https://CLUSTER.KUSTO.WINDOWS.NET", false, false},
+		{"http://localhost:8080", false, false},
+		{"http://127.0.0.1:8080", false, false},
+		{"http://[::1]:8080", false, false},
+		{"https://custom.example", false, true},
+		{"https://custom.example", true, false},
+		{"https://localhost.example", false, true},
+		{"https://notlocalhost.example", false, true},
+		{"https://cluster.kusto.windows.net.example", false, true},
+		{"https://cluster.kusto.windows.net@untrusted.example", false, true},
+		{"https://user@cluster.kusto.windows.net", false, true},
+		{"cluster.kusto.windows.net", false, true},
+		{"https://", false, true},
+		{"https://%", false, true},
+		{"file:///cluster.kusto.windows.net", false, true},
+		{"file:///custom.example", true, true},
+	} {
+		t.Run(tc.url, func(t *testing.T) {
+			err := trusted.ValidateEndpointURL(tc.url, tc.skip)
+			if (err != nil) != tc.wantErr {
+				t.Fatalf("ValidateEndpointURL(%q, %v) = %v, want error %v", tc.url, tc.skip, err, tc.wantErr)
+			}
+		})
+	}
+}

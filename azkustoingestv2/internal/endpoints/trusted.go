@@ -4,6 +4,8 @@
 package endpoints
 
 import (
+	"net"
+	"net/url"
 	"strings"
 
 	"github.com/Azure/azure-kusto-go/azkustoingestv2/ingestoptions"
@@ -95,7 +97,7 @@ var WellKnownKustoEndpoints = []MatchRule{
 
 // KustoTrustedEndpoints validates that a Kusto endpoint is trusted.
 type KustoTrustedEndpoints struct {
-	matcher *FastSuffixMatcher
+	matcher         *FastSuffixMatcher
 	additionalRules []MatchRule
 }
 
@@ -125,15 +127,25 @@ func (e *KustoTrustedEndpoints) IsTrustedEndpoint(hostname string) bool {
 // ValidateEndpoint validates that the endpoint is trusted or security checks are skipped.
 // Returns an error if the endpoint is not trusted and security checks are not skipped.
 func (e *KustoTrustedEndpoints) ValidateEndpoint(hostname string, skipSecurityChecks bool) error {
+	return e.ValidateEndpointURL("https://"+hostname, skipSecurityChecks)
+}
+
+// ValidateEndpointURL validates an HTTP endpoint URL against the trusted host rules.
+func (e *KustoTrustedEndpoints) ValidateEndpointURL(rawURL string, skipSecurityChecks bool) error {
+	u, err := url.Parse(rawURL)
+	if err != nil || (u.Scheme != "https" && u.Scheme != "http") || u.Hostname() == "" || u.User != nil {
+		return ingestoptions.NewIngestClientError("invalid Kusto endpoint URL", err, true)
+	}
 	if skipSecurityChecks {
 		return nil
 	}
-	if IsReservedHostname("https://" + hostname) {
+	hostname := strings.ToLower(u.Hostname())
+	if hostname == "localhost" || strings.HasSuffix(hostname, ".localhost") || net.ParseIP(hostname) != nil {
 		return nil
 	}
 	if !e.IsTrustedEndpoint(hostname) {
 		return ingestoptions.NewIngestClientError(
-			"endpoint is not a trusted Kusto endpoint: "+hostname+". Set skipSecurityChecks to bypass.",
+			"endpoint is not a trusted Kusto endpoint: "+hostname+". Use WithSkipSecurityChecks(true) only for a trusted custom endpoint.",
 			nil, true)
 	}
 	return nil

@@ -119,15 +119,18 @@ func TestSourceBlobNaming(t *testing.T) {
 	t.Parallel()
 
 	tests := []struct {
-		name       string
-		format     ingestoptions.DataFormat
-		compress   ingestoptions.CompressionType
-		expectGZ   bool
+		name         string
+		format       ingestoptions.DataFormat
+		compress     ingestoptions.CompressionType
+		expectGZ     bool
+		dontCompress bool
 	}{
-		{"csv_uncompressed_gets_gz", ingestoptions.FormatCSV, ingestoptions.CompressionNone, true},
-		{"csv_already_gzip_stays_gz", ingestoptions.FormatCSV, ingestoptions.CompressionGZip, true},
-		{"parquet_binary_no_gz", ingestoptions.FormatParquet, ingestoptions.CompressionNone, false},
-		{"json_uncompressed_gets_gz", ingestoptions.FormatJSON, ingestoptions.CompressionNone, true},
+		{"csv_uncompressed_gets_gz", ingestoptions.FormatCSV, ingestoptions.CompressionNone, true, false},
+		{"csv_already_gzip_stays_gz", ingestoptions.FormatCSV, ingestoptions.CompressionGZip, true, false},
+		{"parquet_binary_no_gz", ingestoptions.FormatParquet, ingestoptions.CompressionNone, false, false},
+		{"json_uncompressed_gets_gz", ingestoptions.FormatJSON, ingestoptions.CompressionNone, true, false},
+		{"csv_dont_compress_no_gz", ingestoptions.FormatCSV, ingestoptions.CompressionNone, false, true},
+		{"gzip_dont_compress_stays_gz", ingestoptions.FormatCSV, ingestoptions.CompressionGZip, true, true},
 	}
 
 	for _, tt := range tests {
@@ -141,8 +144,11 @@ func TestSourceBlobNaming(t *testing.T) {
 			}
 
 			// For local sources, test GenerateBlobName
-			source := ingestoptions.NewStreamSource(nil, tt.format,
-				ingestoptions.WithStreamCompression(tt.compress))
+			opts := []ingestoptions.StreamSourceOption{ingestoptions.WithStreamCompression(tt.compress)}
+			if tt.dontCompress {
+				opts = append(opts, ingestoptions.DontCompress())
+			}
+			source := ingestoptions.NewStreamSource(nil, tt.format, opts...)
 			blobName := source.GenerateBlobName()
 			hasGZ := len(blobName) > 3 && blobName[len(blobName)-3:] == ".gz"
 			if tt.expectGZ && !hasGZ {

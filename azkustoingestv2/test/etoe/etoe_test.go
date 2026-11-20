@@ -56,11 +56,11 @@ func TestStreamingIngestion(t *testing.T) {
 	defer streamingClient.Close()
 
 	tests := []struct {
-		desc      string
-		source    func(t *testing.T) ingestoptions.IngestionSource
-		props     *ingestoptions.IngestRequestProperties
-		wantCount int64
-		wantErr   bool
+		desc       string
+		source     func(t *testing.T) ingestoptions.IngestionSource
+		props      *ingestoptions.IngestRequestProperties
+		wantCount  int64
+		wantErr    bool
 		skipNoBlob bool
 	}{
 		{
@@ -299,7 +299,7 @@ func TestQueuedIngestion(t *testing.T) {
 			props: &ingestoptions.IngestRequestProperties{
 				Format:              ingestoptions.FormatMultiJSON,
 				IngestionMappingRef: "Logs_mapping",
-				FlushImmediately:    true,
+				SkipBatching:        true,
 				EnableTracking:      true,
 			},
 			wantCount: 500,
@@ -316,7 +316,7 @@ func TestQueuedIngestion(t *testing.T) {
 			props: &ingestoptions.IngestRequestProperties{
 				Format:              ingestoptions.FormatMultiJSON,
 				IngestionMappingRef: "NonExistentMapping",
-				FlushImmediately:    true,
+				SkipBatching:        true,
 				EnableTracking:      true,
 			},
 			wantErr: true,
@@ -428,7 +428,7 @@ func TestQueuedStatusTracking(t *testing.T) {
 	props := &ingestoptions.IngestRequestProperties{
 		Format:              ingestoptions.FormatMultiJSON,
 		IngestionMappingRef: "Logs_mapping",
-		FlushImmediately:    true,
+		SkipBatching:        true,
 		EnableTracking:      true,
 	}
 
@@ -524,16 +524,17 @@ func TestClientValidation(t *testing.T) {
 		}
 	})
 
-	t.Run("MappingRefAndInlineMappingConflict", func(t *testing.T) {
+	t.Run("StreamingRejectsInlineMapping", func(t *testing.T) {
 		props := &ingestoptions.IngestRequestProperties{
 			Format:              ingestoptions.FormatJSON,
 			IngestionMappingRef: "SomeMapping",
 			IngestionMapping: []ingestoptions.ColumnMapping{
-				{Name: "col1", MappingKind: "JsonMapping"},
+				{Name: "col1"},
 			},
 		}
-		if err := props.Validate(); err == nil {
-			t.Error("expected validation error for conflicting mapping ref and inline mapping")
+		source := ingestoptions.NewFileSource(csvFileFromString(t), ingestoptions.FormatCSV)
+		if _, err := streamingClient.Ingest(context.Background(), testConfig.Database, "table", source, props); err == nil {
+			t.Error("expected direct streaming to reject inline mapping")
 		}
 	})
 }

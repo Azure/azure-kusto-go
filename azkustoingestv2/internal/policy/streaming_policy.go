@@ -97,17 +97,16 @@ type ManagedStreamingErrorState struct {
 }
 
 // DefaultManagedStreamingPolicy is the default policy for managed streaming.
-// When there is a permanent streaming error, it defaults to queued ingestion
-// for a time period.
+// Transient streaming failures can temporarily route subsequent requests to queued ingestion.
 type DefaultManagedStreamingPolicy struct {
-	continueWhenUnavailable   bool
-	dataSizeFactor            float64
-	retryPolicy               ingestoptions.IngestRetryPolicy
-	throttleBackoffPeriod     time.Duration
+	continueWhenUnavailable    bool
+	dataSizeFactor             float64
+	retryPolicy                ingestoptions.IngestRetryPolicy
+	throttleBackoffPeriod      time.Duration
 	timeUntilResumingStreaming time.Duration
 
-	mu                      sync.RWMutex
-	defaultToQueuedByTable  map[string]*ManagedStreamingErrorState
+	mu                     sync.RWMutex
+	defaultToQueuedByTable map[string]*ManagedStreamingErrorState
 }
 
 // DefaultManagedStreamingPolicyOption configures a DefaultManagedStreamingPolicy.
@@ -138,7 +137,7 @@ func NewDefaultManagedStreamingPolicy(opts ...DefaultManagedStreamingPolicyOptio
 	p := &DefaultManagedStreamingPolicy{
 		continueWhenUnavailable:    ingestoptions.ManagedStreamingContinueWhenUnavailableDefault,
 		dataSizeFactor:             ingestoptions.ManagedStreamingDataSizeFactorDefault,
-		retryPolicy:               ingestoptions.CreateDefaultManagedStreamingRetryPolicy(),
+		retryPolicy:                ingestoptions.CreateDefaultManagedStreamingRetryPolicy(),
 		throttleBackoffPeriod:      ingestoptions.ManagedStreamingThrottleBackoff,
 		timeUntilResumingStreaming: ingestoptions.ManagedStreamingResumeTime,
 		defaultToQueuedByTable:     make(map[string]*ManagedStreamingErrorState),
@@ -193,6 +192,11 @@ func (p *DefaultManagedStreamingPolicy) StreamingErrorCallback(source ingestopti
 
 	p.mu.Lock()
 	defer p.mu.Unlock()
+
+	if details.IsPermanent {
+		delete(p.defaultToQueuedByTable, key)
+		return
+	}
 
 	switch details.ErrorCategory {
 	case ErrorCategoryStreamingIngestionOff, ErrorCategoryTableConfigurationPreventsStreaming:

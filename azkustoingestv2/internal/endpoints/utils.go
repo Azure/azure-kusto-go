@@ -10,10 +10,7 @@ import (
 	"strings"
 )
 
-const (
-	ingestPrefix   = "ingest-"
-	protocolSuffix = "://"
-)
+const ingestPrefix = "ingest-"
 
 // GetIngestionEndpoint converts a cluster URL to an ingestion endpoint URL
 // by adding the "ingest-" prefix.
@@ -21,25 +18,35 @@ const (
 // Special URLs (localhost, IP addresses, onebox.dev.kusto.windows.net) are
 // returned unchanged to support local development and testing scenarios.
 func GetIngestionEndpoint(clusterURL string) string {
-	if clusterURL == "" ||
-		strings.Contains(clusterURL, ingestPrefix) ||
-		IsReservedHostname(clusterURL) {
-		return clusterURL
-	}
-
-	if strings.Contains(clusterURL, protocolSuffix) {
-		return strings.Replace(clusterURL, protocolSuffix, protocolSuffix+ingestPrefix, 1)
-	}
-	return ingestPrefix + clusterURL
+	return correctEndpoint(clusterURL, true)
 }
 
 // GetQueryEndpoint converts an ingestion endpoint URL to a query endpoint URL
 // by removing the "ingest-" prefix.
 func GetQueryEndpoint(clusterURL string) string {
-	if clusterURL == "" || IsReservedHostname(clusterURL) {
+	return correctEndpoint(clusterURL, false)
+}
+
+func correctEndpoint(clusterURL string, ingestion bool) string {
+	u, err := url.Parse(clusterURL)
+	if err != nil || IsReservedHostname(clusterURL) {
 		return clusterURL
 	}
-	return strings.Replace(clusterURL, ingestPrefix, "", 1)
+	host := u.Hostname()
+	hasPrefix := strings.HasPrefix(strings.ToLower(host), ingestPrefix)
+	if hasPrefix == ingestion {
+		return clusterURL
+	}
+	if ingestion {
+		host = ingestPrefix + host
+	} else {
+		host = host[len(ingestPrefix):]
+	}
+	if port := u.Port(); port != "" {
+		host = net.JoinHostPort(host, port)
+	}
+	u.Host = host
+	return u.String()
 }
 
 // IsReservedHostname checks if the given URL points to a reserved hostname
@@ -69,7 +76,7 @@ func IsReservedHostname(rawURI string) bool {
 	hostLower := strings.ToLower(host)
 
 	// Check for IPv6 address (wrapped in brackets)
-	if strings.HasPrefix(host, "[") || net.ParseIP(host) != nil {
+	if strings.HasPrefix(u.Host, "[") || net.ParseIP(host) != nil {
 		return true
 	}
 
@@ -79,7 +86,7 @@ func IsReservedHostname(rawURI string) bool {
 	}
 
 	// Check for localhost
-	if strings.Contains(hostLower, "localhost") {
+	if hostLower == "localhost" || strings.HasSuffix(hostLower, ".localhost") {
 		return true
 	}
 

@@ -10,6 +10,7 @@ import (
 	"path/filepath"
 	"strings"
 
+	"github.com/Azure/azure-kusto-go/azkustoingestv2/internal/validation"
 	"github.com/google/uuid"
 )
 
@@ -33,11 +34,27 @@ type LocalSource interface {
 	Data() (io.ReadCloser, error)
 	// Size returns the approximate size of the data in bytes, or -1 if unknown.
 	Size() int64
-	// ShouldCompress returns true if the data should be compressed during upload.
+	// ShouldCompress returns true if the data should be compressed during ingestion.
 	ShouldCompress() bool
 	// GenerateBlobName generates a unique blob name for upload.
 	GenerateBlobName() string
 }
+
+// LocalSourceOption configures both file and stream sources.
+type LocalSourceOption interface {
+	FileSourceOption
+	StreamSourceOption
+}
+
+// DontCompress disables automatic compression without changing the source compression type.
+func DontCompress() LocalSourceOption {
+	return dontCompressOption{}
+}
+
+type dontCompressOption struct{}
+
+func (dontCompressOption) applyToFile(s *FileSource)     { s.dontCompress = true }
+func (dontCompressOption) applyToStream(s *StreamSource) { s.dontCompress = true }
 
 // BlobSource represents a blob-based ingestion source. This source references
 // data that already exists in blob storage.
@@ -47,7 +64,7 @@ type BlobSource struct {
 	compressionType CompressionType
 	sourceID        uuid.UUID
 	name            string
-	// BlobExactSize is the exact size of the blob in bytes if available.
+	// BlobExactSize is the exact size of the blob in bytes, or zero if unknown.
 	BlobExactSize int64
 }
 
@@ -61,7 +78,6 @@ func NewBlobSource(blobPath string, format DataFormat, opts ...BlobSourceOption)
 		format:          format,
 		compressionType: CompressionNone,
 		sourceID:        uuid.New(),
-		BlobExactSize:   -1,
 	}
 	for _, opt := range opts {
 		opt(s)
@@ -83,11 +99,11 @@ func WithBlobSourceID(id uuid.UUID) BlobSourceOption {
 	return func(s *BlobSource) { s.sourceID = id }
 }
 
-func (s *BlobSource) Format() DataFormat          { return s.format }
+func (s *BlobSource) Format() DataFormat               { return s.format }
 func (s *BlobSource) CompressionType() CompressionType { return s.compressionType }
-func (s *BlobSource) SourceID() uuid.UUID          { return s.sourceID }
-func (s *BlobSource) Name() string                 { return s.name }
-func (s *BlobSource) Close() error                 { return nil }
+func (s *BlobSource) SourceID() uuid.UUID              { return s.sourceID }
+func (s *BlobSource) Name() string                     { return s.name }
+func (s *BlobSource) Close() error                     { return nil }
 
 // BlobPath returns the blob storage path.
 func (s *BlobSource) BlobPath() string { return s.blobPath }
@@ -98,7 +114,7 @@ func (s *BlobSource) PathForTracing() string {
 	return parts[0]
 }
 
-// Size returns the exact blob size if known, or -1.
+// Size returns the exact blob size if known, or zero.
 func (s *BlobSource) Size() int64 { return s.BlobExactSize }
 
 // FileSource represents a file-based ingestion source.
@@ -109,6 +125,7 @@ type FileSource struct {
 	sourceID        uuid.UUID
 	name            string
 	stream          io.ReadCloser
+	dontCompress    bool
 }
 
 // NewFileSource creates a new FileSource.
@@ -119,7 +136,7 @@ func NewFileSource(path string, format DataFormat, opts ...FileSourceOption) *Fi
 		sourceID: uuid.New(),
 	}
 	for _, opt := range opts {
-		opt(s)
+		opt.applyToFile(s)
 	}
 	if s.compressionType == CompressionNone {
 		s.compressionType = detectCompressionFromPath(path)
@@ -129,23 +146,31 @@ func NewFileSource(path string, format DataFormat, opts ...FileSourceOption) *Fi
 }
 
 // FileSourceOption configures a FileSource.
-type FileSourceOption func(*FileSource)
+type FileSourceOption interface {
+	applyToFile(*FileSource)
+}
+
+type fileSourceOptionFunc func(*FileSource)
+
+func (f fileSourceOptionFunc) applyToFile(s *FileSource) {
+	f(s)
+}
 
 // WithFileCompression sets the compression type for a FileSource.
 func WithFileCompression(ct CompressionType) FileSourceOption {
-	return func(s *FileSource) { s.compressionType = ct }
+	return fileSourceOptionFunc(func(s *FileSource) { s.compressionType = ct })
 }
 
 // WithFileSourceID sets the source ID for a FileSource.
 func WithFileSourceID(id uuid.UUID) FileSourceOption {
-	return func(s *FileSource) { s.sourceID = id }
+	return fileSourceOptionFunc(func(s *FileSource) { s.sourceID = id })
 }
 
-func (s *FileSource) Format() DataFormat          { return s.format }
+func (s *FileSource) Format() DataFormat               { return s.format }
 func (s *FileSource) CompressionType() CompressionType { return s.compressionType }
-func (s *FileSource) SourceID() uuid.UUID          { return s.sourceID }
-func (s *FileSource) Name() string                 { return s.name }
-func (s *FileSource) Path() string                 { return s.path }
+func (s *FileSource) SourceID() uuid.UUID              { return s.sourceID }
+func (s *FileSource) Name() string                     { return s.name }
+func (s *FileSource) Path() string                     { return s.path }
 
 // Data returns an io.ReadCloser for the file.
 func (s *FileSource) Data() (io.ReadCloser, error) {
@@ -176,26 +201,24 @@ func (s *FileSource) Size() int64 {
 	return info.Size()
 }
 
-// ShouldCompress returns true if the file data should be compressed during upload.
+// ShouldCompress returns true if the file data should be compressed during ingestion.
 func (s *FileSource) ShouldCompress() bool {
-	return s.compressionType == CompressionNone && !s.format.IsBinaryFormat()
+	return !s.dontCompress && s.compressionType == CompressionNone && !s.format.IsBinaryFormat()
 }
 
 // GenerateBlobName generates a unique blob name for upload.
 func (s *FileSource) GenerateBlobName() string {
-	effectiveCompression := s.compressionType
-	if s.ShouldCompress() {
-		effectiveCompression = CompressionGZip
-	}
-	ext := effectiveCompression.Extension()
-	return fmt.Sprintf("%s_%s%s", sanitizeUUID(s.sourceID), string(s.format), ext)
+	return GenerateBlobName(s)
 }
 
+// Close releases the file handle. Data reopens the file on its next call.
 func (s *FileSource) Close() error {
-	if s.stream != nil {
-		return s.stream.Close()
+	if s.stream == nil {
+		return nil
 	}
-	return nil
+	stream := s.stream
+	s.stream = nil
+	return stream.Close()
 }
 
 // StreamSource represents a stream-based ingestion source.
@@ -206,6 +229,8 @@ type StreamSource struct {
 	sourceID        uuid.UUID
 	name            string
 	leaveOpen       bool
+	closed          bool
+	dontCompress    bool
 }
 
 // NewStreamSource creates a new StreamSource.
@@ -217,34 +242,43 @@ func NewStreamSource(stream io.ReadCloser, format DataFormat, opts ...StreamSour
 		sourceID:        uuid.New(),
 	}
 	for _, opt := range opts {
-		opt(s)
+		opt.applyToStream(s)
 	}
 	s.name = fmt.Sprintf("stream_%s%s%s", sanitizeUUID(s.sourceID), s.format, s.compressionType.String())
 	return s
 }
 
 // StreamSourceOption configures a StreamSource.
-type StreamSourceOption func(*StreamSource)
+type StreamSourceOption interface {
+	applyToStream(*StreamSource)
+}
+
+type streamSourceOptionFunc func(*StreamSource)
+
+func (f streamSourceOptionFunc) applyToStream(s *StreamSource) {
+	f(s)
+}
 
 // WithStreamCompression sets the compression type for a StreamSource.
 func WithStreamCompression(ct CompressionType) StreamSourceOption {
-	return func(s *StreamSource) { s.compressionType = ct }
+	return streamSourceOptionFunc(func(s *StreamSource) { s.compressionType = ct })
 }
 
 // WithStreamSourceID sets the source ID for a StreamSource.
 func WithStreamSourceID(id uuid.UUID) StreamSourceOption {
-	return func(s *StreamSource) { s.sourceID = id }
+	return streamSourceOptionFunc(func(s *StreamSource) { s.sourceID = id })
 }
 
-// WithLeaveOpen sets whether the stream should be left open after use.
+// WithLeaveOpen controls whether StreamSource.Close closes the underlying reader.
+// All ingestion modes call Close when the complete ingestion call finishes.
 func WithLeaveOpen(leaveOpen bool) StreamSourceOption {
-	return func(s *StreamSource) { s.leaveOpen = leaveOpen }
+	return streamSourceOptionFunc(func(s *StreamSource) { s.leaveOpen = leaveOpen })
 }
 
-func (s *StreamSource) Format() DataFormat          { return s.format }
+func (s *StreamSource) Format() DataFormat               { return s.format }
 func (s *StreamSource) CompressionType() CompressionType { return s.compressionType }
-func (s *StreamSource) SourceID() uuid.UUID          { return s.sourceID }
-func (s *StreamSource) Name() string                 { return s.name }
+func (s *StreamSource) SourceID() uuid.UUID              { return s.sourceID }
+func (s *StreamSource) Name() string                     { return s.name }
 
 // Data returns the underlying data stream.
 func (s *StreamSource) Data() (io.ReadCloser, error) {
@@ -256,23 +290,29 @@ func (s *StreamSource) Size() int64 {
 	return -1
 }
 
-// ShouldCompress returns true if the stream data should be compressed during upload.
+// ShouldCompress returns true if the stream data should be compressed during ingestion.
 func (s *StreamSource) ShouldCompress() bool {
-	return s.compressionType == CompressionNone && !s.format.IsBinaryFormat()
+	return !s.dontCompress && s.compressionType == CompressionNone && !s.format.IsBinaryFormat()
 }
 
 // GenerateBlobName generates a unique blob name for upload.
 func (s *StreamSource) GenerateBlobName() string {
-	effectiveCompression := s.compressionType
-	if s.ShouldCompress() {
+	return GenerateBlobName(s)
+}
+
+// GenerateBlobName builds an upload name using the source's effective format and compression.
+func GenerateBlobName(source LocalSource) string {
+	effectiveCompression := source.CompressionType()
+	if source.ShouldCompress() {
 		effectiveCompression = CompressionGZip
 	}
 	ext := effectiveCompression.Extension()
-	return fmt.Sprintf("%s_%s%s", sanitizeUUID(s.sourceID), string(s.format), ext)
+	return fmt.Sprintf("%s_%s%s", sanitizeUUID(source.SourceID()), string(source.Format()), ext)
 }
 
 func (s *StreamSource) Close() error {
-	if !s.leaveOpen && s.stream != nil {
+	if !s.leaveOpen && !s.closed && !validation.IsNil(s.stream) {
+		s.closed = true
 		return s.stream.Close()
 	}
 	return nil

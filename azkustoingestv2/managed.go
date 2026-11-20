@@ -7,8 +7,8 @@ import (
 	"context"
 	"errors"
 	"fmt"
-	"io"
 	"log/slog"
+	"net/http"
 	"strings"
 	"time"
 
@@ -20,12 +20,11 @@ import (
 //
 // It intelligently chooses between streaming and queued ingestion based on:
 //   - Data size (falls back to queued for large data)
-//   - Server response (falls back to queued on certain errors)
+//   - Server response (falls back to queued after transient retries are exhausted)
 //   - Policy decisions (configured managed streaming policy)
 //
-// When streaming fails with transient errors, the client retries.
-// When it fails with permanent errors (e.g., streaming disabled), it
-// falls back to queued ingestion.
+// When streaming fails with transient errors, the client retries before falling back.
+// Permanent streaming errors are returned without queued fallback.
 type ManagedStreamingIngestClient struct {
 	streamingClient *StreamingIngestClient
 	queuedClient    *QueuedIngestClient
@@ -33,8 +32,8 @@ type ManagedStreamingIngestClient struct {
 	logger          *slog.Logger
 }
 
-// NewManagedStreamingIngestClient creates a new ManagedStreamingIngestClient.
-func NewManagedStreamingIngestClient(
+// newManagedStreamingIngestClient creates a new ManagedStreamingIngestClient.
+func newManagedStreamingIngestClient(
 	streamingClient *StreamingIngestClient,
 	queuedClient *QueuedIngestClient,
 	p policy.ManagedStreamingPolicy,
@@ -52,11 +51,15 @@ func NewManagedStreamingIngestClient(
 
 // Ingest ingests data, choosing between streaming and queued based on policy.
 func (c *ManagedStreamingIngestClient) Ingest(ctx context.Context, database, table string, source ingestoptions.IngestionSource, props *ingestoptions.IngestRequestProperties) (*ingestoptions.ExtendedIngestResponse, error) {
+	defer closeIngestionSource(source, c.logger)
 	if database == "" {
 		return nil, ingestoptions.NewIngestRequestError("database cannot be empty", nil, true)
 	}
 	if table == "" {
 		return nil, ingestoptions.NewIngestRequestError("table cannot be empty", nil, true)
+	}
+	if err := validateIngestionSource(source); err != nil {
+		return nil, err
 	}
 
 	switch s := source.(type) {
@@ -79,19 +82,7 @@ func (c *ManagedStreamingIngestClient) ingestBlob(ctx context.Context, source *i
 }
 
 func (c *ManagedStreamingIngestClient) ingestLocal(ctx context.Context, source ingestoptions.LocalSource, database, table string, props *ingestoptions.IngestRequestProperties) (*ingestoptions.ExtendedIngestResponse, error) {
-	// Check stream validity
-	stream, err := source.Data()
-	if err != nil {
-		return nil, ingestoptions.NewIngestClientError("failed to get source data", err, true)
-	}
-
-	// Check size
-	var streamSize int64
-	if sizer, ok := stream.(interface{ Len() int }); ok {
-		streamSize = int64(sizer.Len())
-	}
-
-	if c.shouldUseQueuedBySize(streamSize) || c.shouldUseQueuedByPolicy(source, database, table) {
+	if c.shouldUseQueuedBySize(source.Size()) || c.shouldUseQueuedByPolicy(source, database, table) {
 		return c.invokeQueued(ctx, database, table, source, props)
 	}
 	return c.invokeStreamingWithFallback(ctx, source, database, table, props)
@@ -114,54 +105,59 @@ func (c *ManagedStreamingIngestClient) shouldUseQueuedByPolicy(source ingestopti
 }
 
 func (c *ManagedStreamingIngestClient) invokeStreamingWithFallback(ctx context.Context, source ingestoptions.IngestionSource, database, table string, props *ingestoptions.IngestRequestProperties) (*ingestoptions.ExtendedIngestResponse, error) {
+	originalSource := source
+	if local, ok := source.(ingestoptions.LocalSource); ok {
+		props = normalizeIngestProperties(source, props)
+		prepared, useQueued, err := c.prepareLocalSource(ctx, local)
+		if err != nil {
+			return nil, err
+		}
+		source = prepared
+		if useQueued {
+			return c.invokeQueued(ctx, database, table, source, props)
+		}
+	}
+
 	retryPolicy := c.policy.RetryPolicy()
 	var lastErr error
 
 	for attempt := 0; ; attempt++ {
+		if err := ctx.Err(); err != nil {
+			return nil, err
+		}
 		if !retryPolicy.ShouldRetry(attempt) && attempt > 0 {
 			break
 		}
 
 		startTime := time.Now()
 
-		result, err := c.streamingClient.Ingest(ctx, database, table, source, props)
+		result, err := c.streamingClient.ingest(ctx, database, table, source, props)
 		duration := time.Since(startTime)
 
 		if err == nil {
-			c.policy.StreamingSuccessCallback(source, database, table, policy.ManagedStreamingRequestSuccessDetails{
+			c.policy.StreamingSuccessCallback(originalSource, database, table, policy.ManagedStreamingRequestSuccessDetails{
 				Duration: duration,
 			})
 			return result, nil
 		}
 
+		if ctx.Err() != nil {
+			return nil, ctx.Err()
+		}
 		lastErr = err
 		isPermanent := isPermError(err)
 		category := categorizeError(err)
 
-		c.policy.StreamingErrorCallback(source, database, table, policy.ManagedStreamingRequestFailureDetails{
+		c.policy.StreamingErrorCallback(originalSource, database, table, policy.ManagedStreamingRequestFailureDetails{
 			Duration:      duration,
 			IsPermanent:   isPermanent,
 			ErrorCategory: category,
 			Err:           err,
 		})
 
-		// If permanent error, decide whether to fall back
 		if isPermanent {
-			switch category {
-			case policy.ErrorCategoryStreamingIngestionOff:
-				if !c.policy.ContinueWhenStreamingIngestionUnavailable() {
-					return nil, err
-				}
-			case policy.ErrorCategoryTableConfigurationPreventsStreaming:
-				// Fall through to queued
-			default:
-				// For other permanent errors, fall back
-			}
-			break
+			return nil, err
 		}
-
-		// Reset stream for retry if possible
-		c.resetSourceIfPossible(source)
 
 		if attempt+1 < retryPolicy.MaxRetries() {
 			delay := retryPolicy.GetDelay(attempt)
@@ -173,23 +169,14 @@ func (c *ManagedStreamingIngestClient) invokeStreamingWithFallback(ctx context.C
 		}
 	}
 
+	if err := ctx.Err(); err != nil {
+		return nil, err
+	}
 	// Streaming failed, fall back to queued
 	c.logger.Warn("streaming ingestion failed, falling back to queued",
 		"lastError", lastErr,
 	)
 	return c.invokeQueued(ctx, database, table, source, props)
-}
-
-func (c *ManagedStreamingIngestClient) resetSourceIfPossible(source ingestoptions.IngestionSource) {
-	if ls, ok := source.(ingestoptions.LocalSource); ok {
-		stream, err := ls.Data()
-		if err != nil {
-			return
-		}
-		if seeker, ok := stream.(io.Seeker); ok {
-			_, _ = seeker.Seek(0, io.SeekStart)
-		}
-	}
 }
 
 func (c *ManagedStreamingIngestClient) invokeQueued(ctx context.Context, database, table string, source ingestoptions.IngestionSource, props *ingestoptions.IngestRequestProperties) (*ingestoptions.ExtendedIngestResponse, error) {
@@ -198,6 +185,9 @@ func (c *ManagedStreamingIngestClient) invokeQueued(ctx context.Context, databas
 
 // GetOperationSummary delegates to the appropriate client based on IngestKind.
 func (c *ManagedStreamingIngestClient) GetOperationSummary(ctx context.Context, op *IngestionOperation) (*OperationStatus, error) {
+	if err := validateIngestionOperation(op); err != nil {
+		return nil, err
+	}
 	if op.IngestKind == ingestoptions.IngestKindStreaming {
 		c.logger.Warn("GetOperationSummary called for streaming operation; streaming operations are not tracked")
 		return &OperationStatus{}, nil
@@ -207,6 +197,9 @@ func (c *ManagedStreamingIngestClient) GetOperationSummary(ctx context.Context, 
 
 // GetOperationDetails delegates to the appropriate client based on IngestKind.
 func (c *ManagedStreamingIngestClient) GetOperationDetails(ctx context.Context, op *IngestionOperation) (*StatusResponse, error) {
+	if err := validateIngestionOperation(op); err != nil {
+		return nil, err
+	}
 	if op.IngestKind == ingestoptions.IngestKindStreaming {
 		c.logger.Warn("GetOperationDetails called for streaming operation; streaming operations are not tracked")
 		return &StatusResponse{Status: &OperationStatus{}}, nil
@@ -232,6 +225,14 @@ func categorizeError(err error) policy.ManagedStreamingErrorCategory {
 		return policy.ErrorCategoryUnknown
 	}
 
+	statusCode := extractStatusCode(err)
+	switch statusCode {
+	case http.StatusRequestEntityTooLarge:
+		return policy.ErrorCategoryRequestPropertiesPreventStreaming
+	case http.StatusTooManyRequests:
+		return policy.ErrorCategoryThrottled
+	}
+
 	msg := strings.ToLower(err.Error())
 
 	// Check for streaming ingestion off
@@ -252,32 +253,39 @@ func categorizeError(err error) policy.ManagedStreamingErrorCategory {
 		return policy.ErrorCategoryRequestPropertiesPreventStreaming
 	}
 
-	// Check failure codes from IngestError or IngestRequestError
-	failureCode := extractFailureCode(err)
-	if failureCode == 413 {
-		return policy.ErrorCategoryRequestPropertiesPreventStreaming
-	}
-	if failureCode == 429 || strings.Contains(msg, "kustorequestthrottledexception") {
+	if strings.Contains(msg, "kustorequestthrottledexception") {
 		return policy.ErrorCategoryThrottled
 	}
 
 	return policy.ErrorCategoryOther
 }
 
-// extractFailureCode extracts the failure code from an error, unwrapping as needed.
-func extractFailureCode(err error) int {
+// Prefer HTTP status while retaining failure-code support for caller-created errors.
+func extractStatusCode(err error) int {
+	var fallback int
 	for err != nil {
+		var ingestErr *ingestoptions.IngestError
 		switch e := err.(type) {
 		case *ingestoptions.IngestRequestError:
-			return e.FailureCode
+			ingestErr = &e.IngestError
 		case *ingestoptions.IngestServiceError:
-			return e.FailureCode
+			ingestErr = &e.IngestError
+		case *ingestoptions.IngestClientError:
+			ingestErr = &e.IngestError
 		case *ingestoptions.IngestError:
-			return e.FailureCode
+			ingestErr = e
+		}
+		if ingestErr != nil {
+			if ingestErr.HTTPStatusCode != 0 {
+				return ingestErr.HTTPStatusCode
+			}
+			if fallback == 0 {
+				fallback = ingestErr.FailureCode
+			}
 		}
 		err = errors.Unwrap(err)
 	}
-	return 0
+	return fallback
 }
 
 // isPermError checks if an error is permanent, unwrapping wrapped errors.

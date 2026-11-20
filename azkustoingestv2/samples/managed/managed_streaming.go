@@ -40,8 +40,8 @@ func main() {
 
 	// Create managed streaming client — needs both DM and Engine URLs
 	client, err := azkustoingestv2.NewManagedStreamingClient(
-		dmEndpoint,  // Data Management endpoint (for queued fallback)
-		endpoint,    // Engine endpoint (for streaming)
+		dmEndpoint, // Data Management endpoint (for queued fallback)
+		endpoint,   // Engine endpoint (for streaming)
 		azkustoingestv2.WithTokenProvider(staticTokenProvider(token)),
 	)
 	if err != nil {
@@ -143,9 +143,10 @@ func ingestWithBuilder(ctx context.Context, client *azkustoingestv2.ManagedStrea
 	// Use the builder pattern for cleaner property construction
 	props, err := ingestoptions.NewIngestRequestPropertiesBuilder().
 		WithFormat(ingestoptions.FormatCSV).
-		WithIgnoreFirstRecord(true).          // Skip header row
-		WithIngestIfNotExists("unique-run-1"). // Idempotent ingestion
-		WithDropByTags([]string{"v1.0"}).      // Tag for later drop-by
+		WithIgnoreFirstRecord(true). // Skip header row
+		WithIngestByTags([]string{"unique-run-1"}).
+		WithIngestIfNotExists([]string{"ingest-by:unique-run-1"}). // Idempotent ingestion
+		WithDropByTags([]string{"v1.0"}).                          // Tag for later drop-by
 		Build()
 	if err != nil {
 		log.Fatalf("Failed to build properties: %v", err)

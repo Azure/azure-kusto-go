@@ -14,6 +14,7 @@ import (
 	"github.com/google/uuid"
 
 	"github.com/Azure/azure-kusto-go/azkustoingestv2/ingestoptions"
+	"github.com/Azure/azure-kusto-go/azkustoingestv2/internal/validation"
 )
 
 // StreamingIngestClient handles direct streaming ingestion to the Kusto engine.
@@ -34,18 +35,28 @@ func NewStreamingIngestClient(apiClient *APIClient) *StreamingIngestClient {
 }
 
 // Ingest ingests data from the specified source via streaming ingestion.
+// Inline ingestion mappings are not supported by direct streaming.
 func (c *StreamingIngestClient) Ingest(ctx context.Context, database, table string, source ingestoptions.IngestionSource, props *ingestoptions.IngestRequestProperties) (*ingestoptions.ExtendedIngestResponse, error) {
+	defer closeIngestionSource(source, c.logger)
+	if props != nil && len(props.IngestionMapping) > 0 {
+		return nil, ingestoptions.NewIngestClientError("inline ingestion mappings are not supported by the streaming client", nil, true)
+	}
+	return c.ingest(ctx, database, table, source, props)
+}
+
+// ingest is shared with managed ingestion, which retains inline mappings for queued fallback.
+func (c *StreamingIngestClient) ingest(ctx context.Context, database, table string, source ingestoptions.IngestionSource, props *ingestoptions.IngestRequestProperties) (*ingestoptions.ExtendedIngestResponse, error) {
 	if database == "" {
 		return nil, ingestoptions.NewIngestRequestError("database cannot be empty", nil, true)
 	}
 	if table == "" {
 		return nil, ingestoptions.NewIngestRequestError("table cannot be empty", nil, true)
 	}
-
-	effectiveProps := props
-	if effectiveProps == nil {
-		effectiveProps = &ingestoptions.IngestRequestProperties{}
+	if err := validateIngestionSource(source); err != nil {
+		return nil, err
 	}
+
+	effectiveProps := normalizeIngestProperties(source, props)
 
 	format := effectiveProps.Format.String()
 	mappingName := effectiveProps.IngestionMappingRef
@@ -69,55 +80,25 @@ func (c *StreamingIngestClient) Ingest(ctx context.Context, database, table stri
 			return nil, fmt.Errorf("streaming ingest from blob failed: %w", err)
 		}
 
-	case *ingestoptions.FileSource:
-		c.logger.Info("streaming ingestion from FileSource",
+	case ingestoptions.LocalSource:
+		c.logger.Info("streaming ingestion from local source",
 			"name", s.Name(),
 			"database", database,
 			"table", table,
 		)
-		data, err := c.readSourceData(s)
+		data, compression, err := c.prepareSourceStream(s, effectiveProps.Format)
 		if err != nil {
 			return nil, err
 		}
-		if err := c.checkStreamingSize(data); err != nil {
-			return nil, err
-		}
-		contentEncoding := ""
-		if s.CompressionType() == ingestoptions.CompressionGZip {
-			contentEncoding = "gzip"
-		}
-		_ = contentEncoding
+		defer data.Close()
 		_, err = c.apiClient.PostStreamingIngest(
 			ctx, database, table,
-			bytes.NewReader(data), "application/octet-stream",
+			data, "application/octet-stream",
 			format, mappingName,
-			"", s.CompressionType(),
+			"", compression,
 		)
 		if err != nil {
-			return nil, fmt.Errorf("streaming ingest from file failed: %w", err)
-		}
-
-	case *ingestoptions.StreamSource:
-		c.logger.Info("streaming ingestion from StreamSource",
-			"name", s.Name(),
-			"database", database,
-			"table", table,
-		)
-		data, err := c.readSourceData(s)
-		if err != nil {
-			return nil, err
-		}
-		if err := c.checkStreamingSize(data); err != nil {
-			return nil, err
-		}
-		_, err = c.apiClient.PostStreamingIngest(
-			ctx, database, table,
-			bytes.NewReader(data), "application/octet-stream",
-			format, mappingName,
-			"", s.CompressionType(),
-		)
-		if err != nil {
-			return nil, fmt.Errorf("streaming ingest from stream failed: %w", err)
+			return nil, fmt.Errorf("streaming ingest from local source failed: %w", err)
 		}
 
 	default:
@@ -133,35 +114,36 @@ func (c *StreamingIngestClient) Ingest(ctx context.Context, database, table stri
 	}, nil
 }
 
-// readSourceData reads the data from a local source and returns it as bytes.
-func (c *StreamingIngestClient) readSourceData(source ingestoptions.LocalSource) ([]byte, error) {
+// prepareSourceStream borrows local data and compresses it incrementally when eligible.
+func (c *StreamingIngestClient) prepareSourceStream(source ingestoptions.LocalSource, format ingestoptions.DataFormat) (io.ReadCloser, ingestoptions.CompressionType, error) {
+	compression := source.CompressionType()
 	stream, err := source.Data()
 	if err != nil {
-		return nil, ingestoptions.NewIngestClientError("failed to get source data", err, true)
+		return nil, compression, ingestoptions.NewIngestClientError("failed to get source data", err, true)
 	}
-	data, err := io.ReadAll(stream)
-	if err != nil {
-		return nil, ingestoptions.NewIngestClientError("failed to read source data", err, false)
+	if validation.IsNil(stream) {
+		return nil, compression, ingestoptions.NewIngestClientError("source data cannot be nil", nil, true)
 	}
-	return data, nil
-}
-
-// checkStreamingSize verifies the data doesn't exceed the streaming size limit.
-func (c *StreamingIngestClient) checkStreamingSize(data []byte) error {
-	if int64(len(data)) > ingestoptions.StreamingMaxRequestBodySize {
-		return ingestoptions.NewIngestSizeLimitExceededError(int64(len(data)), ingestoptions.StreamingMaxRequestBodySize)
+	if !source.ShouldCompress() || format.IsBinaryFormat() {
+		return &streamingSourceReader{source: stream}, compression, nil
 	}
-	return nil
+	return newStreamingGzipReader(stream), ingestoptions.CompressionGZip, nil
 }
 
 // GetOperationSummary returns an empty status — streaming doesn't support tracking.
 func (c *StreamingIngestClient) GetOperationSummary(ctx context.Context, op *IngestionOperation) (*OperationStatus, error) {
+	if err := validateIngestionOperation(op); err != nil {
+		return nil, err
+	}
 	c.logger.Warn("GetOperationSummary called for streaming ingestion; streaming operations are not tracked")
 	return &OperationStatus{}, nil
 }
 
 // GetOperationDetails returns an empty response — streaming doesn't support tracking.
 func (c *StreamingIngestClient) GetOperationDetails(ctx context.Context, op *IngestionOperation) (*StatusResponse, error) {
+	if err := validateIngestionOperation(op); err != nil {
+		return nil, err
+	}
 	c.logger.Warn("GetOperationDetails called for streaming ingestion; streaming operations are not tracked")
 	return &StatusResponse{Status: &OperationStatus{}}, nil
 }

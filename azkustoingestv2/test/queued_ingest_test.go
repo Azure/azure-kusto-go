@@ -8,23 +8,22 @@ import (
 	"encoding/json"
 	"io"
 	"net/http"
-	"net/http/httptest"
+	"slices"
 	"strings"
 	"testing"
 	"time"
 
 	"github.com/Azure/azure-kusto-go/azkustoingestv2"
 	"github.com/Azure/azure-kusto-go/azkustoingestv2/ingestoptions"
-	"github.com/Azure/azure-kusto-go/azkustoingestv2/internal/httpclient"
 )
 
 // fakeUploader implements upload.Uploader for testing queued flow without real blob storage.
 type fakeUploader struct {
-	blobURL   string
-	blobSize  int64
-	err       error
-	uploads   int
-	lastData  []byte
+	blobURL  string
+	blobSize int64
+	err      error
+	uploads  int
+	lastData []byte
 }
 
 func (f *fakeUploader) Upload(ctx context.Context, source ingestoptions.LocalSource) (*ingestoptions.BlobSource, error) {
@@ -74,13 +73,6 @@ type fakeConfigData struct {
 	maxBlobs int
 }
 
-func newTestBaseClient(token string) *httpclient.BaseClient {
-	return httpclient.NewBaseClient(
-		func(ctx context.Context) (string, error) { return token, nil },
-		ingestoptions.NewClientDetails("test-app", "test-user", "1.0.0"),
-	)
-}
-
 // TestQueuedIngest_BlobSource_PostsCorrectPayload verifies that IngestBlobs sends the correct
 // request payload to the DM endpoint with proper URL, format, tags, and properties.
 func TestQueuedIngest_BlobSource_PostsCorrectPayload(t *testing.T) {
@@ -90,7 +82,7 @@ func TestQueuedIngest_BlobSource_PostsCorrectPayload(t *testing.T) {
 	var capturedPath string
 	var capturedAuth string
 
-	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+	srv := newQueuedTestServer(t, http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		capturedPath = r.URL.Path
 		capturedAuth = r.Header.Get("Authorization")
 		capturedBody, _ = io.ReadAll(r.Body)
@@ -101,29 +93,35 @@ func TestQueuedIngest_BlobSource_PostsCorrectPayload(t *testing.T) {
 	}))
 	defer srv.Close()
 
-	baseClient := newTestBaseClient("test-token-xyz")
-	apiClient := azkustoingestv2.NewAPIClient(srv.URL, srv.URL, baseClient)
-
-	// Use a nil config cache + nil uploader since we're testing blob path only
-	client := azkustoingestv2.NewQueuedIngestClient(apiClient, newDefaultFakeCache(), nil, false)
+	client := newTestQueuedClient(t, srv.URL, "test-token-xyz")
 
 	blob := mustBlobSource(t,
 		"https://storage.blob.core.windows.net/container/data.csv.gz?sas=token",
 		ingestoptions.FormatCSV,
 	)
 	blob.BlobExactSize = 1024
+	unknownSizeBlob := mustBlobSource(t,
+		"https://storage.blob.core.windows.net/container/unknown.csv.gz?sas=token",
+		ingestoptions.FormatCSV,
+	)
 
 	props := &ingestoptions.IngestRequestProperties{
-		Format:            ingestoptions.FormatCSV,
-		IgnoreFirstRecord: true,
-		FlushImmediately:  true,
-		Tags:              []string{"env:test"},
-		IngestByTags:      []string{"batch-1"},
-		DropByTags:        []string{"old-data"},
+		Format:              ingestoptions.FormatCSV,
+		IgnoreFirstRecord:   true,
+		SkipBatching:        true,
+		Tags:                []string{"env:test"},
+		IngestByTags:        []string{"batch-1"},
+		DropByTags:          []string{"old-data"},
+		IngestionMappingRef: "CSVMapping",
+		IngestionMapping: []ingestoptions.ColumnMapping{{
+			Name:       "value",
+			DataType:   "string",
+			Properties: map[string]string{"Ordinal": "0"},
+		}},
 	}
 
 	resp, err := client.IngestBlobs(context.Background(), "testdb", "testtable",
-		[]*ingestoptions.BlobSource{blob}, props)
+		[]*ingestoptions.BlobSource{blob, unknownSizeBlob}, props)
 	if err != nil {
 		t.Fatalf("IngestBlobs failed: %v", err)
 	}
@@ -154,12 +152,18 @@ func TestQueuedIngest_BlobSource_PostsCorrectPayload(t *testing.T) {
 
 	// Check blobs array
 	blobs, ok := reqBody["blobs"].([]interface{})
-	if !ok || len(blobs) != 1 {
-		t.Fatalf("expected 1 blob in request, got %v", reqBody["blobs"])
+	if !ok || len(blobs) != 2 {
+		t.Fatalf("expected 2 blobs in request, got %v", reqBody["blobs"])
 	}
 	blobPayload := blobs[0].(map[string]interface{})
 	if blobPayload["url"] != blob.BlobPath() {
 		t.Errorf("expected blob url %q, got %q", blob.BlobPath(), blobPayload["url"])
+	}
+	if blobPayload["rawSize"] != float64(1024) {
+		t.Errorf("expected known rawSize=1024, got %v", blobPayload["rawSize"])
+	}
+	if size, present := blobs[1].(map[string]interface{})["rawSize"]; present {
+		t.Errorf("unknown blob size must be omitted, got rawSize=%v", size)
 	}
 
 	// Check properties
@@ -170,8 +174,44 @@ func TestQueuedIngest_BlobSource_PostsCorrectPayload(t *testing.T) {
 	if props2["ignoreFirstRecord"] != true {
 		t.Errorf("expected ignoreFirstRecord=true")
 	}
-	if props2["flushImmediately"] != true {
-		t.Errorf("expected flushImmediately=true")
+	if props2["skipBatching"] != true {
+		t.Errorf("expected skipBatching=true")
+	}
+	if _, present := props2["flushImmediately"]; present {
+		t.Error("properties must not contain flushImmediately")
+	}
+
+	mappingJSON, ok := props2["ingestionMapping"].(string)
+	if !ok {
+		t.Fatalf("expected ingestionMapping to be a JSON string, got %T", props2["ingestionMapping"])
+	}
+	if props2["ingestionMappingReference"] != props.IngestionMappingRef {
+		t.Fatalf("queued ingestion did not retain the mapping reference: %v", props2["ingestionMappingReference"])
+	}
+	var mappings []map[string]json.RawMessage
+	if err := json.Unmarshal([]byte(mappingJSON), &mappings); err != nil {
+		t.Fatalf("failed to decode inline mapping: %v", err)
+	}
+	if len(mappings) != 1 {
+		t.Fatalf("expected one inline mapping, got %d", len(mappings))
+	}
+	if string(mappings[0]["columnName"]) != `"value"` {
+		t.Errorf("expected columnName to identify the column, got %s", mappings[0]["columnName"])
+	}
+	if string(mappings[0]["columnType"]) != `"string"` {
+		t.Errorf("expected columnType to identify the data type, got %s", mappings[0]["columnType"])
+	}
+	var mappingProperties map[string]string
+	if err := json.Unmarshal(mappings[0]["properties"], &mappingProperties); err != nil {
+		t.Fatalf("failed to decode mapping properties: %v", err)
+	}
+	if mappingProperties["Ordinal"] != "0" {
+		t.Errorf("expected mapping properties Ordinal=0, got %q", mappingProperties["Ordinal"])
+	}
+	for _, oldKey := range []string{"Name", "DataType", "Properties"} {
+		if _, present := mappings[0][oldKey]; present {
+			t.Errorf("inline mapping must not contain the old %s key", oldKey)
+		}
 	}
 
 	// Verify synthesized tags include ingest-by and drop-by prefixed tags
@@ -194,10 +234,168 @@ func TestQueuedIngest_BlobSource_PostsCorrectPayload(t *testing.T) {
 	}
 }
 
+func TestQueuedIngest_IngestIfNotExists(t *testing.T) {
+	t.Parallel()
+
+	for _, tc := range []struct {
+		name string
+		tags []string
+	}{
+		{"nil", nil},
+		{"empty", []string{}},
+		{"single", []string{"ingest-by:batch-42"}},
+		{"multiple", []string{"ingest-by:batch-42", "ingest-by:batch-43"}},
+	} {
+		t.Run(tc.name, func(t *testing.T) {
+			var capturedBody []byte
+			srv := newQueuedTestServer(t, http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+				var err error
+				capturedBody, err = io.ReadAll(r.Body)
+				if err != nil {
+					t.Errorf("reading queued request: %v", err)
+					w.WriteHeader(http.StatusBadRequest)
+					return
+				}
+				w.Header().Set("Content-Type", "application/json")
+				if err := json.NewEncoder(w).Encode(map[string]string{"ingestionOperationId": "op-dedup"}); err != nil {
+					t.Errorf("writing queued response: %v", err)
+				}
+			}))
+			defer srv.Close()
+
+			props, err := ingestoptions.NewIngestRequestPropertiesBuilder().
+				WithIngestIfNotExists(tc.tags).
+				Build()
+			if err != nil {
+				t.Fatal(err)
+			}
+			client := newTestQueuedClient(t, srv.URL, "token")
+			source := mustBlobSource(t, "https://storage/data.csv", ingestoptions.FormatCSV)
+			if _, err := client.Ingest(context.Background(), "db", "table", source, props); err != nil {
+				t.Fatalf("ingest failed: %v", err)
+			}
+			var request struct {
+				Properties map[string]json.RawMessage `json:"properties"`
+			}
+			if err := json.Unmarshal(capturedBody, &request); err != nil {
+				t.Fatalf("decoding queued request: %v", err)
+			}
+			value, present := request.Properties["ingestIfNotExists"]
+			if len(tc.tags) == 0 {
+				if present {
+					t.Fatalf("empty ingestIfNotExists must be omitted, got %s", value)
+				}
+				return
+			}
+			var tags []string
+			if err := json.Unmarshal(value, &tags); err != nil {
+				t.Fatalf("ingestIfNotExists must be an array: %v", err)
+			}
+			if !slices.Equal(tags, tc.tags) {
+				t.Fatalf("tags changed: got %v, want %v", tags, tc.tags)
+			}
+			if _, present := request.Properties["tags"]; present {
+				t.Fatal("ingestIfNotExists must not implicitly attach extent tags")
+			}
+		})
+	}
+}
+
+func TestQueuedIngest_ValidationPolicy(t *testing.T) {
+	t.Parallel()
+
+	for _, managed := range []bool{false, true} {
+		name := "queued"
+		if managed {
+			name = "managed-fallback"
+		}
+		t.Run(name, func(t *testing.T) {
+			for _, tc := range []struct {
+				name   string
+				policy *ingestoptions.ValidationPolicy
+			}{
+				{"omitted", nil},
+				{"configured", &ingestoptions.ValidationPolicy{
+					ValidationOptions:      "SameNumberOfFields",
+					ValidationImplications: "FailIngestion",
+				}},
+			} {
+				t.Run(tc.name, func(t *testing.T) {
+					var capturedBody []byte
+					dmHandler := http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+						var err error
+						capturedBody, err = io.ReadAll(r.Body)
+						if err != nil {
+							t.Errorf("reading queued request: %v", err)
+							w.WriteHeader(http.StatusBadRequest)
+							return
+						}
+						w.Header().Set("Content-Type", "application/json")
+						if err := json.NewEncoder(w).Encode(map[string]string{"ingestionOperationId": "op-policy"}); err != nil {
+							t.Errorf("writing queued response: %v", err)
+						}
+					})
+
+					var client azkustoingestv2.IngestClient
+					if managed {
+						c, cleanup := newTestManagedClient(t, http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+							w.WriteHeader(http.StatusServiceUnavailable)
+						}), dmHandler)
+						defer cleanup()
+						client = c
+					} else {
+						srv := newQueuedTestServer(t, dmHandler)
+						defer srv.Close()
+						client = newTestQueuedClient(t, srv.URL, "token")
+					}
+
+					source := mustBlobSource(t, "https://storage/data.csv", ingestoptions.FormatCSV)
+					response, err := client.Ingest(context.Background(), "db", "table", source,
+						&ingestoptions.IngestRequestProperties{ValidationPolicy: tc.policy})
+					if err != nil {
+						t.Fatalf("ingest failed: %v", err)
+					}
+					if response.Kind != ingestoptions.IngestKindQueued {
+						t.Fatalf("expected queued ingestion, got %v", response.Kind)
+					}
+
+					var request struct {
+						Properties map[string]json.RawMessage `json:"properties"`
+					}
+					if err := json.Unmarshal(capturedBody, &request); err != nil {
+						t.Fatalf("decoding queued request: %v", err)
+					}
+					value, present := request.Properties["validationPolicy"]
+					if tc.policy == nil {
+						if present {
+							t.Fatalf("nil validation policy must be omitted, got %s", value)
+						}
+						return
+					}
+					if !present {
+						t.Fatal("configured validation policy is missing")
+					}
+					var encoded string
+					if err := json.Unmarshal(value, &encoded); err != nil {
+						t.Fatalf("validationPolicy must be a JSON string: %v", err)
+					}
+					var policy ingestoptions.ValidationPolicy
+					if err := json.Unmarshal([]byte(encoded), &policy); err != nil {
+						t.Fatalf("validationPolicy must contain JSON: %v", err)
+					}
+					if policy != *tc.policy {
+						t.Fatalf("validation policy changed: got %+v, want %+v", policy, *tc.policy)
+					}
+				})
+			}
+		})
+	}
+}
+
 // TestQueuedIngest_BlobValidation_EmptyList verifies that empty source list is rejected.
 func TestQueuedIngest_BlobValidation_EmptyList(t *testing.T) {
 	t.Parallel()
-	client := azkustoingestv2.NewQueuedIngestClient(nil, nil, nil, false)
+	client := &azkustoingestv2.QueuedIngestClient{}
 	_, err := client.IngestBlobs(context.Background(), "db", "table",
 		[]*ingestoptions.BlobSource{}, nil)
 	if err == nil {
@@ -212,15 +410,13 @@ func TestQueuedIngest_BlobValidation_EmptyList(t *testing.T) {
 func TestQueuedIngest_BlobValidation_FormatMismatch(t *testing.T) {
 	t.Parallel()
 
-	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+	srv := newQueuedTestServer(t, http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		// Should not reach here
 		t.Error("server should not be called for validation error")
 	}))
 	defer srv.Close()
 
-	baseClient := newTestBaseClient("token")
-	apiClient := azkustoingestv2.NewAPIClient(srv.URL, srv.URL, baseClient)
-	client := azkustoingestv2.NewQueuedIngestClient(apiClient, newDefaultFakeCache(), nil, false)
+	client := newTestQueuedClient(t, srv.URL, "token")
 
 	blobs := []*ingestoptions.BlobSource{
 		mustBlobSource(t, "https://storage/a.csv", ingestoptions.FormatCSV),
@@ -242,14 +438,12 @@ func TestQueuedIngest_BlobValidation_FormatMismatch(t *testing.T) {
 func TestQueuedIngest_BlobValidation_DuplicateURLs(t *testing.T) {
 	t.Parallel()
 
-	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+	srv := newQueuedTestServer(t, http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		t.Error("server should not be called for validation error")
 	}))
 	defer srv.Close()
 
-	baseClient := newTestBaseClient("token")
-	apiClient := azkustoingestv2.NewAPIClient(srv.URL, srv.URL, baseClient)
-	client := azkustoingestv2.NewQueuedIngestClient(apiClient, newDefaultFakeCache(), nil, false)
+	client := newTestQueuedClient(t, srv.URL, "token")
 
 	blobs := []*ingestoptions.BlobSource{
 		mustBlobSource(t, "https://storage/data.csv?sas=A", ingestoptions.FormatCSV),
@@ -271,7 +465,7 @@ func TestQueuedIngest_BlobValidation_DuplicateURLs(t *testing.T) {
 func TestQueuedIngest_ServerError_ParsesOneAPI(t *testing.T) {
 	t.Parallel()
 
-	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+	srv := newQueuedTestServer(t, http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		w.Header().Set("Content-Type", "application/json")
 		w.WriteHeader(http.StatusBadRequest)
 		json.NewEncoder(w).Encode(map[string]interface{}{
@@ -285,9 +479,7 @@ func TestQueuedIngest_ServerError_ParsesOneAPI(t *testing.T) {
 	}))
 	defer srv.Close()
 
-	baseClient := newTestBaseClient("token")
-	apiClient := azkustoingestv2.NewAPIClient(srv.URL, srv.URL, baseClient)
-	client := azkustoingestv2.NewQueuedIngestClient(apiClient, newDefaultFakeCache(), nil, false)
+	client := newTestQueuedClient(t, srv.URL, "token")
 
 	blob := mustBlobSource(t, "https://storage/bad.csv", ingestoptions.FormatCSV)
 	_, err := client.IngestBlobs(context.Background(), "db", "table",
@@ -305,7 +497,7 @@ func TestQueuedIngest_ServerError_ParsesOneAPI(t *testing.T) {
 func TestQueuedIngest_ServerError_404IsNonPermanent(t *testing.T) {
 	t.Parallel()
 
-	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+	srv := newQueuedTestServer(t, http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		w.Header().Set("Content-Type", "application/json")
 		w.WriteHeader(http.StatusNotFound)
 		json.NewEncoder(w).Encode(map[string]interface{}{
@@ -317,9 +509,7 @@ func TestQueuedIngest_ServerError_404IsNonPermanent(t *testing.T) {
 	}))
 	defer srv.Close()
 
-	baseClient := newTestBaseClient("token")
-	apiClient := azkustoingestv2.NewAPIClient(srv.URL, srv.URL, baseClient)
-	client := azkustoingestv2.NewQueuedIngestClient(apiClient, newDefaultFakeCache(), nil, false)
+	client := newTestQueuedClient(t, srv.URL, "token")
 
 	blob := mustBlobSource(t, "https://storage/data.csv", ingestoptions.FormatCSV)
 	_, err := client.IngestBlobs(context.Background(), "db", "table",
@@ -342,7 +532,7 @@ func TestQueuedIngest_GetOperationStatus(t *testing.T) {
 	t.Parallel()
 
 	var capturedPath string
-	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+	srv := newQueuedTestServer(t, http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		capturedPath = r.URL.RequestURI()
 		w.Header().Set("Content-Type", "application/json")
 		json.NewEncoder(w).Encode(map[string]interface{}{
@@ -363,9 +553,7 @@ func TestQueuedIngest_GetOperationStatus(t *testing.T) {
 	}))
 	defer srv.Close()
 
-	baseClient := newTestBaseClient("token")
-	apiClient := azkustoingestv2.NewAPIClient(srv.URL, srv.URL, baseClient)
-	client := azkustoingestv2.NewQueuedIngestClient(apiClient, newDefaultFakeCache(), nil, false)
+	client := newTestQueuedClient(t, srv.URL, "token")
 
 	op := &azkustoingestv2.IngestionOperation{
 		Database:    "mydb",
@@ -406,7 +594,10 @@ func TestQueuedIngest_GetOperationStatus(t *testing.T) {
 func TestQueuedIngest_GetOperationSummary(t *testing.T) {
 	t.Parallel()
 
-	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+	srv := newQueuedTestServer(t, http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		if r.Method != http.MethodGet || r.URL.RequestURI() != "/v1/rest/ingestion/queued/db/tbl/op-789?details=false" {
+			t.Errorf("unexpected summary request: %s %s", r.Method, r.URL)
+		}
 		w.Header().Set("Content-Type", "application/json")
 		json.NewEncoder(w).Encode(map[string]interface{}{
 			"status": map[string]interface{}{
@@ -419,9 +610,7 @@ func TestQueuedIngest_GetOperationSummary(t *testing.T) {
 	}))
 	defer srv.Close()
 
-	baseClient := newTestBaseClient("token")
-	apiClient := azkustoingestv2.NewAPIClient(srv.URL, srv.URL, baseClient)
-	client := azkustoingestv2.NewQueuedIngestClient(apiClient, newDefaultFakeCache(), nil, false)
+	client := newTestQueuedClient(t, srv.URL, "token")
 
 	op := &azkustoingestv2.IngestionOperation{
 		Database:    "db",
@@ -446,16 +635,14 @@ func TestQueuedIngest_Headers_AreSet(t *testing.T) {
 	t.Parallel()
 
 	var capturedHeaders http.Header
-	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+	srv := newQueuedTestServer(t, http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		capturedHeaders = r.Header.Clone()
 		w.Header().Set("Content-Type", "application/json")
 		json.NewEncoder(w).Encode(map[string]string{"ingestionOperationId": "op-1"})
 	}))
 	defer srv.Close()
 
-	baseClient := newTestBaseClient("token")
-	apiClient := azkustoingestv2.NewAPIClient(srv.URL, srv.URL, baseClient)
-	client := azkustoingestv2.NewQueuedIngestClient(apiClient, newDefaultFakeCache(), nil, false)
+	client := newTestQueuedClient(t, srv.URL, "token")
 
 	blob := mustBlobSource(t, "https://storage/data.csv", ingestoptions.FormatCSV)
 	_, _ = client.IngestBlobs(context.Background(), "db", "tbl",

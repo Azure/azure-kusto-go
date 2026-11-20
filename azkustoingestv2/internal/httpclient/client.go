@@ -14,6 +14,7 @@ import (
 	"github.com/google/uuid"
 
 	"github.com/Azure/azure-kusto-go/azkustoingestv2/ingestoptions"
+	"github.com/Azure/azure-kusto-go/azkustoingestv2/internal/endpoints"
 )
 
 // TokenProvider returns a bearer token for authentication.
@@ -29,12 +30,20 @@ type BaseClient struct {
 	tokenProvider TokenProvider
 	clientDetails *ingestoptions.ClientDetails
 
+	trustedEndpoints   *endpoints.KustoTrustedEndpoints
+	skipSecurityChecks bool
+
 	s2sTokenProvider         S2STokenProvider
 	s2sFabricPLAccessContext string
 }
 
 // Option configures a BaseClient.
 type Option func(*BaseClient)
+
+// WithSkipSecurityChecks disables trusted-endpoint validation.
+func WithSkipSecurityChecks(skip bool) Option {
+	return func(b *BaseClient) { b.skipSecurityChecks = skip }
+}
 
 // WithHTTPClient sets a custom http.Client.
 func WithHTTPClient(c *http.Client) Option {
@@ -63,6 +72,8 @@ func NewBaseClient(
 		},
 		tokenProvider: tokenProvider,
 		clientDetails: clientDetails,
+
+		trustedEndpoints: endpoints.DefaultKustoTrustedEndpoints(),
 	}
 	for _, opt := range opts {
 		opt(c)
@@ -75,12 +86,27 @@ func NewBaseClient(
 
 // Do executes an HTTP request with authentication and tracing headers.
 func (c *BaseClient) Do(ctx context.Context, method, url string, body io.Reader, contentType string) (*http.Response, error) {
+	return c.DoWithHeaders(ctx, method, url, body, contentType, nil)
+}
+
+// DoWithHeaders executes an authenticated request with additional headers.
+func (c *BaseClient) DoWithHeaders(ctx context.Context, method, url string, body io.Reader, contentType string, headers http.Header) (*http.Response, error) {
 	req, err := http.NewRequestWithContext(ctx, method, url, body)
 	if err != nil {
 		return nil, fmt.Errorf("failed to create request: %w", err)
 	}
 
+	if err := c.trustedEndpoints.ValidateEndpointURL(req.URL.String(), c.skipSecurityChecks); err != nil {
+		if req.Body != nil {
+			req.Body.Close()
+		}
+		return nil, err
+	}
+
 	c.setHeaders(req, contentType)
+	for name, values := range headers {
+		req.Header[http.CanonicalHeaderKey(name)] = append([]string(nil), values...)
+	}
 
 	if err := c.setAuth(ctx, req); err != nil {
 		return nil, err
@@ -89,7 +115,9 @@ func (c *BaseClient) Do(ctx context.Context, method, url string, body io.Reader,
 	return c.httpClient.Do(req)
 }
 
-// DoJSON executes a POST with JSON body and parses the JSON response into result.
+// DoJSON executes a request with a JSON body and parses a successful JSON response into result.
+// Decoded responses have their body consumed, closed, and replaced with http.NoBody.
+// Other response bodies remain caller-owned.
 func (c *BaseClient) DoJSON(ctx context.Context, method, url string, requestBody any, result any) (*http.Response, error) {
 	var body io.Reader
 	if requestBody != nil {
@@ -106,7 +134,10 @@ func (c *BaseClient) DoJSON(ctx context.Context, method, url string, requestBody
 	}
 
 	if result != nil && resp.StatusCode >= 200 && resp.StatusCode < 300 {
-		defer resp.Body.Close()
+		defer func() {
+			resp.Body.Close()
+			resp.Body = http.NoBody
+		}()
 		respBody, err := io.ReadAll(resp.Body)
 		if err != nil {
 			return resp, fmt.Errorf("failed to read response body: %w", err)
@@ -139,12 +170,14 @@ func (c *BaseClient) setHeaders(req *http.Request, contentType string) {
 	}
 
 	// S2S headers for Fabric Private Link
+	// TODO: Fabric Private Link header handling may change after OTEL integration.
 	if c.s2sFabricPLAccessContext != "" {
 		req.Header.Set(ingestoptions.HeaderMSFabricS2SAccessContext, c.s2sFabricPLAccessContext)
 	}
 }
 
 // setAuth sets the Authorization header and optional S2S token headers.
+// TODO: Authentication handling may change after OTEL integration.
 func (c *BaseClient) setAuth(ctx context.Context, req *http.Request) error {
 	if c.tokenProvider != nil {
 		token, err := c.tokenProvider(ctx)

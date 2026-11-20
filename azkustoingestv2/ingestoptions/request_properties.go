@@ -19,8 +19,6 @@ type IngestRequestProperties struct {
 	IngestionMapping []ColumnMapping
 	// EnableTracking enables operation status tracking.
 	EnableTracking bool
-	// FlushImmediately requests immediate flushing of the ingestion queue.
-	FlushImmediately bool
 	// IgnoreFirstRecord indicates whether the first record should be ignored (header row).
 	IgnoreFirstRecord bool
 	// IgnoreLastRecordIfInvalid indicates whether the last record should be ignored if invalid.
@@ -31,8 +29,8 @@ type IngestRequestProperties struct {
 	DropByTags []string
 	// IngestByTags are tags used for ingest-by deduplication.
 	IngestByTags []string
-	// IngestIfNotExists is a tag used for idempotent ingestion.
-	IngestIfNotExists string
+	// IngestIfNotExists lists ingest-by tags checked to prevent duplicate ingestion.
+	IngestIfNotExists []string
 	// ValidationPolicy specifies the validation policy for the ingestion.
 	ValidationPolicy *ValidationPolicy
 	// CreationTime sets the creation time for the ingested data extents.
@@ -43,24 +41,19 @@ type IngestRequestProperties struct {
 	ExtendSchema bool
 	// RecreateSchema recreates the table schema on ingestion.
 	RecreateSchema bool
-	// SkipBatching disables batching and ingests immediately.
+	// SkipBatching requests ingestion without waiting for normal batching.
 	SkipBatching bool
 	// DeleteAfterDownload deletes the blob after download.
 	DeleteAfterDownload bool
-	// IgnoreSizeLimit ignores the size limit for uploads.
+	// IgnoreSizeLimit ignores the size limit during ingestion.
+	// This flag is forwarded to DM.
+	// It does not bypass SDK upload limits; use the client option WithIgnoreSizeLimit for those.
 	IgnoreSizeLimit bool
-	// AdditionalProperties holds any additional properties as key-value pairs.
-	AdditionalProperties map[string]string
 }
 
-// Validate checks the properties for consistency errors.
+// Validate is retained for API compatibility. Mapping options may coexist, as in
+// legacy Go; direct streaming enforces its own supported options.
 func (p *IngestRequestProperties) Validate() error {
-	if p.IngestionMappingRef != "" && len(p.IngestionMapping) > 0 {
-		return NewIngestClientError(
-			"cannot specify both ingestionMappingReference and inline ingestionMapping",
-			nil, true,
-		)
-	}
 	return nil
 }
 
@@ -89,13 +82,11 @@ func (p *IngestRequestProperties) SynthesizeTags() []string {
 // ColumnMapping defines an ingestion column mapping.
 type ColumnMapping struct {
 	// Name is the column name.
-	Name string `json:"Name"`
-	// MappingKind is the kind of mapping (e.g., "CsvMapping", "JsonMapping").
-	MappingKind string `json:"Kind,omitempty"`
+	Name string `json:"columnName"`
 	// DataType is the Kusto data type (e.g., "string", "int", "datetime").
-	DataType string `json:"DataType,omitempty"`
+	DataType string `json:"columnType,omitempty"`
 	// Properties holds format-specific mapping properties.
-	Properties map[string]string `json:"Properties,omitempty"`
+	Properties map[string]string `json:"properties,omitempty"`
 }
 
 // SerializeColumnMappings serializes column mappings to a JSON string.
@@ -125,11 +116,7 @@ type IngestRequestPropertiesBuilder struct {
 
 // NewIngestRequestPropertiesBuilder creates a new builder.
 func NewIngestRequestPropertiesBuilder() *IngestRequestPropertiesBuilder {
-	return &IngestRequestPropertiesBuilder{
-		props: IngestRequestProperties{
-			AdditionalProperties: make(map[string]string),
-		},
-	}
+	return &IngestRequestPropertiesBuilder{}
 }
 
 // WithFormat sets the data format.
@@ -153,12 +140,6 @@ func (b *IngestRequestPropertiesBuilder) WithMapping(mapping []ColumnMapping) *I
 // WithTracking enables operation tracking.
 func (b *IngestRequestPropertiesBuilder) WithTracking(enable bool) *IngestRequestPropertiesBuilder {
 	b.props.EnableTracking = enable
-	return b
-}
-
-// WithFlushImmediately sets flush immediately.
-func (b *IngestRequestPropertiesBuilder) WithFlushImmediately(flush bool) *IngestRequestPropertiesBuilder {
-	b.props.FlushImmediately = flush
 	return b
 }
 
@@ -192,9 +173,9 @@ func (b *IngestRequestPropertiesBuilder) WithIngestByTags(tags []string) *Ingest
 	return b
 }
 
-// WithIngestIfNotExists sets the ingest-if-not-exists tag.
-func (b *IngestRequestPropertiesBuilder) WithIngestIfNotExists(tag string) *IngestRequestPropertiesBuilder {
-	b.props.IngestIfNotExists = tag
+// WithIngestIfNotExists sets the ingest-if-not-exists tags.
+func (b *IngestRequestPropertiesBuilder) WithIngestIfNotExists(tags []string) *IngestRequestPropertiesBuilder {
+	b.props.IngestIfNotExists = tags
 	return b
 }
 
@@ -225,12 +206,6 @@ func (b *IngestRequestPropertiesBuilder) WithRecreateSchema(recreate bool) *Inge
 // WithSkipBatching disables batching.
 func (b *IngestRequestPropertiesBuilder) WithSkipBatching(skip bool) *IngestRequestPropertiesBuilder {
 	b.props.SkipBatching = skip
-	return b
-}
-
-// WithAdditionalProperty sets an additional property.
-func (b *IngestRequestPropertiesBuilder) WithAdditionalProperty(key, value string) *IngestRequestPropertiesBuilder {
-	b.props.AdditionalProperties[key] = value
 	return b
 }
 

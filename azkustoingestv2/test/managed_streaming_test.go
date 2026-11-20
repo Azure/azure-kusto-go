@@ -23,10 +23,9 @@ func TestManagedStreamingPolicy_ErrorCallback_StreamingOff(t *testing.T) {
 		ErrorCategory: policy.ErrorCategoryStreamingIngestionOff,
 	})
 
-	// By default, continueWhenUnavailable is false, so ShouldDefaultToQueued returns false
-	// (it should NOT fall back silently, it should error)
+	// Permanent errors must not cause later requests to bypass streaming.
 	if p.ShouldDefaultToQueuedIngestion(nil, "testdb", "testtable") {
-		t.Error("when continueWhenUnavailable=false, should NOT default to queued for streaming off")
+		t.Error("permanent streaming-off errors must not default to queued")
 	}
 }
 
@@ -38,8 +37,8 @@ func TestManagedStreamingPolicy_ErrorCallback_StreamingOff_WithContinue(t *testi
 		ErrorCategory: policy.ErrorCategoryStreamingIngestionOff,
 	})
 
-	if !p.ShouldDefaultToQueuedIngestion(nil, "testdb", "testtable") {
-		t.Error("when continueWhenUnavailable=true, should default to queued for streaming off")
+	if p.ShouldDefaultToQueuedIngestion(nil, "testdb", "testtable") {
+		t.Error("permanent streaming-off errors must not default to queued even with continue enabled")
 	}
 }
 
@@ -51,8 +50,8 @@ func TestManagedStreamingPolicy_ErrorCallback_TableConfig(t *testing.T) {
 		ErrorCategory: policy.ErrorCategoryTableConfigurationPreventsStreaming,
 	})
 
-	if !p.ShouldDefaultToQueuedIngestion(nil, "testdb", "testtable") {
-		t.Error("should default to queued after table config error")
+	if p.ShouldDefaultToQueuedIngestion(nil, "testdb", "testtable") {
+		t.Error("permanent table configuration errors must not default to queued")
 	}
 }
 
@@ -74,7 +73,7 @@ func TestManagedStreamingPolicy_SuccessClears(t *testing.T) {
 
 	// Set error state
 	p.StreamingErrorCallback(nil, "testdb", "testtable", policy.ManagedStreamingRequestFailureDetails{
-		IsPermanent:   true,
+		IsPermanent:   false,
 		ErrorCategory: policy.ErrorCategoryTableConfigurationPreventsStreaming,
 	})
 
@@ -90,7 +89,7 @@ func TestManagedStreamingPolicy_DifferentTables(t *testing.T) {
 	p := policy.NewDefaultManagedStreamingPolicy()
 
 	p.StreamingErrorCallback(nil, "testdb", "table1", policy.ManagedStreamingRequestFailureDetails{
-		IsPermanent:   true,
+		IsPermanent:   false,
 		ErrorCategory: policy.ErrorCategoryTableConfigurationPreventsStreaming,
 	})
 

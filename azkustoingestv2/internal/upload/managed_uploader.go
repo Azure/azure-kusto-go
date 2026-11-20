@@ -7,9 +7,14 @@ import (
 	"context"
 	"fmt"
 	"log/slog"
+	"net/http"
+	"strings"
+
+	"github.com/Azure/azure-sdk-for-go/sdk/azcore"
 
 	"github.com/Azure/azure-kusto-go/azkustoingestv2/ingestoptions"
 	"github.com/Azure/azure-kusto-go/azkustoingestv2/internal/config"
+	"github.com/Azure/azure-kusto-go/azkustoingestv2/internal/httpclient"
 	"github.com/Azure/azure-kusto-go/azkustoingestv2/internal/resources"
 )
 
@@ -24,12 +29,16 @@ type ManagedUploader struct {
 type ManagedUploaderOption func(*managedUploaderConfig)
 
 type managedUploaderConfig struct {
-	ignoreSizeLimit bool
-	maxConcurrency  int
-	maxDataSize     int64
-	configCache     config.ConfigurationCache
-	uploadMethod    ingestoptions.UploadMethod
-	retryPolicy     ingestoptions.IngestRetryPolicy
+	ignoreSizeLimit  bool
+	maxConcurrency   int
+	maxDataSize      int64
+	configCache      config.ConfigurationCache
+	uploadMethod     ingestoptions.UploadMethod
+	retryPolicy      ingestoptions.IngestRetryPolicy
+	tokenCredential  azcore.TokenCredential
+	httpClient       *http.Client
+	s2sTokenProvider httpclient.S2STokenProvider
+	s2sAccessContext string
 }
 
 // WithUploaderIgnoreSizeLimit sets whether to ignore size limits.
@@ -62,6 +71,24 @@ func WithUploaderRetryPolicy(p ingestoptions.IngestRetryPolicy) ManagedUploaderO
 	return func(c *managedUploaderConfig) { c.retryPolicy = p }
 }
 
+// WithUploaderTokenCredential sets the credential for OneLake uploads.
+func WithUploaderTokenCredential(credential azcore.TokenCredential) ManagedUploaderOption {
+	return func(c *managedUploaderConfig) { c.tokenCredential = credential }
+}
+
+// WithUploaderHTTPClient sets the HTTP transport used for uploads.
+func WithUploaderHTTPClient(client *http.Client) ManagedUploaderOption {
+	return func(c *managedUploaderConfig) { c.httpClient = client }
+}
+
+// WithUploaderFabricPrivateLink configures S2S headers for OneLake requests.
+func WithUploaderFabricPrivateLink(provider httpclient.S2STokenProvider, accessContext string) ManagedUploaderOption {
+	return func(c *managedUploaderConfig) {
+		c.s2sTokenProvider = provider
+		c.s2sAccessContext = accessContext
+	}
+}
+
 // NewManagedUploader creates a new ManagedUploader with the given options.
 func NewManagedUploader(opts ...ManagedUploaderOption) (*ManagedUploader, error) {
 	cfg := &managedUploaderConfig{
@@ -76,6 +103,12 @@ func NewManagedUploader(opts ...ManagedUploaderOption) (*ManagedUploader, error)
 	if cfg.configCache == nil {
 		return nil, fmt.Errorf("configuration cache is required")
 	}
+	if cfg.maxConcurrency < 1 || cfg.maxConcurrency > 65535 {
+		return nil, fmt.Errorf("upload concurrency must be between 1 and 65535")
+	}
+	if cfg.s2sTokenProvider != nil && strings.TrimSpace(cfg.s2sAccessContext) == "" {
+		return nil, fmt.Errorf("Fabric Private Link access context must not be blank")
+	}
 
 	base := NewContainerUploaderBase(
 		cfg.retryPolicy,
@@ -85,6 +118,12 @@ func NewManagedUploader(opts ...ManagedUploaderOption) (*ManagedUploader, error)
 		cfg.uploadMethod,
 	)
 	base.ignoreSizeLimit = cfg.ignoreSizeLimit
+	base.tokenCredential = cfg.tokenCredential
+	if cfg.httpClient != nil {
+		base.clientOptions.Transport = cfg.httpClient
+	}
+	base.s2sTokenProvider = cfg.s2sTokenProvider
+	base.s2sAccessContext = cfg.s2sAccessContext
 
 	m := &ManagedUploader{
 		ContainerUploaderBase: base,
@@ -130,7 +169,7 @@ func (m *ManagedUploader) doSelectContainers(ctx context.Context, method ingesto
 	// Both types available — determine effective upload method
 	effectiveMethod := method
 	if method == ingestoptions.UploadMethodDefault {
-		if containerSettings.PreferredUploadMethod == "Lake" {
+		if strings.EqualFold(containerSettings.PreferredUploadMethod, "Lake") {
 			effectiveMethod = ingestoptions.UploadMethodLake
 		} else {
 			effectiveMethod = ingestoptions.UploadMethodStorage

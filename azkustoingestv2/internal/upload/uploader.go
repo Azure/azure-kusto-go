@@ -4,17 +4,24 @@
 package upload
 
 import (
+	"bufio"
 	"compress/gzip"
 	"context"
+	"errors"
 	"fmt"
 	"io"
 	"log/slog"
 	"sync"
 	"time"
 
+	"github.com/Azure/azure-sdk-for-go/sdk/azcore"
+	"github.com/Azure/azure-sdk-for-go/sdk/azcore/policy"
+
 	"github.com/Azure/azure-kusto-go/azkustoingestv2/ingestoptions"
 	"github.com/Azure/azure-kusto-go/azkustoingestv2/internal/config"
+	"github.com/Azure/azure-kusto-go/azkustoingestv2/internal/httpclient"
 	"github.com/Azure/azure-kusto-go/azkustoingestv2/internal/resources"
+	"github.com/Azure/azure-kusto-go/azkustoingestv2/internal/validation"
 )
 
 // Uploader defines the interface for uploading data sources to blob storage.
@@ -43,6 +50,10 @@ type ContainerUploaderBase struct {
 	uploadMethod     ingestoptions.UploadMethod
 	ignoreSizeLimit  bool
 	selectContainers selectContainersFunc
+	tokenCredential  azcore.TokenCredential
+	clientOptions    policy.ClientOptions
+	s2sTokenProvider httpclient.S2STokenProvider
+	s2sAccessContext string
 
 	logger *slog.Logger
 }
@@ -78,7 +89,7 @@ func (u *ContainerUploaderBase) Upload(ctx context.Context, source ingestoptions
 			ingestoptions.UploadErrorSourceNotReadable, source.Name(), err,
 		)
 	}
-	if stream == nil {
+	if validation.IsNil(stream) {
 		return nil, ingestoptions.NewUploadFailedError(
 			ingestoptions.UploadErrorSourceIsNull, source.Name(), nil,
 		)
@@ -86,22 +97,18 @@ func (u *ContainerUploaderBase) Upload(ctx context.Context, source ingestoptions
 
 	name := source.GenerateBlobName()
 
-	// Check size limit if not ignored
-	if !u.ignoreSizeLimit {
-		if sizer, ok := stream.(interface{ Len() int }); ok {
-			size := int64(sizer.Len())
-			if size == 0 {
-				return nil, ingestoptions.NewUploadFailedError(
-					ingestoptions.UploadErrorSourceIsEmpty, source.Name(), nil,
-				)
-			}
-			if size > u.maxDataSize {
-				return nil, ingestoptions.NewUploadFailedError(
-					ingestoptions.UploadErrorSourceSizeLimitExceed, source.Name(),
-					fmt.Errorf("size %d exceeds max %d", size, u.maxDataSize),
-				)
-			}
-		}
+	size, err := remainingUploadSize(stream)
+	if err != nil {
+		return nil, ingestoptions.NewUploadFailedError(ingestoptions.UploadErrorSourceNotReadable, source.Name(), err)
+	}
+	if size == 0 {
+		return nil, ingestoptions.NewUploadFailedError(ingestoptions.UploadErrorSourceIsEmpty, source.Name(), nil)
+	}
+	if !u.ignoreSizeLimit && size >= 0 && size > u.maxDataSize {
+		return nil, ingestoptions.NewUploadFailedError(
+			ingestoptions.UploadErrorSourceSizeLimitExceed, source.Name(),
+			fmt.Errorf("size %d exceeds max %d", size, u.maxDataSize),
+		)
 	}
 
 	// Get containers
@@ -113,26 +120,13 @@ func (u *ContainerUploaderBase) Upload(ctx context.Context, source ingestoptions
 		return nil, ingestoptions.NewIngestClientError("no upload containers available", nil, true)
 	}
 
-	// Compress stream if needed
-	preparedStream := stream
 	effectiveCompression := source.CompressionType()
 	if source.ShouldCompress() {
-		u.logger.Debug("auto-compressing stream", "name", name)
-		pr, pw := io.Pipe()
-		go func() {
-			gw := gzip.NewWriter(pw)
-			_, copyErr := io.Copy(gw, stream)
-			if closeErr := gw.Close(); closeErr != nil && copyErr == nil {
-				copyErr = closeErr
-			}
-			pw.CloseWithError(copyErr)
-		}()
-		preparedStream = pr
 		effectiveCompression = ingestoptions.CompressionGZip
 	}
 
 	// Upload with retries and container cycling
-	blobSource, err := u.uploadWithRetries(ctx, source, name, preparedStream, containers, effectiveCompression, source.Format())
+	blobSource, err := u.uploadWithRetries(ctx, source, name, stream, containers, effectiveCompression, source.Format())
 	if err != nil {
 		return nil, err
 	}
@@ -174,6 +168,13 @@ func (u *ContainerUploaderBase) UploadMany(ctx context.Context, sources []ingest
 	}
 
 	wg.Wait()
+	for _, result := range results.Results {
+		if result.IsSuccess() {
+			results.SuccessCount++
+		} else {
+			results.FailureCount++
+		}
+	}
 	return results, nil
 }
 
@@ -193,8 +194,25 @@ func (u *ContainerUploaderBase) uploadWithRetries(
 	format ingestoptions.DataFormat,
 ) (*ingestoptions.BlobSource, error) {
 	var lastErr error
+	seeker, seekable := stream.(io.Seeker)
+	var startOffset int64
+	if seekable {
+		var err error
+		startOffset, err = seeker.Seek(0, io.SeekCurrent)
+		if err != nil {
+			return nil, fmt.Errorf("get upload stream position: %w", err)
+		}
+	}
 
 	for attempt := 0; u.retryPolicy.ShouldRetry(attempt); attempt++ {
+		if err := ctx.Err(); err != nil {
+			return nil, err
+		}
+		if attempt > 0 {
+			if _, err := seeker.Seek(startOffset, io.SeekStart); err != nil {
+				return nil, fmt.Errorf("rewind upload stream: %w", errors.Join(lastErr, err))
+			}
+		}
 		container := containers.Next()
 		if container == nil {
 			lastErr = ingestoptions.NewIngestClientError("no containers available", nil, true)
@@ -208,31 +226,62 @@ func (u *ContainerUploaderBase) uploadWithRetries(
 			"blob", name,
 		)
 
-		// Here we would perform the actual blob upload using Azure SDK.
-		// This is a placeholder for the actual upload implementation.
-		err := u.uploadToBlob(ctx, blobPath, stream, container)
+		checked := &uploadSizeReader{
+			reader: stream, name: source.Name(), max: u.maxDataSize, ignore: u.ignoreSizeLimit,
+		}
+		buffered := bufio.NewReader(checked)
+		_, err := buffered.Peek(1)
+		if err == nil {
+			err = u.uploadToContainer(ctx, blobPath, buffered, container, source.ShouldCompress())
+		}
+		if checked.err != nil {
+			err = checked.err
+		}
 		if err != nil {
 			lastErr = err
 			u.logger.Warn("upload attempt failed",
 				"attempt", attempt+1,
 				"error", err,
 			)
+			if ctx.Err() != nil {
+				return nil, ctx.Err()
+			}
+			var uploadError *ingestoptions.UploadFailedError
+			if errors.As(err, &uploadError) && uploadError.IsPermanent {
+				return nil, err
+			}
+			var responseError *azcore.ResponseError
+			if errors.As(err, &responseError) && responseError.StatusCode >= 400 && responseError.StatusCode < 500 {
+				return nil, ingestoptions.NewIngestError(fmt.Sprintf("storage rejected the upload: %v", err), err, true)
+			}
+			var clientError *ingestoptions.IngestClientError
+			if errors.As(err, &clientError) && clientError.IsPermanent {
+				return nil, err
+			}
+			if !u.retryPolicy.ShouldRetry(attempt + 1) {
+				break
+			}
+			if !seekable {
+				return nil, ingestoptions.NewIngestClientError("cannot retry upload of a non-seekable stream", err, true)
+			}
 
-			if attempt+1 < u.retryPolicy.MaxRetries() {
-				delay := u.retryPolicy.GetDelay(attempt)
-				select {
-				case <-ctx.Done():
-					return nil, ctx.Err()
-				case <-time.After(delay):
-				}
+			delay := u.retryPolicy.GetDelay(attempt)
+			select {
+			case <-ctx.Done():
+				return nil, ctx.Err()
+			case <-time.After(delay):
 			}
 			continue
 		}
 
-		blobSrc, err := ingestoptions.NewBlobSource(blobPath, format)
+		blobSrc, err := ingestoptions.NewBlobSource(blobPath, format,
+			ingestoptions.WithBlobCompression(compression),
+			ingestoptions.WithBlobSourceID(source.SourceID()),
+		)
 		if err != nil {
 			return nil, err
 		}
+		blobSrc.BlobExactSize = max(0, source.Size())
 		return blobSrc, nil
 	}
 
@@ -242,13 +291,34 @@ func (u *ContainerUploaderBase) uploadWithRetries(
 	return nil, lastErr
 }
 
-// uploadToBlob performs the actual upload to Azure Blob Storage.
-// This is a placeholder that should be implemented with the Azure SDK.
-func (u *ContainerUploaderBase) uploadToBlob(ctx context.Context, blobPath string, stream io.Reader, container *resources.ExtendedContainerInfo) error {
-	// TODO: Implement actual blob upload using Azure Blob SDK (azblob).
-	// The implementation should:
-	// 1. Create a BlobClient using the container's SAS URL
-	// 2. Upload the stream using BlockBlobClient.Upload or StageBlock/CommitBlockList
-	// 3. Handle the upload timeout (BLOB_UPLOAD_TIMEOUT_HOURS)
-	return nil
+func (u *ContainerUploaderBase) uploadToContainer(ctx context.Context, blobPath string, stream io.Reader, container *resources.ExtendedContainerInfo, compress bool) error {
+	ctx, cancel := context.WithTimeout(ctx, ingestoptions.BlobUploadTimeout)
+	defer cancel()
+
+	if compress {
+		pr, pw := io.Pipe()
+		done := make(chan struct{})
+		defer func() {
+			_ = pr.Close()
+			<-done
+		}()
+		go func(input io.Reader) {
+			defer close(done)
+			gw := gzip.NewWriter(pw)
+			_, copyErr := io.Copy(gw, input)
+			_ = pw.CloseWithError(errors.Join(copyErr, gw.Close()))
+		}(stream)
+		stream = pr
+	}
+
+	switch container.UploadMethod {
+	case ingestoptions.UploadMethodStorage:
+		return u.uploadUsingBlobAPI(ctx, blobPath, stream)
+	case ingestoptions.UploadMethodLake:
+		return u.uploadUsingDataLakeAPI(ctx, blobPath, stream)
+	default:
+		return ingestoptions.NewIngestClientError(
+			fmt.Sprintf("unsupported upload method: %v", container.UploadMethod), nil, true,
+		)
+	}
 }

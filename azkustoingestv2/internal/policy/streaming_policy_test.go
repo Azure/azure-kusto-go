@@ -36,10 +36,10 @@ func TestPolicyShouldDefaultToQueuedByTable(t *testing.T) {
 		t.Error("should not default to queued initially")
 	}
 
-	// Simulate a streaming ingestion off error
+	// Simulate a transient streaming ingestion off error
 	policy.StreamingErrorCallback(nil, "db", "table1", ManagedStreamingRequestFailureDetails{
 		Duration:      100 * time.Millisecond,
-		IsPermanent:   true,
+		IsPermanent:   false,
 		ErrorCategory: ErrorCategoryStreamingIngestionOff,
 	})
 
@@ -51,6 +51,30 @@ func TestPolicyShouldDefaultToQueuedByTable(t *testing.T) {
 	// Different table should not be affected
 	if policy.ShouldDefaultToQueuedIngestion(nil, "db", "table2") {
 		t.Error("different table should not be affected")
+	}
+}
+
+func TestPermanentErrorClearsQueuedRouting(t *testing.T) {
+	for _, category := range []ManagedStreamingErrorCategory{
+		ErrorCategoryStreamingIngestionOff,
+		ErrorCategoryTableConfigurationPreventsStreaming,
+		ErrorCategoryThrottled,
+	} {
+		t.Run(category.String(), func(t *testing.T) {
+			p := NewDefaultManagedStreamingPolicy(WithContinueWhenUnavailable(true))
+			p.StreamingErrorCallback(nil, "db", "table", ManagedStreamingRequestFailureDetails{
+				ErrorCategory: ErrorCategoryThrottled,
+			})
+			if !p.ShouldDefaultToQueuedIngestion(nil, "db", "table") {
+				t.Fatal("expected transient throttling to set queued routing")
+			}
+			p.StreamingErrorCallback(nil, "db", "table", ManagedStreamingRequestFailureDetails{
+				IsPermanent: true, ErrorCategory: category,
+			})
+			if p.ShouldDefaultToQueuedIngestion(nil, "db", "table") {
+				t.Fatal("permanent failure must not route subsequent calls to queued")
+			}
+		})
 	}
 }
 

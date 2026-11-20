@@ -14,12 +14,12 @@ import (
 
 // OneAPIError represents a Kusto OneAPI-style error response.
 type OneAPIError struct {
-	Code           string `json:"code"`
-	Message        string `json:"message"`
-	Type           string `json:"@type"`
-	DetailMessage  string `json:"@message"`
-	FailureCode    string `json:"@failureCode"`
-	IsPermanent    *bool  `json:"@permanent"`
+	Code          string `json:"code"`
+	Message       string `json:"message"`
+	Type          string `json:"@type"`
+	DetailMessage string `json:"@message"`
+	FailureCode   string `json:"@failureCode"`
+	IsPermanent   *bool  `json:"@permanent"`
 }
 
 // oneAPIErrorEnvelope wraps the error field in the response.
@@ -27,19 +27,22 @@ type oneAPIErrorEnvelope struct {
 	Error *OneAPIError `json:"error"`
 }
 
-// ParseErrorResponse parses a non-success HTTP response into an IngestError.
+// ParseErrorResponse parses a non-success HTTP response into an IngestError and closes its body.
 // It attempts to parse OneAPI-style error JSON; if that fails, it uses the raw body.
 func ParseErrorResponse(resp *http.Response) error {
 	if resp == nil {
 		return ingestoptions.NewIngestError("nil response", nil, true)
 	}
+	defer resp.Body.Close()
 
 	body, err := io.ReadAll(io.LimitReader(resp.Body, 8192))
 	if err != nil {
-		return ingestoptions.NewIngestError(
+		ingestErr := ingestoptions.NewIngestError(
 			fmt.Sprintf("HTTP %d: failed to read error body", resp.StatusCode),
-			err, true,
+			err, isPermanentHTTPStatus(resp.StatusCode),
 		)
+		ingestErr.HTTPStatusCode = resp.StatusCode
+		return ingestErr
 	}
 
 	// Try to parse as OneAPI error
@@ -49,17 +52,17 @@ func ParseErrorResponse(resp *http.Response) error {
 	}
 
 	// Fallback: raw body
-	isPermanent := resp.StatusCode != http.StatusNotFound
-	return ingestoptions.NewIngestError(
+	ingestErr := ingestoptions.NewIngestError(
 		fmt.Sprintf("HTTP %d: %s", resp.StatusCode, string(body)),
-		nil, isPermanent,
+		nil, isPermanentHTTPStatus(resp.StatusCode),
 	)
+	ingestErr.HTTPStatusCode = resp.StatusCode
+	return ingestErr
 }
 
 // oneAPIToIngestError converts a OneAPI error into the appropriate IngestError type.
 func oneAPIToIngestError(statusCode int, e *OneAPIError) error {
-	// Determine permanence: @permanent defaults to true when absent
-	isPermanent := true
+	isPermanent := isPermanentHTTPStatus(statusCode)
 	if e.IsPermanent != nil {
 		isPermanent = *e.IsPermanent
 	}
@@ -76,20 +79,31 @@ func oneAPIToIngestError(statusCode int, e *OneAPIError) error {
 		message = fmt.Sprintf("HTTP %d: %s", statusCode, e.Code)
 	}
 
+	base := ingestoptions.IngestError{
+		Message:        message,
+		HTTPStatusCode: statusCode,
+		IsPermanent:    isPermanent,
+		FailureCode:    parseFailureCode(e.FailureCode),
+		FailureSubCode: failureSubCode(statusCode),
+	}
 	if isPermanent {
 		return &ingestoptions.IngestRequestError{
-			IngestError: ingestoptions.IngestError{
-				Message:        message,
-				IsPermanent:    true,
-				FailureCode:    parseFailureCode(e.FailureCode),
-				FailureSubCode: failureSubCode(statusCode),
-			},
+			IngestError: base,
 			ErrorCode:   e.Code,
 			ErrorReason: e.Type,
 		}
 	}
 
-	return ingestoptions.NewIngestServiceError(message, nil, parseFailureCode(e.FailureCode), failureSubCode(statusCode))
+	return &ingestoptions.IngestServiceError{IngestError: base}
+}
+
+func isPermanentHTTPStatus(statusCode int) bool {
+	switch statusCode {
+	case http.StatusNotFound, http.StatusRequestTimeout, http.StatusTooManyRequests:
+		return false
+	default:
+		return statusCode < http.StatusInternalServerError || statusCode >= 600
+	}
 }
 
 // parseFailureCode converts the string @failureCode to int.

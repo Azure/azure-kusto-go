@@ -4,12 +4,18 @@
 package test
 
 import (
+	"archive/zip"
 	"bytes"
+	"compress/gzip"
 	"context"
+	"crypto/rand"
 	"encoding/json"
+	"errors"
 	"io"
 	"net/http"
 	"net/http/httptest"
+	"os"
+	"path/filepath"
 	"strings"
 	"testing"
 
@@ -26,11 +32,13 @@ func TestStreamingIngest_BlobSource_SendsJSON(t *testing.T) {
 	var capturedBody []byte
 	var capturedContentType string
 	var capturedURL string
+	var capturedContentEncoding string
 
 	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		capturedBody, _ = io.ReadAll(r.Body)
 		capturedContentType = r.Header.Get("Content-Type")
 		capturedURL = r.URL.RequestURI()
+		capturedContentEncoding = r.Header.Get("Content-Encoding")
 		w.WriteHeader(http.StatusOK)
 	}))
 	defer srv.Close()
@@ -50,7 +58,7 @@ func TestStreamingIngest_BlobSource_SendsJSON(t *testing.T) {
 
 	resp, err := client.Ingest(context.Background(), "testdb", "testtable", blob,
 		&ingestoptions.IngestRequestProperties{
-			Format:             ingestoptions.FormatCSV,
+			Format:              ingestoptions.FormatCSV,
 			IngestionMappingRef: "csvMapping",
 		})
 	if err != nil {
@@ -64,6 +72,9 @@ func TestStreamingIngest_BlobSource_SendsJSON(t *testing.T) {
 	// Verify content type is JSON
 	if capturedContentType != "application/json" {
 		t.Errorf("expected Content-Type 'application/json', got %q", capturedContentType)
+	}
+	if capturedContentEncoding != "" {
+		t.Errorf("blob URI JSON must not be marked as gzip, got %q", capturedContentEncoding)
 	}
 
 	// Verify body has SourceUri
@@ -98,11 +109,13 @@ func TestStreamingIngest_StreamSource_SendsOctetStream(t *testing.T) {
 	var capturedBody []byte
 	var capturedContentType string
 	var capturedURL string
+	var capturedContentEncoding string
 
 	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		capturedBody, _ = io.ReadAll(r.Body)
 		capturedContentType = r.Header.Get("Content-Type")
 		capturedURL = r.URL.RequestURI()
+		capturedContentEncoding = r.Header.Get("Content-Encoding")
 		w.WriteHeader(http.StatusOK)
 	}))
 	defer srv.Close()
@@ -130,10 +143,13 @@ func TestStreamingIngest_StreamSource_SendsOctetStream(t *testing.T) {
 	if capturedContentType != "application/octet-stream" {
 		t.Errorf("expected Content-Type 'application/octet-stream', got %q", capturedContentType)
 	}
+	if capturedContentEncoding != "gzip" {
+		t.Errorf("expected Content-Encoding gzip, got %q", capturedContentEncoding)
+	}
 
 	// Verify body matches the CSV data
-	if string(capturedBody) != csvData {
-		t.Errorf("expected body %q, got %q", csvData, string(capturedBody))
+	if got := readStreamingGzip(t, capturedBody); string(got) != csvData {
+		t.Errorf("expected body %q, got %q", csvData, string(got))
 	}
 
 	// Verify no sourceKind in URL (not a blob)
@@ -142,12 +158,199 @@ func TestStreamingIngest_StreamSource_SendsOctetStream(t *testing.T) {
 	}
 }
 
-// TestStreamingIngest_SizeLimit verifies that data exceeding StreamingMaxRequestBodySize is rejected.
-func TestStreamingIngest_SizeLimit(t *testing.T) {
+func TestStreamingIngest_Compression(t *testing.T) {
+	dontCompress := ingestoptions.DontCompress()
+	cases := []struct {
+		name          string
+		format        ingestoptions.DataFormat
+		requestFormat ingestoptions.DataFormat
+		compression   ingestoptions.CompressionType
+		dontCompress  bool
+		encoding      string
+	}{
+		{"automatic-gzip", ingestoptions.FormatCSV, ingestoptions.FormatCSV, ingestoptions.CompressionNone, false, "gzip"},
+		{"already-gzip", ingestoptions.FormatCSV, ingestoptions.FormatCSV, ingestoptions.CompressionGZip, false, "gzip"},
+		{"already-zip", ingestoptions.FormatCSV, ingestoptions.FormatCSV, ingestoptions.CompressionZip, false, ""},
+		{"binary", ingestoptions.FormatParquet, ingestoptions.FormatParquet, ingestoptions.CompressionNone, false, ""},
+		{"binary-sstream", ingestoptions.FormatSStream, ingestoptions.FormatSStream, ingestoptions.CompressionNone, false, ""},
+		{"binary-request-format", ingestoptions.FormatUnknown, ingestoptions.FormatParquet, ingestoptions.CompressionNone, false, ""},
+		{"dont-compress", ingestoptions.FormatCSV, ingestoptions.FormatCSV, ingestoptions.CompressionNone, true, ""},
+		{"dont-compress-already-gzip", ingestoptions.FormatCSV, ingestoptions.FormatCSV, ingestoptions.CompressionGZip, true, "gzip"},
+	}
+	for _, kind := range []string{"file", "stream", "managed-stream"} {
+		for _, tc := range cases {
+			t.Run(kind+"/"+tc.name, func(t *testing.T) {
+				t.Parallel()
+				payload := []byte("name,age\nAlice,30\n")
+				switch tc.compression {
+				case ingestoptions.CompressionGZip:
+					var compressed bytes.Buffer
+					writer := gzip.NewWriter(&compressed)
+					if _, err := writer.Write(payload); err != nil {
+						t.Fatal(err)
+					}
+					if err := writer.Close(); err != nil {
+						t.Fatal(err)
+					}
+					payload = compressed.Bytes()
+				case ingestoptions.CompressionZip:
+					var compressed bytes.Buffer
+					writer := zip.NewWriter(&compressed)
+					entry, err := writer.Create("data.csv")
+					if err != nil {
+						t.Fatal(err)
+					}
+					if _, err := entry.Write(payload); err != nil {
+						t.Fatal(err)
+					}
+					if err := writer.Close(); err != nil {
+						t.Fatal(err)
+					}
+					payload = compressed.Bytes()
+				}
+
+				type request struct {
+					headers http.Header
+					body    []byte
+				}
+				requests := make(chan request, 1)
+				server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+					body, err := io.ReadAll(r.Body)
+					if err != nil {
+						t.Error(err)
+					}
+					requests <- request{headers: r.Header.Clone(), body: body}
+					w.WriteHeader(http.StatusOK)
+				}))
+				defer server.Close()
+				baseClient := httpclient.NewBaseClient(
+					func(context.Context) (string, error) { return "token", nil }, nil,
+				)
+				apiClient := azkustoingestv2.NewAPIClient(server.URL, server.URL, baseClient)
+				streamingClient := azkustoingestv2.NewStreamingIngestClient(apiClient)
+				var client azkustoingestv2.IngestClient = streamingClient
+				if kind == "managed-stream" {
+					managed, err := azkustoingestv2.NewManagedStreamingClient(
+						server.URL, server.URL,
+						azkustoingestv2.WithTokenProvider(func(context.Context) (string, error) { return "token", nil }),
+					)
+					if err != nil {
+						t.Fatal(err)
+					}
+					t.Cleanup(func() { _ = managed.Close() })
+					client = managed
+				}
+				var source ingestoptions.IngestionSource
+				if kind == "file" {
+					path := filepath.Join(t.TempDir(), "data."+tc.format.String()+tc.compression.Extension())
+					if err := os.WriteFile(path, payload, 0600); err != nil {
+						t.Fatal(err)
+					}
+					var opts []ingestoptions.FileSourceOption
+					if tc.dontCompress {
+						opts = append(opts, dontCompress)
+					}
+					source = ingestoptions.NewFileSource(path, tc.format, opts...)
+				} else {
+					opts := []ingestoptions.StreamSourceOption{ingestoptions.WithStreamCompression(tc.compression)}
+					if tc.dontCompress {
+						opts = append(opts, dontCompress)
+					}
+					source = ingestoptions.NewStreamSource(
+						io.NopCloser(bytes.NewReader(payload)), tc.format, opts...,
+					)
+				}
+				t.Cleanup(func() {
+					if err := source.Close(); err != nil {
+						t.Error(err)
+					}
+				})
+				response, err := client.Ingest(context.Background(), "db", "table", source,
+					&ingestoptions.IngestRequestProperties{Format: tc.requestFormat})
+				if err != nil {
+					t.Fatal(err)
+				}
+				if response.Kind != ingestoptions.IngestKindStreaming {
+					t.Fatalf("unexpected ingest kind: %v", response.Kind)
+				}
+				got := <-requests
+				if got.headers.Get("Content-Encoding") != tc.encoding {
+					t.Errorf("expected Content-Encoding %q, got %q", tc.encoding, got.headers.Get("Content-Encoding"))
+				}
+				if got.headers.Get("Content-Type") != "application/octet-stream" ||
+					got.headers.Get("Authorization") != "Bearer token" {
+					t.Errorf("standard headers were not preserved: %v", got.headers)
+				}
+				if tc.encoding == "gzip" && tc.compression == ingestoptions.CompressionNone {
+					got.body = readStreamingGzip(t, got.body)
+				}
+				if !bytes.Equal(got.body, payload) {
+					t.Error("payload did not match the source, or already-compressed data was compressed again")
+				}
+				if source.CompressionType() != tc.compression {
+					t.Error("streaming changed the source compression metadata")
+				}
+			})
+		}
+	}
+}
+
+func readStreamingGzip(t *testing.T, data []byte) []byte {
+	t.Helper()
+	reader, err := gzip.NewReader(bytes.NewReader(data))
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer reader.Close()
+	data, err = io.ReadAll(reader)
+	if err != nil {
+		t.Fatal(err)
+	}
+	return data
+}
+
+func TestStreamingIngest_CompressedSizeLimitFromService(t *testing.T) {
+	t.Parallel()
+	payload := make([]byte, ingestoptions.StreamingMaxRequestBodySize)
+	if _, err := rand.Read(payload); err != nil {
+		t.Fatal(err)
+	}
+	source := ingestoptions.NewStreamSource(io.NopCloser(bytes.NewReader(payload)), ingestoptions.FormatCSV)
+	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		size, err := io.Copy(io.Discard, r.Body)
+		if err != nil {
+			t.Error(err)
+		}
+		if size <= ingestoptions.StreamingMaxRequestBodySize {
+			t.Errorf("expected compressed data beyond the managed streaming bound, got %d bytes", size)
+		}
+		w.WriteHeader(http.StatusRequestEntityTooLarge)
+	}))
+	defer server.Close()
+	client, err := azkustoingestv2.NewStreamingClient(server.URL)
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer client.Close()
+	_, err = client.Ingest(context.Background(), "db", "table", source,
+		&ingestoptions.IngestRequestProperties{Format: ingestoptions.FormatCSV})
+	var serviceErr *ingestoptions.IngestError
+	if !errors.As(err, &serviceErr) || serviceErr.HTTPStatusCode != http.StatusRequestEntityTooLarge {
+		t.Fatalf("expected size rejection from the service, got %v", err)
+	}
+}
+
+func TestStreamingIngest_LargePayloadStreams(t *testing.T) {
 	t.Parallel()
 
+	var received int64
 	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		t.Error("server should not be called when size limit exceeded")
+		var err error
+		received, err = io.Copy(io.Discard, r.Body)
+		if err != nil {
+			t.Error(err)
+		}
+		w.WriteHeader(http.StatusOK)
 	}))
 	defer srv.Close()
 
@@ -158,24 +361,19 @@ func TestStreamingIngest_SizeLimit(t *testing.T) {
 	apiClient := azkustoingestv2.NewAPIClient(srv.URL, srv.URL, baseClient)
 	client := azkustoingestv2.NewStreamingIngestClient(apiClient)
 
-	// Create data slightly over 10 MiB
 	bigData := make([]byte, ingestoptions.StreamingMaxRequestBodySize+1)
 	source := ingestoptions.NewStreamSource(
 		io.NopCloser(bytes.NewReader(bigData)),
-		ingestoptions.FormatCSV,
+		ingestoptions.FormatParquet,
 	)
 
-	_, err := client.Ingest(context.Background(), "db", "tbl", source,
-		&ingestoptions.IngestRequestProperties{Format: ingestoptions.FormatCSV})
-	if err == nil {
-		t.Fatal("expected error for oversized data")
+	result, err := client.Ingest(context.Background(), "db", "tbl", source,
+		&ingestoptions.IngestRequestProperties{Format: ingestoptions.FormatParquet})
+	if err != nil || result == nil || result.Kind != ingestoptions.IngestKindStreaming {
+		t.Fatalf("direct streaming applied a local size limit: result=%v err=%v", result, err)
 	}
-
-	var sizeErr *ingestoptions.IngestSizeLimitExceededError
-	if ok := containsError(err, &sizeErr); !ok {
-		if !strings.Contains(strings.ToLower(err.Error()), "size") {
-			t.Errorf("expected size-related error, got %q", err.Error())
-		}
+	if received != int64(len(bigData)) {
+		t.Errorf("received %d bytes, want %d", received, len(bigData))
 	}
 }
 
@@ -214,8 +412,8 @@ func TestStreamingIngest_ServerError_Propagated(t *testing.T) {
 		w.WriteHeader(http.StatusInternalServerError)
 		json.NewEncoder(w).Encode(map[string]interface{}{
 			"error": map[string]interface{}{
-				"code":    "InternalError",
-				"message": "Streaming ingestion is disabled for this cluster",
+				"code":       "InternalError",
+				"message":    "Streaming ingestion is disabled for this cluster",
 				"@permanent": true,
 			},
 		})
@@ -264,9 +462,11 @@ func TestStreamingIngest_FileSource_SendsOctetStream(t *testing.T) {
 
 	var capturedContentType string
 	var capturedBody []byte
+	var capturedContentEncoding string
 
 	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		capturedContentType = r.Header.Get("Content-Type")
+		capturedContentEncoding = r.Header.Get("Content-Encoding")
 		capturedBody, _ = io.ReadAll(r.Body)
 		w.WriteHeader(http.StatusOK)
 	}))
@@ -283,6 +483,11 @@ func TestStreamingIngest_FileSource_SendsOctetStream(t *testing.T) {
 	tmpFile := createTempCSVFile(t, "name,age\nAlice,30\n")
 
 	source := ingestoptions.NewFileSource(tmpFile, ingestoptions.FormatCSV)
+	t.Cleanup(func() {
+		if err := source.Close(); err != nil {
+			t.Error(err)
+		}
+	})
 
 	_, err := client.Ingest(context.Background(), "db", "tbl", source,
 		&ingestoptions.IngestRequestProperties{Format: ingestoptions.FormatCSV})
@@ -293,7 +498,10 @@ func TestStreamingIngest_FileSource_SendsOctetStream(t *testing.T) {
 	if capturedContentType != "application/octet-stream" {
 		t.Errorf("expected Content-Type 'application/octet-stream', got %q", capturedContentType)
 	}
-	if len(capturedBody) == 0 {
-		t.Error("expected non-empty body")
+	if capturedContentEncoding != "gzip" {
+		t.Errorf("expected Content-Encoding gzip, got %q", capturedContentEncoding)
+	}
+	if got := readStreamingGzip(t, capturedBody); string(got) != "name,age\nAlice,30\n" {
+		t.Errorf("unexpected file payload: %q", got)
 	}
 }

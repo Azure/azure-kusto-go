@@ -7,6 +7,7 @@ import (
 	"bytes"
 	"context"
 	"encoding/json"
+	"errors"
 	"fmt"
 	"io"
 	"net/http"
@@ -17,35 +18,29 @@ import (
 
 	"github.com/Azure/azure-kusto-go/azkustoingestv2"
 	"github.com/Azure/azure-kusto-go/azkustoingestv2/ingestoptions"
-	"github.com/Azure/azure-kusto-go/azkustoingestv2/internal/httpclient"
-	"github.com/Azure/azure-kusto-go/azkustoingestv2/internal/policy"
 )
 
-// testRetryPolicy is a fast retry policy for tests (no real delays).
-// Currently unused — tests use default policy. Kept for future customization.
 // newTestManagedClient creates a managed streaming client backed by httptest servers.
 // The engineHandler handles streaming requests; the dmHandler handles queued requests.
-func newTestManagedClient(t *testing.T, engineHandler, dmHandler http.HandlerFunc, policyOpts ...policy.DefaultManagedStreamingPolicyOption) (*azkustoingestv2.ManagedStreamingIngestClient, func()) {
+func newTestManagedClient(t *testing.T, engineHandler, dmHandler http.HandlerFunc) (*azkustoingestv2.ManagedStreamingIngestClient, func()) {
 	t.Helper()
 
 	engineSrv := httptest.NewServer(engineHandler)
-	dmSrv := httptest.NewServer(dmHandler)
+	dmSrv := newQueuedTestServer(t, dmHandler)
 
-	baseClient := httpclient.NewBaseClient(
-		func(ctx context.Context) (string, error) { return "token", nil },
-		ingestoptions.NewClientDetails("test", "user", "1.0"),
+	managed, err := azkustoingestv2.NewManagedStreamingClient(
+		dmSrv.URL, engineSrv.URL,
+		azkustoingestv2.WithTokenProvider(func(ctx context.Context) (string, error) { return "token", nil }),
+		azkustoingestv2.WithClientDetails(ingestoptions.NewClientDetails("test", "user", "1.0")),
 	)
-
-	streamingAPI := azkustoingestv2.NewAPIClient(dmSrv.URL, engineSrv.URL, baseClient)
-	queuedAPI := azkustoingestv2.NewAPIClient(dmSrv.URL, engineSrv.URL, baseClient)
-
-	streamingClient := azkustoingestv2.NewStreamingIngestClient(streamingAPI)
-	queuedClient := azkustoingestv2.NewQueuedIngestClient(queuedAPI, newDefaultFakeCache(), nil, false)
-
-	p := policy.NewDefaultManagedStreamingPolicy(policyOpts...)
-	managed := azkustoingestv2.NewManagedStreamingIngestClient(streamingClient, queuedClient, p)
+	if err != nil {
+		engineSrv.Close()
+		dmSrv.Close()
+		t.Fatal(err)
+	}
 
 	cleanup := func() {
+		_ = managed.Close()
 		engineSrv.Close()
 		dmSrv.Close()
 	}
@@ -146,8 +141,7 @@ func TestManagedStreaming_TransientError_RetriesThenSucceeds(t *testing.T) {
 	}
 }
 
-// TestManagedStreaming_PermanentError_FallsBackToQueued tests fallback on permanent streaming error.
-func TestManagedStreaming_PermanentError_FallsBackToQueued(t *testing.T) {
+func TestManagedStreaming_PermanentError_ReturnsWithoutFallback(t *testing.T) {
 	t.Parallel()
 
 	var engineCalled atomic.Int32
@@ -165,26 +159,21 @@ func TestManagedStreaming_PermanentError_FallsBackToQueued(t *testing.T) {
 		})
 	})
 	dmHandler := http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		w.Header().Set("Content-Type", "application/json")
-		json.NewEncoder(w).Encode(map[string]string{"ingestionOperationId": "op-fallback"})
+		t.Error("DM should not be called after a permanent streaming error")
+		w.WriteHeader(http.StatusBadRequest)
 	})
 
-	managed, cleanup := newTestManagedClient(t, engineHandler, dmHandler,
-		policy.WithContinueWhenUnavailable(true),
-	)
+	managed, cleanup := newTestManagedClient(t, engineHandler, dmHandler)
 	defer cleanup()
 
 	blob := mustBlobSource(t, "https://storage/data.csv", ingestoptions.FormatCSV)
 
 	resp, err := managed.Ingest(context.Background(), "db", "tbl", blob,
 		&ingestoptions.IngestRequestProperties{Format: ingestoptions.FormatCSV})
-	if err != nil {
-		t.Fatalf("Ingest failed: %v", err)
-	}
-
-	// Should have fallen back to queued
-	if resp.Kind != ingestoptions.IngestKindQueued {
-		t.Errorf("expected Queued kind (fallback), got %v", resp.Kind)
+	var requestErr *ingestoptions.IngestRequestError
+	if resp != nil || !errors.As(err, &requestErr) || !requestErr.IsPermanent ||
+		requestErr.HTTPStatusCode != http.StatusBadRequest || !strings.Contains(err.Error(), "incompatible schema") {
+		t.Fatalf("expected the permanent streaming error, got response=%v err=%v", resp, err)
 	}
 	// Streaming should have been attempted exactly once (permanent = no retry)
 	if engineCalled.Load() != 1 {
@@ -192,9 +181,7 @@ func TestManagedStreaming_PermanentError_FallsBackToQueued(t *testing.T) {
 	}
 }
 
-// TestManagedStreaming_StreamingDisabled_NoFallbackWhenNotConfigured tests that streaming-off
-// is a hard failure when ContinueWhenStreamingIngestionUnavailable is false.
-func TestManagedStreaming_StreamingDisabled_NoFallbackWhenNotConfigured(t *testing.T) {
+func TestManagedStreaming_StreamingDisabled_NoFallback(t *testing.T) {
 	t.Parallel()
 
 	engineHandler := http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
@@ -209,10 +196,9 @@ func TestManagedStreaming_StreamingDisabled_NoFallbackWhenNotConfigured(t *testi
 		})
 	})
 	dmHandler := http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		t.Error("DM should not be called when streaming is disabled and fallback is off")
+		t.Error("DM should not be called after a permanent streaming-disabled error")
 	})
 
-	// Default: ContinueWhenStreamingIngestionUnavailable = false
 	managed, cleanup := newTestManagedClient(t, engineHandler, dmHandler)
 	defer cleanup()
 
@@ -225,25 +211,27 @@ func TestManagedStreaming_StreamingDisabled_NoFallbackWhenNotConfigured(t *testi
 	_, err := managed.Ingest(context.Background(), "db", "tbl", source,
 		&ingestoptions.IngestRequestProperties{Format: ingestoptions.FormatCSV})
 	if err == nil {
-		t.Fatal("expected error when streaming is disabled and fallback is off")
+		t.Fatal("expected the permanent streaming-disabled error")
 	}
 	if !strings.Contains(strings.ToLower(err.Error()), "disabled") {
 		t.Errorf("expected 'disabled' in error, got %q", err.Error())
 	}
 }
 
-// TestManagedStreaming_LargeData_DirectlyQueued verifies that after a streaming error sets
-// the policy state, subsequent requests go directly to queued without attempting streaming.
-func TestManagedStreaming_LargeData_DirectlyQueued(t *testing.T) {
+func TestManagedStreaming_PermanentError_DoesNotBypassNextStreamingRequest(t *testing.T) {
 	t.Parallel()
 
+	var engineCalls atomic.Int32
 	dmHandler := http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		w.Header().Set("Content-Type", "application/json")
-		json.NewEncoder(w).Encode(map[string]string{"ingestionOperationId": "op-queued"})
+		t.Error("permanent streaming errors must not route later requests to DM")
+		w.WriteHeader(http.StatusBadRequest)
 	})
 
-	// Engine returns a permanent schema error to set policy state
 	engineDisabledSrv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		if engineCalls.Add(1) > 1 {
+			w.WriteHeader(http.StatusOK)
+			return
+		}
 		w.Header().Set("Content-Type", "application/json")
 		w.WriteHeader(http.StatusBadRequest)
 		json.NewEncoder(w).Encode(map[string]interface{}{
@@ -256,38 +244,32 @@ func TestManagedStreaming_LargeData_DirectlyQueued(t *testing.T) {
 	}))
 	defer engineDisabledSrv.Close()
 
-	dmSrv := httptest.NewServer(dmHandler)
+	dmSrv := newQueuedTestServer(t, dmHandler)
 	defer dmSrv.Close()
 
-	baseClient := httpclient.NewBaseClient(
-		func(ctx context.Context) (string, error) { return "token", nil },
-		ingestoptions.NewClientDetails("test", "user", "1.0"),
+	managed, err := azkustoingestv2.NewManagedStreamingClient(
+		dmSrv.URL, engineDisabledSrv.URL,
+		azkustoingestv2.WithTokenProvider(func(ctx context.Context) (string, error) { return "token", nil }),
 	)
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer managed.Close()
 
-	streamingAPI := azkustoingestv2.NewAPIClient(dmSrv.URL, engineDisabledSrv.URL, baseClient)
-	queuedAPI := azkustoingestv2.NewAPIClient(dmSrv.URL, engineDisabledSrv.URL, baseClient)
-
-	p := policy.NewDefaultManagedStreamingPolicy(
-		policy.WithContinueWhenUnavailable(true),
-	)
-	streamingClient := azkustoingestv2.NewStreamingIngestClient(streamingAPI)
-	queuedClient := azkustoingestv2.NewQueuedIngestClient(queuedAPI, newDefaultFakeCache(), nil, false)
-	managed := azkustoingestv2.NewManagedStreamingIngestClient(streamingClient, queuedClient, p)
-
-	// First ingest triggers schema error → falls back to queued → sets policy state
 	blob1 := mustBlobSource(t, "https://storage/data1.csv", ingestoptions.FormatCSV)
-	_, _ = managed.Ingest(context.Background(), "db", "tbl", blob1,
-		&ingestoptions.IngestRequestProperties{Format: ingestoptions.FormatCSV})
+	if resp, err := managed.Ingest(context.Background(), "db", "tbl", blob1,
+		&ingestoptions.IngestRequestProperties{Format: ingestoptions.FormatCSV}); resp != nil || err == nil {
+		t.Fatalf("expected a permanent streaming error, got response=%v err=%v", resp, err)
+	}
 
-	// Second ingest should go directly to queued (policy state set)
 	blob2 := mustBlobSource(t, "https://storage/data2.csv", ingestoptions.FormatCSV)
 	resp, err := managed.Ingest(context.Background(), "db", "tbl", blob2,
 		&ingestoptions.IngestRequestProperties{Format: ingestoptions.FormatCSV})
 	if err != nil {
 		t.Fatalf("Second ingest failed: %v", err)
 	}
-	if resp.Kind != ingestoptions.IngestKindQueued {
-		t.Errorf("expected Queued kind for policy-bypassed ingest, got %v", resp.Kind)
+	if resp.Kind != ingestoptions.IngestKindStreaming || engineCalls.Load() != 2 {
+		t.Errorf("expected the next request to use streaming, got response=%v engine calls=%d", resp, engineCalls.Load())
 	}
 }
 
@@ -308,8 +290,13 @@ func TestManagedStreaming_EmptyFields_Rejected(t *testing.T) {
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
 			t.Parallel()
-			managed := azkustoingestv2.NewManagedStreamingIngestClient(nil, nil, nil)
-			_, err := managed.Ingest(context.Background(), tt.database, tt.table, nil, nil)
+			managed, err := azkustoingestv2.NewManagedStreamingClient(
+				"https://ingest-cluster.kusto.windows.net", "https://cluster.kusto.windows.net")
+			if err != nil {
+				t.Fatal(err)
+			}
+			defer managed.Close()
+			_, err = managed.Ingest(context.Background(), tt.database, tt.table, nil, nil)
 			if err == nil {
 				t.Fatal("expected error")
 			}
@@ -327,11 +314,12 @@ func TestManagedStreaming_GetOperationSummary_DelegatesBasedOnKind(t *testing.T)
 
 	t.Run("streaming_returns_empty", func(t *testing.T) {
 		t.Parallel()
-		managed := azkustoingestv2.NewManagedStreamingIngestClient(
-			azkustoingestv2.NewStreamingIngestClient(nil),
-			azkustoingestv2.NewQueuedIngestClient(nil, nil, nil, false),
-			nil,
-		)
+		managed, err := azkustoingestv2.NewManagedStreamingClient(
+			"https://ingest-cluster.kusto.windows.net", "https://cluster.kusto.windows.net")
+		if err != nil {
+			t.Fatal(err)
+		}
+		defer managed.Close()
 		status, err := managed.GetOperationSummary(context.Background(), &azkustoingestv2.IngestionOperation{
 			IngestKind: ingestoptions.IngestKindStreaming,
 		})
@@ -355,16 +343,11 @@ func TestManagedStreaming_GetOperationSummary_DelegatesBasedOnKind(t *testing.T)
 		}))
 		defer srv.Close()
 
-		baseClient := httpclient.NewBaseClient(
-			func(ctx context.Context) (string, error) { return "t", nil },
-			nil,
-		)
-		api := azkustoingestv2.NewAPIClient(srv.URL, srv.URL, baseClient)
-		managed := azkustoingestv2.NewManagedStreamingIngestClient(
-			azkustoingestv2.NewStreamingIngestClient(api),
-			azkustoingestv2.NewQueuedIngestClient(api, nil, nil, false),
-			nil,
-		)
+		managed, err := azkustoingestv2.NewManagedStreamingClient(srv.URL, srv.URL)
+		if err != nil {
+			t.Fatal(err)
+		}
+		defer managed.Close()
 		status, err := managed.GetOperationSummary(context.Background(), &azkustoingestv2.IngestionOperation{
 			Database:    "db",
 			Table:       "tbl",

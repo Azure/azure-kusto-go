@@ -32,17 +32,6 @@ func TestUploadFailedError(t *testing.T) {
 	}
 }
 
-func TestRequestPropertiesValidation_MappingConflict(t *testing.T) {
-	props := &ingestoptions.IngestRequestProperties{
-		IngestionMappingRef: "myMapping",
-		IngestionMapping:    []ingestoptions.ColumnMapping{{Name: "col1"}},
-	}
-	err := props.Validate()
-	if err == nil {
-		t.Error("expected error for mapping ref + inline mapping conflict")
-	}
-}
-
 func TestRequestPropertiesValidation_OK(t *testing.T) {
 	props := &ingestoptions.IngestRequestProperties{
 		IngestionMappingRef: "myMapping",
@@ -112,15 +101,23 @@ func TestSerializeColumnMappings_Empty(t *testing.T) {
 	}
 }
 
-func TestBuilderWithValidation(t *testing.T) {
-	builder := ingestoptions.NewIngestRequestPropertiesBuilder()
-	_, err := builder.
-		WithFormat(ingestoptions.FormatCSV).
-		WithMappingRef("ref").
-		WithMapping([]ingestoptions.ColumnMapping{{Name: "col"}}).
-		Build()
-	if err == nil {
-		t.Error("expected error for conflicting mapping ref and inline mapping")
+func TestBuilderWithBothMappings(t *testing.T) {
+	for _, mappingFirst := range []bool{false, true} {
+		builder := ingestoptions.NewIngestRequestPropertiesBuilder().WithFormat(ingestoptions.FormatCSV)
+		mapping := []ingestoptions.ColumnMapping{{Name: "col"}}
+		if mappingFirst {
+			builder.WithMapping(mapping).WithMappingRef("ref")
+		} else {
+			builder.WithMappingRef("ref").WithMapping(mapping)
+		}
+		props, err := builder.Build()
+		if err != nil {
+			t.Fatalf("legacy mapping options should coexist: %v", err)
+		}
+		if props.IngestionMappingRef != "ref" || len(props.IngestionMapping) != 1 ||
+			props.IngestionMapping[0].Name != "col" {
+			t.Fatalf("builder did not retain both mappings: %+v", props)
+		}
 	}
 }
 

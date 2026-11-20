@@ -16,6 +16,14 @@ func TestGetIngestionEndpoint(t *testing.T) {
 		{"https://ingest-mycluster.kusto.windows.net", "https://ingest-mycluster.kusto.windows.net"},
 		{"https://localhost:8080", "https://localhost:8080"},
 		{"https://127.0.0.1:8080", "https://127.0.0.1:8080"},
+		{"https://[::1]:8080", "https://[::1]:8080"},
+		{"https://[fe80::1%25eth0]:8080", "https://[fe80::1%25eth0]:8080"},
+		{"https://onebox.dev.kusto.windows.net", "https://onebox.dev.kusto.windows.net"},
+		{"https://mycluster.kusto.windows.net:8443/path%2Fpart?name=ingest-value#fragment", "https://ingest-mycluster.kusto.windows.net:8443/path%2Fpart?name=ingest-value#fragment"},
+		{"https://my-ingest-cluster.kusto.windows.net/ingest-data", "https://ingest-my-ingest-cluster.kusto.windows.net/ingest-data"},
+		{"https://INGEST-mycluster.kusto.windows.net", "https://INGEST-mycluster.kusto.windows.net"},
+		{"https://my-localhost.kusto.windows.net", "https://ingest-my-localhost.kusto.windows.net"},
+		{"not-a-url", "not-a-url"},
 		{"", ""},
 	}
 
@@ -37,6 +45,14 @@ func TestGetQueryEndpoint(t *testing.T) {
 		{"https://ingest-mycluster.kusto.windows.net", "https://mycluster.kusto.windows.net"},
 		{"https://mycluster.kusto.windows.net", "https://mycluster.kusto.windows.net"},
 		{"https://localhost:8080", "https://localhost:8080"},
+		{"https://127.0.0.1:8080", "https://127.0.0.1:8080"},
+		{"https://[::1]:8080", "https://[::1]:8080"},
+		{"https://[fe80::1%25eth0]:8080", "https://[fe80::1%25eth0]:8080"},
+		{"https://onebox.dev.kusto.windows.net", "https://onebox.dev.kusto.windows.net"},
+		{"https://INGEST-mycluster.kusto.windows.net:8443/path%2Fpart?name=ingest-value#fragment", "https://mycluster.kusto.windows.net:8443/path%2Fpart?name=ingest-value#fragment"},
+		{"https://mycluster.kusto.windows.net/ingest-data?name=ingest-value", "https://mycluster.kusto.windows.net/ingest-data?name=ingest-value"},
+		{"https://my-ingest-cluster.kusto.windows.net", "https://my-ingest-cluster.kusto.windows.net"},
+		{"not-a-url", "not-a-url"},
 		{"", ""},
 	}
 

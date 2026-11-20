@@ -67,7 +67,7 @@ func ingestBlobWithTracking(ctx context.Context, client *azkustoingestv2.QueuedI
 	props := &ingestoptions.IngestRequestProperties{
 		Format:              ingestoptions.FormatJSON,
 		IngestionMappingRef: "Logs_mapping", // Must exist on the target table
-		FlushImmediately:    true,
+		SkipBatching:        true,
 		EnableTracking:      true,
 	}
 
@@ -123,7 +123,7 @@ func ingestMultipleBlobs(ctx context.Context, client *azkustoingestv2.QueuedInge
 	props := &ingestoptions.IngestRequestProperties{
 		Format:              ingestoptions.FormatJSON,
 		IngestionMappingRef: "Logs_mapping",
-		FlushImmediately:    true,
+		SkipBatching:        true,
 	}
 
 	// Check how many blobs can be submitted in one request

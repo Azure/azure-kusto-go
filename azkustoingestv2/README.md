@@ -62,6 +62,11 @@ func main() {
 }
 ```
 
+Direct streaming sends local file and stream data incrementally, applying gzip
+when eligible without buffering the complete input. Like legacy Go, it delegates
+streaming size enforcement to the service. Managed ingestion still uses a bounded
+prefix to choose streaming or queued ingestion.
+
 ### Managed Streaming (recommended for production)
 
 ```go
@@ -106,7 +111,7 @@ blobSource, _ := ingestoptions.NewBlobSource(
 
 props := &ingestoptions.IngestRequestProperties{
     Format:           ingestoptions.FormatJSON,
-    FlushImmediately: true,
+    SkipBatching:     true,
     EnableTracking:   true,
 }
 
@@ -124,9 +129,23 @@ op := &azkustoingestv2.IngestionOperation{
     IngestKind:  resp.Kind,
 }
 
-summary, _ := client.GetOperationSummary(ctx, op)
-fmt.Printf("Succeeded: %d, Failed: %d\n", summary.Succeeded, summary.Failed)
+result, err := client.PollForCompletion(ctx, op,
+    azkustoingestv2.WithPollingInterval(5*time.Second),
+    azkustoingestv2.WithPollingTimeout(5*time.Minute),
+)
+if err != nil {
+    log.Fatalf("Ingestion did not complete successfully: %v; last status: %+v", err, result)
+}
+fmt.Printf("Ingestion completed: %+v\n", result)
 ```
+
+`PollForCompletion` is explicit: `EnableTracking` only enables service-side tracking,
+not background polling. Queued and managed clients implement `OperationPoller`;
+managed requests that used direct streaming cannot be polled. Defaults are a
+30-second interval and a 5-minute timeout. Context cancellation or an earlier
+context deadline stops polling, including an in-flight status request. Failed or
+canceled ingestions return their final status with an error; status-request errors
+stop polling without automatically retrying or resubmitting ingestion.
 
 ## Source Types
 
@@ -135,6 +154,12 @@ fmt.Printf("Succeeded: %d, Failed: %d\n", summary.Succeeded, summary.Failed)
 | `FileSource` | Local file on disk | `ingestoptions.NewFileSource(path, format)` |
 | `StreamSource` | In-memory stream (io.ReadCloser) | `ingestoptions.NewStreamSource(reader, format)` |
 | `BlobSource` | Existing blob in Azure Storage | `ingestoptions.NewBlobSource(url, format)` |
+
+Clients close SDK-opened `FileSource` handles when `Ingest` returns, on success
+or failure and after any managed retries or queued fallback. All ingestion modes
+close `StreamSource` readers when the complete call finishes unless
+`WithLeaveOpen(true)` is set. Readers stay available through uploads, retries,
+and managed fallback; the ownership rule does not depend on the ingestion route.
 
 ### Source Options
 
@@ -150,7 +175,7 @@ blobSource, _ := ingestoptions.NewBlobSource(blobURL, ingestoptions.FormatJSON,
 )
 blobSource.BlobExactSize = 1024000
 
-// Stream that should be left open after ingestion
+// Stream whose reader should remain open after ingestion and source.Close()
 source := ingestoptions.NewStreamSource(myReader, ingestoptions.FormatCSV,
     ingestoptions.WithLeaveOpen(true),
 )
@@ -164,14 +189,21 @@ Use `IngestRequestProperties` to configure ingestion behavior:
 props := &ingestoptions.IngestRequestProperties{
     Format:              ingestoptions.FormatJSON,
     IngestionMappingRef: "MyMapping",     // Reference to pre-defined mapping
-    FlushImmediately:    true,            // Skip batching (queued only)
-    EnableTracking:      true,            // Enable status polling
+    SkipBatching:        true,            // Skip batching (queued only)
+    EnableTracking:      true,            // Enable service-side status tracking
     IgnoreFirstRecord:   true,            // Skip header row (CSV)
-    IngestIfNotExists:   "unique-tag",    // Idempotent ingestion
+    IngestIfNotExists:   []string{"ingest-by:unique-tag"}, // Idempotent ingestion
     DropByTags:          []string{"v1"},  // Extent drop-by tags
-    IngestByTags:        []string{"batch1"}, // Ingest-by dedup tags
+    IngestByTags:        []string{"unique-tag"}, // Ingest-by dedup tags
 }
 ```
+
+Mapping behavior follows legacy Go: queued ingestion accepts inline mappings and
+mapping references together and forwards both to the service. Direct streaming
+rejects inline mappings and supports mapping references only. Managed ingestion
+accepts both, uses only the reference during streaming, and retains both for queued
+routing or fallback. The SDK does not guarantee that the service accepts both
+mapping options in a queued request.
 
 Or use the builder pattern:
 
@@ -179,7 +211,7 @@ Or use the builder pattern:
 props, err := ingestoptions.NewIngestRequestPropertiesBuilder().
     WithFormat(ingestoptions.FormatJSON).
     WithMappingRef("MyMapping").
-    WithFlushImmediately(true).
+    WithSkipBatching(true).
     WithTracking(true).
     Build()
 ```
@@ -218,7 +250,44 @@ azkustoingestv2.WithTokenProvider(func(ctx context.Context) (string, error) {
 })
 ```
 
+### OneLake uploads
+
+Local files and streams are uploaded using the Blob or Data Lake API according
+to the selected container's upload method. For OneLake bearer authentication,
+pass an Azure Identity credential with
+`azkustoingestv2.WithUploadTokenCredential(cred)`. The uploader requests a storage
+token separately from the Kusto token supplied by `WithTokenProvider`.
+Without an upload credential, the uploader uses the destination's SAS token,
+if present, or sends the request without bearer authentication.
+
+For Fabric Private Link, configure both `WithS2STokenProvider` and a nonblank
+`WithS2SFabricAccessContext`. These headers are also applied to OneLake upload
+requests, including retries. `WithHTTPClient` applies to both API and upload
+requests.
+
+Azure SDKs retry individual transfer requests. Retrying an entire upload against
+another container additionally requires a seekable source; non-seekable sources
+return an error rather than retrying with partially consumed data.
+
 ## Client Options
+
+Client factories correct endpoint hostnames by default, like legacy Go ingestion:
+queued clients add `ingest-`, streaming clients remove it, and managed clients
+correct both URLs to their respective roles. For example,
+`NewManagedStreamingClient(clusterURL, clusterURL)` derives the DM endpoint from
+the same Engine URL. Correction also applies to `WithDMURL` and `WithEngineURL`
+overrides. Ports, paths, and query strings are preserved; localhost, IP, and onebox
+development endpoints are unchanged. Use `WithoutEndpointCorrection()` to preserve
+the supplied URLs exactly. This option does not disable trusted-host validation.
+
+Kusto API endpoints are validated against the SDK's trusted-host rules by default.
+Localhost and IP endpoints remain supported for development.
+For a trusted custom hostname, explicitly opt out with `WithSkipSecurityChecks(true)`.
+This option disables hostname trust checks, not TLS certificate verification.
+
+`WithMaxDataSize` limits local source bytes before SDK-added compression, including
+streams of unknown length. `WithIgnoreSizeLimit(true)` bypasses that maximum, but
+empty input and source read errors still fail ingestion.
 
 ```go
 azkustoingestv2.NewQueuedClient(dmURL,
@@ -271,18 +340,19 @@ if err != nil {
 
 ## Managed Streaming Behavior
 
-The `ManagedStreamingIngestClient` makes intelligent routing decisions:
+The `ManagedStreamingIngestClient` uses built-in routing and retry behavior,
+as in legacy Go. Custom policy injection and callbacks are not part of the public API.
 
-1. **Size check** — If data exceeds ~4MB (configurable via policy), routes directly to queued
+1. **Size check** — Data exceeding the built-in streaming threshold routes directly to queued
 2. **Streaming attempt** — Sends to engine endpoint
 3. **Retry on transient errors** — Retries with backoff
-4. **Fallback on permanent errors** — Routes to queued ingestion
+4. **Fallback after transient retries are exhausted** — Routes to queued ingestion
 
-Error categories that trigger fallback:
-- `STREAMING_INGESTION_OFF` — Streaming disabled on cluster
-- `TABLE_CONFIGURATION_PREVENTS_STREAMING` — Update policy or schema issues
-- `REQUEST_PROPERTIES_PREVENT_STREAMING` — Payload too large (413)
-- `THROTTLED` — Request throttled (429)
+Permanent streaming errors are returned immediately, without retries or queued
+fallback, as in legacy Go. This includes permanent authorization, schema,
+streaming-disabled, and payload-too-large errors. These failures do not cause
+subsequent requests to bypass streaming. Size-based routing before streaming is
+unchanged.
 
 ## Running Tests
 

@@ -6,6 +6,7 @@ package httpclient
 import (
 	"context"
 	"encoding/json"
+	"errors"
 	"io"
 	"net/http"
 	"net/http/httptest"
@@ -84,6 +85,44 @@ func TestBaseClient_S2SHeaders(t *testing.T) {
 
 	assertHeader(t, capturedHeaders, ingestoptions.HeaderMSS2SActorAuthorization, "Bearer s2s-token")
 	assertHeader(t, capturedHeaders, ingestoptions.HeaderMSFabricS2SAccessContext, "fabric-context")
+}
+
+func TestBaseClient_RequestHeadersArePerRequest(t *testing.T) {
+	requests := make(chan http.Header, 1)
+	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		requests <- r.Header.Clone()
+		w.WriteHeader(http.StatusOK)
+	}))
+	defer server.Close()
+	client := NewBaseClient(
+		func(context.Context) (string, error) { return "test-token", nil },
+		ingestoptions.NewClientDetails("myApp", "myUser", "1.0.0"),
+		WithHTTPClient(server.Client()),
+		WithS2STokenProvider(func(context.Context) (*ingestoptions.S2SToken, error) {
+			return &ingestoptions.S2SToken{Scheme: "Bearer", Token: "s2s-token"}, nil
+		}),
+		WithS2SFabricAccessContext("fabric-context"),
+	)
+	response, err := client.DoWithHeaders(context.Background(), "POST", server.URL,
+		strings.NewReader("payload"), "application/octet-stream",
+		http.Header{"Content-Encoding": []string{"gzip"}})
+	if err != nil {
+		t.Fatal(err)
+	}
+	response.Body.Close()
+	headers := <-requests
+	assertHeader(t, headers, "Content-Encoding", "gzip")
+	assertHeader(t, headers, "Authorization", "Bearer test-token")
+	assertHeader(t, headers, ingestoptions.HeaderMSApp, "myApp")
+	assertHeader(t, headers, ingestoptions.HeaderMSS2SActorAuthorization, "Bearer s2s-token")
+	assertHeader(t, headers, ingestoptions.HeaderMSFabricS2SAccessContext, "fabric-context")
+
+	response, err = client.Do(context.Background(), "GET", server.URL, nil, "")
+	if err != nil {
+		t.Fatal(err)
+	}
+	response.Body.Close()
+	assertHeader(t, <-requests, "Content-Encoding", "")
 }
 
 func TestBaseClient_DoJSON(t *testing.T) {
@@ -185,5 +224,76 @@ func assertHeader(t *testing.T, headers http.Header, key, expected string) {
 	got := headers.Get(key)
 	if got != expected {
 		t.Errorf("header %q: expected %q, got %q", key, expected, got)
+	}
+}
+
+type endpointTransport func(*http.Request) (*http.Response, error)
+
+type endpointRequestBody struct {
+	io.Reader
+	closed bool
+}
+
+func (b *endpointRequestBody) Close() error {
+	b.closed = true
+	return nil
+}
+
+func (f endpointTransport) RoundTrip(req *http.Request) (*http.Response, error) {
+	return f(req)
+}
+
+func TestBaseClientValidatesEndpointBeforeAuthentication(t *testing.T) {
+	for _, tc := range []struct {
+		name    string
+		url     string
+		skip    bool
+		wantErr bool
+	}{
+		{"trusted", "https://cluster.kusto.windows.net", false, false},
+		{"untrusted", "https://custom.example", false, true},
+		{"localhost-lookalike", "https://localhost.example", false, true},
+		{"explicit-bypass", "https://custom.example", true, false},
+	} {
+		t.Run(tc.name, func(t *testing.T) {
+			var tokenCalled, s2sCalled, transportCalled bool
+			client := NewBaseClient(
+				func(context.Context) (string, error) {
+					tokenCalled = true
+					return "token", nil
+				}, nil,
+				WithSkipSecurityChecks(tc.skip),
+				WithS2STokenProvider(func(context.Context) (*ingestoptions.S2SToken, error) {
+					s2sCalled = true
+					return &ingestoptions.S2SToken{Scheme: "Bearer", Token: "actor-token"}, nil
+				}),
+				WithHTTPClient(&http.Client{Transport: endpointTransport(func(req *http.Request) (*http.Response, error) {
+					transportCalled = true
+					assertHeader(t, req.Header, "Authorization", "Bearer token")
+					return &http.Response{StatusCode: http.StatusOK, Body: http.NoBody, Request: req}, nil
+				})}),
+			)
+			body := &endpointRequestBody{Reader: strings.NewReader("data")}
+			response, err := client.Do(context.Background(), http.MethodPost, tc.url, body, "")
+			if response != nil {
+				response.Body.Close()
+			}
+			if (err != nil) != tc.wantErr {
+				t.Fatalf("unexpected request error: %v", err)
+			}
+			if tc.wantErr {
+				if !body.closed {
+					t.Error("rejected request body was not closed")
+				}
+				var clientErr *ingestoptions.IngestClientError
+				if !errors.As(err, &clientErr) || !clientErr.IsPermanent {
+					t.Fatalf("expected permanent client error, got %v", err)
+				}
+			}
+			if tokenCalled != !tc.wantErr || s2sCalled != !tc.wantErr || transportCalled != !tc.wantErr {
+				t.Fatalf("unexpected authentication/transport calls: token=%v, s2s=%v, transport=%v",
+					tokenCalled, s2sCalled, transportCalled)
+			}
+		})
 	}
 }

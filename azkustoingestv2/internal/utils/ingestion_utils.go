@@ -21,15 +21,15 @@ func BuildIngestionMessage(
 	props *ingestoptions.IngestRequestProperties,
 ) ([]byte, error) {
 	msg := map[string]interface{}{
-		"Id":                    sourceID,
-		"BlobPath":              blobPath,
-		"RawDataSize":           rawSize,
-		"DatabaseName":          database,
-		"TableName":             table,
-		"RetainBlobOnSuccess":   true,
-		"FlushImmediately":      false,
-		"ReportLevel":           2,
-		"ReportMethod":          0,
+		"Id":                  sourceID,
+		"BlobPath":            blobPath,
+		"RawDataSize":         rawSize,
+		"DatabaseName":        database,
+		"TableName":           table,
+		"RetainBlobOnSuccess": true,
+		"FlushImmediately":    false,
+		"ReportLevel":         2,
+		"ReportMethod":        0,
 	}
 
 	if props != nil {
@@ -39,13 +39,13 @@ func BuildIngestionMessage(
 		if props.IngestionMappingRef != "" {
 			msg["IngestionMappingReference"] = props.IngestionMappingRef
 		}
-		if props.FlushImmediately {
+		if props.SkipBatching {
 			msg["FlushImmediately"] = true
 		}
 		if props.IgnoreFirstRecord {
 			msg["IgnoreFirstRecord"] = true
 		}
-		if props.IngestIfNotExists != "" {
+		if len(props.IngestIfNotExists) > 0 {
 			msg["IngestIfNotExists"] = props.IngestIfNotExists
 		}
 		if len(props.Tags) > 0 {
@@ -66,9 +66,6 @@ func BuildIngestionMessage(
 				props.ValidationPolicy.ValidationOptions,
 				props.ValidationPolicy.ValidationImplications,
 			)
-		}
-		for k, v := range props.AdditionalProperties {
-			msg[k] = v
 		}
 	}
 

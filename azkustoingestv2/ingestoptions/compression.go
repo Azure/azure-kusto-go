@@ -43,24 +43,24 @@ func (c CompressionType) Extension() string {
 type DataFormat string
 
 const (
-	FormatUnknown       DataFormat = ""
-	FormatCSV           DataFormat = "csv"
-	FormatJSON          DataFormat = "json"
-	FormatMultiJSON     DataFormat = "multijson"
-	FormatAvro          DataFormat = "avro"
-	FormatApacheAvro    DataFormat = "apacheavro"
-	FormatParquet       DataFormat = "parquet"
-	FormatORC           DataFormat = "orc"
-	FormatTSV           DataFormat = "tsv"
-	FormatSCSV          DataFormat = "scsv"
-	FormatSOHSV         DataFormat = "sohsv"
-	FormatPSV           DataFormat = "psv"
-	FormatTXT           DataFormat = "txt"
-	FormatRAW           DataFormat = "raw"
-	FormatSingleJSON    DataFormat = "singlejson"
-	FormatW3CLOGFILE    DataFormat = "w3clogfile"
-	FormatTSVE          DataFormat = "tsve"
-	FormatSStream       DataFormat = "sstream"
+	FormatUnknown    DataFormat = ""
+	FormatCSV        DataFormat = "csv"
+	FormatJSON       DataFormat = "json"
+	FormatMultiJSON  DataFormat = "multijson"
+	FormatAvro       DataFormat = "avro"
+	FormatApacheAvro DataFormat = "apacheavro"
+	FormatParquet    DataFormat = "parquet"
+	FormatORC        DataFormat = "orc"
+	FormatTSV        DataFormat = "tsv"
+	FormatSCSV       DataFormat = "scsv"
+	FormatSOHSV      DataFormat = "sohsv"
+	FormatPSV        DataFormat = "psv"
+	FormatTXT        DataFormat = "txt"
+	FormatRAW        DataFormat = "raw"
+	FormatSingleJSON DataFormat = "singlejson"
+	FormatW3CLOGFILE DataFormat = "w3clogfile"
+	FormatTSVE       DataFormat = "tsve"
+	FormatSStream    DataFormat = "sstream"
 )
 
 // String returns the string representation of the data format.
@@ -71,7 +71,7 @@ func (f DataFormat) String() string {
 // IsBinaryFormat returns true if the format is a binary format that should not be compressed.
 func (f DataFormat) IsBinaryFormat() bool {
 	switch f {
-	case FormatAvro, FormatApacheAvro, FormatParquet, FormatORC:
+	case FormatAvro, FormatApacheAvro, FormatParquet, FormatORC, FormatSStream:
 		return true
 	default:
 		return false
