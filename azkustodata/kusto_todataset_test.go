@@ -91,6 +91,16 @@ func TestToDatasetReleasesRequest(t *testing.T) {
 			}
 			require.Equal(t, 2, primaryRows)
 
+			// The request context must be released by materialization itself: the body is also closed at EOF,
+			// so only the outbound request's own context proves reqCancel ran.
+			reqCtx := tt.ctx.Load()
+			require.NotNil(t, reqCtx)
+			select {
+			case <-(*reqCtx).Done():
+			case <-time.After(3 * time.Second):
+				t.Fatal("request context was not cancelled after conversion")
+			}
+
 			body := tt.body.Load()
 			require.NotNil(t, body)
 			waitClosed(t, body.closed, "response body close")

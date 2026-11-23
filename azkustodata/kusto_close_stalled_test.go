@@ -3,6 +3,7 @@ package azkustodata
 import (
 	"compress/flate"
 	"compress/gzip"
+	"context"
 	"io"
 	"net/http"
 	"net/http/httptest"
@@ -117,9 +118,14 @@ func TestIterativeQueryCloseStalledCompressedRead(t *testing.T) {
 type trackingTransport struct {
 	base http.RoundTripper
 	body atomic.Pointer[trackingBody]
+	ctx  atomic.Pointer[context.Context] // context of the outbound query request
 }
 
 func (t *trackingTransport) RoundTrip(r *http.Request) (*http.Response, error) {
+	if strings.HasSuffix(r.URL.Path, "/v2/rest/query") {
+		rc := r.Context()
+		t.ctx.Store(&rc)
+	}
 	resp, err := t.base.RoundTrip(r)
 	if err != nil || !strings.HasSuffix(r.URL.Path, "/v2/rest/query") {
 		return resp, err
