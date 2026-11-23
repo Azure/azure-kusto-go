@@ -119,6 +119,7 @@ type trackingTransport struct {
 	base http.RoundTripper
 	body atomic.Pointer[trackingBody]
 	ctx  atomic.Pointer[context.Context] // context of the outbound query request
+	log  func(string)                    // optional event log shared with the decompressor spies
 }
 
 func (t *trackingTransport) RoundTrip(r *http.Request) (*http.Response, error) {
@@ -130,7 +131,7 @@ func (t *trackingTransport) RoundTrip(r *http.Request) (*http.Response, error) {
 	if err != nil || !strings.HasSuffix(r.URL.Path, "/v2/rest/query") {
 		return resp, err
 	}
-	tb := &trackingBody{ReadCloser: resp.Body, closed: make(chan struct{})}
+	tb := &trackingBody{ReadCloser: resp.Body, closed: make(chan struct{}), log: t.log}
 	t.body.Store(tb)
 	resp.Body = tb
 	return resp, nil
@@ -143,15 +144,22 @@ type trackingBody struct {
 	closed        chan struct{}
 	closeOnce     atomic.Bool
 	closeCount    atomic.Int32 // total Close calls
+	log           func(string) // optional event log
 }
 
 func (b *trackingBody) Read(p []byte) (int, error) {
 	b.inRead.Add(1)
 	defer b.inRead.Add(-1)
+	if b.log != nil {
+		b.log("http-read")
+	}
 	return b.ReadCloser.Read(p)
 }
 
 func (b *trackingBody) Close() error {
+	if b.log != nil {
+		b.log("body-close")
+	}
 	b.closeCount.Add(1)
 	if b.inRead.Load() > 0 {
 		b.closedMidRead.Store(true)

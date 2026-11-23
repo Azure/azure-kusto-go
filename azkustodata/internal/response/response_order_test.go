@@ -114,16 +114,16 @@ func (s *spyReader) Close() error {
 // spyDecompressors replaces the package's decompressor constructors with spies bound to body for the test.
 func spyDecompressors(t *testing.T, body *eventBody, closeErr error) {
 	t.Helper()
-	oldG, oldF := newGzipReader, newFlateReader
-	t.Cleanup(func() { newGzipReader, newFlateReader = oldG, oldF })
-	newGzipReader = func(r io.Reader) (io.ReadCloser, error) {
+	oldG, oldF := NewGzipReader, NewFlateReader
+	t.Cleanup(func() { NewGzipReader, NewFlateReader = oldG, oldF })
+	NewGzipReader = func(r io.Reader) (io.ReadCloser, error) {
 		g, err := oldG(r)
 		if err != nil {
 			return nil, err
 		}
 		return &spyReader{ReadCloser: g, body: body, closeErr: closeErr}, nil
 	}
-	newFlateReader = func(r io.Reader) io.ReadCloser {
+	NewFlateReader = func(r io.Reader) io.ReadCloser {
 		return &spyReader{ReadCloser: oldF(r), body: body, closeErr: closeErr}
 	}
 }
