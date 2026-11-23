@@ -160,3 +160,18 @@ func TestBoolAsInt(t *testing.T) {
 	assert.NoError(t, err)
 	assert.Nil(t, nullBool)
 }
+
+// A timespan that is valid in Kusto but does not fit into a time.Duration must be reported as an error,
+// not returned as a wrapped-around value.
+func TestTimespanOutsideDurationRange(t *testing.T) {
+	t.Parallel()
+
+	const response = `{"Tables":[{"TableName":"Table_0","Columns":[{"ColumnName":"Span","DataType":"TimeSpan","ColumnType":"timespan"}],"Rows":[["1.02:03:04"],["3652058.00:00:00"]]}]}`
+	ds, err := NewDatasetFromReader(context.Background(), errors.OpQuery, io.NopCloser(strings.NewReader(response)))
+	if err == nil {
+		span, spanErr := ds.Tables()[0].Rows()[1].TimespanByIndex(0)
+		assert.NoError(t, spanErr)
+		t.Fatalf("expected an error, got timespan %v", *span)
+	}
+	assert.Contains(t, err.Error(), "outside the range of time.Duration")
+}

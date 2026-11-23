@@ -3,6 +3,7 @@ package value
 import (
 	"fmt"
 	"github.com/Azure/azure-kusto-go/azkustodata/types"
+	"math"
 	"reflect"
 	"strconv"
 	"strings"
@@ -11,6 +12,26 @@ import (
 
 const tick = 100 * time.Nanosecond
 const day = 24 * time.Hour
+
+// errTimespanRange is returned when a timespan does not fit into a time.Duration. Kusto timespans can be up to
+// about 10675199 days long, but a time.Duration can only hold about 106751 days (292 years).
+var errTimespanRange = fmt.Errorf("timespan is outside the range of time.Duration (about +-292 years)")
+
+// mulDuration returns n*unit, or errTimespanRange if the result does not fit into a time.Duration.
+func mulDuration(n int, unit time.Duration) (time.Duration, error) {
+	if int64(n) > math.MaxInt64/int64(unit) || int64(n) < math.MinInt64/int64(unit) {
+		return 0, errTimespanRange
+	}
+	return time.Duration(n) * unit, nil
+}
+
+// addDuration returns a+b, or errTimespanRange if the result does not fit into a time.Duration.
+func addDuration(a, b time.Duration) (time.Duration, error) {
+	if (b > 0 && a > math.MaxInt64-b) || (b < 0 && a < math.MinInt64-b) {
+		return 0, errTimespanRange
+	}
+	return a + b, nil
+}
 
 // Timespan represents a Kusto timespan type.  Timespan implements Kusto.
 type Timespan struct {
@@ -112,20 +133,23 @@ func (t *Timespan) Unmarshal(i interface{}) error {
 	if err != nil {
 		return parseError(v, sp, err)
 	}
-	sum += d
+	sum = d
 
 	d, err = t.unmarshalMinutes(sp[minutesIndex])
 	if err != nil {
 		return parseError(v, sp, err)
 	}
-	sum += d
+	if sum, err = addDuration(sum, d); err != nil {
+		return parseError(v, sp, err)
+	}
 
 	d, err = t.unmarshalSeconds(sp[secondsIndex])
 	if err != nil {
 		return parseError(v, sp, err)
 	}
-
-	sum += d
+	if sum, err = addDuration(sum, d); err != nil {
+		return parseError(v, sp, err)
+	}
 
 	if negative {
 		sum = sum * time.Duration(-1)
@@ -143,7 +167,7 @@ func (t *Timespan) unmarshalDaysHours(s string) (time.Duration, error) {
 		if err != nil {
 			return 0, fmt.Errorf("timespan's hours/day field was incorrect, was %s: %s", s, err)
 		}
-		return time.Duration(hours) * time.Hour, nil
+		return mulDuration(hours, time.Hour)
 	case 2:
 		days, err := strconv.Atoi(sp[0])
 		if err != nil {
@@ -153,7 +177,15 @@ func (t *Timespan) unmarshalDaysHours(s string) (time.Duration, error) {
 		if err != nil {
 			return 0, fmt.Errorf("timespan's hours/day field was incorrect, was %s", s)
 		}
-		return time.Duration(days)*day + time.Duration(hours)*time.Hour, nil
+		d, err := mulDuration(days, day)
+		if err != nil {
+			return 0, err
+		}
+		h, err := mulDuration(hours, time.Hour)
+		if err != nil {
+			return 0, err
+		}
+		return addDuration(d, h)
 	}
 	return 0, fmt.Errorf("timespan's hours/days field did not have the requisite '.'s, was %s", s)
 }
@@ -186,7 +218,7 @@ func (t *Timespan) unmarshalSeconds(s string) (time.Duration, error) {
 		if err != nil {
 			return 0, fmt.Errorf("timespan's seconds field was incorrect, was %s", s)
 		}
-		return time.Duration(seconds) * time.Second, nil
+		return mulDuration(seconds, time.Second)
 	case 2:
 		seconds, err := strconv.Atoi(sp[0])
 		if err != nil {
@@ -220,7 +252,11 @@ func (t *Timespan) unmarshalSeconds(s string) (time.Duration, error) {
 			return 0, fmt.Errorf("timespan's seconds field did not have 1-9 numbers after the decimal, had %v", s)
 		}
 
-		return time.Duration(seconds)*time.Second + prec, nil
+		d, err := mulDuration(seconds, time.Second)
+		if err != nil {
+			return 0, err
+		}
+		return addDuration(d, prec)
 	}
 	return 0, fmt.Errorf("timespan's seconds field did not have the requisite '.'s, was %s", s)
 }

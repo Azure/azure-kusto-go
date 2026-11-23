@@ -516,6 +516,16 @@ func TestTimespanUnmarshal(t *testing.T) {
 		{i: "03.00:00:00.111", want: *NewTimespan(3*24*time.Hour + 111*time.Millisecond)},
 		{i: "03.00:00:00.111", want: *NewTimespan(3*24*time.Hour + 111*time.Millisecond)},
 		{i: "364.23:59:59.9999999", want: *NewTimespan(364*day + 23*time.Hour + 59*time.Minute + 59*time.Second + 9999999*100*time.Nanosecond)},
+		{i: "106751.23:47:16.8547758", want: *NewTimespan(time.Duration(math.MaxInt64 / int64(tick) * int64(tick)))},
+		{i: "-106751.23:47:16.8547758", want: *NewTimespan(-time.Duration(math.MaxInt64 / int64(tick) * int64(tick)))},
+		{i: "106751.23:47:16.854775807", want: *NewTimespan(time.Duration(math.MaxInt64))},
+		{desc: "one day past the time.Duration range", i: "106752.00:00:00", err: true},
+		{desc: "one nanosecond past the time.Duration range", i: "106751.23:47:16.854775808", err: true},
+		{desc: "negative, one day past the time.Duration range", i: "-106752.00:00:00", err: true},
+		{desc: "datetime max - datetime min", i: "3652058.00:00:00", err: true},
+		{desc: "max .NET TimeSpan", i: "10675199.02:48:05.4775807", err: true},
+		{desc: "min .NET TimeSpan", i: "-10675199.02:48:05.4775808", err: true},
+		{desc: "hours past the time.Duration range", i: "2562048:00:00", err: true},
 	}
 
 	for _, test := range tests {
