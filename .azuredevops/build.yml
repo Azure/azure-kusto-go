@@ -70,13 +70,13 @@ jobs:
       set -euo pipefail
 
       go work sync
-      for module in azkustodata azkustoingest; do
+      for module in azkustodata azkustoingest azkustoingestv2; do
         pushd "${module}"
         go get -v -t -d ./...
         go build -v ./...
         popd
       done
-    displayName: Sync workspace, restore dependencies, and build both modules
+    displayName: Sync workspace, restore dependencies, and build all SDK modules
 
 - job: Test
   displayName: Run unit and authenticated Kusto E2E tests
@@ -126,7 +126,7 @@ jobs:
       set -euo pipefail
 
       go work sync
-      for module in azkustodata azkustoingest; do
+      for module in azkustodata azkustoingest azkustoingestv2; do
         pushd "${module}"
         go get -v -t -d ./...
         popd
@@ -156,7 +156,7 @@ jobs:
         results="$(Agent.TempDirectory)/go-test-results"
         raw="$(Agent.TempDirectory)/go-test-raw"
         status=0
-        for module in azkustodata azkustoingest; do
+        for module in azkustodata azkustoingest azkustoingestv2; do
           pushd "${module}"
           if ! go test -p 100 -race \
             -coverprofile="${results}/coverage-${module}.out" \
@@ -181,7 +181,7 @@ jobs:
       results="$(Agent.TempDirectory)/go-test-results"
       raw="$(Agent.TempDirectory)/go-test-raw"
       status=0
-      for module in azkustodata azkustoingest; do
+      for module in azkustodata azkustoingest azkustoingestv2; do
         rawLog="${raw}/gotest-${module}.log"
         log="${results}/gotest-${module}.log"
         if [[ ! -f "${rawLog}" ]]; then
