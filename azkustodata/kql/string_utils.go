@@ -90,6 +90,17 @@ func ShouldBeEscaped(c int32) bool {
 }
 
 func FormatTimespan(duration time.Duration) string {
+	// The format has a precision of 100ns (one tick). Truncate first, so a negative duration shorter than a tick
+	// is not formatted as "-00:00:00.0000000" and negating the minimum duration below cannot overflow.
+	duration = duration / 100 * 100
+
+	// Format the absolute value and prefix the sign, like the .NET "c" format ([-][d.]hh:mm:ss[.fffffff]).
+	sign := ""
+	if duration < 0 {
+		sign = "-"
+		duration = -duration
+	}
+
 	// Calculate the number of days in the duration
 	days := duration / (24 * time.Hour)
 
@@ -102,7 +113,8 @@ func FormatTimespan(duration time.Duration) string {
 	}
 
 	// Use the `fmt.Sprintf()` function to format the duration as a string
-	return fmt.Sprintf("%s%02d:%02d:%02d.%07d",
+	return fmt.Sprintf("%s%s%02d:%02d:%02d.%07d",
+		sign,
 		daysStr,
 		int(remaining.Hours()),
 		int(remaining.Minutes())%60,

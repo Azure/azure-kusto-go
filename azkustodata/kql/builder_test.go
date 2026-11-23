@@ -1,6 +1,7 @@
 package kql
 
 import (
+	"math"
 	"testing"
 	"time"
 
@@ -70,6 +71,41 @@ func TestBuilder(t *testing.T) {
 				"MyTable | where i != ",
 			).AddTimespan(49*time.Hour + 2*time.Minute + 3*time.Second + 4*time.Microsecond),
 			"MyTable | where i != timespan(2.01:02:03.0000040)",
+		},
+		{
+			"Test add negative duration",
+			New(
+				"MyTable | where i != ",
+			).AddTimespan(-(1*time.Hour + 2*time.Minute + 3*time.Second + 4*time.Microsecond)),
+			"MyTable | where i != timespan(-01:02:03.0000040)",
+		},
+		{
+			"Test add negative duration with days",
+			New(
+				"MyTable | where i != ",
+			).AddTimespan(-(49*time.Hour + 2*time.Minute + 3*time.Second + 4*time.Microsecond)),
+			"MyTable | where i != timespan(-2.01:02:03.0000040)",
+		},
+		{
+			"Test add negative whole days",
+			New(
+				"MyTable | where i != ",
+			).AddTimespan(-7 * 24 * time.Hour),
+			"MyTable | where i != timespan(-7.00:00:00.0000000)",
+		},
+		{
+			"Test add negative duration shorter than a tick",
+			New(
+				"MyTable | where i != ",
+			).AddTimespan(-50 * time.Nanosecond),
+			"MyTable | where i != timespan(00:00:00.0000000)",
+		},
+		{
+			"Test add minimum duration",
+			New(
+				"MyTable | where i != ",
+			).AddTimespan(math.MinInt64),
+			"MyTable | where i != timespan(-106751.23:47:16.8547758)",
 		},
 		{
 			"Test add dynamic",
