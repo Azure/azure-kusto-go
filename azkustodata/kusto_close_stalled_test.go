@@ -150,10 +150,13 @@ type trackingBody struct {
 func (b *trackingBody) Read(p []byte) (int, error) {
 	b.inRead.Add(1)
 	defer b.inRead.Add(-1)
+	n, err := b.ReadCloser.Read(p)
+	// Log once the underlying read has returned. A stalled read is entered before
+	// Close and returns only after cancellation, so logging at entry hides that order.
 	if b.log != nil {
 		b.log("http-read")
 	}
-	return b.ReadCloser.Read(p)
+	return n, err
 }
 
 func (b *trackingBody) Close() error {
