@@ -8,6 +8,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Fixed
+
+- Negative timespans passed to `kql.Builder.AddTimespan` or `kql.Parameters.AddTimespan` are now formatted correctly (for example `timespan(-7.00:00:00.0000000)`). Before, the days were dropped and every field got its own minus sign, so `-7 * 24 * time.Hour` was sent as `timespan(00:00:00.0000000)`.
+
 ## [1.2.3] - 2026-11-03
 
 ### Security

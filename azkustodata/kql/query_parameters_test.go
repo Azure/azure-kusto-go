@@ -88,6 +88,15 @@ func TestQueryParameters(t *testing.T) {
 				"tableName":    `"b\a\r"`,
 				"txt":          `"f_u_n\u1234c"`,
 			}},
+		{
+			"Test negative timespan",
+			New("where Timestamp > now() + lookback"),
+			NewParameters().
+				AddTimespan("lookback", -7*24*time.Hour-30*time.Minute),
+			"declare query_parameters(lookback:timespan);\nwhere Timestamp > now() + lookback",
+			map[string]string{
+				"lookback": "timespan(-7.00:30:00.0000000)",
+			}},
 	}
 	for _, test := range tests {
 		t.Run(test.name, func(t *testing.T) {
