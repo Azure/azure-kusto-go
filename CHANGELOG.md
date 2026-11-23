@@ -8,6 +8,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Fixed
+
+- Timespan values that do not fit into a `time.Duration` (more than about 292 years, e.g. `now() - datetime(1601-01-01)`) are now reported as a parse error instead of being decoded into a wrong, wrapped-around duration.
+
 ## [1.2.3] - 2026-11-03
 
 ### Security

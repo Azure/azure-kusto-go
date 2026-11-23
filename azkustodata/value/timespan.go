@@ -3,6 +3,7 @@ package value
 import (
 	"fmt"
 	"github.com/Azure/azure-kusto-go/azkustodata/types"
+	"math"
 	"reflect"
 	"strconv"
 	"strings"
@@ -11,6 +12,26 @@ import (
 
 const tick = 100 * time.Nanosecond
 const day = 24 * time.Hour
+
+// errTimespanRange is returned when a timespan does not fit into a time.Duration. Kusto timespans can be up to
+// about 10675199 days long, but a time.Duration can only hold about 106751 days (292 years).
+var errTimespanRange = fmt.Errorf("timespan is outside the range of time.Duration (about +-292 years)")
+
+// mulDuration returns n*unit, or errTimespanRange if the result does not fit into a time.Duration.
+func mulDuration(n int, unit time.Duration) (time.Duration, error) {
+	if int64(n) > math.MaxInt64/int64(unit) || int64(n) < math.MinInt64/int64(unit) {
+		return 0, errTimespanRange
+	}
+	return time.Duration(n) * unit, nil
+}
+
+// addDuration returns a+b, or errTimespanRange if the result does not fit into a time.Duration.
+func addDuration(a, b time.Duration) (time.Duration, error) {
+	if (b > 0 && a > math.MaxInt64-b) || (b < 0 && a < math.MinInt64-b) {
+		return 0, errTimespanRange
+	}
+	return a + b, nil
+}
 
 // Timespan represents a Kusto timespan type.  Timespan implements Kusto.
 type Timespan struct {
@@ -93,10 +114,12 @@ func (t *Timespan) Unmarshal(i interface{}) error {
 		return convertError(t, i)
 	}
 
-	negative := false
+	// sign is applied to every field before it is added up, so the sum is built in its final sign and the
+	// range checks accept time.Duration(math.MinInt64), whose magnitude does not fit into a positive Duration.
+	sign := 1
 	if len(v) > 1 {
 		if string(v[0]) == "-" {
-			negative = true
+			sign = -1
 			v = v[1:]
 		}
 	}
@@ -108,34 +131,33 @@ func (t *Timespan) Unmarshal(i interface{}) error {
 
 	var sum time.Duration
 
-	d, err := t.unmarshalDaysHours(sp[hoursIndex])
+	d, err := t.unmarshalDaysHours(sp[hoursIndex], sign)
 	if err != nil {
 		return parseError(v, sp, err)
 	}
-	sum += d
+	sum = d
 
-	d, err = t.unmarshalMinutes(sp[minutesIndex])
+	d, err = t.unmarshalMinutes(sp[minutesIndex], sign)
 	if err != nil {
 		return parseError(v, sp, err)
 	}
-	sum += d
-
-	d, err = t.unmarshalSeconds(sp[secondsIndex])
-	if err != nil {
+	if sum, err = addDuration(sum, d); err != nil {
 		return parseError(v, sp, err)
 	}
 
-	sum += d
-
-	if negative {
-		sum = sum * time.Duration(-1)
+	d, err = t.unmarshalSeconds(sp[secondsIndex], sign)
+	if err != nil {
+		return parseError(v, sp, err)
+	}
+	if sum, err = addDuration(sum, d); err != nil {
+		return parseError(v, sp, err)
 	}
 
 	t.value = &sum
 	return nil
 }
 
-func (t *Timespan) unmarshalDaysHours(s string) (time.Duration, error) {
+func (t *Timespan) unmarshalDaysHours(s string, sign int) (time.Duration, error) {
 	sp := strings.Split(s, ".")
 	switch len(sp) {
 	case 1:
@@ -143,7 +165,7 @@ func (t *Timespan) unmarshalDaysHours(s string) (time.Duration, error) {
 		if err != nil {
 			return 0, fmt.Errorf("timespan's hours/day field was incorrect, was %s: %s", s, err)
 		}
-		return time.Duration(hours) * time.Hour, nil
+		return mulDuration(sign*hours, time.Hour)
 	case 2:
 		days, err := strconv.Atoi(sp[0])
 		if err != nil {
@@ -153,12 +175,20 @@ func (t *Timespan) unmarshalDaysHours(s string) (time.Duration, error) {
 		if err != nil {
 			return 0, fmt.Errorf("timespan's hours/day field was incorrect, was %s", s)
 		}
-		return time.Duration(days)*day + time.Duration(hours)*time.Hour, nil
+		d, err := mulDuration(sign*days, day)
+		if err != nil {
+			return 0, err
+		}
+		h, err := mulDuration(sign*hours, time.Hour)
+		if err != nil {
+			return 0, err
+		}
+		return addDuration(d, h)
 	}
 	return 0, fmt.Errorf("timespan's hours/days field did not have the requisite '.'s, was %s", s)
 }
 
-func (t *Timespan) unmarshalMinutes(s string) (time.Duration, error) {
+func (t *Timespan) unmarshalMinutes(s string, sign int) (time.Duration, error) {
 	s = strings.Split(s, ".")[0] // We can have 01 or 01.00 or 59, but nothing comes behind the .
 
 	minutes, err := strconv.Atoi(s)
@@ -168,14 +198,14 @@ func (t *Timespan) unmarshalMinutes(s string) (time.Duration, error) {
 	if minutes < 0 || minutes > 59 {
 		return 0, fmt.Errorf("timespan's minutes field was incorrect, was %s", s)
 	}
-	return time.Duration(minutes) * time.Minute, nil
+	return time.Duration(sign*minutes) * time.Minute, nil
 }
 
 // unmarshalSeconds deals with this crazy output format. Instead of having some multiplier, the number
 // of precision characters behind the decimal indicates your multiplier. This can be between 0 and 7, but
 // really only has 3, 4 and 7. There is something called a tick, which is 100 Nanoseconds and the precision
 // at len 4 is 100 * Microsecond (don't know if that has a name).
-func (t *Timespan) unmarshalSeconds(s string) (time.Duration, error) {
+func (t *Timespan) unmarshalSeconds(s string, sign int) (time.Duration, error) {
 	// "03" = 3 * time.Second
 	// "00.099" = 99 * time.Millisecond
 	// "03.0123" == 3 * time.Second + 12300 * time.Microsecond
@@ -186,7 +216,7 @@ func (t *Timespan) unmarshalSeconds(s string) (time.Duration, error) {
 		if err != nil {
 			return 0, fmt.Errorf("timespan's seconds field was incorrect, was %s", s)
 		}
-		return time.Duration(seconds) * time.Second, nil
+		return mulDuration(sign*seconds, time.Second)
 	case 2:
 		seconds, err := strconv.Atoi(sp[0])
 		if err != nil {
@@ -220,7 +250,11 @@ func (t *Timespan) unmarshalSeconds(s string) (time.Duration, error) {
 			return 0, fmt.Errorf("timespan's seconds field did not have 1-9 numbers after the decimal, had %v", s)
 		}
 
-		return time.Duration(seconds)*time.Second + prec, nil
+		d, err := mulDuration(sign*seconds, time.Second)
+		if err != nil {
+			return 0, err
+		}
+		return addDuration(d, time.Duration(sign)*prec)
 	}
 	return 0, fmt.Errorf("timespan's seconds field did not have the requisite '.'s, was %s", s)
 }
