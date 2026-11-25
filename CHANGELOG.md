@@ -8,6 +8,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Fixed
+
+- KQL string literals and query parameters now escape characters outside the Basic Multilingual Plane (such as emoji) with the eight-digit `\U` form, instead of a `\u` escape that decoded to a different string.
+
 ## [1.2.3] - 2026-11-03
 
 ### Security

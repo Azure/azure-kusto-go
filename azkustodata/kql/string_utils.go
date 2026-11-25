@@ -70,6 +70,9 @@ func QuoteString(value string, hidden bool) string {
 		default:
 			if !ShouldBeEscaped(c) {
 				literal.WriteString(string(c))
+			} else if c > 0xFFFF {
+				// \u takes exactly four hex digits, so code points outside the BMP need the eight-digit \U form.
+				literal.WriteString(fmt.Sprintf("\\U%08x", c))
 			} else {
 				literal.WriteString(fmt.Sprintf("\\u%04x", c))
 			}
