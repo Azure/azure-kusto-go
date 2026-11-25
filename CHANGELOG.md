@@ -8,6 +8,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Fixed
+
+- Null values added as query parameters or through the KQL builder are now written as typed null literals (such as `dynamic(null)` or `int(null)`). A null `Dynamic` was written as an empty `dynamic()`, and the other null types caused a panic.
+
 ## [1.2.3] - 2026-11-03
 
 ### Security
