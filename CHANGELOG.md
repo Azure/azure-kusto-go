@@ -8,6 +8,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Fixed
+
+- KQL builders and query parameters now format negative timespans with a single leading sign and preserve the day component.
+
 ## [1.2.3] - 2026-11-03
 
 ### Security

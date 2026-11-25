@@ -90,24 +90,27 @@ func ShouldBeEscaped(c int32) bool {
 }
 
 func FormatTimespan(duration time.Duration) string {
-	// Calculate the number of days in the duration
-	days := duration / (24 * time.Hour)
+	const day = 24 * time.Hour
+	days, remaining := duration/day, duration%day
 
-	// Calculate the remaining time after subtracting the days
-	remaining := duration - days*24*time.Hour
+	sign := ""
+	if duration < 0 {
+		sign = "-"
+		// Negate the parts separately because the minimum duration has no positive counterpart.
+		days, remaining = -days, -remaining
+	}
 
 	daysStr := ""
 	if days > 0 {
 		daysStr = fmt.Sprintf("%d.", days)
 	}
 
-	// Use the `fmt.Sprintf()` function to format the duration as a string
-	return fmt.Sprintf("%s%02d:%02d:%02d.%07d",
-		daysStr,
-		int(remaining.Hours()),
-		int(remaining.Minutes())%60,
-		int(remaining.Seconds())%60,
-		int((remaining.Nanoseconds())%1000000000/100))
+	return fmt.Sprintf("%s%s%02d:%02d:%02d.%07d",
+		sign, daysStr,
+		remaining/time.Hour,
+		remaining/time.Minute%60,
+		remaining/time.Second%60,
+		remaining%time.Second/(100*time.Nanosecond))
 }
 
 func FormatDatetime(datetime time.Time) string {
