@@ -8,6 +8,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Fixed
+
+- Ingestion with gzip compression now returns the error from the source reader, instead of ending the compressed stream normally and accepting partial data.
+
 ## [1.2.3] - 2026-11-03
 
 ### Security

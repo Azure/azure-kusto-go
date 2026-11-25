@@ -3,6 +3,7 @@ package gzip
 import (
 	"bytes"
 	"compress/gzip"
+	"errors"
 	"io"
 	"math/rand"
 	"os"
@@ -63,5 +64,26 @@ func TestStreamer(t *testing.T) {
 
 	if int64(len(str)) != streamer.InputSize() {
 		t.Fatalf("TestStreamer(InputSize): got %d, want %d", streamer.InputSize(), len(str))
+	}
+}
+
+type failingReader struct {
+	data []byte
+	err  error
+}
+
+func (f *failingReader) Read(b []byte) (int, error) {
+	n := copy(b, f.data)
+	f.data = f.data[n:]
+	return n, f.err
+}
+
+func TestStreamerReadError(t *testing.T) {
+	t.Parallel()
+
+	wantErr := errors.New("source read failed")
+	_, err := io.ReadAll(Compress(&failingReader{data: []byte("a,b,c\n"), err: wantErr}))
+	if !errors.Is(err, wantErr) {
+		t.Fatalf("TestStreamerReadError: got err == %v, want %v", err, wantErr)
 	}
 }

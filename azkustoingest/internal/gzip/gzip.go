@@ -65,16 +65,20 @@ func (s *Streamer) run() {
 
 	go func() {
 		defer compressPool.Put(zw)
-		defer s.outputWrite.Close()
-		defer zw.Close()
-		defer zw.Flush()
 
 		amount, err := io.Copy(zw, s.userInput)
 		s.size = int64(amount)
 
+		if err == nil {
+			err = zw.Close()
+		}
 		if err != nil {
 			s.err.Store(err)
 		}
+
+		// A nil error ends the stream with io.EOF. On failure the gzip trailer is not written and
+		// the consumer receives the error, so partial data is never taken as complete.
+		_ = s.outputWrite.CloseWithError(err)
 	}()
 }
 
