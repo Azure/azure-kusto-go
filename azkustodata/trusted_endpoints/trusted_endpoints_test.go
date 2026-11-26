@@ -182,7 +182,6 @@ func TestWellTrustedEndpoints_ProxyNegativeTest(t *testing.T) {
 		"https://cluster.eu.kusto.aria.microsoft.com",
 		"https://cluster.ade.loganalytics.io",
 		"https://cluster.ade.applicationinsights.io",
-		"https://cluster.adx.monitor.azure.com",
 		"https://cluster.adx.applicationinsights.azure.cn",
 		"https://cluster.adx.monitor.azure.eaglex.ic.gov",
 	} {
@@ -205,6 +204,79 @@ func TestWellTrustedEndpoints_EndpointsNegative(t *testing.T) {
 	} {
 		err := checkEndpoint(c, defaultPublicLoginUrl, true)
 		require.NoError(t, err, c)
+	}
+}
+
+func TestWellTrustedEndpoints_MonitorProxySuffixes(t *testing.T) {
+	trusted := createInstance()
+	for _, cloud := range []struct {
+		domain string
+		login  string
+	}{
+		{"azure.com", defaultPublicLoginUrl},
+		{"azure.us", "https://login.microsoftonline.us"},
+		{"azure.cn", chinaCloudLoginUrl},
+	} {
+		t.Run(cloud.domain, func(t *testing.T) {
+			for _, service := range []string{"applicationinsights", "loganalytics", "monitor"} {
+				host := fmt.Sprintf("adx.%s.%s", service, cloud.domain)
+				require.NoError(t, trusted.ValidateTrustedEndpoint("https://"+host, cloud.login))
+				require.NoError(t, trusted.ValidateTrustedEndpoint("https://region."+host, cloud.login))
+				require.Error(t, trusted.ValidateTrustedEndpoint("https://region."+host+".example.com", cloud.login))
+			}
+		})
+	}
+}
+
+func TestWellTrustedEndpoints_SovereignCloudServices(t *testing.T) {
+	trusted := createInstance()
+	for _, country := range []string{"fr", "de", "sg"} {
+		t.Run(country, func(t *testing.T) {
+			login := "https://login.sovcloud-identity." + country
+			for _, service := range []string{"applicationinsights", "loganalytics", "monitor"} {
+				host := fmt.Sprintf("adx.%s.sovcloud-api.%s", service, country)
+				require.NoError(t, trusted.ValidateTrustedEndpoint("https://"+host, login))
+				require.Error(t, trusted.ValidateTrustedEndpoint("https://region."+host, login))
+				require.Error(t, trusted.ValidateTrustedEndpoint("https://"+host, defaultPublicLoginUrl))
+				oldHost := fmt.Sprintf("adx.%s.azure.%s", service, country)
+				require.NoError(t, trusted.ValidateTrustedEndpoint("https://"+oldHost, login))
+			}
+		})
+	}
+}
+
+func TestWellTrustedEndpoints_FabricClouds(t *testing.T) {
+	trusted := createInstance()
+	for _, cloud := range []struct {
+		suffix string
+		login  string
+	}{
+		{"kusto.fabric.microsoft.us", "https://login.microsoftonline.us"},
+		{"kusto.fabric.sovcloud-api.fr", "https://login.sovcloud-identity.fr"},
+		{"kusto.fabric.sovcloud-api.de", "https://login.sovcloud-identity.de"},
+	} {
+		t.Run(cloud.suffix, func(t *testing.T) {
+			endpoint := "https://cluster." + cloud.suffix
+			require.NoError(t, trusted.ValidateTrustedEndpoint(endpoint, cloud.login))
+			require.Error(t, trusted.ValidateTrustedEndpoint(endpoint, defaultPublicLoginUrl))
+			require.Error(t, trusted.ValidateTrustedEndpoint(endpoint+".example.com", cloud.login))
+		})
+	}
+}
+
+func TestWellTrustedEndpoints_PreservedEndpoints(t *testing.T) {
+	trusted := createInstance()
+	for _, endpoint := range []struct {
+		host  string
+		login string
+	}{
+		{"adx.int.applicationinsights.azure.com", defaultPublicLoginUrl},
+		{"adx.int.loganalytics.azure.com", defaultPublicLoginUrl},
+		{"adx.int.monitor.azure.com", defaultPublicLoginUrl},
+	} {
+		t.Run(endpoint.host, func(t *testing.T) {
+			require.NoError(t, trusted.ValidateTrustedEndpoint("https://"+endpoint.host, endpoint.login))
+		})
 	}
 }
 
