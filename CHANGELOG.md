@@ -12,6 +12,32 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 - KQL string literals and query parameters now escape characters outside the Basic Multilingual Plane (such as emoji) with the eight-digit `\U` form, instead of a `\u` escape that decoded to a different string.
 
+## [1.2.4] - 2026-11-26
+
+### Added
+
+- Added trusted HTTPS monitoring proxy hostnames for Bleu, Delos, and Singapore; Fabric endpoint suffixes for Bleu, Delos, and US Government; and monitoring proxy suffixes for Public, US Government, and China clouds. All existing trusted endpoints and authentication behavior are preserved (#383).
+- Added the `.securitycenter.windows.us` trusted endpoint suffix for US Government (#354).
+- Added Azure Pipelines validation for both SDK modules, including credential-free builds for fork pull requests, authenticated E2E tests for non-fork runs, and published test and coverage reports with URL query-string redaction (#362, #365).
+
+### Changed
+
+- [BREAKING] Raised the minimum Go version from 1.24 to 1.25 for both SDK modules and the quickstart.
+- Updated transitive dependencies `golang.org/x/sys` to v0.45.0 and `golang.org/x/text` to v0.37.0.
+- Updated GitHub Actions dependencies used by CodeQL analysis and release workflows (#367).
+- Replaced external-service-dependent HTTP error and redirect E2E tests with local HTTP fixtures (#369).
+- Corrected value package documentation to describe `GetValue()`, pointer-backed nullability, and non-nullable Kusto strings instead of the obsolete `.Value` and `.Valid` fields (#368).
+
+### Fixed
+
+- Streaming query datasets now report frame read errors between tables and after table completion instead of silently treating incomplete responses as successful (#363).
+- Fixed ingestion error formatting in the quickstart (#352).
+
+### Security
+
+- Updated `golang.org/x/net` to v0.55.0 across both SDK modules and the quickstart (#342, #343, #344).
+- Updated `golang.org/x/crypto` to v0.52.0 across both SDK modules and the quickstart (#345, #346, #347).
+
 ## [1.2.3] - 2026-11-03
 
 ### Security
