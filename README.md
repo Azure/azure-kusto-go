@@ -1,5 +1,7 @@
 # Microsoft Azure Data Explorer (Kusto) [![GoDoc](https://godoc.org/github.com/Azure/azure-kusto-go?status.svg)](https://pkg.go.dev/github.com/Azure/azure-kusto-go/azkustodata) [![GoDoc](https://godoc.org/github.com/Azure/azure-kusto-go?status.svg)](https://pkg.go.dev/github.com/Azure/azure-kusto-go/azkustoingest)
 
+Go SDK for Azure Data Explorer and Microsoft Fabric Eventhouse (Real-Time Intelligence): run KQL queries and management commands, and ingest data from Go.
+
 - [About Azure Data Explorer](https://azure.microsoft.com/en-us/services/data-explorer/)
 - [Data Client documentation](https://godoc.org/github.com/Azure/azure-kusto-go/azkustodata)
 - [Ingest Client documentation](https://godoc.org/github.com/Azure/azure-kusto-go/azkustoingest)
@@ -46,11 +48,14 @@ For more information about Azure Data Explorer (Kusto), its features, and releva
 
 ### Install the package
 
-Install the Kusto/Azure Data Explorer client module for Go with `go get`:
+Install the Kusto/Azure Data Explorer client modules for Go with `go get`. The original `github.com/Azure/azure-kusto-go` module is no longer published, so install the two modules below:
 
 ```bash
-go get github.com/Azure/azure-kusto-go
+go get github.com/Azure/azure-kusto-go/azkustodata
+go get github.com/Azure/azure-kusto-go/azkustoingest
 ```
+
+These modules work with Azure Data Explorer clusters and with Microsoft Fabric Eventhouse KQL databases. For Eventhouse, copy the Query URI and the Ingestion URI from the [KQL database details card](https://learn.microsoft.com/en-us/fabric/real-time-intelligence/access-database-copy-uri). A sample application is in the [quickstart](quickstart/) folder.
 
 ### Prerequisites
 

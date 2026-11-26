@@ -1,5 +1,5 @@
 /*
-Package azkustodata provides a client for querying and managing data in Azure Data Explorer (Kusto) clusters.
+Package azkustodata provides a client for querying and managing data in Azure Data Explorer (Kusto) clusters and Microsoft Fabric Eventhouse (Real-Time Intelligence) KQL databases.
 
 The package supports running both Kusto Query Language (KQL) queries and management commands, with built-in support for
 streaming responses and mapping results to Go structs.
