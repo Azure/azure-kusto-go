@@ -10,6 +10,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Fixed
 
+- Query and management request bodies are no longer built in a pooled buffer. `http.Client.Do` can return before the transport has finished sending the body (an early response, an error, a cancelled context), and the buffer, already back in the pool, could be reset and refilled by the next request while still being sent: a data race that could send one request with another's body.
 - KQL string literals and query parameters now escape characters outside the Basic Multilingual Plane (such as emoji) with the eight-digit `\U` form, instead of a `\u` escape that decoded to a different string.
 - Null values added as query parameters or through the KQL builder are now written as typed null literals (such as `dynamic(null)` or `int(null)`). A null `Dynamic` was written as an empty `dynamic()`, and the other null types caused a panic.
 - KQL builders and query parameters now format negative timespans with a single leading sign and preserve the day component.

@@ -12,7 +12,6 @@ import (
 	"net/http"
 	"net/url"
 	"strings"
-	"sync"
 	"sync/atomic"
 	"unicode"
 
@@ -21,12 +20,6 @@ import (
 	truestedEndpoints "github.com/Azure/azure-kusto-go/azkustodata/trusted_endpoints"
 	"github.com/google/uuid"
 )
-
-var bufferPool = sync.Pool{
-	New: func() interface{} {
-		return &bytes.Buffer{}
-	},
-}
 
 // TODO - inspect this. Do we need this? can this be simplified?
 
@@ -107,9 +100,12 @@ func (c *Conn) doRequest(ctx context.Context, execType int, db string, query Sta
 
 	var endpoint *url.URL
 
-	buff := bufferPool.Get().(*bytes.Buffer)
-	buff.Reset()
-	defer bufferPool.Put(buff)
+	// The request body gets a buffer of its own, never a pooled one. http.Client.Do
+	// can return before the transport has finished reading the body (an early
+	// response, an error, a cancelled context), so a buffer returned to a pool when
+	// this function returns could be reset and refilled by the next request while
+	// the transport is still sending it: a data race that can corrupt the body.
+	buff := &bytes.Buffer{}
 
 	switch execType {
 	case execQuery, execMgmt:
