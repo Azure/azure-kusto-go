@@ -14,6 +14,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - KQL string literals and query parameters now escape characters outside the Basic Multilingual Plane (such as emoji) with the eight-digit `\U` form, instead of a `\u` escape that decoded to a different string.
 - Null values added as query parameters or through the KQL builder are now written as typed null literals (such as `dynamic(null)` or `int(null)`). A null `Dynamic` was written as an empty `dynamic()`, and the other null types caused a panic.
 - KQL builders and query parameters now format negative timespans with a single leading sign and preserve the day component.
+- Closing an iterative dataset now cancels the query request made by `Client.IterativeQuery`, so a read that is blocked on the response body is interrupted and the body is closed. `Close()` starts the cancellation and does not wait for cleanup. Callers of `NewIterativeDataset` remain responsible for interrupting blocked reads on their own reader, and for closing it if construction fails (#364).
 
 ## [1.2.4] - 2026-11-26
 
