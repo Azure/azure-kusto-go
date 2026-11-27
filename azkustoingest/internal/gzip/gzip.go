@@ -6,7 +6,6 @@ import (
 	"compress/gzip"
 	"io"
 	"sync"
-	"sync/atomic"
 )
 
 var compressPool = &sync.Pool{
@@ -20,8 +19,7 @@ type Streamer struct {
 	userInput   io.ReadCloser
 	outputRead  *io.PipeReader
 	outputWrite *io.PipeWriter
-	size        int64
-	err         atomic.Value // holds error
+	size        *int64
 }
 
 // New creates a new streamer object. Use Reset() to initialize it.
@@ -34,8 +32,7 @@ func New() *Streamer {
 func (s *Streamer) Reset(reader io.ReadCloser) {
 	s.userInput = reader
 	s.outputRead, s.outputWrite = io.Pipe()
-	s.size = 0
-	s.err = atomic.Value{}
+	s.size = new(int64)
 
 	s.run()
 }
@@ -43,7 +40,10 @@ func (s *Streamer) Reset(reader io.ReadCloser) {
 // InputSize returns the amount of data that the Streamer streamed. This will only be accurate for
 // the full stream after Read() has returned io.EOF and not before.
 func (s *Streamer) InputSize() int64 {
-	return s.size
+	if s.size == nil {
+		return 0
+	}
+	return *s.size
 }
 
 func Compress(payload io.Reader) io.Reader {
@@ -60,25 +60,26 @@ func Compress(payload io.Reader) io.Reader {
 
 // run copies the file into a buffer that we stream back via our Read() call.
 func (s *Streamer) run() {
+	// The producer may outlive Close() while blocked on the source, so it must only use the
+	// state of its own stream and never the fields that a later Reset() replaces.
+	input, output, size := s.userInput, s.outputWrite, s.size
+
 	zw := compressPool.Get().(*gzip.Writer)
-	zw.Reset(s.outputWrite)
+	zw.Reset(output)
 
 	go func() {
 		defer compressPool.Put(zw)
 
-		amount, err := io.Copy(zw, s.userInput)
-		s.size = int64(amount)
+		amount, err := io.Copy(zw, input)
+		*size = amount
 
 		if err == nil {
 			err = zw.Close()
 		}
-		if err != nil {
-			s.err.Store(err)
-		}
 
 		// A nil error ends the stream with io.EOF. On failure the gzip trailer is not written and
 		// the consumer receives the error, so partial data is never taken as complete.
-		_ = s.outputWrite.CloseWithError(err)
+		_ = output.CloseWithError(err)
 	}()
 }
 
