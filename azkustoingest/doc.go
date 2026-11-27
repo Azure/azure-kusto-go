@@ -1,5 +1,5 @@
 /*
-Package azkustoingest provides a client for ingesting data into Azure Data Explorer (Kusto) clusters.
+Package azkustoingest provides a client for ingesting data into Azure Data Explorer (Kusto) clusters and Microsoft Fabric Eventhouse (Real-Time Intelligence) KQL databases.
 
 This package enables users to use different ingestion methods including queued, streaming, and managed ingestion from
 various sources such as local files, Azure Blob Storage urls, streams, or any `io.Reader`.
