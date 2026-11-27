@@ -101,3 +101,22 @@ func TestQueryParameters(t *testing.T) {
 		})
 	}
 }
+
+func TestAddNegativeTimespan(t *testing.T) {
+	tests := []struct {
+		name     string
+		duration time.Duration
+		literal  string
+	}{
+		{"days and minutes", -25*time.Hour - 2*time.Minute, "timespan(-1.01:02:00.0000000)"},
+		{"fractional second", -250 * time.Millisecond, "timespan(-00:00:00.2500000)"},
+		{"minimum duration", -1 << 63, "timespan(-106751.23:47:16.8547758)"},
+	}
+	for _, test := range tests {
+		t.Run(test.name, func(t *testing.T) {
+			parameters := NewParameters().AddTimespan("offset", test.duration)
+			require.Equal(t, test.literal, parameters.ToParameterCollection()["offset"])
+			require.Equal(t, test.literal, New("").AddTimespan(test.duration).String())
+		})
+	}
+}

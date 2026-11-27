@@ -6,13 +6,24 @@ import (
 	"github.com/Azure/azure-kusto-go/azkustodata/value"
 	"github.com/google/uuid"
 	"github.com/shopspring/decimal"
+	"reflect"
 	"time"
 )
+
+// isNull reports whether val is nil, including a nil pointer or nil slice boxed in an interface,
+// which is how null Kusto values are returned by GetValue.
+func isNull(val interface{}) bool {
+	if val == nil {
+		return true
+	}
+	rv := reflect.ValueOf(val)
+	return (rv.Kind() == reflect.Ptr || rv.Kind() == reflect.Slice) && rv.IsNil()
+}
 
 func QuoteValue(v value.Kusto) string {
 	val := v.GetValue()
 	t := v.GetType()
-	if val == nil {
+	if isNull(val) {
 		return fmt.Sprintf("%v(null)", t)
 	}
 
