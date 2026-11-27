@@ -10,6 +10,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Fixed
 
+- KQL string literals and query parameters now escape characters outside the Basic Multilingual Plane (such as emoji) with the eight-digit `\U` form, instead of a `\u` escape that decoded to a different string.
 - Null values added as query parameters or through the KQL builder are now written as typed null literals (such as `dynamic(null)` or `int(null)`). A null `Dynamic` was written as an empty `dynamic()`, and the other null types caused a panic.
 - KQL builders and query parameters now format negative timespans with a single leading sign and preserve the day component.
 
